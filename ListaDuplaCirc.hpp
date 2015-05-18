@@ -74,6 +74,12 @@ class ListaDuplaCirc {
         if (novo == NULL) {
             throw 20;
         }
+<<<<<<< HEAD
+=======
+        if (pos == size) {
+            tail = novo;
+        }
+>>>>>>> d7e3863ce15742b4e5494e8b08234a7ac7ca8789
         anterior = head;
         for (int i = 0; i < pos-1; i++) {
             anterior = anterior->getProximo();
