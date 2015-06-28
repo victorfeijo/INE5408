@@ -1,0 +1,42 @@
+<beginning of page>
+devmap_dup <-> device mapping duplication entry point
+#include <sys/ddi.h>
+#include <sys/sunddi.h
+ int prefixdevmap_dup(devmap_cookie_t dhp, void *pvtp,
+ devmap_cookie_t new_dhp, void **new_pvtp);
+Solaris DDI specific (Solaris DDI).
+dhp An opaque mapping handle that the system uses to describe the mapping currently being duplicated.
+pvtp Driver private mapping data for the mapping currently being duplicated.
+new_dhp An opaque data structure that the system uses to describe the duplicated device mapping.
+new_pvtp A pointer to be filled in by device drivers with the driver private mapping data for the duplicated device
+mapping.
+The system calls devmap_dup() when a device mapping is duplicated, such as during the execution of the fork(2)
+system call. The system expects devmap_dup() to generate new driver private data for the new mapping, and to set
+new_pvtp to point to it. new_dhp is the handle of the new mapped object.
+A non-zero return value from devmap_dup() will cause a corresponding operation such as fork() to fail.
+devmap_dup() returns the following values:
+0 Successful completion.
+Non-zero An error occurred.
+ static int
+ xxdevmap_dup(devmap_cookie_t dhp, void *pvtp, \
+  devmap_cookie_t new_dhp,
+  void **new_pvtp)
+ {
+  struct xxpvtdata *prvtdata;
+  struct xxpvtdata *p = (struct xxpvtdata *)pvtp;
+  struct xx_softc *softc = p->softc;
+  mutex_enter(&softc->mutex);
+  /* Allocate a new private data structure */
+  prvtdata = kmem_alloc(sizeof (struct xxpvtdata), KM_SLEEP);
+  /* Return the new data */
+  prvtdata->off = p->off;
+  prvtdata->len = p->len;
+  prvtdata->ctx = p->ctx;
+  prvtdata->dhp = new_dhp;
+  prvtdata->softc = p->softc;
+  *new_pvtp = prvtdata;
+  mutex_exit(&softc->mutex);
+  return (0);
+ }
+fork(2), devmap_callback_ctl(9S)
+Writing Device Drivers

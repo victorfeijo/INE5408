@@ -1,0 +1,32 @@
+<beginning of page>
+id32_alloc, id32_free, id32_lookup <-> 32-bit driver ID management routines
+#include <sys/ddi.h>
+#include <sys/id32.h>
+uint32_t id32_alloc(void *ptr, int flag);
+void id32_free(uint32_t token);
+void *id32_lookup(uint32_t token);
+Solaris architecture specific (Solaris DDI).
+ptr any valid 32- or 64-bit pointer
+flag determines whether caller can sleep for memory (see kmem_alloc(9F) for a description)
+These routines were originally developed so that device drivers could manage 64-bit pointers on devices that save
+space only for 32-bit pointers.
+Many device drivers need to pass a 32-bit value to the hardware when attempting I/O. Later, when that I/O com<hy>
+pletes, the only way the driver has to identify the request that generated that I/O is via a "token". When the I/O is ini<hy>
+tiated, the driver passes this token to the hardware. When the I/O completes the hardware passes back this 32-bit to<hy>
+ken.
+Before Solaris supported 64-bit pointers, device drivers just passed a raw 32-bit pointer to the hardware. When
+pointers grew to be 64 bits this was no longer possible. The id32_*() routines were created to help drivers translate
+between 64-bit pointers and a 32-bit token.
+Given a 32- or 64-bit pointer, the routine id32_alloc() allocates a 32-bit token, returning 0 if KM_NOSLEEP was
+specified and memory could not be allocated. The allocated token is passed back to id32_lookup() to obtain the
+original 32- or 64-bit pointer.
+The routine id32_free() is used to free an allocated token. Once id32_free() is called, the supplied token is no longer
+valid.
+Note that these routines have some degree of error checking. This is done so that an invalid token passed to
+id32_lookup() will not be accepted as valid. When id32_lookup() detects an invalid token it returns NULL. Calling
+routines should check for this return value so that they do not try to dereference a NULL pointer.
+These functions can be called from user or interrupt context. The routine id32_alloc() should not be called from in<hy>
+terrupt context when the KM_SLEEP flag is passed in. All other routines can be called from interrupt or kernel con<hy>
+text.
+kmem_alloc(9F)
+Writing Device Drivers

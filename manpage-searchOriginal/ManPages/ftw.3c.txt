@@ -1,0 +1,134 @@
+<beginning of page>
+ftw, nftw <-> walk a file tree
+#include <ftw.h>
+int ftw(const char *path, int (*fn) (const char *,
+ const struct stat *, int), int depth);
+int nftw(const char *path, int (*fn) (const char *,
+ const struct stat *, int, struct FTW *), int depth,
+ int flags);
+The ftw() function recursively descends the directory hierarchy rooted in path. For each object in the hierarchy,
+ftw() calls the user-defined function fn, passing it a pointer to a null-terminated character string containing the name
+of the object, a pointer to a stat structure (see stat(2)) containing information about the object, and an integer. Possi<hy>
+ble values of the integer, defined in the <ftw.h> header, are:
+FTW_F The object is a file.
+FTW_D The object is a directory.
+FTW_DNR The object is a directory that cannot be read. Descendants of the directory are not processed.
+FTW_NS The stat() function failed on the object because of lack of appropriate permission or the object is a sym<hy>
+bolic link that points to a non-existent file. The stat buffer passed to fn is undefined.
+The ftw() function visits a directory before visiting any of its descendants.
+The tree traversal continues until the tree is exhausted, an invocation of fn returns a non-zero value, or some error is
+detected within ftw() (such as an I/O error). If the tree is exhausted, ftw() returns 0. If fn returns a non-zero value,
+ftw() stops its tree traversal and returns whatever value was returned by fn.
+The nftw() function is similar to ftw() except that it takes the additional argument flags, which is a bitwise-inclusive
+OR of zero or more of the following flags:
+FTW_CHDIR If set, nftw() changes the current working directory to each directory as it reports files in that direc<hy>
+tory. If clear, nftw() does not change the current working directory.
+FTW_DEPTH If set, nftw() reports all files in a directory before reporting the directory itself. If clear, nftw() re<hy>
+ports any directory before reporting the files in that directory.
+FTW_MOUNT If set, nftw() reports only files in the same file system as path. If clear, nftw() reports all files en<hy>
+countered during the walk.
+FTW_PHYS If set, nftw() performs a physical walk and does not follow symbolic links.
+If FTW_PHYS is clear and FTW_DEPTH is set, nftw() follows links instead of reporting them, but does not report
+any directory that would be a descendant of itself. If FTW_PHYS is clear and FTW_DEPTH is clear, nftw() fol<hy>
+lows links instead of reporting them, but does not report the contents of any directory that would be a descendant of
+itself.
+At each file it encounters, nftw() calls the user-supplied function fn with four arguments: <bu> The first argument is the
+pathname of the object. <bu> The second argument is a pointer to the stat buffer containing information on the object. <bu>
+The third argument is an integer giving additional information. Its value is one of the following:
+FTW_F The object is a file.
+<beginning of page>
+FTW_D The object is a directory.
+FTW_DP The object is a directory and subdirectories have been visited. (This condition only occurs if the
+FTW_DEPTH flag is included in flags.)
+FTW_SL The object is a symbolic link. (This condition only occurs if the FTW_PHYS flag is included in flags.)
+FTW_SLN The object is a symbolic link that points to a non-existent file. (This condition only occurs if the
+FTW_PHYS flag is not included in flags.)
+FTW_DNR The object is a directory that cannot be read. The user-defined function fn will not be called for any of
+its descendants.
+FTW_NS The stat() function failed on the object because of lack of appropriate permission. The stat buffer passed
+to fn is undefined. Failure of stat() for any other reason is considered an error and nftw() returns <mi>1.
+<bu> The fourth argument is a pointer to an FTW structure that contains the following members:
+ int base;
+ int level;
+The base member is the offset of the object's filename in the pathname passed as the first argument to fn(). The val<hy>
+ue of level indicates the depth relative to the root of the walk, where the root level is 0.
+The results are unspecified if the application-supplied fn() function does not preserve the current working directory.
+Both ftw() and nftw() use one file descriptor for each level in the tree. The depth argument limits the number of file
+descriptors used. If depth is zero or negative, the effect is the same as if it were 1. It must not be greater than the
+number of file descriptors currently available for use. The ftw() function runs faster if depth is at least as large as the
+number of levels in the tree. Both ftw() and nftw() are able to descend to arbitrary depths in a file hierarchy and do
+not fail due to path length limitations unless either the length of the path name pointed to by the path argument ex<hy>
+ceeds {PATH_MAX} requirements, or for ftw(), the specified depth is less than 2, or for nftw(), the specified depth
+is less than 2 and FTW_CHDIR is not set. When ftw() and nftw() return, they close any file descriptors they have
+opened; they do not close any file descriptors that might have been opened by fn.
+If the tree is exhausted, ftw() and nftw() return 0. If the function pointed to by fn returns a non-zero value, ftw() and
+nftw() stop their tree traversal and return whatever value was returned by the function pointed to by fn. If ftw() and
+nftw() detect an error, they return <mi>1 and set errno to indicate the error.
+If ftw() and nftw() encounter an error other than EACCES (see FTW_DNR and FTW_NS above), they return <mi>1
+and set errno to indicate the error. The external variable errno can contain any error value that is possible when a
+directory is opened or when one of the stat functions is executed on a directory or file.
+The ftw() and nftw() functions will fail if:
+ELOOP A loop exists in symbolic links encountered during resolution of the path argument
+ENAMETOOLONG The length of the path name pointed to by the path argument exceeds {PATH_MAX}, or a
+path name component is longer than {NAME_MAX}.
+ENOENT A component of path does not name an existing file or path is an empty string.
+ENOTDIR A component of path is not a directory.
+EOVERFLOW A field in the stat structure cannot be represented correctly in the current programming environ<hy>
+ment for one or more files found in the file hierarchy.
+<beginning of page>
+The ftw() function will fail if:
+EACCES Search permission is denied for any component of path or read permission is denied for path.
+ENAMETOOLONG The ftw() function has descended to a path that exceeds {PATH_MAX} and the depth argu<hy>
+ment specified by the application is less than 2 and FTW_CHDIR is not set.
+The nftw() function will fail if:
+EACCES Search permission is denied for any component of path or read permission is denied for path, or fn() re<hy>
+turns <mi>1 and does not reset errno.
+The nftw() and ftw() functions may fail if:
+ELOOP Too many symbolic links were encountered during resolution of the path argument.
+ENAMETOOLONG Pathname resolution of a symbolic link in the path name pointed to by the path argument pro<hy>
+duced an intermediate result whose length exceeds {PATH_MAX}.
+The ftw() function may fail if:
+EINVAL The value of the depth argument is invalid.
+The nftw() function may fail if:
+EMFILE There are {OPEN_MAX} file descriptors currently open in the calling process.
+ENFILE Too many files are currently open in the system.
+If the function pointed to by fn encounters system errors, errno may be set accordingly. Example 1 Walk a directo<hy>
+ry structure using ftw().
+The following example walks the current directory structure, calling the fn() function for every directory entry, using
+at most 10 file descriptors:
+ #include <ftw.h>
+ ...
+ if (ftw(".", fn, 10) != 0) {
+  perror("ftw"); exit(2);
+ }
+Example 2 Walk a directory structure using nftw().
+The following example walks the /tmp directory and its subdirectories, calling the nftw() function for every directo<hy>
+ry entry, to a maximum of 5 levels deep.
+ #include <ftw.h>
+ ...
+ int nftwfunc(const char *, const struct stat *, int, struct FTW *);
+ int nftwfunc(const char *filename, const struct stat *statptr,
+  int fileflags, struct FTW *pfwt)
+ {
+  return 0;
+ }
+<beginning of page>
+ ...
+ char *startpath = "/tmp";
+ int depth = 5;
+ int flags = FTW_CHDIR | FTW_DEPTH | FTW_MOUNT;
+ int ret;
+ ret = nftw(startpath, nftwfunc, depth, flags);
+Because ftw() and nftw() are recursive, they can terminate with a memory fault when applied by a thread with a
+small stack to very deep file structures.
+The ftw() and nftw() functions allocate resources (memory, file descriptors) during their operation. If ftw() they are
+forcibly terminated, such as by longjmp(3C) being executed by fn or an interrupt routine, they will not have a
+chance to free those resources, so they remain permanently allocated. A safe way to handle interrupts is to store the
+fact that an interrupt has occurred and arrange to have fn return a non-zero value at its next invocation.
+The ftw() and nftw() functions have transitional interfaces for 64-bit file offsets. See lf64(5).
+The ftw() function is safe in multithreaded applications. The nftw() function is safe in multithreaded applications
+when the FTW_CHDIR flag is not set.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Standard _ MT-LevelMT-Safe with exceptions
+stat(2), longjmp(3C), attributes(5), lf64(5), standards(5)

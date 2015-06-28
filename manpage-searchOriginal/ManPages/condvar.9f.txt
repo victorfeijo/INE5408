@@ -1,0 +1,92 @@
+<beginning of page>
+condvar, cv_init, cv_destroy, cv_wait, cv_signal, cv_broadcast, cv_wait_sig, cv_timedwait, cv_timedwait_sig <-> con<hy>
+dition variable routines
+#include <sys/ksynch.h>
+void cv_init(kcondvar_t *cvp, char *name, kcv_type_t type, void *arg);
+void cv_destroy(kcondvar_t *cvp);
+void cv_wait(kcondvar_t *cvp, kmutex_t *mp);
+void cv_signal(kcondvar_t *cvp);
+void cv_broadcast(kcondvar_t *cvp);
+int cv_wait_sig(kcondvar_t *cvp, kmutex_t *mp);
+clock_t cv_timedwait(kcondvar_t *cvp, kmutex_t *mp, clock_t timeout);
+clock_t cv_timedwait_sig(kcondvar_t *cvp, kmutex_t *mp, clock_t timeout);
+Solaris DDI specific (Solaris DDI).
+cvp A pointer to an abstract data type kcondvar_t.
+mp A pointer to a mutual exclusion lock (kmutex_t), initialized by mutex_init(9F) and held by the caller.
+name Descriptive string. This is obsolete and should be NULL. (Non-NULL strings are legal, but they're a waste of
+kernel memory.)
+type The constant CV_DRIVER.
+arg A type-specific argument, drivers should pass arg as NULL.
+timeout A time, in absolute ticks since boot, when cv_timedwait() or cv_timedwait_sig() should return.
+Condition variables are a standard form of thread synchronization. They are designed to be used with mutual exclu<hy>
+sion locks (mutexes). The associated mutex is used to ensure that a condition can be checked atomically and that the
+thread can block on the associated condition variable without missing either a change to the condition or a signal
+that the condition has changed. Condition variables must be initialized by calling cv_init(), and must be deallocated
+by calling cv_destroy().
+The usual use of condition variables is to check a condition (for example, device state, data structure reference
+count, etc.) while holding a mutex which keeps other threads from changing the condition. If the condition is such
+that the thread should block, cv_wait() is called with a related condition variable and the mutex. At some later point
+in time, another thread would acquire the mutex, set the condition such that the previous thread can be unblocked,
+unblock the previous thread with cv_signal() or cv_broadcast(), and then release the mutex.
+cv_wait() suspends the calling thread and exits the mutex atomically so that another thread which holds the mutex
+cannot signal on the condition variable until the blocking thread is blocked. Before returning, the mutex is reac<hy>
+quired.
+cv_signal() signals the condition and wakes one blocked thread. All blocked threads can be unblocked by calling
+cv_broadcast(). cv_signal() and cv_broadcast() can be called by a thread even if it does not hold the mutex passed
+into cv_wait(), though holding the mutex is necessary to ensure predictable scheduling.
+The function cv_wait_sig() is similar to cv_wait() but returns 0 if a signal (for example, by kill(2)) is sent to the
+thread. In any case, the mutex is reacquired before returning.
+<beginning of page>
+The function cv_timedwait() is similar to cv_wait(), except that it returns <mi>1 without the condition being signaled
+after the timeout time has been reached.
+The function cv_timedwait_sig() is similar to cv_timedwait() and cv_wait_sig(), except that it returns <mi>1 without
+the condition being signaled after the timeout time has been reached, or 0 if a signal (for example, by kill(2)) is sent
+to the thread.
+For both cv_timedwait() and cv_timedwait_sig(), time is in absolute clock ticks since the last system reboot. The
+current time may be found by calling ddi_get_lbolt(9F).
+0 For cv_wait_sig() and cv_timedwait_sig() indicates that the condition was not necessarily signaled and the func<hy>
+tion returned because a signal (as in kill(2)) was pending.
+<mi>1 For cv_timedwait() and cv_timedwait_sig() indicates that the condition was not necessarily signaled and the
+function returned because the timeout time was reached.
+>0 For cv_wait_sig(), cv_timedwait() or cv_timedwait_sig() indicates that the condition was met and the function
+returned due to a call to cv_signal() or cv_broadcast(), or due to a premature wakeup (see NOTES).
+These functions can be called from user, kernel or interrupt context. In most cases, however, cv_wait(), cv_timed<hy>
+wait(), cv_wait_sig(), and cv_timedwait_sig() should not be called from interrupt context, and cannot be called
+from a high-level interrupt context.
+If cv_wait(), cv_timedwait(), cv_wait_sig(), or cv_timedwait_sig() are used from interrupt context, lower-priority
+interrupts will not be serviced during the wait. This means that if the thread that will eventually perform the wakeup
+becomes blocked on anything that requires the lower-priority interrupt, the system will hang.
+For example, the thread that will perform the wakeup may need to first allocate memory. This memory allocation
+may require waiting for paging I/O to complete, which may require a lower-priority disk or network interrupt to be
+serviced. In general, situations like this are hard to predict, so it is advisable to avoid waiting on condition variables
+or semaphores in an interrupt context. Example 1 Waiting for a Flag Value in a Driver's Unit
+Here the condition being waited for is a flag value in a driver's unit structure. The condition variable is also in the
+unit structure, and the flag word is protected by a mutex in the unit structure.
+  mutex_enter(&un->un_lock);
+  while (un->un_flag & UNIT_BUSY)
+  cv_wait(&un->un_cv, &un->un_lock);
+  un->un_flag |= UNIT_BUSY;
+  mutex_exit(&un->un_lock);
+Example 2 Unblocking Threads Blocked by the Code in Example 1
+At some later point in time, another thread would execute the following to unblock any threads blocked by the above
+code.
+  
+ mutex_enter(&un->un_lock);
+ un->un_flag &= ~UNIT_BUSY;
+ cv_broadcast(&un->un_cv);
+ mutex_exit(&un->un_lock);
+It is possible for cv_wait(), cv_wait_sig(), cv_timedwait(), and cv_timedwait_sig() to return prematurely, that is,
+not due to a call to cv_signal() or cv_broadcast(). This occurs most commonly in the case of cv_wait_sig() and
+cv_timedwait_sig() when the thread is stopped and restarted by job control signals or by a debugger, but can happen
+in other cases as well, even for cv_wait(). Code that calls these functions must always recheck the reason for block<hy>
+ing and call again if the reason for blocking is still true.
+If your driver needs to wait on behalf of processes that have real-time constraints, use cv_timedwait() rather than
+<beginning of page>
+delay(9F). The delay() function calls timeout(9F), which can be subject to priority inversions.
+Not all threads can receive signals from user level processes. In cases where such reception is impossible (such as
+during execution of close(9E) due to exit(2)), cv_wait_sig() behaves as cv_wait(), and cv_timedwait_sig() behaves
+as cv_timedwait(). To avoid unkillable processes, users of these functions may need to protect against waiting indef<hy>
+initely for events that might not occur. The ddi_can_receive_sig(9F) function is provided to detect when signal re<hy>
+ception is possible.
+kill(2), ddi_can_receive_sig(9F), ddi_get_lbolt(9F), mutex(9F), mutex_init(9F)
+Writing Device Drivers

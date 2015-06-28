@@ -1,0 +1,53 @@
+<beginning of page>
+ddi_model_convert_from <-> determine data model type mismatch
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+ uint_tddi_model_convert_from(uint_t model);
+Solaris DDI specific (Solaris DDI).
+model The data model type of the current thread.
+ddi_model_convert_from() is used to determine if the current thread uses a different C Language Type Model than
+the device driver. The 64-bit version of Solaris will require a 64-bit kernel to support both 64-bit and 32-bit user
+mode programs. The difference between a 32-bit program and a 64-bit program is in its C Language Type Model: a
+32-bit program is ILP32 (integer, longs, and pointers are 32-bit) and a 64-bit program is LP64 (longs and pointers
+are 64-bit). There are a number of driver entry points such as ioctl(9E) and mmap(9E) where it is necessary to iden<hy>
+tify the C Language Type Model of the user-mode originator of an kernel event. For example any data which flows
+between programs and the device driver or vice versa need to be identical in format. A 64-bit device driver may need
+to modify the format of the data before sending it to a 32-bit application. ddi_model_convert_from() is used to de<hy>
+termine if data that is passed between the device driver and the application requires reformatting to any non-native
+data model.
+DDI_MODEL_ILP32 A conversion to/from ILP32 is necessary.
+DDI_MODEL_NONE No conversion is necessary. Current thread and driver use the same data model.
+ddi_model_convert_from() can be called from any context. Example 1 : Using ddi_model_convert_from() in the
+ioctl() entry point to support both 32-bit and 64-bit applications.
+The following is an example how to use ddi_model_convert_from() in the ioctl() entry point to support both 32-bit
+and 64-bit applications.
+ struct passargs32 {
+  int len;
+  caddr32_t addr;
+ };
+ struct passargs {
+  int len;
+  caddr_t addr;
+ };
+ xxioctl(dev_t dev, int cmd, intptr_t arg, int mode,
+  cred_t *credp, int *rvalp) {
+  struct passargs pa;
+  switch (ddi_model_convert_from(mode & FMODELS)) {
+  case DDI_MODEL_ILP32:
+  {
+  struct passargs32 pa32;
+  ddi_copyin(arg, &pa32, sizeof (struct passargs32), mode);
+  pa.len = pa32.len;
+  pa.address = pa32.address;
+  break;
+  }
+  case DDI_MODEL_NONE:
+  ddi_copyin(arg, &pa, sizeof (struct passargs), mode);
+  break;
+  }
+  do_ioctl(&pa);
+  ....
+<beginning of page>
+ }
+ioctl(9E), mmap(9E), ddi_mmap_get_model(9F)
+Writing Device Drivers

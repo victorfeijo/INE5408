@@ -1,0 +1,181 @@
+<beginning of page>
+volume-request, volume-defaults <-> Solaris Volume Manager configuration information for top down volume cre<hy>
+ation with metassist
+/usr/share/lib/xml/dtd/volume-request.dtd
+/usr/share/lib/xml/dtd/volume-defaults.dtd
+/etc/defaults/metassist.xml
+A volume request file, XML-based and compliant with the volume-request.dtd Document Type Definition, de<hy>
+scribes the characteristics of the volumes that metassist should produce.
+A system administrator would use the volume request file instead of providing options at the command line to give
+more specific instructions about the characteristics of the volumes to create. A volume request file can request more
+than one volume, but all requested volumes must reside in the same disk set.
+If you start metassist by providing a volume-request file as input, metassist can implement the configuration speci<hy>
+fied in the file, can generate a command file that sets up the configuraiton for you to inspect or edit, or can generate a
+volume configuration file for you to inspect or edit.
+As a system administrator, you would want to create a volume request file if you need to reuse configurations (and
+do not want to reenter the same command arguments), or if you prefer to use a configuration file to specify volume
+characteristics.
+Volume request files must be valid XML that complies with the document type definition in the volume-request.dtd
+file, located at /usr/share/lib/xml/dtd/volume-request.dtd. You create a volume request file, and provide it as input
+to metassist to create volumes from the top down.
+The top level element <volume-request> surrounds the volume request data. This element has no attributes. A vol<hy>
+ume request requires at least one <diskset> element, which must be the first element after <volume-request>.
+Optionally, the <volume-request> element can include one or more <available> and <unavailable> elements to
+specify which controllers or disks associated with a specific controller can or cannot be used to create the volume.
+Optionally, the <volume-request> element can include a <hsp> element to specify characteristics of a hot spare
+pool if fault recovery is used.
+If not specified for a volume with fault-recovery, the first hot spare pool found in the disk set is used. If no hot spare
+pool exists but one is required, a hot spare pool is created.
+Optionally, the volume-request can include one or more <concat>, <stripe>, <mirror>, <volume> elements to
+specify volumes to create.
+Within the <volume-request> element, a <diskset> element must exist. The <diskset> element, with the name at<hy>
+tribute, specifies the name of the disk set to be used. If this disk set does not exist, it is created. This element and the
+name attribute are required.
+Within the <volume-request> element and within other elements, you can specify available or unavailable compo<hy>
+nents (disks, or disks on a specific controller path) for use or exclusion from use in a volume or hot spare pool.
+The <available> and <unavailable> elements require a name attribute which specifies either a full ctd name, or a
+partial ctd name that is used with the implied wildcard to complete the expression. For example, specifying c3t2d0
+as available would look like:
+ <available name="/dev/dsk/c3t2d0">
+The <available> element also makes any unnamed components unavailable. Specifying all controllers exept c1 un<hy>
+available would look like:
+ <available name="c1">
+Specifying all disks on controller 2 as unavailable would look like:
+ <unavailable name="c2">
+<beginning of page>
+The <unavailable> element can also be used to further restrict the list of available components. For example, speci<hy>
+fying all controllers exept c1 unavailable, and making all devices associated with c1t2 unavailable as well would
+look like this:
+ <available name="c1">
+ <unavailable name="c1t2">
+Components specified as available must be either part of the named disk set used for this volume creation, or must
+be unused and not in any disk set. If the components are selected for use, but are not in the specified diskset, the
+metassist command automatically adds them to the diskset.
+It is unnecessary to specify components that are in other disk sets as unavailable. metassist automatically excludes
+them from consideration. However, unused components or components that are not obviously used (for example, an
+unmounted slice that is reserved for different uses) must be explicitly specified as unavailable, or the metassist com<hy>
+mand can include them in the configuration.
+The next element within the <volume-request> element, after the <diskset> and, optionally, <available> and <un<hy>
+available> elements, is the <hsp> element. Its sole attribute specifies the name of the hot spare pool:
+ <hsp name="hsp001">
+The hot spare pool names must start with hsp and conclude with a number, thus following the existing Solaris Vol<hy>
+ume Manager hot spare pool naming requirements.
+Within the <hsp> element, you can specify one or more <available> and <unavailable> elements to specify which
+disks, or disks associated with a specific controller can or cannot be used to create the hot spares within the pool.
+Also within the <hsp> element, you can use the <slice> element to specify hot spares to be included in the hot spare
+pool (see DEFINING SLICE). Depending on the requirements placed on the hot spare pool by other parts of the
+volume request, additional slices can be added to the hot spare pool.
+The <slice> element is used to define slices to include or exclude within other elements. It requires only a name at<hy>
+tribute to specify the ctd name of the slice, and the context of the <slice> element determines the function of the ele<hy>
+ment. Sample slice elements might look like:
+ <slice name="c0t1d0s2" />
+ <slice name="c0t12938567201lkj29561sllkj381d0s2" />
+The <stripe> element defines stripes (interlaced RAID 0 volumes) to be used in a volume. It can contain either slice
+elements (to explicitly determine which slices are used), or appropriate combinations of available and unavailable el<hy>
+ements if the specific determination of slices is to be left to the metassist command.
+The <stripe> element takes an optional name attribute to specify a name. If the name is not specified, an available
+name is automatically selected from available Solaris Volume Manager names. If possible, names for related compo<hy>
+nents are related.
+The <stripe> element takes an optional size attribute that specifies the size as value and units (for example, 10TB,
+5GB). If slices for the <stripe> are explicitly specified, the size attribute is ignored. The <available> and <unavail<hy>
+able> elements can be used to constrain slices for use in a stripe.
+The <stripe> elements takes optional mincomp and maxcomp attributes to specify both the minimum and maxi<hy>
+mum number of components that can be included in it. As with size, if slices for the <stripe> are explicitly speci<hy>
+fied, the mincomp and maxcomp attributes are ignored.
+The <stripe> elements takes an optional interlace attribute as value and units (for example, 16KB, 5BLOCKS,
+20KB). If this value is not specified, the Solaris Volume Manager default value is used.
+The <stripe> element takes an optional usehsp attribute to specify if a hot spare pool should be associated with this
+component. This attribute is specified as a boolean value, as usehsp="TRUE". If the component is not a submirror,
+this attribute is ignored.
+<beginning of page>
+The <concat> element defines concats (non-interlaced RAID 0 volumes) to be used in a configuration. It is specified
+in the same way as a <stripe> element, except that the mincomp, maxcomp, and interlace attributes are not valid.
+The <mirror> element defines mirrors (RAID 1 volumes) to be used in a volume configuration. It can contain com<hy>
+binations of <concat> and <stripe> elements (to explicitly determine which volumes are used as submirrors). Alter<hy>
+natively, it can have a size attribute specified, along with the appropriate combinations of available and unavailable
+elements to leave the specific determination of components to the metassist command.
+The <mirror> element takes an optional name attribute to specify a name. If the name is not specified, an available
+name is automatically selected.
+The <mirror> element takes an optional size attribute that specifies the size as value and units (for example, 10TB,
+5GB). If <stripe> and <concat> elements for the mirror are not specified, this attribute is required. Otherwise, it is
+ignored.
+The <mirror> element takes an optional nsubmirrors attribute to define the number of submirrors (1-4) to include.
+Like the size attribute, this attribute is ignored if the underlying <concat> and <stripe> submirrors are explicitly
+specified. The <mirror> element takes an optional read attribute to define the mirror read options (ROUNDROBIN,
+GEOMETRIC, or FIRST) for the mirror. If this attribute is not specified, the Solaris Volume Manager default val<hy>
+ue is used.
+The <mirror> element takes an optional write attribute to define the mirror write options (PARALLEL, SERIAL,
+or FIRST) for the mirror. If this attribute is not specified, the Solaris Volume Manager default value is used.
+The <mirror> element takes an optional usehsp attribute to specify if a hot spare pool should be associated with
+each submirror. This attribute is specified as a boolean value, as usehsp="TRUE". If the usehsp attribute is speci<hy>
+fied in the configuration of the <stripe> or <concat> element used as a submirror, it overrides the value of usehsp
+attributes for the mirror as a whole.
+The <volume> element defines volumes (high-level) by the quality of service they should provide. (The <volume>
+element offers the same functionality that options on the metassist command line can provide.)
+The <volume> element can contain combinations of <available> and <unavailable> elements to determine which
+components can be included in the configuration.
+The <volume> element takes an optional name attribute to specify a name. If the name is not specified, an available
+name is automatically selected.
+The <volume> element takes a required size attribute that specifies the size as value and units (for example, 10TB,
+5GB).
+The <volume> element takes an optional redundancy attribute to define the number of additional copies of data
+(1-4) to include. In a worst-case scenario, a volume can suffer failure of n-1 components without data loss, where re<hy>
+dundancy=n. With fault recovery options, the volume could withstand up to n+hsps-1 non-concurrent failures with<hy>
+out data loss. Specifying redundancy=0 results in a RAID 0 volume being created (a stripe, specifically).
+The <volume> element takes an optional faultrecovery attribute to determine if additional components should be al<hy>
+located to recover from component failures in the volume. This is used to determine whether the volume is associat<hy>
+ed with a hot spare pool. The faultrecovery attribute is a boolean attribute, with a default value of FALSE.
+The <volume> element takes an optional datapaths attribute to determine if multiple data paths should be required to
+access the volume. The datapaths attribute should be set to a numeric value.
+Global defaults can be set in /etc/default/metassist.xml. This volume-defaults file can contain most of the same ele<hy>
+ments as a volume-request file, but differs structurally from a volume-request file: <bu> The container element must be
+<volume-defaults>, not <volume-request>. <bu> The <volume-defaults> element can contain <available>, <un<hy>
+available>, <hsp>, <concat>, <stripe>, <mirror>, or <volume> elements.
+Attributes specified by these elements define global default values, unless overridden by the corresponding attributes
+and elements in a volume-request. None of these elements is a container element. <bu> The <volume-defaults> ele<hy>
+ment can contain one or more <diskset> elements to provide disk set-specific defaults. The <diskset> element can
+contain <available>, <unavailable>, <hsp>, <concat>, <stripe>, <mirror>, or <volume> elements. <bu> Settings
+specified outside of a <diskset> element apply to all disk sets, but can be overridden within each <diskset> element.
+Example 1 Creating a Redundant Volume
+The following example shows a volume request file used to create a redundant and fault tolerant volume of 1TB.
+<beginning of page>
+ <volume-request>
+  <diskset name="sparestorage"/>
+  <volume size="1TB" redundancy="2" faultrecovery="TRUE">
+  <available name="c2" />
+  <available name="c3" />
+  <unavailable name="c2t2d0" />
+  </volume>
+ </volume-request>
+Example 2 Creating a Complex Configuration
+The following example shows a sample volume-request file that specifies a disk set name, and specifically itemizes
+characteristics of components to create.
+ <volume-request>
+  <!-- Specify the disk set to use -->
+  <diskset name="mailspool"/>
+  <!-- Generally available devices -->
+  <available name="c0"/>
+  <!-- Create a 3-way mirror with redundant datapaths and HSPs /
+  via QoS -->
+  <volume size="10GB" redundancy="3" datapaths="2" /
+  faultrecovery="TRUE"/>
+  <!-- Create a 1-way mirror with a HSP via QoS -->
+  <volume size="10GB" faultrecovery="TRUE"/>
+  <!-- Create a stripe via QoS -->
+  <volume size="100GB"/>
+ </volume-request>
+ Attribute Minimum Maximum
+ mincomp 1 N/A
+ maxcomp N/A 32
+ nsubmirrors 1 4
+ passnum 0 9
+ datapaths 1 4
+ redundancy 0 4
+/usr/share/lib/xml/dtd/volume-request.dtd
+/usr/share/lib/xml/dtd/volume-defaults.dtd
+/etc/defaults/metassist.xml
+metassist(1M), metaclear(1M), metadb(1M), metadetach(1M), metahs(1M), metainit(1M), metaoffline(1M),
+metaonline(1M), metaparam(1M), metarecover(1M), metareplace(1M), metaroot(1M), metaset(1M), meta<hy>
+sync(1M), metattach(1M), mount_ufs(1M), mddb.cf(4)
+<beginning of page>
+Solaris Volume Manager Administration Guide

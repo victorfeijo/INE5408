@@ -1,0 +1,66 @@
+<beginning of page>
+mtmalloc, mallocctl <-> MT hot memory allocator
+#include <mtmalloc.h>
+cc -o a.out -lthread -lmtmalloc
+void *malloc(size_t size);
+void free(void *ptr);
+void *memalign(size_t alignment, size_t size);
+void *realloc(void *ptr, size_t size);
+void *valloc(size_t size);
+void mallocctl(int cmd, long value);
+The malloc() and free() functions provide a simple general-purpose memory allocation package that is suitable for
+use in high performance multithreaded applications. The suggested use of this library is in multithreaded applica<hy>
+tions; it can be used for single threaded applications, but there is no advantage in doing so. This library cannot be
+dynamically loaded with dlopen(3C) during runtime because there must be only one manager of the process heap.
+The malloc() function returns a pointer to a block of at least size bytes suitably aligned for any use.
+The argument to free() is a pointer to a block previously allocated by malloc() or realloc(). After free() is performed
+this space is available for further allocation. If ptr is a null pointer, no action occurs. The free() function does not set
+errno.
+Undefined results will occur if the space assigned by malloc() is overrun or if a random number is handed to free().
+A freed pointer that is passed to free() will send a SIGABRT signal to the calling process. This behavior is con<hy>
+trolled by mallocctl().
+The memalign() function allocates size bytes on a specified alignment boundary and returns a pointer to the allocat<hy>
+ed block. The value of the returned address is guaranteed to be an even multiple of alignment. Note that the value of
+alignment must be a power of two, and must be greater than or equal to the size of a word.
+The realloc() function changes the size of the block pointed to by ptr to size bytes and returns a pointer to the (possi<hy>
+bly moved) block. The contents will be unchanged up to the lesser of the new and old sizes. If the new size of the
+block requires movement of the block, the space for the previous instantiation of the block is freed. If the new size is
+larger, the contents of the newly allocated portion of the block are unspecified. If ptr is NULL, realloc() behaves like
+malloc() for the specified size. If size is 0 and ptr is not a null pointer, the space pointed to is freed.
+The valloc() function has the same effect as malloc(), except that the allocated memory will be aligned to a multiple
+of the value returned by sysconf(_SC_PAGESIZE).
+After possible pointer coercion, each allocation routine returns a pointer to a space that is suitably aligned for stor<hy>
+age of any type of object.
+The malloc(), realloc(), memalign(), and valloc() functions will fail if there is not enough available memory.
+The mallocctl() function controls the behavior of the malloc library. The options fall into two general classes, de<hy>
+bugging options and performance options.
+MTDOUBLEFREE Allows double free of a pointer. Setting value to 1 means yes and 0 means no. The default
+behavior of double free results in a core dump.
+MTDEBUGPATTERN Writes misaligned data into the buffer after free(). When the buffer is reallocated, the con<hy>
+tents are verified to ensure that there was no access to the buffer after the free. If the buffer has been dirtied, a
+SIGABRT signal is delivered to the process. Setting value to 1 means yes and 0 means no. The default behavior is
+to not write misaligned data. The pattern used is 0xdeadbeef. Use of this option results in a performance penalty.
+MTINITBUFFER Writes misaligned data into the newly allocated buffer. This option is useful for detecting some
+accesses before initialization. Setting value to 1 means yes and 0 means no. The default behavior is to not write mis<hy>
+aligned data to the newly allocated buffer. The pattern used is 0xbaddcafe. Use of this option results in a perfor<hy>
+<beginning of page>
+mance penalty.
+MTCHUNKSIZE This option changes the size of allocated memory when a pool has exhausted all available mem<hy>
+ory in the buffer. Increasing this value allocates more memory for the application. A substantial performance gain
+can occur because the library makes fewer calls to the OS for more memory. Acceptable number values are between
+9 and 256. The default value is 9. This value is multiplied by 8192.
+If there is no available memory, malloc(), realloc(), memalign(), and valloc() return a null pointer. When realloc()
+is called with size > 0 and returns NULL, the block pointed to by ptr is left intact. If size, nelem, or elsize is 0, either
+a null pointer or a unique pointer that can be passed to free() is returned.
+If malloc() or realloc() returns unsuccessfully, errno will be set to indicate the error.
+The malloc() and realloc() functions will fail if:
+ENOMEM The physical limits of the system are exceeded by size bytes of memory which cannot be allocated.
+EAGAIN There is not enough memory available to allocate size bytes of memory; but the application could try
+again later.
+Comparative features of the various allocation libraries can be found in the umem_alloc(3MALLOC) manual page.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelSafe
+brk(2), getrlimit(2), bsdmalloc(3MALLOC), dlopen(3C), malloc(3C), malloc(3MALLOC), mapmalloc(3MAL<hy>
+LOC), signal.h(3HEAD), umem_alloc(3MALLOC), watchmalloc(3MALLOC), attributes(5)
+Undefined results will occur if the size requested for a block of memory exceeds the maximum size of a process's
+heap. This information may be obtained using getrlimit().

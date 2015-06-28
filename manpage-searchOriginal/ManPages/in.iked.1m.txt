@@ -1,0 +1,126 @@
+<beginning of page>
+in.iked <-> daemon for the Internet Key Exchange (IKE)
+/usr/lib/inet/in.iked [-d] [-f filename] [-p level]
+/usr/lib/inet/in.iked -c [-f filename]
+in.iked performs automated key management for IPsec using the Internet Key Exchange (IKE) protocol.
+in.iked implements the following: <bu> IKE authentication with either pre-shared keys, DSS signatures, RSA signa<hy>
+tures, or RSA encryption. <bu> Diffie-Hellman key derivation using either 768, 1024, or 1536-bit public key moduli. <bu>
+Authentication protection with cipher choices of AES, DES, Blowfish, or 3DES, and hash choices of either HMAC-
+MD5 or HMAC-SHA-1. Encryption in in.iked is limited to the IKE authentication and key exchange. See ipsece<hy>
+sp(7P) for information regarding IPsec protection choices.
+in.iked is managed by the following smf(5) service:
+ svc:/network/ipsec/ike
+This service is delivered disabled because the configuration file needs to be created before the service can be en<hy>
+abled. See ike.config(4) for the format of this file.
+See "Service Management Facility" for information on managing the smf(5) service.
+in.iked listens for incoming IKE requests from the network and for requests for outbound traffic using the PF_KEY
+socket. See pf_key(7P).
+in.iked has two support programs that are used for IKE administration and diagnosis: ikeadm(1M) and ike<hy>
+cert(1M).
+The ikeadm(1M) command can read the /etc/inet/ike/config file as a rule, then pass the configuration information
+to the running in.iked daemon using a doors interface.
+ example# ikeadm read rule /etc/inet/ike/config
+Refreshing the ike smf(5) service provided to manage the in.iked daemon sends a SIGHUP signal to the in.iked
+daemon, which will (re)read /etc/inet/ike/config and reload the certificate database.
+The preceding two commands have the same effect, that is, to update the running IKE daemon with the latest config<hy>
+uration. See "Service Management Facility" for more details on managing the in.iked daemon.
+The IKE daemon (in.iked) is managed by the service management facility, smf(5). The following group of services
+manage the components of IPsec:
+ svc:/network/ipsec/ipsecalgs (See ipsecalgs(1M))
+ svc:/network/ipsec/policy (See ipsecconf(1M))
+ svc:/network/ipsec/manual-key (See ipseckey(1M))
+ svc:/network/ipsec/ike (see ike.config(4))
+The manual-key and ike services are delivered disabled because the system administrator must create configuration
+files for each service, as described in the respective man pages listed above.
+The correct administrative procedure is to create the configuration file for each service, then enable each service us<hy>
+ing svcadm(1M).
+The ike service has a dependency on the ipsecalgs and policy services. These services should be enabled before the
+ike service. Failure to do so results in the ike service entering maintenance mode.
+If the configuration needs to be changed, edit the configuration file then refresh the service, as follows:
+ example# svcadm refresh ike
+<beginning of page>
+The following properties are defined for the ike service:
+config/admin_privilege
+Defines the level that ikeadm(1M) invocations can change or observe the running in.iked. The acceptable values for
+this property are the same as those for the -p option. See the description of -p in OPTIONS.
+config/config_file
+Defines the configuration file to use. The default value is /etc/inet/ike/config. See ike.config(4) for the format of this
+file. This property has the same effect as the -f flag. See the description of -f in OPTIONS.
+config/debug_level
+Defines the amount of debug output that is written to the debug_logfile file, described below. The default value for
+this is op or operator. This property controls the recording of information on events such as re-reading the configu<hy>
+ration file. Acceptable value for debug_level are listed in the ikeadm(1M) man page. The value all is equivalent to
+the -d flag. See the description of -d in OPTIONS.
+config/debug_logfile
+Defines where debug output should be written. The messages written here are from debug code within in.iked. Start<hy>
+up error messages are recorded by the smf(5) framework and recorded in a service-specific log file. Use any of the
+following commands to examine the logfile property:
+ example# svcs -l ike
+ example# svcprop ike
+ example# svccfg -s ike listprop
+The values for these log file properties might be different, in which case both files should be inspected for errors.
+config/ignore_errors
+A boolean value that controls in.iked's behavior should the configuration file have syntax errors. The default value is
+false, which causes in.iked to enter maintenance mode if the configuration is invalid.
+Setting this value to true causes the IKE service to stay online, but correct operation requires the administrator to
+configure the running daemon with ikeadm(1M). This option is provided for compatibility with previous releases.
+These properties can be modified using svccfg(1M) by users who have been assigned the following authorization:
+ solaris.smf.value.ipsec
+PKCS#11 token objects can be unlocked or locked by using ikeadm token login and ikeadm token logout, respec<hy>
+tively. Availability of private keying material stored on these PKCS#11 token objects can be observed with: ikeadm
+dump certcache. The following authorizations allow users to log into and out of PKCS#11 token objects:
+ solaris.network.ipsec.ike.token.login
+ solaris.network.ipsec.ike.token.logout
+See auths(1), ikeadm(1M), user_attr(4), rbac(5).
+The service needs to be refreshed using svcadm(1M) before a new property value is effective. General, non-modifi<hy>
+able properties can be viewed with the svcprop(1) command.
+<beginning of page>
+ # svccfg -s ipsec/ike setprop config/config_file = \
+ /new/config_file
+ # svcadm refresh ike
+Administrative actions on this service, such as enabling, disabling, refreshing, and requesting restart can be per<hy>
+formed using svcadm(1M). A user who has been assigned the authorization shown below can perform these actions:
+ solaris.smf.manage.ipsec
+The service's status can be queried using the svcs(1) command.
+The in.iked daemon is designed to be run under smf(5) management. While the in.iked command can be run from
+the command line, this is discouraged. If the in.iked command is to be run from the command line, the ike smf(5)
+service should be disabled first. See svcadm(1M).
+The following options are supported:
+-c Check the syntax of a configuration file.
+-d Use debug mode. The process stays attached to the controlling terminal and produces large amounts of debugging
+output. This option is deprecated. See "Service Management Facility" for more details.
+-f filename Use filename instead of /etc/inet/ike/config. See ike.config(4) for the format of this file. This option is
+deprecated. See "Service Management Facility" for more details.
+-p level Specify privilege level (level). This option sets how much ikeadm(1M) invocations can change or observe
+about the running in.iked.
+Valid levels are:
+0 Base level
+1 Access to preshared key info
+2 Access to keying material
+If -p is not specified, level defaults to 0.
+This option is deprecated. See "Service Management Facility" for more details.
+This program has sensitive private keying information in its image. Care should be taken with any core dumps or
+system dumps of a running in.iked daemon, as these files contain sensitive keying information. Use the core<hy>
+adm(1M) command to limit any corefiles produced by in.iked.
+/etc/inet/ike/config
+Default configuration file.
+/etc/inet/secret/ike.privatekeys/*
+Private keys. A private key must have a matching public-key certificate with the same filename in /etc/inet/ike/pub<hy>
+lickeys/.
+<beginning of page>
+/etc/inet/ike/publickeys/*
+Public-key certificates. The names are only important with regard to matching private key names.
+/etc/inet/ike/crls/*
+Public key certificate revocation lists.
+/etc/inet/secret/ike.preshared
+IKE pre-shared secrets for Phase I authentication.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu
+svcs(1), coreadm(1M), ikeadm(1M), ikecert(1M), svccfg(1M), svcadm(1M), ike.config(4), attributes(5), smf(5),
+ipsecesp(7P), pf_key(7P)
+Harkins, Dan and Carrel, Dave. RFC 2409, Internet Key Exchange (IKE). Network Working Group. November 1998.
+Maughan, Douglas, Schertler, M., Schneider, M., Turner, J. RFC 2408, Internet Security Association and Key Man<hy>
+agement Protocol (ISAKMP). Network Working Group. November 1998.
+Piper, Derrell, RFC 2407, The Internet IP Security Domain of Interpretation for ISAKMP. Network Working Group.
+November 1998.

@@ -1,0 +1,111 @@
+<beginning of page>
+rpc_clnt_calls, clnt_call, clnt_send, clnt_freeres, clnt_geterr, clnt_perrno, clnt_perror, clnt_sperrno, clnt_sperror,
+rpc_broadcast, rpc_broadcast_exp, rpc_call <-> library routines for client side calls
+#include <rpc/rpc.h>
+enum clnt_stat clnt_call(CLIENT *clnt, const rpcproc_t procnum,
+ const xdrproc_t inproc, const caddr_t in, const xdrproc_t outproc,
+ caddr_t out, const struct timeval tout);
+enum clnt_stat clnt_send (CLIENT *clnt, const u_long
+ procnum, const xdrproc_t proc, const caddr_t in);
+bool_t clnt_freeres(CLIENT *clnt, const xdrproc_t outproc,
+ caddr_t out);
+void clnt_geterr(const CLIENT *clnt, struct rpc_err *errp);
+void clnt_perrno(const enum clnt_stat stat);
+void clnt_perror(const CLIENT *clnt, const char *s);
+char *clnt_sperrno(const enum clnt_stat stat);
+char *clnt_sperror(const CLIENT *clnt, const char *s);
+enum clnt_stat rpc_broadcast(const rpcprog_t prognum,
+ const rpcvers_t versnum, const rpcproc_t procnum,
+ const xdrproc_tinproc, const caddr_t in,
+ const xdrproc_t outproc, caddr_t out,
+ const resultproc_t eachresult, const char *nettype);
+enum clnt_stat rpc_broadcast_exp(const rpcprog_t prognum,
+ const rpcvers_t versnum,const rpcproc_t procnum,
+ const xdrproc_txargs, caddr_t argsp, const xdrproc_txresults,
+ caddr_t resultsp, const resultproc_t eachresult, const int inittime,
+ const int waittime, const char *nettype);
+enum clnt_stat rpc_call(const char *host, const rpcprog_t prognum,
+ const rpcvers_t versnum, const rpcproc_t procnum, const xdrproc_t inproc,
+ const char *in, const xdrproc_t outproc, char *out, const char *nettype);
+RPC library routines allow C language programs to make procedure calls on other machines across the network.
+First, the client calls a procedure to send a request to the server. Upon receipt of the request, the server calls a dis<hy>
+patch routine to perform the requested service and then sends back a reply.
+The clnt_call(), rpc_call(), and rpc_broadcast() routines handle the client side of the procedure call. The remaining
+routines deal with error handling.
+Some of the routines take a CLIENT handle as one of the parameters. A CLIENT handle can be created by an
+RPC creation routine such as clnt_create(). See rpc_clnt_create(3NSL).
+These routines are safe for use in multithreaded applications. CLIENT handles can be shared between threads; how<hy>
+ever, in this implementation requests by different threads are serialized. In other words, the first request will receive
+its results before the second request is sent.
+See rpc(3NSL) for the definition of the CLIENT data structure.
+clnt_call() A function macro that calls the remote procedure procnum associated with the client handle, clnt, which
+is obtained with an RPC client creation routine such as clnt_create(). See rpc_clnt_create(3NSL). The parameter
+inproc is the XDR function used to encode the procedure's parameters, and outproc is the XDR function used to
+decode the procedure's results. in is the address of the procedure's argument(s), and out is the address of where to
+place the result(s). tout is the time allowed for results to be returned, which is overridden by a time-out set explicitly
+through clnt_control(). See rpc_clnt_create(3NSL).
+If the remote call succeeds, the status returned is RPC_SUCCESS. Otherwise, an appropriate status is returned.
+<beginning of page>
+clnt_send() Use the clnt_send() function to call a remote asynchronous function.
+The clnt_send() function calls the remote function procnum() associated with the client handle, clnt, which is ob<hy>
+tained with an RPC client creation routine such as clnt_create(). See rpc_clnt_create(3NSL). The parameter proc is
+the XDR function used to encode the procedure's parameters. The parameter in is the address of the procedure's ar<hy>
+gument(s).
+By default, the blocking I/O mode is used. See the clnt_control(3NSL) man page for more information on I/O
+modes.
+The clnt_send() function does not check if the program version number supplied to clnt_create() is registered with
+the rpcbind service. Use clnt_create_vers() instead of clnt_create() to check on incorrect version number registra<hy>
+tion. clnt_create_vers() will return a valid handle to the client only if a version within the range supplied to
+clnt_create_vers() is supported by the server.
+RPC_SUCCESS is returned when a request is successfully delivered to the transport layer. This does not mean that
+the request was received. If an error is returned, use the clnt_getterr() routine to find the failure status or the
+clnt_perrno() routine to translate the failure status into error messages.
+clnt_freeres() A function macro that frees any data allocated by the RPC/XDR system when it decoded the results
+of an RPC call. The parameter out is the address of the results, and outproc is the XDR routine describing the re<hy>
+sults. This routine returns 1 if the results were successfully freed; otherwise it returns 0.
+clnt_geterr() A function macro that copies the error structure out of the client handle to the structure at address er<hy>
+rp.
+clnt_perrno() Prints a message to standard error corresponding to the condition indicated by stat. A newline is ap<hy>
+pended. It is normally used after a procedure call fails for a routine for which a client handle is not needed, for in<hy>
+stance rpc_call()
+clnt_perror() Prints a message to the standard error indicating why an RPC call failed; clnt is the handle used to do
+the call. The message is prepended with string s and a colon. A newline is appended. This routine is normally used
+after a remote procedure call fails for a routine that requires a client handle, for instance clnt_call().
+clnt_sperrno() Takes the same arguments as clnt_perrno(), but instead of sending a message to the standard error
+indicating why an RPC call failed, returns a pointer to a string that contains the message.
+clnt_sperrno() is normally used instead of clnt_perrno() when the program does not have a standard error, as a pro<hy>
+gram running as a server quite likely does not. clnt_sperrno() is also used if the programmer does not want the mes<hy>
+sage to be output with printf(), or if a message format different than that supported by clnt_perrno() is to be used.
+See printf(3C). Unlike clnt_sperror() and clnt_spcreaterror(), clnt_sperrno() does not return a pointer to static
+data. Therefore, the result is not overwritten on each call. See rpc_clnt_create(3NSL).
+clnt_sperror() Similar to clnt_perror(), except that like clnt_sperrno(), it returns a string instead of printing to
+standard error. However, clnt_sperror() does not append a newline at the end of the message.
+clnt_sperror() returns a pointer to a buffer that is overwritten on each call. In multithreaded applications, this buffer
+is implemented as thread-specific data.
+rpc_broadcast() Similar to rpc_call(), except that the call message is broadcast to all the connectionless transports
+specified by nettype. If nettype is NULL, it defaults to netpath. Each time it receives a response, this routine calls
+eachresult(), whose form is:
+ bool_t eachresult(caddr_t out, const struct netbuf *addr,
+ const struct netconfig *netconf);
+where out is the same as out passed to rpc_broadcast(), except that the remote procedure's output is decoded there.
+addr points to the address of the machine that sent the results, and netconf is the netconfig structure of the transport
+<beginning of page>
+on which the remote server responded. If eachresult() returns 0, rpc_broadcast() waits for more replies; otherwise,
+it returns with appropriate status.
+The broadcast file descriptors are limited in size to the maximum transfer size of that transport. For Ethernet, this
+value is 1500 bytes. rpc_broadcast() uses AUTH_SYS credentials by default. See rpc_clnt_auth(3NSL).
+rpc_broadcast_exp() Similar to rpc_broadcast(), except that the initial timeout, inittime and the maximum time<hy>
+out, waittime, are specified in milliseconds.
+inittime is the initial time that rpc_broadcast_exp() waits before resending the request. After the first resend, the re<hy>
+transmission interval increases exponentially until it exceeds waittime.
+rpc_call() Calls the remote procedure associated with prognum, versnum, and procnum on the machine, host. The
+parameter inproc is used to encode the procedure's parameters, and outproc is used to decode the procedure's re<hy>
+sults. in is the address of the procedure's argument(s), and out is the address of where to place the result(s). nettype
+can be any of the values listed on rpc(3NSL). This routine returns RPC_SUCCESS if it succeeds, or it returns an
+appropriate status. Use the clnt_perrno() routine to translate failure status into error messages.
+The rpc_call() function uses the first available transport belonging to the class nettype on which it can create a con<hy>
+nection. You do not have control of timeouts or authentication using this routine.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ ArchitectureAll _
+AvailabilitySUNWcsl (32-bit) _ SUNWcslx (64-bit) _ Interface StabilityEvolving _ MT-LevelMT-Safe
+printf(3C), rpc(3NSL), rpc_clnt_auth(3NSL), rpc_clnt_create(3NSL), attributes(5)

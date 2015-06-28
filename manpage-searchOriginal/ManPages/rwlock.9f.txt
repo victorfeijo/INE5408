@@ -1,0 +1,64 @@
+<beginning of page>
+rwlock, rw_init, rw_destroy, rw_enter, rw_exit, rw_tryenter, rw_downgrade, rw_tryupgrade, rw_read_locked <-> read<hy>
+ers/writer lock functions
+#include <sys/ksynch.h>
+void rw_init(krwlock_t *rwlp, char *name, krw_type_t type, void *arg);
+void rw_destroy(krwlock_t *rwlp);
+void rw_enter(krwlock_t *rwlp, krw_t enter_type);
+void rw_exit(krwlock_t *rwlp);
+int rw_tryenter(krwlock_t *rwlp, krw_t enter_type);
+void rw_downgrade(krwlock_t *rwlp);
+int rw_tryupgrade(krwlock_t *rwlp);
+int rw_read_locked(krwlock_t *rwlp);
+Solaris DDI specific (Solaris DDI).
+rwlp Pointer to a krwlock_t readers/writer lock.
+name Descriptive string. This is obsolete and should be NULL. (Non-null strings are legal, but they're a waste of
+kernel memory.)
+type Type of readers/writer lock.
+arg Type-specific argument for initialization function.
+enter_type One of the values RW_READER or RW_WRITER, indicating whether the lock is to be acquired non-
+exclusively (RW_READER) or exclusively (RW_WRITER).
+A multiple-readers, single-writer lock is represented by the krwlock_t data type. This type of lock will allow many
+threads to have simultaneous read-only access to an object. Only one thread may have write access at any one time.
+An object which is searched more frequently than it is changed is a good candidate for a readers/writer lock.
+Readers/writer locks are slightly more expensive than mutex locks, and the advantage of multiple read access may
+not occur if the lock will only be held for a short time.
+The rw_init() function initializes a readers/writer lock. It is an error to initialize a lock more than once. The type ar<hy>
+gument should be set to RW_DRIVER. If the lock is used by the interrupt handler, the type-specific argument, arg,
+should be the interrupt priority returned from ddi_intr_get_pri(9F) or ddi_intr_get_softint_pri(9F). Note that arg
+should be the value of the interrupt priority cast by calling the DDI_INTR_PRI macro. If the lock is not used by
+any interrupt handler, the argument should be NULL.
+The rw_destroy() function releases any resources that might have been allocated by rw_init(). It should be called
+before freeing the memory containing the lock. The lock must not be held by any thread when it is destroyed.
+The rw_enter() function acquires the lock, and blocks if necessary. If enter_type is RW_READER, the caller
+blocks if there is a writer or a thread attempting to enter for writing. If enter_type is RW_WRITER, the caller
+blocks if any thread holds the lock.
+NOTE: It is a programming error for any thread to acquire an rwlock it already holds, even as a reader. Doing so can
+deadlock the system: if thread R acquires the lock as a reader, then thread W tries to acquire the lock as a writer, W
+will set write-wanted and block. When R tries to get its second read hold on the lock, it will honor the write-wanted
+bit and block waiting for W; but W cannot run until R drops the lock. Thus threads R and W deadlock.
+<beginning of page>
+The rw_exit() function releases the lock and may wake up one or more threads waiting on the lock.
+The rw_tryenter() function attempts to enter the lock, like rw_enter(), but never blocks. It returns a non-zero value
+if the lock was successfully entered, and zero otherwise.
+A thread which holds the lock exclusively (entered with RW_WRITER), may call rw_downgrade() to convert to
+holding the lock non-exclusively (as if entered with RW_READER). One or more waiting readers may be un<hy>
+blocked.
+The rw_tryupgrade() function can be called by a thread which holds the lock for reading to attempt to convert to
+holding it for writing. This upgrade can only succeed if no other thread is holding the lock and no other thread is
+blocked waiting to acquire the lock for writing.
+The rw_read_locked() function returns non-zero if the calling thread holds the lock for read, and zero if the caller
+holds the lock for write. The caller must hold the lock. The system may panic if rw_read_locked() is called for a
+lock that isn't held by the caller.
+0 rw_tryenter() could not obtain the lock without blocking.
+0 rw_tryupgrade() was unable to perform the upgrade because of other threads holding or waiting to hold the lock.
+0 rw_read_locked() returns 0 if the lock is held by the caller for write.
+non-zero from rw_read_locked() if the lock is held by the caller for read.
+non-zero successful return from rw_tryenter() or rw_tryupgrade().
+These functions can be called from user, interrupt, or kernel context, except for rw_init() and rw_destroy(), which
+can be called from user context only.
+condvar(9F), ddi_intr_alloc(9F), ddi_intr_add_handler(9F), ddi_intr_get_pri(9F), ddi_intr_get_soft<hy>
+int_pri(9F), mutex(9F), semaphore(9F)
+Writing Device Drivers
+Compiling with _LOCKTEST or _MPSTATS defined no longer has any effect. To gather lock statistics, see lock<hy>
+stat(1M).

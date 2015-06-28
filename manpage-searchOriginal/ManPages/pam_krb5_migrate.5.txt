@@ -1,0 +1,69 @@
+<beginning of page>
+pam_krb5_migrate <-> authentication PAM module for the KerberosV5 auto-migration of users feature
+/usr/lib/security/pam_krb5_migrate.so.1
+The KerberosV5 auto-migrate service module for PAM provides functionality for the PAM authentication compo<hy>
+nent. The service module helps in the automatic migration of PAM_USER to the client's local Kerberos realm, us<hy>
+ing PAM_AUTHTOK (the PAM authentication token associated with PAM_USER) as the new Kerberos princi<hy>
+pal's password.
+The KerberosV5 auto-migrate authentication component provides the pam_sm_authenticate(3PAM) function to
+migrate a user who does not have a corresponding krb5 principal account to the default Kerberos realm of the client.
+pam_sm_authenticate(3PAM) uses a host-based client service principal, present in the local keytab
+(/etc/krb5/krb5.keytab) to authenticate to kadmind(1M) (defaults to the host/nodename.fqdn service principal),
+for the principal creation operation. Also, for successful creation of the krb5 user principal account, the host-based
+client service principal being used needs to be assigned the appropriate privilege on the master KDC's kadm5.acl(4)
+file. kadmind(1M) checks for the appropriate privilege and validates the user password using PAM by calling
+pam_authenticate(3PAM) and pam_acct_mgmt(3PAM) for the k5migrate service.
+If migration of the user to the KerberosV5 infrastructure is successful, the module will inform users about it by
+means of a PAM_TEXT_INFO message, unless instructed otherwise by the presence of the quiet option.
+The authentication component always returns PAM_IGNORE and is meant to be stacked in pam.conf with a re<hy>
+quirement that it be listed below pam_authtok_get(5) in the authentication stack. Also, if pam_krb5_migrate is
+used in the authentication stack of a particular service, it is mandatory that pam_krb5(5) be listed in the PAM ac<hy>
+count stack of that service for proper operation (see EXAMPLES).
+The following options can be passed to the KerberosV5 auto-migrate authentication module:
+debug
+Provides syslog(3C) debugging information at LOG_DEBUG level.
+client_service=<service name>
+Name of the service used to authenticate to kadmind(1M) defaults to host. This means that the module uses
+host/<nodename.fqdn> as its client service principal name, KerberosV5 user principal creation operation or <ser<hy>
+vice>/<nodename.fqdn> if this option is provided.
+quiet
+Do not explain KerberosV5 migration to the user.
+This has the same effect as passing the PAM_SILENT flag to pam_sm_authenticate(3PAM) and is useful where
+applications cannot handle PAM_TEXT_INFO messages.
+If not set, the authentication component will issue a PAM_TEXT_INFO message after creation of the Kerberos V5
+principal, indicating that it has done so.
+expire_pw
+Causes the creation of KerberosV5 user principals with password expiration set to now (current time).
+Example 1 Sample Entries from pam.conf
+The following entries from pam.conf(4) demonstrate the use of the pam_krb5_migrate.so.1 module:
+ login auth requisite pam_authtok_get.so.1
+ login auth required pam_dhkeys.so.1
+ login auth required pam_unix_cred.so.1
+ login auth sufficient pam_krb5.so.1
+ login auth requisite pam_unix_auth.so.1
+ login auth optional pam_krb5_migrate.so.1 expire_pw
+ login auth required pam_dial_auth.so.1
+<beginning of page>
+ other account requisite pam_roles.so.1
+ other account required pam_krb5.so.1
+ other account required pam_unix_account.so.1
+The pam_krb5_migrate module can generally be present on the authentication stack of any service where the ap<hy>
+plication calls pam_sm_authenticate(3PAM) and an authentication token (in the preceding example, the authentica<hy>
+tion token would be the user's Unix password) is available for use as a Kerberos V5 password.
+Example 2 Sample Entries from kadm5.acl
+The following entries from kadm5.acl(4) permit or deny privileges to the host client service principal:
+ host/*@ACME.COM U root
+ host/*@ACME.COM ui *
+The preceding entries permit the pam_krb5_migrate add privilege to the host client service principal of any ma<hy>
+chine in the ACME.COM KerberosV5 realm, but denies the add privilege to all host service principals for addition
+of the root user account.
+Example 3 Sample Entries in pam.conf of the Master KDC
+The entries below enable kadmind(1M) on the master KDC to use the k5migrate PAM service in order to validate
+Unix user passwords for accounts that require migration to the Kerberos realm.
+ k5migrate auth required pam_unix_auth.so.1
+ k5migrate account required pam_unix_account.so.1
+See attributes(5) for a description of the following attribute:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stabili<hy>
+tyEvolving
+kadmind(1M), syslog(3C), pam_authenticate(3PAM), pam_acct_mgmt(3PAM), pam_sm_authenticate(3PAM),
+kadm5.acl(4), pam.conf(4), attributes(5), pam_authtok_get(5), pam_krb5(5)

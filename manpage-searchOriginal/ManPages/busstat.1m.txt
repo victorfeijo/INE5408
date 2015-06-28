@@ -1,0 +1,125 @@
+<beginning of page>
+busstat <-> report bus-related performance statistics
+busstat -e device-inst | -h | -l
+busstat [-a] [-n]
+ [-w device-inst [,pic0=event,picn=event ]]...
+ [-r device-inst]... [interval [count]]
+busstat provides access to the bus-related performance counters in the system. These performance counters allow
+for the measurement of statistics like hardware clock cycles, bus statistics including DMA and cache coherency
+transactions on a multiprocessor system. Each bus device that supports these counters can be programmed to count a
+number of events from a specified list. Each device supports one or more Performance Instrumentation Counters
+(PIC) that are capable of counting events independently of each other.
+Separate events can be selected for each PIC on each instance of these devices. busstat summarizes the counts over
+the last interval seconds, repeating forever. If a count is given, the statistics are repeated count times.
+ Only root users can program these counters. Non-root users have the option of reading the counters that have been
+programmed by a root user.
+The default value for the interval argument is 1 second, and the default count is unlimited.
+The devices that export these counters are highly platform-dependent and the data may be difficult to interpret with<hy>
+out an in-depth understanding of the operation of the components that are being measured and of the system they re<hy>
+side in.
+The following options are supported:
+-a
+Display absolute counter values. The default is delta values.
+-e device-inst
+Display the list of events that the specified device supports  for each pic.
+Specify device-inst as device (name) followed by an optional instance number. If an instance number is specified,
+the events for that instance are displayed. If no instance number is specified, the events for the first instance of the
+specified device are displayed.
+-h
+Print a usage message.
+-l
+List the devices in the system which support performance counters.
+-n
+Do not display a title in the output. The default is to display titles.
+-r device-inst
+Read and display all pic values for the specified device
+Specify device-inst as device (name) followed by instance number, if specifying an instance number of a device
+whose counters are to be read and displayed. If all instances of this device are to be read, use device (name) without
+an instance number. All pic values will be sampled when using the -r option.
+-w device-inst [,pic0=event] [,picn=event]
+Program (write) the specified devices to count the specified events. Write access to the counters is restricted to root
+<beginning of page>
+users only. Non-root users can use -r option.
+Specify device-inst as device (name) followed by an optional instance number. If specifying an instance number of a
+device to program these events on. If all instances of this device are to be programmed the same, then use device
+without an instance number. Specify an event to be counted for a specified pic by providing a comma separated list
+of picn=event values.
+The -e option displays all valid event names for each device. Any devices that are programmed will be sampled ev<hy>
+ery interval seconds and repeated count times. It is recommended that the interval specified is small enough to en<hy>
+sure that counter wraparound will be detected. The rate at which  counters wraparound varies from device to
+device. If a user is programming events using the -w option and busstat detects that another user has changed the
+events that are being counted, the tool will terminate as the programmed devices are now being controlled by anoth<hy>
+er user. Only one user can be programming a device instance at any one time. Extra devices can be sampled using
+the -r option. Using multiple instances of the -w option on the same command line, with the same device-inst speci<hy>
+fying a different list of events for the pics will give the effect of multiplexing for that device. busstat will switch be<hy>
+tween the list of events for that device every interval seconds. Event can be a string representing the event name, or
+even a number representing the bit pattern to be programmed into the Performance Control Register (PCR). This
+assumes explicit knowledge of the meaning of the control register bits for a device. The number can be specified in
+hexadecimal, decimal, or octal, using the usual conventions of strtol(3C).
+The following exit values are returned:
+0 Successful completion.
+1 An error occurred.
+2 Another user is writing to the same devices.
+Example 1 Programming and monitoring the Address Controller counters
+In this example, ac0 refers to the Address Controller instance 0. The counters are programmed to count Memory
+Bank stalls on an Ultra Enterprise system at 10 second intervals with the values displayed in absolute form instead
+of deltas.
+ # busstat -a -w ac0,pic0=mem_bank0_stall,pic1=mem_bank1_stall 10
+ time dev event0 pic0 event1 pic1
+ 10 ac0 mem_bank0_stall 1234 mem_bank1_stall 5678
+ 20 ac0 mem_bank0_stall 5678 mem_bank1_stall 12345
+ 30 ac0 mem_bank0_stall 12345 mem_bank1_stall 56789
+ ...
+For a complete list of the supported events for a device, use the -e option.
+Example 2 Programming and monitoring the counters on all instances of the Address Controller
+In this example, ac refers to all ac instances. This example programs all instances of the Address Controller counters
+to count_clock cycles and mem_bank0_rds at 2 second intervals, 100 times, displaying the values as deltas.
+ # busstat -w ac,pic0=clock_cycles,pic1=mem_bank0_rds 2 100
+ time dev event0 pic0 event1 pic1
+ 2 ac0 clock_cycles 167242902 mem_bank0_rds 3144
+ 2 ac1 clock_cycles 167254476 mem_bank0_rds 1392
+ 4 ac0 clock_cycles 168025190 mem_bank0_rds 40302
+ 4 ac1 clock_cycles 168024056 mem_bank0_rds 40580
+ ...
+Example 3 Monitoring the events being counted
+<beginning of page>
+This example monitors the events that are being counted on the sbus1 device, 100 times at 1 second intervals. It sug<hy>
+gests that a root user has changed the events that sbus1 was counting to be dvma_tlb_misses and interrupts instead
+of pio_cycles.
+ % busstat -r sbus0 1 100
+ time dev event0 pic0 event1 pic1
+ 1 sbus1 pio_cycles 2321 pio_cycles 2321
+ 2 sbus1 pio_cycles 48 pio_cycles 48
+ 3 sbus1 pio_cycles 49 pio_cycles 49
+ 4 sbus1 pio_cycles 2281 pio_cycles 2281
+ 5 sbus1 dvma_tlb_misses 0 interrupts 0
+ 6 sbus1 dvma_tlb_misses 6 interrupts 2
+ 7 sbus1 dvma_tlb_misses 8 interrupts 11
+ ...
+Example 4 Event Multiplexing
+This example programs ac0 to alternate between counting (clock cycles, mem_bank0_rds) and (addr_pkts, da<hy>
+ta_pkts) at 2 second intervals while also monitoring what ac1 is counting :
+It shows the expected output of the above busstat command. Another root user on the machine has changed the
+events that this user had programmed and busstat has detected this and terminates the command with a message.
+ # busstat -w ac0,pic0=clock_cycles,pic1=mem_bank0_rds \
+  -w ac0,pic0=addr_pkts,pic1=data_pkts \
+  -r ac1 2
+ time dev event0 pic0 event1 pic1
+ 2 ac0 addr_pkts 12866 data_pkts 17015
+ 2 ac1 rio_pkts 385 rio_pkts 385
+ 4 ac0 clock_cycles 168018914 mem_bank0_rds 2865
+ 4 ac1 rio_pkts 506 rio_pkts 506
+ 6 ac0 addr_pkts 144236 data_pkts 149223
+ 6 ac1 rio_pkts 522 rio_pkts 522
+ 8 ac0 clock_cycles 168021245 mem_bank0_rds 2564
+ 8 ac1 rio_pkts 387 rio_pkts 387
+ 10 ac0 addr_pkts 144292 data_pkts 159645
+ 10 ac1 rio_pkts 506 rio_pkts 506
+ 12 ac0 clock_cycles 168020364 mem_bank0_rds 2665
+ 12 ac1 rio_pkts 522 rio_pkts 522
+ busstat: events changed (possibly by another busstat).
+ #
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu
+iostat(1M), mpstat(1M), vmstat(1M), strtol(3C), attributes(5)

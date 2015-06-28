@@ -1,0 +1,95 @@
+<beginning of page>
+usb_bulk_request <-> USB bulk request structure
+#include <sys/usb/usba.h>
+Solaris DDI specific (Solaris DDI)
+A bulk request (that is, a request sent through a bulk pipe) is used to transfer large amounts of data in reliable but
+non-time-critical fashion. Please refer to Section 5.8 of the USB 2.0 specification for information on bulk transfers.
+(The USB 2.0 specification is available at www.usb.org.)
+The fields in the usb_bulk_req_t are used to format a bulk request. Please see below for acceptable combinations of
+flags and attributes.
+The usb_bulk_req_t fields are:
+ uint_t bulk_len; /* number of bytes to xfer */
+  /* Please see */
+  /* usb_pipe_get_max_bulk_xfer_size(9F) */
+  /* for maximum size */
+ mblk_t *bulk_data; /* the data for the data phase */
+  /* IN or OUT: allocated by client */
+ uint_t bulk_timeout; /* xfer timeout value in secs */
+  /* If set to zero, defaults to 5 sec */
+ usb_opaque_t bulk_client_private; /* Client specific information */
+ usb_req_attrs_t bulk_attributes; /* xfer-attributes */
+ /* Normal callback function, called upon completion. */
+ void (*bulk_cb)(
+  usb_pipe_handle_t ph, struct usb_bulk_req *req);
+ /* Exception callback function, for error handling. */
+ void (*bulk_exc_cb)(
+  usb_pipe_handle_t ph, struct usb_bulk_req *req);
+ /* set by USBA/HCD framework on completion */
+ usb_cr_t bulk_completion_reason; /* overall success status */
+  /* See usb_completion_reason(9S) */
+ usb_cb_flags_t bulk_cb_flags; /* recovery done by callback hndlr */
+  /* See usb_callback_flags(9S) */
+Request attributes define special handling for transfers. The following attributes are valid for bulk requests:
+USB_ATTRS_SHORT_XFER_OK USB framework accepts transfers where less data is received than expected.
+USB_ATTRS_AUTOCLEARING USB framework resets pipe and clears functional stalls automatically on excep<hy>
+tion.
+USB_ATTRS_PIPE_RESET USB framework resets pipe automatically on exception.
+Please see usb_request_attributes(9S) for more information.
+Bulk transfers/requests are subject to the following constraints and caveats:
+1) The following table indicates combinations of usb_pipe_bulk_xfer() flags argument and fields of the
+usb_bulk_req_t request argument (X = don't care).
+ Flags Type Attributes Data Timeout Semantics
+ ---------------------------------------------------------------
+  X X X ==NULL X illegal
+  X X ONE_XFER X X illegal
+<beginning of page>
+  no sleep IN !SHORT_XFER_OK !=NULL 0 See note (A)
+  no sleep IN !SHORT_XFER_OK !=NULL > 0 See note (B)
+  sleep IN !SHORT_XFER_OK !=NULL 0 See note (C)
+  sleep IN !SHORT_XFER_OK !=NULL > 0 See note (D)
+  no sleep IN SHORT_XFER_OK !=NULL 0 See note (E)
+  no sleep IN SHORT_XFER_OK !=NULL > 0 See note (F)
+  sleep IN SHORT_XFER_OK !=NULL 0 See note (G)
+  sleep IN SHORT_XFER_OK !=NULL > 0 See note (H)
+  X OUT SHORT_XFER_OK X X illegal
+  no sleep OUT X !=NULL 0 See note (I)
+  no sleep OUT X !=NULL > 0 See note (J)
+  sleep OUT X !=NULL 0 See note (K)
+  sleep OUT X !=NULL > 0 See note (L)
+Table notes:
+ A). Fill buffer, no timeout, callback when bulk_len is transferred.
+ B). Fill buffer, with timeout; callback when bulk_len is transferred.
+ C). Fill buffer, no timeout, unblock when bulk_len is transferred; no callback.
+ D). Fill buffer, with timeout; unblock when bulk_len is transferred or a timeout occurs; no callback.
+ E) Fill buffer, no timeout, callback when bulk_len is transferred or first short packet is received.
+ F). Fill buffer, with timeout; callback when bulk_len is transferred or first short packet is received.
+ G). Fill buffer, no timeout, unblock when bulk_len is transferred or first short packet is received; no callback.
+ H). Fill buffer, with timeout; unblock when bulk_len is transferred, first short packet is received, or a timeout
+ occurs; no callback.
+ I). Empty buffer, no timeout; callback when bulk_len is transferred.
+ J) Empty buffer, with timeout; callback when bulk_len is transferred or a timeout occurs.
+ K). Empty buffer, no timeout; unblock when bulk_len is transferred; no callback.
+ L). Empty buffer, with timeout; unblock when bulk_len is transferred or a timeout occurs; no callback.
+2) bulk_len must be > 0. bulk_data must not be NULL.
+3) Bulk_residue is set for both READ and WRITE. If it is set to 0, it means that all of the data was transferred suc<hy>
+cessfully. In case of WRITE it contains data not written and in case of READ it contains the data NOT read so far.
+A residue can only occur because of timeout or bus/device error. (Note that a short transfer for a request where the
+USB_ATTRS_SHORT_XFER_OK attribute is not set is considered a device error.) An exception callback is made
+and completion_reason will be non-zero.
+4) Splitting large Bulk xfers: Due to internal constraints, the USBA framework can only do a limited size bulk data
+xfer per request. A client driver may first determine this limitation by calling the USBA interface
+(usb_pipe_get_max_bulk_xfer_size(9F)) and then restrict itself to doing transfers in multiples of this fixed size. This
+forces a client driver to do data xfers in a loop for a large request, splitting it into multiple chunks of fixed size.
+The bulk_completion_reason indicates the status of the transfer. See usb_completion_reason(9S) for usb_cr_t defi<hy>
+nitions.
+The bulk_cb_flags are set prior to calling the exception callback handler to summarize recovery actions taken and er<hy>
+rors encountered during recovery. See usb_callback_flags(9S) for usb_cb_flags_t definitions.
+--- Callback handling ---
+All usb request types share the same callback handling. See usb_callback_flags(9S) for details.
+<beginning of page>
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ ArchitecturePCI-
+based systems _ Interface stabilityCommitted _ AvailabilitySUNWusbu
+usb_alloc_request(9F), usb_pipe_bulk_xfer(9F), usb_pipe_ctrl_xfer(9F), usb_pipe_get_max_bulk_trans<hy>
+fer_size(9F), usb_pipe_intr_xfer(9F), usb_pipe_isoc_xfer(9F), usb_callback_flags(9S), usb_completion_rea<hy>
+son(9S), usb_ctrl_request(9S), usb_intr_request(9S), usb_isoc_request(9S), usb_request_attributes(9S)

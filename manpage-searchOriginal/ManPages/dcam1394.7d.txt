@@ -1,0 +1,277 @@
+<beginning of page>
+dcam1394 <-> 1394-based digital camera (IIDC) driver
+#include <sys/dcam/dcam1394_io.h>
+The dcam1394 driver supports devices implementing the 1394 Trade Association Digital Camera Specification (also
+referred to as the IIDC specification). Only a subset of the specification is supported.
+Isochronous data is read from the driver frame-by-frame and is maintained within the driver in a ring buffer.
+Video frames are read from the isochronous input device using read(2).
+The dcam1394_frame_t structure describes the frame layout and is defined as follows:
+  struct {
+  unsigned int vid_mode;
+  unsigned int seq_num;
+  hrtime_t timestamp;
+  unsigned char *buff;
+  };
+The size to allocate for the structure is determined by the video mode for which the camera is configured. Possible
+values for the vid_mode field are listed under DCAM1394_PARAM_VID_MODE below.
+The following ioctl requests are supported:
+DCAM1394_CMD_CAM_RESET
+Reset the device.
+DCAM1394_CMD_REG_READ
+Read the indicated dcam/IIDC register. The argument is a pointer to a dcam1394_reg_io_t structure, which is de<hy>
+fined as follows:
+  struct {
+  unsigned int offs;
+  unsigned int val;
+  };
+The offs field should be set to the offset of the register from which to read. Register offset values are defined in the
+1394 Trade Association Digital Camera Specification.
+After the operation is completed, the camera register value is put in the val field.
+DCAM1394_CMD_REG_WRITE
+Write the indicated dcam/IIDC register. The argument is a pointer to a dcam1394_reg_io_t structure (described
+above).
+The offs field should be set to the offset of the register from which to read. The register offset values are defined in
+the 1394 Trade Association Digital Camera Specification.
+The val field should be set to the value to be written to the camera register.
+DCAM1394_CMD_PARAM_GET
+Gets a list of parameters associated with a camera. The argument is a pointer to a dcam1394_param_list_t structure
+(described below). The parameter list is accessed through macros defined below.
+The paramter list only supports Format 1 video formats.
+<beginning of page>
+DCAM1394_CMD_PARAM_SET
+Sets a list of parameters associated with a camera. The argument is a pointer to a dcam1394_param_list_t struc<hy>
+ture (described below). The parameter list is accessed through macros defined below.
+The paramter list only supports Format 1 video formats.
+DCAM1394_CMD_FRAME_RCV_START
+Start receiving video frames from the camera.
+The contents of the ring buffer may be accessed by reading the isochronous stream device.
+DCAM1394_CMD_FRAME_RCV_STOP
+Stop receiving frames from the camera.
+DCAM1394_CMD_RING_BUFF_FLUSH
+Flush the frames in the ring buffer.
+DCAM1394_CMD_FRAME_SEQ_NUM_COUNT_RESET
+Reset frame sequence number.
+The parameter list is initialized and access through macros. The data type for the parameter list is
+dcam1394_param_list_t.
+The following macros are used to access the parameter list:
+PARAM_LIST_INIT(param_list)
+Initialize the parameter list.
+PARAM_LIST_ADD(param_list, param, subparam)
+Add a parameter to the list.
+PARAM_LIST_REMOVE(param_list, param, subparam)
+Remove a parameter from the list.
+PARAM_LIST_IS_ENTRY(param_list, param, subparam)
+Indicates if a specific parameter is in the list.
+PARAM_VAL(param_list, param, subparam)
+Value of a specified parameter.
+PARAM_ERR(param_list, param, subparam)
+Indicates if a specific parameter is successfully set.
+When no subparam value is required, the value DCAM1394_SUBPARAM_NONE may be used.
+The following parameters may appear in the list:
+<beginning of page>
+DCAM1394_PARAM_CAP_POWER_CTRL
+Queries if the camera can be turned off and on through software. The subparam value is ignored.
+DCAM1394_PARAM_POWER
+Controls or queries if the camera is powered up. Verify this feature using DCAM1394_PARAM_CAP_POW<hy>
+ER_CTRL before use. The subparam field is ignored.
+DCAM1394_PARAM_CAP_VID_MOD
+Queries if a specific video mode is supported by the camera.
+subparam is one of the following and is used to determine if a specified video mode is supported by the camera:
+  DCAM1394_SUBPARAM_VID_MODE_0
+  DCAM1394_SUBPARAM_VID_MODE_YUV_444_160_120
+  Video mode is 4:4:4, YUV color space, 160x120 resolution.
+  DCAM1394_SUBPARAM_VID_MODE_1
+  DCAM1394_SUBPARAM_VID_MODE_YUV_422_320_240
+  Video mode is 4:2:2, YUV color space, 320x240 resolution.
+  DCAM1394_SUBPARAM_VID_MODE_2
+  DCAM1394_SUBPARAM_VID_MODE_YUV_411_640_480
+  Video mode is 4:1:1, YUV color space, 640x480 resolution.
+  DCAM1394_SUBPARAM_VID_MODE_3
+  DCAM1394_SUBPARAM_VID_MODE_YUV_422_640_480
+  Video mode is 4:2:2, YUV color space, 640x480 resolution.
+  DCAM1394_SUBPARAM_VID_MODE_4
+  DCAM1394_SUBPARAM_VID_MODE_RGB_640_480
+  Video mode is RGB color space, 640x480 resolution.
+  DCAM1394_SUBPARAM_VID_MODE_5
+  DCAM1394_SUBPARAM_VID_MODE_Y_640_480
+  Video mode is Y color space, 640x480 resolution.
+DCAM1394_PARAM_VID_MODE
+Controls or queries the current video mode of the camera. The subparam field is ignored. When selecting the video
+mode, it should be compatible with the capability of the camera, which may be determined by checking the
+DCAM1394_PARAM_CAP_VID_MODE parameter.
+The value of this parameter may be one of the following:
+  DCAM1394_VID_MODE_0
+  DCAM1394_VID_MODE_YUV_444_160_120
+  Video mode is 4:4:4, YUV color space, 160x120 resolution.
+  DCAM1394_VID_MODE_1
+  DCAM1394_VID_MODE_YUV_422_320_240
+  Video mode is 4:2:2, YUV color space, 320x240 resolution.
+  DCAM1394_VID_MODE_2
+  DCAM1394_VID_MODE_YUV_411_640_480
+  Video mode is 4:1:1, YUV color space, 640x480 resolution.
+  DCAM1394_VID_MODE_3
+  DCAM1394_VID_MODE_YUV_422_640_480
+  Video mode is 4:2:2, YUV color space, 640x480 resolution.
+  DCAM1394_VID_MODE_4
+<beginning of page>
+  DCAM1394_VID_MODE_RGB_640_480
+  Video mode is RGB color space, 640x480 resolution.
+  DCAM1394_VID_MODE_5
+  DCAM1394_VID_MODE_Y_640_480
+  Video mode is Y color space, 640x480 resolution.
+DCAM1394_PARAM_CAP_FRAME_RATE_VID_MODE_0
+Queries if a specific frame rate is supported by the camera in video mode 0 (4:4:4, YUV, 160x120).
+subparam is one of the following and used to determine if a specified frame rate is supported by the camera:
+  DCAM1394_SUBPARAM_FRAME_RATE_0
+  DCAM1394_SUBPARAM_FRAME_RATE_3_75_FPS
+  Frame rate is 3.75 frames/second.
+  DCAM1394_SUBPARAM_FRAME_RATE_1
+  DCAM1394_SUBPARAM_FRAME_RATE_7_5_FPS
+  Frame rate is 7.5 frames/second.
+  DCAM1394_SUBPARAM_FRAME_RATE_2
+  DCAM1394_SUBPARAM_FRAME_RATE_15_FPS
+  Frame rate is 15 frames/second.
+  DCAM1394_SUBPARAM_FRAME_RATE_3
+  DCAM1394_SUBPARAM_FRAME_RATE_30_FPS
+  Frame rate is 30 frames/second.
+  DCAM1394_SUBPARAM_FRAME_RATE_4
+  DCAM1394_SUBPARAM_FRAME_RATE_60_FPS
+  Frame rate is 60 frames/second.
+DCAM1394_PARAM_CAP_FRAME_RATE_VID_MODE_1
+Queries if a specific frame rate is supported by the camera in video mode 1 (4:2:2, YUV, 320x240). See
+DCAM1394_PARAM_CAP_FRAME_RATE_VID_MODE_0 for a listing of valid subparam values.
+DCAM1394_PARAM_CAP_FRAME_RATE_VID_MODE_2
+Queries if a specific frame rate is supported by the camera in video mode 2 (4:1:1, YUV, 640x480). See
+DCAM1394_PARAM_CAP_FRAME_RATE_VID_MODE_0 for a listing of valid subparam values.
+DCAM1394_PARAM_CAP_FRAME_RATE_VID_MODE_3
+Queries if a specific frame rate is supported by the camera in video mode 3 (4:2:2, YUV, 640x480). See
+DCAM1394_PARAM_CAP_FRAME_RATE_VID_MODE_0 for a listing of valid subparam values.
+DCAM1394_PARAM_CAP_FRAME_RATE_VID_MODE_4
+Queries if a specific frame rate is supported by the camera in video mode 4. (RGB, 640x480). See
+DCAM1394_PARAM_CAP_FRAME_RATE_VID_MODE_0 for a listing of valid subparam values.
+DCAM1394_PARAM_CAP_FRAME_RATE_VID_MODE_5
+Queries if a specific frame rate is supported by the camera in video mode 5. (Y, 640x480). See
+DCAM1394_PARAM_CAP_FRAME_RATE_VID_MODE_0 for a listing of valid subparam values.
+<beginning of page>
+DCAM1394_PARAM_FRAME_RATE
+Controls or queries the current frame rate of the camera. The subparam field is ignored. When selecting a frame
+rate, it should be compatible with the capability of the camera, which can be determined by querying one of the
+frame rate capability parameters above.
+The value of this parameter may be one of the following:
+  DCAM1394_FRAME_RATE_0
+  DCAM1394_3_75_FPS
+  The frame rate is 3.75 frames per second.
+  DCAM1394_FRAME_RATE_1
+  DCAM1394_7_5_FPS
+  The frame rate is 7.5 frames per second.
+  DCAM1394_FRAME_RATE_2
+  DCAM1394_15_FPS
+  The frame rate is 15 frames per second.
+  DCAM1394_FRAME_RATE_3
+  DCAM1394_30_FPS
+  The frame rate is 30 frames per second.
+  DCAM1394_FRAME_RATE_4
+  DCAM1394_60_FPS
+  The frame rate is 60 frames per second.
+DCAM1394_PARAM_RING_BUFF_CAPACITY
+Controls or queries the number of frames that the ring buffer may hold. This value can range between 2 and 30. The
+subparam field is ignored.
+DCAM1394_PARAM_RING_BUFF_NUM_FRAMES_READY
+Queries the number of frames in the ring buffer ready to be accessed. The subparam field is ignored.
+DCAM1394_PARAM_RING_BUFF_READ_PTR_INCR
+Controls or queries the number of bytes to advance the read pointer as it consumes data from the ring buffer. The
+subparam field is ignored.
+DCAM1394_PARAM_FRAME_NUM_BYTES
+Queries the number of bytes in a frame at the current video mode. The subparam field is ignored.
+DCAM1394_PARAM_STATUS
+Queries the parameter status. The subparam field is ignored.
+The values for the parameter status is a bit field with the following values possibly set:
+DCAM1394_STATUS_FRAME_RCV_DONE
+Frame successfully received.
+DCAM1394_STATUS_RING_BUFF_LOST_FRAME
+A frame has been lost while processing the ring buffer.
+<beginning of page>
+DCAM1394_STATUS_PARAM_CHANGE
+A parameter has been changed.
+DCAM1394_STATUS_FRAME_SEQ_NUM_COUNT_OVERFLOW
+Frame sequence number has reached its maximum possible value and has overflowed.
+DCAM1394_STATUS_CAM_UNPLUG
+Camera has been unplugged.
+DCAM1394_PARAM_BRIGHTNESS
+Query or control a camera feature. This feature queries or controls the brightness of the camera.
+DCAM1394_SUBPARAM_PRESENCE
+Indicates if the feature is available.
+DCAM1394_SUBPARAM_CAP_ON_OFF
+Indicates if the feature may be enabled and disabled. May only be queried.
+DCAM1394_SUBPARAM_ON_OFF
+Indicates if the feature is enabled.
+DCAM1394_SUBPARAM_CAP_CTRL_AUTO
+Indicates if the automatic control of this feature is supported by the camera. May only be queried.
+DCAM1394_SUBPARAM_CAP_CTRL_MANUAL
+Indicates if the manual control of this feature is supported by the camera. May only be queried.
+DCAM1394_SUBPARAM_CTRL_MODE
+Indicates if the feature is in auto or manual mode.
+DCAM1394_SUBPARAM_MIN_VAL
+Minimum value of the feature. May only be queried.
+DCAM1394_SUBPARAM_MAX_VAL
+Maximum value of the feature. May only be queried.
+DCAM1394_SUBPARAM_VALUE
+Current value of the feature.
+DCAM1394_SUBPARAM_CAP_READ
+Indicates if the feature may be read. May only be queried.
+<beginning of page>
+DCAM1394_PARAM_EXPOSURE
+Query or control a camera feature. This feature queries or controls the exposure of the camera. The subparams sup<hy>
+ported by this feature are described under DCAM1394_PARAM_BRIGHTNESS.
+DCAM1394_PARAM_SHARPNESS
+Query or control a camera feature. This feature queries or controls the sharpness of the camera. The subparams sup<hy>
+ported by this feature are described under DCAM1394_PARAM_BRIGHTNESS.
+DCAM1394_PARAM_WHITE_BALANCE
+Query or control a camera feature. This feature queries or controls the white balance of the camera. The subparams
+supported by this feature are described under DCAM1394_PARAM_BRIGHTNESS, except for DCAM1394_SUB<hy>
+PARAM_VALUE. DCAM1394_SUBPARAM_VALUE is replaced by two distinct subparams.
+DCAM1394_SUBPARAM_U_VALUE U or B component of the white balance.
+DCAM1394_SUBPARAM_V_VALUE V or R component of the white balance.
+DCAM1394_PARAM_HUE
+Query or control a camera feature. This feature queries or controls the hue of the camera. The subparams supported
+by this feature are described under DCAM1394_PARAM_BRIGHTNESS.
+DCAM1394_PARAM_SATURATION
+Query or control a camera feature. This feature queries or controls the saturation of the camera. The subparams sup<hy>
+ported by this feature are described under DCAM1394_PARAM_BRIGHTNESS.
+DCAM1394_PARAM_GAMMA
+Query or control a camera feature. This feature queries or controls the gamma of the camera. The subparams sup<hy>
+ported by this feature are described under DCAM1394_PARAM_BRIGHTNESS.
+DCAM1394_PARAM_SHUTTER
+Query or control a camera feature. This feature queries or controls the sharpness of the camera. The subparams sup<hy>
+ported by this feature are described under DCAM1394_PARAM_BRIGHTNESS.
+DCAM1394_PARAM_GAIN
+Query or control a camera feature. This feature queries or controls the gain of the camera. The subparams supported
+by this feature are described under DCAM1394_PARAM_BRIGHTNESS.
+DCAM1394_PARAM_IRIS
+Query or control a camera feature. This feature queries or controls the iris of the camera. The subparams supported
+by this feature are described under DCAM1394_PARAM_BRIGHTNESS.
+DCAM1394_PARAM_FOCUS
+Query or control a camera feature. This feature queries or controls the focus of the camera. The subparams support<hy>
+ed by this feature are described under DCAM1394_PARAM_BRIGHTNESS.
+DCAM1394_PARAM_ZOOM
+Query or control a camera feature. This feature queries or controls the zoom of the camera. The subparams support<hy>
+ed by this feature are described under DCAM1394_PARAM_BRIGHTNESS.
+<beginning of page>
+DCAM1394_PARAM_PAN
+Query or control a camera feature. This feature queries or controls the pan of the camera. The subparams supported
+by this feature are described under DCAM1394_PARAM_BRIGHTNESS.
+DCAM1394_PARAM_TILT
+Query or control a camera feature. This feature queries or controls the tilt of the camera.The subparams supported
+by this feature are described under DCAM1394_PARAM_BRIGHTNESS.
+/dev/dcamN Device node for isochronous input from camera.
+/dev/dcamctlN Device node for camera control.
+kernel/drv/sparcv9/dcam1394
+64-bit ELF kernel module.
+kernel/drv/dcam1394
+32-bit ELF kernel module.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stabili<hy>
+tyEvolving
+attributes(5), hci1394(7D)
+1394 Trade Association Digital Camera Specification, Version 1.04 - 1996
+IEEE Std 1394-2000 Standard for a High Performance Serial Bus - 2000

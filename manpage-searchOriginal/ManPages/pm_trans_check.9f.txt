@@ -1,0 +1,46 @@
+<beginning of page>
+pm_trans_check <-> Device power cycle advisory check
+#include <sys/sunddi.h>
+int pm_trans_check(struct pm_trans_data *datap, time_t *intervalp);
+Solaris DDI specific (Solaris DDI)
+datap Pointer to a pm_trans_data structure
+intervalp Pointer to time difference when next power cycle will be advised
+The pm_trans_check() function checks if a power-cycle is currently advised based on data in the pm_trans_data
+structure. This function is provided to prevent damage to devices from excess power cycles; drivers for devices that
+are sensitive to the number of power cycles should call pm_trans_check() from their power(9E) function before
+powering-off a device. If pm_trans_check() indicates that the device should not be power cycled, the driver should
+not attempt to power cycle the device and should fail the call to power(9E) entry point.
+If pm_trans_check() returns that it is not advised to power cycle the device, it attempts to calculate when the next
+power cycle is advised, based on the supplied parameters. In such case, intervalp returns the time difference (in sec<hy>
+onds) from the current time to when the next power cycle is advised. If the time for the next power cycle cannot be
+determined, intervalp indicates 0.
+To avoid excessive calls to the power(9E) entry point during a period when power cycling is not advised, the driver
+should mark the corresponding device component busy for the intervalp time period (if interval is not 0). Con<hy>
+veniently, the driver can utilize the fact that calls to pm_busy_component(9F) are stacked. If power cycling is not
+advised, the driver can call pm_busy_component(9F) and issue a timeout(9F) for the intervalp time. The time<hy>
+out() handler can issue the corresponding pm_idle_component(9F) call.
+The format field of pm_trans_data accepts either DC_SCSI_FORMAT or DC_SMART_FORMAT. If the caller
+provides information from a SCSI Log Page, it should set the format field to DC_SCSI_FORMAT, and provide
+valid data in svc_date[], lifemax, ncycles and flag in the pm_scsi_cycles structure. If the caller provides information
+from a SMART feature attribute, it should set the format field to DC_SMART_FORMAT and provide valid data in
+allowed, usedup and flag in the pm_smart_count structure, where allowed indicates the normalized cycle count be<hy>
+fore reaching the borderline threshold cycle count, and usedup indicates the normalized consumed cycle count.
+The flag field in both pm_scsi_cycles and pm_smart_count structures is reserved for future use and must be set to
+0.
+ struct pm_trans_data {
+  int format; /* data format */
+  union {
+  struct pm_scsi_cycles scsi_cycles;
+  struct pm_smart_count smart_count;
+  } un;
+ };
+1 Power cycle is advised.
+0 Power cycle is not advised.
+-1 Error due to invalid argument.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed
+<beginning of page>
+power.conf(4), attributes(5), power(9E)
+Writing Device Drivers
+Using Power Management

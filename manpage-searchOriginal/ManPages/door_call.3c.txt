@@ -1,0 +1,79 @@
+<beginning of page>
+door_call <-> invoke the function associated with a door descriptor
+cc -mt [ flag... ] file... [ library... ]
+#include <door.h>
+int door_call(int d, door_arg_t *params);
+The door_call() function invokes the function associated with the door descriptor d, and passes the arguments (if
+any) specified in params. All of the params members are treated as in/out parameters during a door invocation and
+may be updated upon returning from a door call. Passing NULL for params indicates there are no arguments to be
+passed and no results expected.
+Arguments are specified using the data_ptr and desc_ptr members of params. The size of the argument data in
+bytes is passed in data_size and the number of argument descriptors is passed in desc_num.
+Results from the door invocation are placed in the buffer, rbuf. See door_return(3C). The data_ptr and desc_ptr
+members of params are updated to reflect the location of the results within the rbuf buffer. The size of the data re<hy>
+sults and number of descriptors returned are updated in the data_size and desc_num members. It is acceptable to
+use the same buffer for input argument data and results, so door_call() may be called with data_ptr and desc_ptr
+pointing to the buffer rbuf.
+If the results of a door invocation exceed the size of the buffer specified by rsize, the system automatically allocates
+a new buffer in the caller's address space and updates the rbuf and rsize members to reflect this location. In this
+case, the caller is responsible for reclaiming this area using munmap(rbuf, rsize) when the buffer is no longer re<hy>
+quired. See munmap(2).
+Descriptors passed in a door_desc_t structure are identified by the d_attributes member. The client marks the d_at<hy>
+tributes member with the type of object being passed by logically OR-ing the value of object type. Currently, the
+only object type that can be passed or returned is a file descriptor, denoted by the DOOR_DESCRIPTOR attribute.
+Additionally, the DOOR_RELEASE attribute can be set, causing the descriptor to be closed in the caller's address
+space after it is passed to the target. The descriptor will be closed even if door_call() returns an error, unless that er<hy>
+ror is EFAULT or EBADF.
+The door_desc_t structure includes the following members:
+ typedef struct {
+  door_attr_t d_attributes; /* Describes the parameter */
+  union {
+  struct {
+  int d_descriptor; /* Descriptor */
+  door_id_t d_id; /* Unique door id */
+  } d_desc;
+  } d_data;
+  } door_desc_t;
+When file descriptors are passed or returned, a new descriptor is created in the target address space and the d_de<hy>
+scriptor member in the target argument is updated to reflect the new descriptor. In addition, the system passes a sys<hy>
+tem-wide unique number associated with each door in the door_id member and marks the d_attributes member
+with other attributes associated with a door including the following:
+DOOR_LOCAL The door received was created by this process using door_create(). See door_create(3C).
+DOOR_PRIVATE The door received has a private pool of server threads associated with the door.
+DOOR_UNREF The door received is expecting an unreferenced notification.
+DOOR_UNREF_MULTI Similar to DOOR_UNREF, except multiple unreferenced notifications may be deliv<hy>
+ered for the same door.
+DOOR_REFUSE_DESC This door does not accept argument descriptors.
+<beginning of page>
+DOOR_NO_CANCEL This door does not cancel the server thread upon client abort.
+DOOR_REVOKED The door received has been revoked by the server.
+The door_call() function is not a restartable system call. It returns EINTR if a signal was caught and handled by
+this thread. If the door invocation is not idempotent the caller should mask any signals that may be generated during
+a door_call() operation. If the client aborts in the middle of a door_call() and the door was not created with the
+DOOR_NO_CANCEL flag, the server thread is notified using the POSIX (see standards(5)) thread cancellation
+mechanism. See cancellation(5).
+The descriptor returned from door_create() is marked as close on exec(FD_CLOEXEC). Information about a door
+is available for all clients of a door using door_info(). Applications concerned with security should not place secure
+information in door data that is accessible by door_info(). In particular, secure data should not be stored in the data
+item cookie. See door_info(3C).
+Upon successful completion, 0 is returned. Otherwise, <mi>1 is returned and errno is set to indicate the error.
+The door_call() function will fail if:
+E2BIG Arguments were too big for server thread stack.
+EAGAIN Server was out of available resources.
+EBADF Invalid door descriptor was passed.
+EFAULT Argument pointers pointed outside the allocated address space.
+EINTR A signal was caught in the client, the client called fork(2), or the server exited during invocation.
+EINVAL Bad arguments were passed.
+EMFILE The client or server has too many open descriptors.
+ENFILE The desc_num argument is larger than the door's DOOR_PARAM_DESC_MAX parameter (see
+door_getparam(3C)), and the door does not have the DOOR_REFUSE_DESC set.
+ENOBUFS The data_size argument is larger than the door's DOOR_PARAM_DATA_MAX parameter, or smaller
+than the door's DOOR_PARAM_DATA_MIN parameter (see door_getparam(3C)).
+ENOTSUP The desc_num argument is non-zero and the door has the DOOR_REFUSE_DESC flag set.
+EOVERFLOW System could not create overflow area in caller for results.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Architectureall _
+AvailabilitySUNWcsu _ Interface StabilityStable _ MT-LevelSafe
+munmap(2), door_create(3C), door_getparam(3C), door_info(3C), door_return(3C), libdoor(3LIB), at<hy>
+<beginning of page>
+tributes(5), cancellation(5), standards(5)

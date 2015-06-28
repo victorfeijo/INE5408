@@ -1,0 +1,132 @@
+<beginning of page>
+getsockopt, setsockopt <-> get and set options on sockets
+cc [ flag ... ] file ... -lsocket -lnsl [ library ... ]
+#include <sys/types.h>
+#include <sys/socket.h>
+int getsockopt(int s, int level, int optname, void *optval,
+ int *optlen);
+int setsockopt(int s, int level, int optname, const void *optval,
+ int optlen);
+The getsockopt() and setsockopt() functions manipulate options associated with a socket. Options may exist at mul<hy>
+tiple protocol levels; they are always present at the uppermost "socket" level.
+The level argument specifies the protocol level at which the option resides. To manipulate options at the socket level,
+specify the level argument as SOL_SOCKET. To manipulate options at the protocol level, supply the appropriate
+protocol number for the protocol controlling the option. For example, to indicate that an option will be interpreted by
+the TCP, set level to the protocol number of TCP, as defined in the <netinet/in.h> header, or as determined by us<hy>
+ing getprotobyname(3SOCKET). Some socket protocol families may also define additional levels, such as
+SOL_ROUTE. Only socket-level options are described here.
+The parameters optval and optlen are used to access option values for setsockopt(). For getsockopt(), they identify a
+buffer in which the value(s) for the requested option(s) are to be returned. For getsockopt(), optlen is a value-result
+parameter, initially containing the size of the buffer pointed to by optval, and modified on return to indicate the actu<hy>
+al size of the value returned. Use a 0 optval if no option value is to be supplied or returned.
+The optname and any specified options are passed uninterpreted to the appropriate protocol module for interpreta<hy>
+tion. The include file <sys/socket.h> contains definitions for the socket-level options described below. Options at
+other protocol levels vary in format and name.
+Most socket-level options take an int for optval. For setsockopt(), the optval parameter should be non-zero to enable
+a boolean option, or zero if the option is to be disabled. SO_LINGER uses a struct linger parameter that specifies
+the desired state of the option and the linger interval. struct linger is defined in <sys/socket.h>. struct linger con<hy>
+tains the following members:
+l_onoff on = 1/off = 0
+l_linger linger time, in seconds
+The following options are recognized at the socket level. Except as noted, each may be examined with getsockopt()
+and set with setsockopt().
+SO_DEBUG enable/disable recording of debugging information
+SO_REUSEADDR enable/disable local address reuse
+SO_KEEPALIVE enable/disable keep connections alive
+SO_DONTROUTE enable/disable routing bypass for outgoing messages
+SO_LINGER linger on close if data is present
+SO_BROADCAST enable/disable permission to transmit broadcast messages
+SO_OOBINLINE enable/disable reception of out-of-band data in band
+<beginning of page>
+SO_SNDBUF set buffer size for output
+SO_RCVBUF set buffer size for input
+SO_DGRAM_ERRIND application wants delayed error
+SO_TIMESTAMP enable/disable reception of timestamp with datagrams
+SO_EXCLBIND enable/disable exclusive binding of the socket
+SO_TYPE get the type of the socket (get only)
+SO_ERROR get and clear error on the socket (get only)
+SO_MAC_EXEMPT get or set mandatory access control on the socket. This option is available only when the sys<hy>
+tem is configured with Trusted Extensions.
+SO_ALLZONES bypass zone boundaries (privileged).
+SO_DOMAIN get the domain used in the socket (get only)
+SO_PROTOTYPE for socket in domains PF_INET and PF_INET6, get the underlying protocol number used in
+the socket. For socket in domain PF_ROUTE, get the address family used in the socket.
+The SO_DEBUG option enables debugging in the underlying protocol modules. The SO_REUSEADDR option in<hy>
+dicates that the rules used in validating addresses supplied in a bind(3SOCKET) call should allow reuse of local ad<hy>
+dresses. The SO_KEEPALIVE option enables the periodic transmission of messages on a connected socket. If the
+connected party fails to respond to these messages, the connection is considered broken and threads using the socket
+are notified using a SIGPIPE signal. The SO_DONTROUTE option indicates that outgoing messages should by<hy>
+pass the standard routing facilities. Instead, messages are directed to the appropriate network interface according to
+the network portion of the destination address.
+The SO_LINGER option controls the action taken when unsent messages are queued on a socket and a close(2) is
+performed. If the socket promises reliable delivery of data and SO_LINGER is set, the system will block the thread
+on the close() attempt until it is able to transmit the data or until it decides it is unable to deliver the information (a
+timeout period, termed the linger interval, is specified in the setsockopt() call when SO_LINGER is requested). If
+SO_LINGER is disabled and a close() is issued, the system will process the close() in a manner that allows the
+thread to continue as quickly as possible.
+The option SO_BROADCAST requests permission to send broadcast datagrams on the socket. With protocols that
+support out-of-band data, the SO_OOBINLINE option requests that out-of-band data be placed in the normal data
+input queue as received; it will then be accessible with recv() or read() calls without the MSG_OOB flag.
+The SO_SNDBUF and SO_RCVBUF options adjust the normal buffer sizes allocated for output and input buffers,
+respectively. The buffer size may be increased for high-volume connections or may be decreased to limit the possi<hy>
+ble backlog of incoming data. The maximum buffer size for UDP is determined by the value of the ndd variable
+udp_max_buf. The maximum buffer size for TCP is determined the value of the ndd variable tcp_max_buf. Use
+the ndd(1M) utility to determine the current default values. See the Solaris Tunable Parameters Reference Manual
+for information on setting the values of udp_max_buf and tcp_max_buf. At present, lowering SO_RCVBUF on a
+TCP connection after it has been established has no effect.
+By default, delayed errors (such as ICMP port unreachable packets) are returned only for connected datagram sock<hy>
+ets. The SO_DGRAM_ERRIND option makes it possible to receive errors for datagram sockets that are not con<hy>
+nected. When this option is set, certain delayed errors received after completion of a sendto() or sendmsg() opera<hy>
+tion will cause a subsequent sendto() or sendmsg() operation using the same destination address (to parameter) to
+<beginning of page>
+fail with the appropriate error. See send(3SOCKET).
+If the SO_TIMESTAMP option is enabled on a SO_DGRAM or a SO_RAW socket, the recvmsg(3XNET) call
+will return a timestamp in the native data format, corresponding to when the datagram was received.
+The SO_EXCLBIND option is used to enable or disable the exclusive binding of a socket. It overrides the use of the
+SO_REUSEADDR option to reuse an address on bind(3SOCKET). The actual semantics of the SO_EXCLBIND
+option depend on the underlying protocol. See tcp(7P) or udp(7P) for more information.
+The SO_TYPE and SO_ERROR options are used only with getsockopt(). The SO_TYPE option returns the type
+of the socket, for example, SOCK_STREAM. It is useful for servers that inherit sockets on startup. The SO_ER<hy>
+ROR option returns any pending error on the socket and clears the error status. It may be used to check for asyn<hy>
+chronous errors on connected datagram sockets or for other asynchronous errors.
+The SO_MAC_EXEMPT option is used to toggle socket behavior with unlabeled peers. A socket that has this op<hy>
+tion enabled can communicate with an unlabeled peer if it is in the global zone or has a label that dominates the de<hy>
+fault label of the peer. Otherwise, the socket must have a label that is equal to the default label of the unlabeled peer.
+Calling setsockopt() with this option returns an EACCES error if the process lacks the NET_MAC_AWARE privi<hy>
+lege or if the socket is bound. The SO_MAC_EXEMPT option is available only when the system is configured with
+Trusted Extensions.
+The SO_ALLZONES option can be used to bypass zone boundaries between shared-IP zones. Normally, the system
+prevents a socket from being bound to an address that is not assigned to the current zone. It also prevents a socket
+that is bound to a wildcard address from receiving traffic for other zones. However, some daemons which run in the
+global zone might need to send and receive traffic using addresses that belong to other shared-IP zones. If set before
+a socket is bound, SO_ALLZONES causes the socket to ignore zone boundaries between shared-IP zones and per<hy>
+mits the socket to be bound to any address assigned to the shared-IP zones. If the socket is bound to a wildcard ad<hy>
+dress, it receives traffic intended for all shared-IP zones and behaves as if an equivalent socket were bound in each
+active shared-IP zone. Applications that use the SO_ALLZONES option to initiate connections or send datagram
+traffic should specify the source address for outbound traffic by binding to a specific address. There is no effect from
+setting this option in an exclusive-IP zone. Setting this option requires the sys_net_config privilege. See zones(5).
+If successful, getsockopt() and setsockopt() return 0. Otherwise, the functions return <mi>1 and set errno to indicate
+the error.
+The getsockopt() and setsockopt() calls succeed unless:
+EBADF The argument s is not a valid file descriptor.
+ENOMEM There was insufficient memory available for the operation to complete.
+ENOPROTOOPT The option is unknown at the level indicated.
+ENOSR There were insufficient STREAMS resources available for the operation to complete.
+ENOTSOCK The argument s is not a socket.
+ENOBUFS SO_SNDBUF or SO_RCVBUF exceeds a system limit.
+EINVAL Invalid length for IP_OPTIONS.
+EHOSTUNREACH Invalid address for IP_MULTICAST_IF.
+EINVAL Not a multicast address for IP_ADD_MEMBERSHIP and IP_DROP_MEMBERSHIP.
+EADDRNOTAVAIL Bad interface address for IP_ADD_MEMBERSHIP and IP_DROP_MEMBERSHIP.
+<beginning of page>
+EADDRINUSE Address already joined for IP_ADD_MEMBERSHIP.
+ENOENT Address not joined for IP_DROP_MEMBERSHIP.
+EPERM No permissions.
+EACCES Permission denied.
+EINVAL The specified option is invalid at the specified socket level, or the socket has been shut down.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelSafe
+ndd(1M), close(2), ioctl(2), read(2), bind(3SOCKET), getprotobyname(3SOCKET), recv(3SOCKET),
+recvmsg(3XNET), send(3SOCKET), socket(3SOCKET), socket.h(3HEAD), attributes(5), zones(5), tcp(7P),
+udp(7P)
+Solaris Tunable Parameters Reference Manual

@@ -1,0 +1,50 @@
+<beginning of page>
+td_ta_enable_stats, td_ta_reset_stats, td_ta_get_stats <-> collect target process statistics for libc_db
+cc [ flag... ] file... -lc_db [ library... ]
+#include <proc_service.h>
+#include <thread_db.h>
+td_err_e td_ta_enable_stats(const td_thragent_t *ta_p, int on_off);
+td_err_e_stats td_ta_reset(const td_thragent_t *ta_p);
+td_err_e td_ta_get_stats(const td_thragent_t *ta_p, td_ta_stats_t *tstats);
+The controlling process can request the collection of certain statistics about a target process. Statistics gathering is
+disabled by default. Each target process has a td_ta_stats_t structure that contains current values when statistic
+gathering is enabled.
+The td_ta_enable_stats() function turns statistics gathering on or off for the process identified by ta_p, depending
+on whether or not on_off is non-zero. When statistics gathering is turned on, all statistics are implicitly reset as
+though td_ta_reset_stats() had been called. Statistics are not reset when statistics gathering is turned off. Except
+for nthreads and r_concurrency, the values do not change further, but they remain available for inspection by way
+of td_ta_get_stats().
+The td_ta_reset_stats() function resets all counters in the td_ta_stats_t structure to zero for the target process.
+The td_ta_get_stats() function returns the structure for the process in tstats.
+The td_ta_stats_t structure is defined in <thread_db.h> and contains the following members:
+ typedef struct {
+  int nthreads; /* total number of threads in use */
+  int r_concurrency; /* requested concurrency level */
+  int nrunnable_num; /* numerator of avg runnable threads */
+  int nrunnable_den; /* denominator of avg runnable threads */
+  int a_concurrency_num; /* numerator, avg achieved concurrency */
+  int a_concurrency_den; /* denominator, avg achieved concurrency */
+  int nlwps_num; /* numerator, avg number of LWPs in use */
+  int nlwps_den; /* denominator, avg number of LWPs in use */
+  int nidle_num; /* numerator, avg number of idling LWPs */
+  int nidle_den; /* denominator, avg number of idling LWPs */
+ } td_ta_stats_t;
+The nthreads member is the number of threads that are currently part of the target process. The r_concurrency
+member is the current requested concurrency level, such as would be returned by thr_setconcurrency(3C). The re<hy>
+maining members are averages over time, each expressed as a fraction with an integral numerator and denominator.
+The nrunnable_num and nrunnable_den members represent the average number of runnable threads. The a_con<hy>
+currency_num and a_concurrency_den members represent the average achieved concurrency, the number of actu<hy>
+ally running threads. The a_concurrency_num and a_concurrency_den members are less than or equal to
+nrunnable_num and nrunnable_den, respectively. The nlwps_num and nlwps_den members represent the aver<hy>
+age number of lightweight processes (LWPs) participating in this process. They must be greater than or equal to
+a_concurrency_num and a_concurrency_den, respectively, since every running thread is assigned to an LWP, but
+there can at times be additional idling LWPs with no thread assigned to them. The nidle_num and nidle_den mem<hy>
+bers represent the average number of idle LWPs.
+TD_OK The call completed successfully.
+TD_BADTA An invalid internal process handle was passed in.
+TD_DBERR A call to one of the imported interface routines failed.
+TD_ERR Something else went wrong.
+<beginning of page>
+See attributes(5) for description of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT LevelSafe
+libc_db(3LIB), thr_getconcurrency(3C), attributes(5)

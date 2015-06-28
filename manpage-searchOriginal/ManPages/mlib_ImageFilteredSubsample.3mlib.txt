@@ -1,0 +1,97 @@
+<beginning of page>
+mlib_ImageFilteredSubsample, mlib_ImageFilteredSubsample_Fp <-> antialias filters and subsamples an image
+cc [ flag... ] file... -lmlib [ library... ]
+#include <mlib.h>
+mlib_status mlib_ImageFilteredSubsample(mlib_image *dst,
+ const mlib_image *src, mlib_s32 scaleX, mlib_s32 scaleY,
+ mlib_s32 transX, mlib_s32 transY,
+ const mlib_d64 *hKernel, const mlib_d64 *vKernel, mlib_s32 hSize,
+ mlib_s32 vSize, mlib_s32 hParity, mlib_s32 vParity, mlib_edge edge);
+mlib_status mlib_ImageFilteredSubsample_Fp(mlib_image *dst,
+ const mlib_image *src, mlib_s32 scaleX, mlib_s32 scaleY,
+ mlib_s32 transX, mlib_s32 transY,
+ const mlib_d64 *hKernel, const mlib_d64 *vKernel, mlib_s32 hSize,
+ mlib_s32 vSize, mlib_s32 hParity, mlib_s32 vParity, mlib_edge edge);
+Each of the functions antialias filters and subsamples an image.
+The effect of one of the functions on an image is equivalent to performing convolution (filter) followed by subsam<hy>
+pling (zoom out).
+The functions are similar to the mlib_ImageZoomTranslate() and mlib_ImageZoomTranslate_Fp() functions.
+But they have different definitions on scale factors and translations, hence use different coordinate mapping equa<hy>
+tions. The scaleX and scaleY used by mlib_ImageFilteredSubsample() and mlib_ImageFilteredSubsample_Fp()
+are the reciprocals of the zoomx and zoomy, respectively, used by mlib_ImageZoomTranslate() and mlib_Image<hy>
+ZoomTranslate_Fp().
+The functions use the following equations for coordinate mapping:
+ xS = xD*scaleX + transX
+ yS = yD*scaleY + transY
+where, a point (xD, yD) in the destination image is backward mapped to a point (xS, yS) in the source image. The
+arguments transX and transY are provided to support tiling.
+The subsample terms, i.e., the scale factors scaleX and scaleY, are restricted to positive integral values. Geometri<hy>
+cally, one destination pixel maps to scaleX by scaleY source pixels. With odd scale factors, destination pixel centers
+map directly onto source pixel centers. With even scale factors, destination pixel centers map squarely between
+source pixel centers. Below are examples of even, odd, and combination cases.
+  s s s s s s s s s s s s
+  d d d
+  s s s s s s s d s s d s
+  s s s s s s s s s s s s
+  d d d
+  s s s s s s s s s s s s
+  s s s s s s s d s s d s
+  d d d
+  s s s s s s s s s s s s
+  Even scaleX/Y factors Odd scaleX/Y factors
+  s s s s s s s s s s s s
+  d d
+  s s s s s s s d s s d s s d s
+  s s s s s s s s s s s s
+  d d
+  s s s s s s s s s s s s
+  s s s s s s s d s s d s s d s
+  d d
+<beginning of page>
+  s s s s s s s s s s s s
+  Odd/even scaleX/Y factors Even/odd scaleX/Y factors
+where
+  s = source pixel centers
+  d = destination pixel centers mapped to source
+The applied filter is quadrant symmetric (typically antialias + resample). The filter is product-separable, quadrant
+symmetric, and is defined by half of its span. Parity is used to signify whether the symmetric kernel has a double
+center (even parity) or a single center value (odd parity). For example, if hParity == 0 (even), the horizontal kernel
+is defined as:
+ hKernel[hSize-1], ..., hKernel[0], hKernel[0], ...,
+ hKernel[hSize-1]
+Otherwise, if hParity == 1 (odd), the horizontal kernel is defined as:
+ hKernel[hSize-1], ..., hKernel[0], ...,
+ hKernel[hSize-1]
+Horizontal and vertical kernels representing convolved resample (i.e., the combined separable kernels) can be com<hy>
+puted from a convolution filter (with odd parity), a resample filter, and because the subsample factors affect resample
+weights, the subsample scale factors. It is the user's responsibility to provide meaningful combined kernels.
+To compute the value of a pixel centered at point (xD, yD) in the destination image, apply the combined kernel to
+the source image by aligning the kernel's geometric center to the backward mapped point (xS, yS) in the source im<hy>
+age. In the cases that it can not be exactly on top of point (xS, yS), the kernel's center should be half-pixel right
+and/or below that point. When this is done in a separable manner, the centers of horizontal and vertical kernels
+should align with xS and yS, respectively.
+The combination of subsampling and filtering has performance benefits over sequential fucntion usage in part due to
+the symmetry constraints imposed by only allowing integer parameters for scaling and only allowing separable sym<hy>
+metric filters.
+The function takes the following arguments:
+dst Pointer to destination image.
+src Pointer to source image.
+scaleX The x scale factor of subsampling.
+scaleY The y scale factor of subsampling.
+transX The x translation.
+transY The y translation.
+hKernel Pointer to the compact form of horizontal kernel.
+vKernel Pointer to the compact form of vertical kernel.
+<beginning of page>
+hSize Size of array hKernel.
+vSize Size of array vKernel.
+hParity Parity of horizontal kernel (0: even, 1: odd).
+vParity Parity of vertical kernel (0: even, 1: odd).
+edge Type of edge condition. It can be one of the following:
+ MLIB_EDGE_DST_NO_WRITE
+The function returns MLIB_SUCCESS if successful. Otherwise it returns MLIB_FAILURE.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed _ MT-LevelMT-Safe
+mlib_ImageSubsampleAverage(3MLIB), mlib_ImageZoomTranslate(3MLIB), mlib_ImageZoomTrans<hy>
+late_Fp(3MLIB), attributes(5)

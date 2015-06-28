@@ -1,0 +1,207 @@
+<beginning of page>
+truss <-> trace system calls and signals
+truss [-fcaeildDE] [- [tTvx] [!] syscall ,...]
+ [- [sS] [!] signal ,...] [- [mM] [!] fault ,...]
+ [- [rw] [!] fd ,...]
+ [- [uU] [!] lib ,... : [:] [!] func ,...]
+ [-o outfile] command | -p pid[/lwps]...
+The truss utility executes the specified command and produces a trace of the system calls it performs, the signals it
+receives, and the machine faults it incurs. Each line of the trace output reports either the fault or signal name or the
+system call name with its arguments and return value(s). System call arguments are displayed symbolically when
+possible using defines from relevant system headers. For any path name pointer argument, the pointed-to string is
+displayed. Error returns are reported using the error code names described in Intro(3). If, in the case of an error, the
+kernel reports a missing privilege, a privilege name as described in privileges(5) is reported in square brackets ([ ])
+after the error code name.
+Optionally (see the -u option), truss also produce an entry/exit trace of user-level function calls executed by the
+traced process, indented to indicate nesting.
+For those options that take a list argument, the name all can be used as a shorthand to specify all possible members
+of the list. If the list begins with a !, the meaning of the option is negated (for example, exclude rather than trace).
+Multiple occurrences of the same option can be specified. For the same name in a list, subsequent options (those to
+the right) override previous ones (those to the left).
+The following options are supported:
+-a
+Shows the argument strings that are passed in each exec() system call.
+-c
+Counts traced system calls, faults, and signals rather than displaying the trace line-by-line. A summary report is pro<hy>
+duced after the traced command terminates or when truss is interrupted. If -f is also specified, the counts include all
+traced system calls, faults, and signals for child processes.
+-d
+Includes a time stamp on each line of trace output. The time stamp appears as a field containing seconds.fraction at
+the start of the line. This represents a time in seconds relative to the beginning of the trace. The first line of the trace
+output shows the base time from which the individual time stamps are measured, both as seconds since the epoch
+(see time(2)) and as a date string (see ctime(3C) and date(1)). The times that are reported are the times that the
+event in question occurred. For all system calls, the event is the completion of the system call, not the start of the
+system call.
+-D
+Includes a time delta on each line of trace output. The value appears as a field containing seconds.fraction and rep<hy>
+resents the elapsed time for the LWP that incurred the event since the last reported event incurred by that LWP.
+Specifically, for system calls, this is not the time spent within the system call.
+-e
+Shows the environment strings that are passed in each exec() system call.
+-E
+Includes a time delta on each line of trace output. The value appears as a field containing seconds.fraction and repre<hy>
+sents the difference in time elapsed between the beginning and end of a system call.
+In contrast to the -D option, this is the amount of time spent within the system call.
+<beginning of page>
+-f
+Follows all children created by fork() or vfork() and includes their signals, faults, and system calls in the trace out<hy>
+put. Normally, only the first-level command or process is traced. When -f is specified, the process-id is included with
+each line of trace output to indicate which process executed the system call or received the signal.
+-i
+Does not display interruptible sleeping system calls. Certain system calls, such as open() and read() on terminal de<hy>
+vices or pipes, can sleep for indefinite periods and are interruptible. Normally, truss reports such sleeping system
+calls if they remain asleep for more than one second. The system call is reported again a second time when it com<hy>
+pletes. The -i option causes such system calls to be reported only once, when they complete.
+-l
+Includes the id of the responsible lightweight process (LWP) with each line of trace output. If -f is also specified,
+both the process-id and the LWP-id are included.
+-m [!]fault,...
+Machine faults to trace or exclude. Those faults specified in the comma-separated list are traced. Faults can be speci<hy>
+fied by name or number (see <sys/fault.h>). If the list begins with a !, the specified faults are excluded from the
+trace output. Default is -mall -m !fltpage.
+-M [!]fault,...
+Machine faults that stop the process. The specified faults are added to the set specified by -m. If one of the specified
+faults is incurred, truss leaves the process stopped and abandoned (see the -T option). Default is -M!all.
+-o outfile
+File to be used for the trace output. By default, the output goes to standard error.
+-p
+Interprets the command arguments to truss as a list of process-ids for existing processes (see ps(1)) rather than as a
+command to be executed. truss takes control of each process and begins tracing it provided that the userid and
+groupid of the process match those of the user or that the user is a privileged user. Users can trace only selected
+threads by appending /thread-id to the process-id. Mutiple threads can be selected using the - and , delimiters. For
+example /1,2,7-9 traces threads 1, 2, 7, 8, and 9. Processes can also be specified by their names in the /proc directo<hy>
+ry, for example, /proc/12345.
+-r [!]fd,...
+Shows the full contents of the I/O buffer for each read() on any of the specified file descriptors. The output is for<hy>
+matted 32 bytes per line and shows each byte as an ASCII character (preceded by one blank) or as a 2-character C
+language escape sequence for control characters such as horizontal tab (\t) and newline (\n). If ASCII interpreta<hy>
+tion is not possible, the byte is shown in 2-character hexadecimal representation. (The first 12 bytes of the I/O buffer
+for each traced print >read() are shown even in the absence of -r.) Default is -r!all.
+-s [!]signal,...
+Signals to trace or exclude. Those signals specified in the comma-separated list are traced. The trace output reports
+the receipt of each specified signal, even if the signal is being ignored (not blocked). (Blocked signals are not re<hy>
+ceived until they are unblocked.) Signals can be specified by name or number (see <sys/signal.h>). If the list begins
+with a !, the specified signals are excluded from the trace output. Default is -sall.
+-S [!]signal,...
+Signals that stop the process. The specified signals are added to the set specified by -s. If one of the specified signals
+is received, truss leaves the process stopped and abandoned (see the -T option). Default is -S!all.
+<beginning of page>
+-t [!]syscall,...
+System calls to trace or exclude. Those system calls specified in the comma-separated list are traced. If the list be<hy>
+gins with a !, the specified system calls are excluded from the trace output. Default is -tall.
+-T [!]syscall,...
+Specifies system calls that stop the process. The specified system calls are added to the set specified by -t. If one of
+the specified system calls is encountered, truss leaves the process stopped and abandoned. That is, truss releases the
+process and exits but leaves the process in the stopped state at completion of the system call in question. A debugger
+or other process inspection tool (see proc(1)) can then be applied to the stopped process. truss can be reapplied to
+the stopped process with the same or different options to continue tracing. Default is -T!all.
+A process left stopped in this manner cannot be restarted by the application of kill -CONT because it is stopped on
+an event of interest via /proc, not by the default action of a stopping signal (see signal.h(3HEAD)). The prun(1)
+command described in proc(1) can be used to set the stopped process running again.
+-u [!]lib,...:[:][!]func,...
+User-level function call tracing. lib,... is a comma-separated list of dynamic library names, excluding the ``.so.n''
+suffix. func,... is a comma-separated list of function names. In both cases the names can include name-matching
+metacharacters *,?,[] with the same meanings as those of sh(1) but as applied to the library/function name spaces,
+not to files. An empty library or function list defaults to *, trace all libraries or functions in a library. A leading ! on
+either list specifies an exclusion list, names of libraries or functions not to be traced. Excluding a library excludes all
+functions in that library; any function list following a library exclusion list is ignored.
+A single : separating the library list from the function list means to trace calls into the libraries from outside the li<hy>
+braries, but omit calls made to functions in a library from other functions in the same library. A double :: means to
+trace all calls, regardless of origin.
+Library patterns do not match either the executable file or the dynamic linker unless there is an exact match (l* does
+not match ld.so.1). To trace functions in either of these objects, the names must be specified exactly, as in:
+ truss -u a.out -u ld ...
+a.out is the literal name to be used for this purpose; it does not stand for the name of the executable file. Tracing
+a.out function calls implies all calls (default is ::).
+Multiple -u options can be specified and they are honored left-to-right. The id of the thread that performed the func<hy>
+tion call is included in the trace output for the call. truss searches the dynamic symbol table in each library to find
+function names and also searches the standard symbol table if it has not been stripped.
+-U [!]lib,...:[:][!]func,...
+User-level function calls that stop the process. The specified functions are added to the set specified by -u. If one of
+the specified functions is called, truss leaves the process stopped and abandoned (see the -T option).
+-v [!]syscall,...
+Verbose. Displays the contents of any structures passed by address to the specified system calls (if traced by -t). In<hy>
+put values as well as values returned by the operating system are shown. For any field used as both input and output,
+only the output value is shown. Default is -v!all.
+-w [!]fd,...
+Shows the contents of the I/O buffer for each write() on any of the specified file descriptors (see the -r option). De<hy>
+fault is -w!all.
+<beginning of page>
+-x [!]syscall,...
+Displays the arguments to the specified system calls (if traced by -t) in raw form, usually hexadecimal, rather than
+symbolically. This is for unredeemed hackers who must see the raw bits to be happy. Default is -x!all.
+See man pages section 2: System Calls for system call names accepted by the -t, -T, -v, and -x options. System call
+numbers are also accepted.
+If truss is used to initiate and trace a specified command and if the -o option is used or if standard error is redirected
+to a non-terminal file, then truss runs with hangup, interrupt, and quit signals ignored. This facilitates tracing of in<hy>
+teractive programs that catch interrupt and quit signals from the terminal.
+If the trace output remains directed to the terminal, or if existing processes are traced (the -p option), then truss re<hy>
+sponds to hangup, interrupt, and quit signals by releasing all traced processes and exiting. This enables the user to
+terminate excessive trace output and to release previously-existing processes. Released processes continue normally,
+as though they had never been touched. Example 1 Tracing a Command
+The following example produces a trace of the find(1) command on the terminal:
+ example$ truss find . -print >find.out
+Example 2 Tracing Common System Calls
+The following example shows only a trace of the open, close, read, and write system calls:
+ example$ truss -t open,close,read,write find . -print >find.out
+Example 3 Tracing a Shell Script
+The following example produces a trace of the spell(1) command on the file truss.out:
+ example$ truss -f -o truss.out spell document
+spell is a shell script, so the -f flag is needed to trace not only the shell but also the processes created by the shell.
+(The spell script runs a pipeline of eight processes.)
+Example 4 Abbreviating Output
+The following example abreviates output:
+ example$ truss nroff -mm document >nroff.out
+because 97% of the output reports lseek(), read(), and write() system calls. To abbreviate it:
+ example$ truss -t !lseek,read,write nroff -mm document >nroff.out
+Example 5 Tracing Library Calls From Outside the C Library
+The following example traces all user-level calls made to any function in the C library from outside the C library:
+ example$ truss -u libc ...
+<beginning of page>
+Example 6 Tracing library calls from within the C library
+The following example includes calls made to functions in the C library from within the C library itself:
+ example$ truss -u libc:: ...
+Example 7 Tracing Library Calls Other Than the C Library
+The following example traces all user-level calls made to any library other than the C library:
+ example$ truss -u '*' -u !libc ...
+Example 8 Tracing printf and scanf Function Calls
+The following example traces all user-level calls to functions in the printf and scanf family contained in the C li<hy>
+brary:
+ example$ truss -u 'libc:*printf,*scanf' ...
+Example 9 Tracing Every User-level Function Call
+The following example traces every user-level function call from anywhere to anywhere:
+ example$ truss -u a.out -u ld:: -u :: ...
+Example 10 Tracing a System Call Verbosely
+The following example verbosely traces the system call activity of process #1, init(1M) (if you are a privileged us<hy>
+er):
+ example# truss -p -v all 1
+Interrupting truss returns init to normal operation.
+/proc/* Process files
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Availability<hy>
+SUNWtoo
+date(1), find(1), proc(1), ps(1), sh(1), spell(1), init(1M), Intro(3), exec(2), fork(2), lseek(2), open(2), read(2),
+time(2), vfork(2), write(2), ctime(3C), signal.h(3HEAD), proc(4), attributes(5), privileges(5), threads(5)
+man pages section 2: System Calls
+Some of the system calls described in man pages section 2: System Calls differ from the actual operating system in<hy>
+terfaces. Do not be surprised by minor deviations of the trace output from the descriptions in that document.
+Every machine fault (except a page fault) results in the posting of a signal to the LWP that incurred the fault. A re<hy>
+<beginning of page>
+port of a received signal immediately follows each report of a machine fault (except a page fault) unless that signal is
+being blocked.
+The operating system enforces certain security restrictions on the tracing of processes. In particular, any command
+whose object file (a.out) cannot be read by a user cannot be traced by that user; set-uid and set-gid commands can
+be traced only by a privileged user. Unless it is run by a privileged user, truss loses control of any process that per<hy>
+forms an exec() of a set-id or unreadable object file; such processes continue normally, though independently of
+truss, from the point of the exec().
+To avoid collisions with other controlling processes, truss does not trace a process that it detects is being controlled
+by another process via the /proc interface. This allows truss to be applied to proc(4)-based debuggers as well as to
+another instance of itself.
+The trace output contains tab characters under the assumption that standard tab stops are set (every eight positions).
+The trace output for multiple processes or for a multithreaded process (one that contains more than one LWP) is not
+produced in strict time order. For example, a read() on a pipe can be reported before the corresponding write(). For
+any one LWP (a traditional process contains only one), the output is strictly time-ordered.
+When tracing more than one process, truss runs as one controlling process for each process being traced. For the ex<hy>
+ample of the spell command shown above, spell itself uses 9 process slots, one for the shell and 8 for the 8-member
+pipeline, while truss adds another 9 processes, for a total of 18.
+Not all possible structures passed in all possible system calls are displayed under the -v option.

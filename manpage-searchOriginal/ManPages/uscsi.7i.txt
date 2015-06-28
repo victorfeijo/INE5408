@@ -1,0 +1,124 @@
+<beginning of page>
+uscsi <-> user SCSI command interface
+#include <sys/scsi/impl/uscsi.h>
+ioctl(int fildes, int request, struct uscsi_cmd *cmd);
+The uscsi command is very powerful and somewhat dangerous; therefore it has some permission restrictions. See
+WARNINGS for more details.
+Drivers supporting this ioctl(2) provide a general interface allowing user-level applications to cause individual SCSI
+commands to be directed to a particular SCSI or ATAPI device under control of that driver. The uscsi command is
+supported by the sd driver for SCSI disks and ATAPI CD-ROM drives, and by the st driver for SCSI tape drives.
+uscsi may also be supported by other device drivers; see the specific device driver manual page for complete infor<hy>
+mation.
+Applications must not assume that all Solaris disk device drivers support the uscsi ioctl command. The SCSI com<hy>
+mand may include a data transfer to or from that device, if appropriate for that command. Upon completion of the
+command, the user application can determine how many bytes were transferred and the status returned by the device.
+Also, optionally, if the command returns a Check Condition status, the driver will automatically issue a Request
+Sense command and return the sense data along with the original status. See the USCSI_RQENABLE flag below
+for this Request Sense processing. The uscsi_cmd structure is defined in <sys/scsi/impl/uscsi.h> and includes the
+following members:
+ int uscsi_flags; /* read, write, etc. see below */
+ short uscsi_status; /* resulting status */
+ short uscsi_timeout; /* Command Timeout */
+ caddr_t uscsi_cdb /* CDB to send to target */
+ caddr_t uscsi_bufaddr; /* i/o source/destination */
+ size_t uscsi_buflen; /* size of i/o to take place*/
+ size_t uscsi_resid; /* resid from i/o operation */
+ uchar_t uscsi_cdblen; /* # of valid CDB bytes */
+ uchar_t uscsi_rqlen; /* size of uscsi_rqbuf */
+ uchar_t uscsi_rqstatus; /* status of request sense cmd */
+ uchar_t uscsi_rqresid; /* resid of request sense cmd */
+ caddr_t uscsi_rqbuf; /* request sense buffer */
+ void *uscsi_reserved_5; /* Reserved for future use */
+The fields of the uscsi_cmd structure have the following meanings:
+uscsi_flags The I/O direction and other details of how to carry out the SCSI command. Possible values are de<hy>
+scribed below.
+uscsi_status The SCSI status byte returned by the device is returned in this field.
+uscsi_timeout Time in seconds to allow for completion of the command.
+uscsi_cdb A pointer to the SCSI CDB (command descriptor block) to be transferred to the device in command
+phase.
+uscsi_bufaddr The user buffer containing the data to be read from or written to the device.
+uscsi_buflen The length of uscsi_bufaddr.
+uscsi_resid If a data transfer terminates without transferring the entire requested amount, the remainder, or residue,
+is returned in this field.
+uscsi_cdblen The length of the SCSI CDB to be transferred to the device in command phase.
+<beginning of page>
+uscsi_rqlen The length of uscsi_rqbuf, the application's Request Sense buffer.
+uscsi_rqstatus The SCSI status byte returned for the Request Sense command executed automatically by the driver
+in response to a Check Condition status return.
+uscsi_rqresid The residue, or untransferred data length, of the Request Sense data transfer (the number of bytes, less
+than or equal to uscsi_rqlen, which were not filled with sense data).
+uscsi_rqbuf Points to a buffer in application address space to which the results of an automatic Request Sense com<hy>
+mand are written.
+uscsi_reserved_5 Reserved for future use.
+The uscsi_flags field defines the following:
+ USCSI_WRITE /* send data to device */
+ USCSI_SILENT /* no error messages */
+ USCSI_DIAGNOSE /* fail if any error occurs */
+ USCSI_ISOLATE /* isolate from normal commands */
+ USCSI_READ /* get data from device */
+ USCSI_ASYNC /* set bus to asynchronous mode */
+ USCSI_SYNC /* return bus to sync mode if possible */
+ USCSI_RESET /* reset target */
+ USCSI_RESET_TARGET /* reset target */
+ USCSI_RESET_LUN /* reset logical unit */
+ USCSI_RESET_ALL /* reset all targets */
+ USCSI_RQENABLE /* enable request sense extensions */
+ USCSI_RENEGOT /* renegotiate wide/sync on next I/O */
+The uscsi_flags bits have the following interpretation:
+USCSI_WRITE Data will be written from the initiator to the target.
+USCSI_SILENT The driver should not print any console error messages or warnings regarding failures associated
+with this SCSI command.
+USCSI_DIAGNOSE The driver should not attempt any retries or other recovery mechanisms if this SCSI command
+terminates abnormally in any way.
+USCSI_ISOLATE This SCSI command should not be executed with other commands.
+USCSI_READ Data will be read from the target to the initiator.
+USCSI_ASYNC Set the SCSI bus to asynchronous mode before running this command.
+USCSI_SYNC Set the SCSI bus to synchronous mode before running this command.
+USCSI_RESET Send a SCSI bus device reset message to this target.
+USCSI_RESET_TARGET Same as USCSI_RESET. Use this flag to request TARGET RESET. (USCSI_RESET is
+maintained only for compatibility with old applications).
+<beginning of page>
+USCSI_RESET_LUN Send a SCSI logical unit reset message to this target.
+USCSI_RESET_ALL USCSI_RESET_ALL, USCSI_RESET/USCSI_RESET_TARGET and USCSI_RE<hy>
+SET_LUN are mutually exclusive options and issuing them in any simultaneous combination will result in imple<hy>
+mentation-dependent behavior
+When a USCSI reset request is combined with other SCSI commands, the following semantics take effect:
+If the USCSI RESET flag is specified, the other fields (other than uscsi_flags) in the uscsi_cmd are ignored. The usc<hy>
+si_cdblen must be set to zero.
+USCSI_RQENABLE Enable Request Sense extensions. If the user application is prepared to receive sense data,
+this bit must be set, the fields uscsi_rqbuf and uscsi_rqbuflen must be non-zero, and the uscsi_rqbuf must point to
+memory writable by the application.
+USCSI_RENEGOT Tells USCSI to renegotiate wide mode and synchronous transfer speed before the transmitted
+SCSI command is executed. This flag in effects tells the target driver to pass the FLAG_RENEGOTI<hy>
+ATE_WIDE_SYNC flag in the SCSI packet before passing the command to an adapter driver for transport.
+See the scsi_pkt(9S) flag FLAG_RENEGOTIATE_WIDE_SYNC for more information.
+The ioctl supported by drivers providing the uscsi interface is:
+USCSICMD The argument is a pointer to a uscsi_cmd structure. The SCSI device addressed by that driver is se<hy>
+lected, and given the SCSI command addressed by uscsi_cdb. If this command requires a data phase, the uscsi_bu<hy>
+flen and uscsi_bufaddr fields must be set appropriately; if data phase occurs, the uscsi_resid is returned as the num<hy>
+ber of bytes not transferred. The status of the command, as returned by the device, is returned in the uscsi_status
+field. If the command terminates with Check Condition status, and Request Sense is enabled, the sense data itself is
+returned in uscsi_rqbuf. The uscsi_rqresid provides the residue of the Request Sense data transfer.
+EINVAL A parameter has an incorrect, or unsupported, value.
+EIO An error occurred during the execution of the command.
+EPERM A process without root credentials tried to execute the USCSICMD ioctl.
+EFAULT The uscsi_cmd itself, the uscsi_cdb, the uscsi_buf, or the uscsi_rqbuf point to an invalid address.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Whea _ Interface Stability Committed
+ioctl(2), attributes(5), sd(7D), st(7D)
+ANSI Small Computer System Interface-2 (SCSI-2)
+The uscsi command is very powerful, but somewhat dangerous, and so its use is restricted to processes running as
+root, regardless of the file permissions on the device node. The device driver code expects to own the device state,
+and uscsi commands can change the state of the device and confuse the device driver. It is best to use uscsi com<hy>
+mands only with no side effects, and avoid commands such as Mode Select, as they may cause damage to data
+stored on the drive or system panics. Also, as the commands are not checked in any way by the device driver, any
+<beginning of page>
+block may be overwritten, and the block numbers are absolute block numbers on the drive regardless of which slice
+number is used to send the command.
+The uscsi interface is not recommended for very large data transfers (typically more than 16MB). If the requested
+transfer size exceeds the maximum transfer size of the DMA engine, it will not be broken up into multiple transfers
+and DMA errors may result.
+The USCSICMD ioctl associates a struct uscsi_cmd with a device by using an open file descriptor to the device.
+Other APIs might provide the same struct uscsi_cmd programming interface, but perform device association in
+some other manner.

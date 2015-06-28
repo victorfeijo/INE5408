@@ -1,0 +1,360 @@
+<beginning of page>
+cfgadm_sbd <-> cfgadm commands for system board administration
+cfgadm -l [-a] [-o parsable] ap_id...
+cfgadm -c function [-f] [-y | -n]
+ [-o unassign | nopoweroff] [-v] ap_id...
+cfgadm -t [-v] ap_id...
+cfgadm -x [-f] [-v] function ap_id...
+The cfgadm_sbd plugin provides dynamic reconfiguration functionality for connecting, configuring, unconfiguring,
+and disconnecting class sbd system boards. It also enables you to connect or disconnect a system board from a run<hy>
+ning system without having to reboot the system.
+The cfgadm command resides in /usr/sbin. See cfgadm(1M). The cfgadm_sbd plugin resides /usr/plat<hy>
+form/sun4u/lib/cfgadm.
+Each board slot appears as a single attachment point in the device tree. Each component appears as a dynamic at<hy>
+tachment point. You can view the type, state, and condition of each component, and the states and condition of each
+board slot by using the -a option.
+The cfgadm options perform differently depending on the platform. Additionally, the form of the attachment points
+is different depending on the platform. See the Platform Notes section for more information.
+The following are the names and descriptions of the component conditions:
+failed The component failed testing.
+ok The component is operational.
+unknown The component has not been tested.
+The following is the name and description of the receptacle state for components:
+connected The component is connected to the board slot.
+The following are the names and descriptions of the occupant states for components:
+configured The component is available for use by the Solaris operating environment.
+unconfigured The component is not available for use by the Solaris operating environment.
+The following are the names and descriptions of the board conditions.
+failed The board failed testing.
+ok The board is operational.
+unknown The board has not been tested.
+unusable The board slot is unusable.
+Inserting a board changes the receptacle state from empty to disconnected. Removing a board changes the receptacle
+state from disconnected to empty.
+<beginning of page>
+Caution: Removing a board that is in the connected state or that is powered on and in the disconnected state crashes
+the operating system and can result in permanent damage to the system.
+The following are the names and descriptions of the receptacle states for boards:
+connected The board is powered on and connected to the system bus. You can view the components on a board only
+after it is in the connected state.
+disconnected The board is disconnected from the system bus. A board can be in the disconnected state without be<hy>
+ing powered off. However, a board must be powered off and in the disconnected state before you remove it from the
+slot.
+empty A board is not present.
+The occupant state of a disconnected board is always unconfigured. The following table contains the names and de<hy>
+scriptions of the occupant states for boards:
+configured At least one component on the board is configured.
+unconfigured All of the components on the board are unconfigured.
+Platforms based on dynamic system domains (DSDs, referred to as domains in this document) divide the slots in the
+chassis into electrically isolated hardware partitions (that is, DSDs). Platforms that are not based on DSDs assign all
+slots to the system permanently.
+A slot can be empty or populated, and it can be assigned or available to any number of domains. The number of slots
+available to a given domain is controlled by an available component list (ACL) that is maintained on the system con<hy>
+troller. The ACL is not the access control list provided by the Solaris operating environment.
+A slot is visible to a domain only if the slot is in the domain's ACL and if it is not assigned to another domain. An
+unassigned slot is visible to all domains that have the slot in their ACL. After a slot has been assigned to a domain,
+the slot is no longer visible to any other domain.
+A slot that is visible to a domain, but not assigned, must first be assigned to the domain before any other state chang<hy>
+ing commands are applied. The assign can be done explicitly using -x assign or implicitly as part of a connect. A
+slot must be unassigned from a domain before it can be used by another domain. The unassign is always explicit, ei<hy>
+ther directly using -x unassign or as an option to disconnect using -o unassign.
+Functions that change the state of a board slot or a component on the board can be issued concurrently against any
+attachment point. Only one state changing operation is permitted at a given time. A Y in the Busy field in the state
+changing information indicates an operation is in progress.
+The following list contains the functions that change the state: <bu> configure <bu> unconfigure <bu> connect <bu> disconnect
+Commands that change the availability of a board can be issued concurrently against any attachment point. Only one
+availability change operation is permitted at a given time. These functions also change the information string in the
+cfgadm -l output. A Y in the Busy field indicates that an operation is in progress.
+The following list contains the functions that change the availability: <bu> assign <bu> unassign
+Functions that change the condition of a board slot or a component on the board can be issued concurrently against
+any attachment point. Only one condition change operation is permitted at a given time. These functions also change
+the information string in the cfgadm -l output. A Y in the Busy field indicates an operation is in progress.
+The following list contains the functions that change the condition: <bu> poweron <bu> poweroff <bu> test
+This section contains a description of the unconfigure process, and illustrates the states of source and target boards at
+different stages during the process of moving permanent memory.
+In the following code examples, the permanent memory on board 0 must be moved to another board in the domain.
+Thus, board 0 is the source, and board 1 is the target.
+<beginning of page>
+A status change operation cannot be initiated on a board while it is marked as busy. For brevity, the CPU informa<hy>
+tion has been removed from the code examples.
+The process is started with the following command:
+ # cfgadm -c unconfigure -y SB0::memory &
+First, the memory on board 1 in the same address range as the permanent memory on board 0 must be deleted. Dur<hy>
+ing this phase, the source board, the target board, and the memory attachment points are marked as busy. You can
+display the status with the following command:
+ # cfgadm -a -s cols=ap_id:type:r_state:o_state:busy SB0 SB1
+ Ap_Id Type Receptacle Occupant Busy
+ SB0 CPU connected configured y
+ SB0::memory memory connected configured y
+ SB1 CPU connected configured y
+ SB1::memory memory connected configured y
+After the memory has been deleted on board 1, it is marked as unconfigured. The memory on board 0 remains con<hy>
+figured, but it is still marked as busy, as in the following example.
+ Ap_Id Type Receptacle Occupant Busy
+ SB0 CPU connected configured y
+ SB0::memory memory connected configured y
+ SB1 CPU connected configured y
+ SB1::memory memory connected unconfigured n
+The memory from board 0 is then copied to board 1. After it has been copied, the occupant state for the memory is
+switched. The memory on board 0 becomes unconfigured, and the memory on board 1 becomes configured. At this
+point in the process, only board 0 remains busy, as in the following example.
+ Ap_Id Type Receptacle Occupant Busy
+ SB0 CPU connected configured y
+ SB0::memory memory connected unconfigured n
+ SB1 CPU connected configured n
+ SB1::memory memory connected configured n
+After the entire process has been completed, the memory on board 0 remains unconfigured, and the attachment
+points are not busy, as in the following example.
+ Ap_Id Type Receptacle Occupant Busy
+ SB0 CPU connected configured n
+ SB0::memory memory connected unconfigured n
+ SB1 CPU connected configured n
+ SB1::memory memory connected configured n
+The permanent memory has been moved, and the memory on board 0 has been unconfigured. At this point, you can
+initiate a new state changing operation on either board.
+You can specify platform-specific options that follow the options interpreted by the system board plugin. All plat<hy>
+<beginning of page>
+form-specific options must be preceded by the platform keyword. The following example contains the general for<hy>
+mat of a command with platform-specific options:
+command -o sbd_options,platform=platform_options
+This man page does not include the -v, -a, -s, or -h options for the cfgadm command. See cfgadm(1M) for descrip<hy>
+tions of those options. The following options are supported by the cfgadm_sbd plugin:
+-c function Performs a state change function. You can use the following functions:
+unconfigure Changes the occupant state to unconfigured. This function applies to system board slots and to all of
+the components on the system board.
+The unconfigure function removes the CPUs from the CPU list and deletes the physical memory from the system
+memory pool. If any device is still in use, the cfgadm command fails and reports the failure to the user. You can
+retry the command as soon as the device is no longer busy. If a CPU is in use, you must ensure that it is off line be<hy>
+fore you proceed. See pbind(1M), psradm(1M) and psrinfo(1M).
+The unconfigure function moves the physical memory to another system board before it deletes the memory from
+the board you want to unconfigure. Depending of the type of memory being moved, the command fails if it cannot
+find enough memory on another board or if it cannot find an appropriate physical memory range.
+For permanent memory, the operating system must be suspended (that is, quiesced) while the memory is moved and
+the memory controllers are reprogrammed. If the operating system must be suspended, you will be prompted to pro<hy>
+ceed with the operation. You can use the -y or -n options to always answer yes or no respectively.
+Moving memory can take several minutes to complete, depending on the amount of memory and the system load.
+You can monitor the progress of the operation by issuing a status command against the memory attachment point.
+You can also interrupt the memory operation by stopping the cfgadm command. The deleted memory is returned to
+the system memory pool.
+disconnect Changes the receptacle state to disconnected. This function applies only to system board slots.
+If the occupant state is configured, the disconnect function attempts to unconfigure the occupant. It then powers off
+the system board. At this point, the board can be removed from the slot.
+This function leaves the board in the assigned state on platforms that support dynamic system domains.
+If you specify -o nopoweroff, the disconnect function leaves the board powered on. If you specify -o unassign, the
+disconnect function unassigns the board from the domain.
+If you unassign a board from a domain, you can assign it to another domain. However, if it is assigned to another do<hy>
+main, it is not available to the domain from which is was unassigned.
+configure Changes the occupant state to configured. This function applies to system board slots and to any compo<hy>
+nents on the system board.
+If the receptacle state is disconnected, the configure function attempts to connect the receptacle. It then walks the
+tree of devices that is created by the connect function, and attaches the devices if necessary. Running this function
+configures all of the components on the board, except those that have already been configured.
+For CPUs, the configure function adds the CPUs to the CPU list. For memory, the configure function ensures that
+the memory is initialized then adds the memory to the system memory pool. The CPUs and the memory are ready
+for use after the configure function has been completed successfully.
+For I/O devices, you must use the mount and the ifconfig commands before the devices can be used. See ifcon<hy>
+fig(1M) and mount(1M).
+connect Changes the receptacle state to connected. This function applies only to system board slots.
+If the board slot is not assigned to the domain, the connect function attempts to assign the slot to the domain. Next,
+it powers on and tests the board, then it connects the board electronically to the system bus and probes the compo<hy>
+nents.
+<beginning of page>
+After the connect function is completed successfully, you can use the -a option to view the status of the components
+on the board. The connect function leaves all of the components in the unconfigured state.
+The assignment step applies only to platforms that support dynamic system domains.
+-f Overrides software state changing constraints.
+The -f option never overrides fundamental safety and availability constraints of the hardware and operating system.
+-l Lists the state and condition of attachment points specified in the format controlled by the -s, -v, and -a options as
+specified in cfgadm(1M). The cfgadm_sbd plugin provides specific information in the info field as described below.
+The format of this information might be altered by the -o parsable option.
+The parsable info field is composed of the following:
+cpu The cpu type displays the following information:
+cpuid=#[,#...] Where # is a number, and represents the ID of the CPU. If more than one # is present, this CPU has
+multiple active virtual processors.
+speed=# Where # is a number and represents the speed of the CPU in MHz.
+ecache=# Where # is a number and represents the size of the ecache in MBytes. If the CPU has multiple active vir<hy>
+tual processors, the ecache could either be shared among the virtual processors, or divided between them.
+memory The memory type displays the following information, as appropriate:
+address=# Where # is a number, representing the base physical address.
+size=# Where # is a number, representing the size of the memory in KBytes.
+permanent=# Where # is a number, representing the size of permanent memory in KBytes.
+unconfigurable An operating system setting that prevents the memory from being unconfigured.
+inter-board-interleave The board is participating in interleaving with other boards.
+source=ap_id Represents the source attachment point.
+target=ap_id Represents the target attachment point.
+deleted=# Where # is a number, representing the amount of memory that has already been deleted in KBytes.
+remaining=# Where # is a number, representing the amount of memory to be deleted in KBytes.
+io The io type displays the following information:
+<beginning of page>
+device=path Represents the physical path to the I/O component.
+referenced The I/O component is referenced.
+board The board type displays the following boolean names. If they are not present, then the opposite applies.
+assigned The board is assigned to the domain.
+powered-on The board is powered on.
+The same items appear in the info field in a more readable format if the -o parsable option is not specified.
+-o parsable Returns the information in the info field as a boolean name or a set of name=value pairs, separated by a
+space character.
+The -o parsable option can be used in conjunction with the -s option. See the cfgadm(1M) man page for more infor<hy>
+mation about the -s option.
+-t Tests the board.
+Before a board can be connected, it must pass the appropriate level of testing.
+Use of this option always attempts to test the board, even if it has already passed the appropriate level of testing.
+Testing is also performed when a -c connect state change function is issued, in which case the test step can be
+skipped if the board already shows an appropriate level of testing. Thus the -t option can be used to explicitly re<hy>
+quest that the board be tested.
+-x function Performs an sbd-class function. You can use the following functions:
+assign Assigns a board to a domain.
+The receptacle state must be disconnected or empty. The board must also be listed in the domain available compo<hy>
+nent list. See Dynamic System Domains.
+unassign Unassigns a board from a domain.
+The receptacle state must be disconnected or empty. The board must also be listed in the domain available compo<hy>
+nent list. See Dynamic System Domains.
+poweron Powers the system board on.
+The receptacle state must be disconnected.
+poweroff Powers the system board off.
+The receptacle state must be disconnected.
+The following operands are supported:
+Receptacle ap_id For the Sun Fire high-end systems such as the Sun Fire 15K , the receptacle attachment point ID
+takes the form SBX or IOX, where X equals the slot number.
+The exact format depends on the platform and typically corresponds to the physical labelling on the machine. See
+<beginning of page>
+the platform specific information in the NOTES section.
+Component ap_id The component attachment point ID takes the form component_typeX, where component_type
+equals one of the component types described in "Component Types" and X equals the component number. The com<hy>
+ponent number is a board-relative unit number.
+The above convention does not apply to memory compontents. Any DR action on a memory attachment point affects
+all of the memory on the system board.
+The following examples show user input and system output on a Sun Fire 15K system. User input, specifically refer<hy>
+ences to attachment points and system output might differ on other Sun Fire systems, such as the Sun Fire midrange
+systems such as the 6800. Refer to the Platform Notes for specific information about using the cfgadm_sbd plugin
+on non-Sun Fire high-end models. Example 1 Listing All of the System Board
+ # cfgadm -a -s "select=class(sbd)"
+ Ap_Id Type Receptacle Occupant Condition
+ SB0 CPU connected configured ok
+ SB0::cpu0 cpu connected configured ok
+ SB0::memory memory connected configured ok
+ IO1 HPCI connected configured ok
+ IO1::pci0 io connected configured ok
+ IO1::pci1 io connected configured ok
+ SB2 CPU disconnected unconfigured failed
+ SB3 CPU disconnected unconfigured unusable
+ SB4 unknown empty unconfigured unknown
+This example demonstrates the mapping of the following conditions:
+<bu> The board in Slot 2 failed testing. <bu> Slot 3 is unusable; thus, you cannot hot plug a board into that slot. Example 2
+Listing All of the CPUs on the System Board
+ # cfgadm -a -s "select=class(sbd):type(cpu)"
+ Ap_Id Type Receptacle Occupant Condition
+ SB0::cpu0 cpu connected configured ok
+ SB0::cpu1 cpu connected configured ok
+ SB0::cpu2 cpu connected configured ok
+ SB0::cpu3 cpu connected configured ok
+Example 3 Displaying the CPU Information Field
+ # cfgadm -l -s noheadings,cols=info SB0::cpu0
+ cpuid 16, speed 400 MHz, ecache 8 Mbytes
+Example 4 Displaying the CPU Information Field in Parsable Format
+ # cfgadm -l -s noheadings,cols=info -o parsable SB0::cpu0
+ cpuid=16 speed=400 ecache=8
+Example 5 Displaying the Devices on an I/O Board
+ # cfgadm -a -s noheadings,cols=ap_id:info -o parsable IO1
+ IO1 powered-on assigned
+ IO1::pci0 device=/devices/saf@0/pci@0,2000 referenced
+ IO1::pci1 device=/devices/saf@0/pci@1,2000 referenced
+<beginning of page>
+Example 6 Monitoring an Unconfigure Operation
+In the following example, the memory sizes are displayed in Kbytes.
+ # cfgadm -c unconfigure -y SB0::memory &
+ # cfgadm -l -s noheadings,cols=info -o parsable SB0::memory SB1::memory
+ address=0x0 size=2097152 permanent=752592 target=SB1::memory
+  deleted=1273680 remaining=823472
+ address=0x1000000 size=2097152 source=SB0::memory
+Example 7 Assigning a Slot to a Domain
+ # cfgadm -x assign SB2
+Example 8 Unassigning a Slot from a Domain
+ # cfgadm -x unassign SB3
+See attributes(5) for a description of the following attribute:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wkvm.u _ StabilitySee below.
+The interface stability is evolving. The output stability is unstable.
+cfgadm(1M), devfsadm(1M), ifconfig(1M), mount(1M), pbind(1M), psradm(1M), psrinfo(1M), config_ad<hy>
+min(3CFGADM), attributes(5)
+This section contains information on how to monitor the progress of a memory delete operation. It also contains
+platform specific information.
+The following shell script can be used to monitor the progress of a memory delete operation.
+ # cfgadm -c unconfigure -y SB0::memory &
+ # watch_memdel SB0
+ #!/bin/sh
+ # This is the watch_memdel script.
+ if [ -z "$1" ]; then
+  printf "usage: %s board_id\n" `basename $0`
+  exit 1
+ fi
+ board_id=$1
+ cfgadm_info='cfgadm -s noheadings,cols=info -o parsable'
+ eval `$cfgadm_info $board_id::memory`
+ if [ -z "$remaining" ]; then
+  echo no memory delete in progress involving $board_id
+  exit 0
+ fi
+<beginning of page>
+ echo deleting target $target
+ while true
+ do
+  eval `$cfgadm_info $board_id::memory`
+  if [ -n "$remaining" -a "$remaining" -ne 0 ]
+  then
+  echo $deleted KBytes deleted, $remaining KBytes remaining
+  remaining=
+  else
+  echo memory delete is done
+  exit 0
+  fi
+  sleep 1
+ done
+ exit 0
+The following syntax is used to refer to Platform Notes attachment points on the Sun Enterprise 10000 system:
+ board::component
+ where board refers to the system board; and component refers to the individual component. System boards can
+range from SB0 (zero) to SB15. A maximum of sixteen system boards are available.
+The DR 3.0 model running on a Sun Enterprise 10000 domain supports a limited subset of the functionality provided
+by the cfgadm_sbd plugin. The only supported operation is to view the status of attachment points in the domain.
+This corresponds to the -l option and all of its associated options.
+Attempting to perform any other operation from the domain will result in an error that states that the operation is not
+supported. All operations to add or remove a system board must be initiated from the System Service Processor.
+The following syntax is used to refer to attachment points on the Sun Fire high-end systems:
+ board::component
+where board refers to the system board or I/O board; and component refers to the individual component.
+Depending on the system's configuration, system boards can range from SB0 (zero) through SB17, and I/O boards
+can range from IO0 (IO zero) through IO17. (A maximum of eighteen system and I/O boards are available).
+The -t and -x options behave differently on the Sun Fire high-end system platforms. The following list describes
+their behavior:
+-t The system controller uses a CPU to test system boards by running LPOST, sequenced by the hpost command.
+To test I/O boards, the driver starts the testing in response to the -t option, and the test runs automatically without us<hy>
+er intervention. The driver unconfigures a CPU and a stretch of contiguous physical memory. Then, it sends a com<hy>
+mand to the system controller to test the board. The system controller uses the CPU and memory to test the I/O
+board from inside of a transaction/error cage. You can only use CPUs from system boards (not MCPU boards) to test
+I/O boards.
+-x assign | unassign In the Sun Fire high-end system administration model, the platform administrator controls the
+platform hardware through the use of an available component list for each domain. This information is maintained
+on the system controller. Only the platform administrator can modify the available component list for a domain.
+The domain administrator is only allowed to assign or unassign a board if it is in the available component list for that
+domain. The platform administrator does not have this restriction, and can assign or unassign a board even if it is not
+in the available component list for a domain.
+<beginning of page>
+The following are the names and descriptions of the component types:
+cpu CPU
+io I/O device
+memory Memory
+Note: An operation on a memory component affects all of the memory components on the board.
+References to attachment points are slightly different on Sun Fire midrange servers such as the 6800, 4810, 4800,
+and 3800 systems than on the Sun Fire high-end systems. The following syntax is used to refer to attachment points
+on Sun Fire systems other than the Sun Fire 15K:
+ N#.board::component
+where N# refers to the node; board refers to the system board or I/O board; and component refers to the individual
+component.
+Depending on the system's configuration, system boards can range from SB0 through SB5, and I/O boards can range
+from IB6 through IB9. (A maximum of six system and four I/O boards are available).
+The following are the names and descriptions of the component types:
+cpu CPU
+pci I/O device
+memory Memory
+Note: An operation on a memory component affects all of the memory components on the board.

@@ -1,0 +1,86 @@
+<beginning of page>
+auth_attr <-> authorization description database
+/etc/security/auth_attr
+/etc/security/auth_attr is a local source for authorization names and descriptions. The auth_attr file can be used
+with other authorization sources, including the auth_attr NIS map and NIS+ table. Programs use the getauthat<hy>
+tr(3SECDB) routines to access this information.
+The search order for multiple authorization sources is specified in the /etc/nsswitch.conf file, as described in the
+nsswitch.conf(4) man page.
+An authorization is a right assigned to users that is checked by certain privileged programs to determine whether
+users can execute restricted functionality. Each entry in the auth_attr database consists of one line of text containing
+six fields separated by colons (:). Line continuations using the backslash (\) character are permitted. The format of
+each entry is:
+ name:res1:res2:short_desc:long_desc:attr
+name The name of the authorization. Authorization names are unique strings. Construct authorization names using
+the following convention:
+prefix. or prefix.suffix
+prefix Everything in the name field up to the final dot (.). Authorizations from Sun Microsystems, Inc. use solaris as
+a prefix. To avoid name conflicts, all other authorizations should use a prefix that begins with the reverse-order Inter<hy>
+net domain name of the organization that creates the authorization (for example, com.xyzcompany). Prefixes can
+have additional arbitrary components chosen by the authorization's developer, with components separated by dots.
+suffix The final component in the name field. Specifies what is being authorized.
+When there is no suffix, the name is defined as a heading. Headings are not assigned to users but are constructed for
+use by applications in their GUIs.
+When a name ends with the word grant, the entry defines a grant authorization. Grant authorizations are used to
+support fine-grained delegation. Users with appropriate grant authorizations can delegate some of their authoriza<hy>
+tions to others. To assign an authorization, the user needs to have both the authorization itself and the appropriate
+grant authorization.
+res1 Reserved for future use.
+res2 Reserved for future use.
+short_desc A short description or terse name for the authorization. This name should be suitable for displaying in us<hy>
+er interfaces, such as in a scrolling list in a GUI.
+long_desc A long description. This field can explain the precise purpose of the authorization, the applications in
+which it is used, and the type of user that would be interested in using it. The long description can be displayed in
+the help text of an application.
+attr An optional list of semicolon-separated (;) key-value pairs that describe the attributes of an authorization. Zero
+or more keys may be specified. The keyword help identifies a help file in HTML.
+Example 1 Constructing a Name
+In the following example, the name has a prefix (solaris.admin.usermgr) followed by a suffix (read):
+ solaris.admin.usermgr.read
+<beginning of page>
+Example 2 Defining a Heading
+Because the name field ends with a dot, the following entry defines a heading:
+ solaris.admin.usermgr.:::User Accounts::help=AuthUsermgrHeader.html
+Example 3 Assigning Separate Authorizations to Set User Attributes
+In this example, a heading entry is followed by other associated authorization entries. The entries below the heading
+provide separate authorizations for setting user attributes. The attr field for each entry, including the heading entry,
+assigns a help file. The application that uses the help key requires the value to equal the name of a file ending in
+.htm or .html:
+ solaris.admin.usermgr.:::User Accounts::help=AuthUsermgrHeader.html
+ solaris.admin.usermgr.pswd:::Change Password::help=AuthUserMgrPswd.html
+ solaris.admin.usermgr.write:::Manage Users::help=AuthUsermgrWrite.html
+Example 4 Assigning a Grant Authorization
+This example assigns to an administrator the following authorizations:
+ solaris.admin.printer.grant
+ solaris.admin.printer.delete
+ solaris.admin.printer.modify
+ solaris.admin.printer.read
+ solaris.login.enable
+With the above authorizations, the administrator can assign to others the solaris.admin.printer.delete, solaris.ad<hy>
+min.printer.modify, and solaris.admin.printer.read authorizations, but not the solaris.login.enable authorization.
+If the administrator has both the grant authorization, solaris.admin.printmgr.grant, and the wildcard authorization,
+solaris.admin.printmgr.*, the administrator can grant to others any of the printer authorizations. See user_attr(4)
+for more information about how wildcards can be used to assign multiple authorizations whose names begin with the
+same components.
+Example 5 Authorizing the Ability to Assign Other Authorizations
+The following entry defines an authorization that grants the ability to assign any authorization created with a solaris
+prefix, when the administrator also has either the specific authorization being granted or a matching wildcard entry:
+ solaris.grant:::Grant All Solaris Authorizations::help=PriAdmin.html
+Example 6 Consulting the Local Authorization File Ahead of the NIS Table
+With the following entry from /etc/nsswitch.conf, the local auth_attr file is consulted before the NIS table:
+ auth_attr:files nisplus
+/etc/nsswitch.conf
+/etc/user_attr
+/etc/security/auth_attr
+getauthattr(3SECDB), getexecattr(3SECDB), getprofattr(3SECDB), getuserattr(3SECDB), exec_attr(4), nss<hy>
+witch.conf(4), user_attr(4)
+When deciding which authorization source to use, keep in mind that NIS+ provides stronger authentication than
+NIS.
+<beginning of page>
+Because the list of legal keys is likely to expand, any code that parses this database must be written to ignore un<hy>
+known key-value pairs without error. When any new keywords are created, the names should be prefixed with a
+unique string, such as the company's stock symbol, to avoid potential naming conflicts.
+Each application has its own requirements for whether the help value must be a relative pathname ending with a file<hy>
+name or the name of a file. The only known requirement is for the name of a file.
+The following characters are used in describing the database format and must be escaped with a backslash if used as
+data: colon (:), semicolon (;), equals (=), and backslash (\).

@@ -1,0 +1,245 @@
+<beginning of page>
+ld.so.1 <-> runtime linker for dynamic objects
+/lib/ld.so.1
+/lib/ld.so.1 [-e envar] dynamic-object [object args]...
+Dynamic applications consist of one or more dynamic objects. A dynamic application is typically a dynamic ex<hy>
+ecutable and one or more shared object dependencies. As part of the initialization and execution of a dynamic appli<hy>
+cation, an interpreter is called. This interpreter completes the binding of the application to its shared object depen<hy>
+dencies. In Solaris, this interpreter is referred to as the runtime linker.
+During the link-editing of a dynamic executable, a special .interp section, together with an associated program
+header, is created. This section contains a path name specifying the program's interpreter. An interpreter path name
+can be specified when the executable is constructed using the -I option to ld(1), the link-editor. The default name
+supplied by the link-editor is the name of the runtime linker, ld.so.1.
+During the process of executing a dynamic executable, the kernel maps the file, and locates the required interpreter.
+See exec(2) and mmapobj(2). The kernel maps in, and transfers control to, this interpreter. Sufficient information is
+passed to the interpretor to allow the interpreter to continue to bind, and then execute the application.
+In addition to initializing an application, the runtime linker provides services that allow the application to extend its
+address space. Additional shared objects can be mapped, and symbols within the shared objects can be bound to.
+The runtime linker performs the following functions: <bu> A configuration file, if in existence, is processed. Configura<hy>
+tion files can be employed to alter default search paths, provide a directory cache, and provide alternative object de<hy>
+pendencies. See crle(1). By default, for 32-bit objects, the configuration file /var/ld/ld.config is used. For 64-bit ob<hy>
+jects, the default configuration file /var/ld/64/ld.config is used. Alternative configuration files can be specified with
+the LD_CONFIG environment variable. Alternative configuration files can also be encoded within a dynamic ex<hy>
+ecutable by using the -c option of ld(1). <bu> The runtime linker analyzes the application's dynamic information sec<hy>
+tion, .dynamic, to determine which shared object dependencies are required. <bu> The runtime linker then locates and
+maps in these dependencies. The dynamic information section of each dependency is then analyzed to determine if
+any additional dependencies are required. <bu> Once all the shared object dependencies are loaded, the runtime linker
+performs any necessary relocations. These relocations bind the shared objects in preparation for process execution. <bu>
+Any initialization functions provided by the shared object dependencies and, possibly, by the dynamic executable are
+called. The functions are called in the reverse order of the topologically sorted dependencies. If cyclic dependencies
+exist, the initialization functions are called using the sorted order with the cycle removed. ldd(1) can be used to dis<hy>
+play the initialization order of shared object dependencies. <bu> Control is passed to the application. <bu> During the ap<hy>
+plication's execution, the runtime linker can be called upon to perform any delayed function binding. <bu> If any shared
+objects are deleted from the process, finalization functions are called. By default, these functions are called in the or<hy>
+der of the topologically sorted dependencies. <bu> The application can also call upon the services of the runtime linker
+to acquire additional shared objects by using dlopen(3C). Symbols provided by these objects, can be bound to using
+dlsym(3C).
+Further details on each of the previous topics can be found in the Linker and Libraries Guide.
+The runtime linker uses a prescribed search path for locating the dynamic dependencies of an object. The default
+search paths are the runpath recorded in the object, followed by a series of defaults. For 32-bit objects, the defaults
+are /lib followed by /usr/lib. For 64-bit objects, the defaults are /lib/64 followed by /usr/lib/64. These defaults com<hy>
+ponent can be modified using a configuration file that is created with crle(1). The runpath is specified when the dy<hy>
+namic object is constructed using the -R option to ld(1). The environment variable LD_LIBRARY_PATH can be
+used to indicate directories to be searched before the default directories.
+Typically, the runtime linker is invoked indirectly through executing a dynamic executable that declares the runtime
+linker as its interpreter. The runtime linker can also be executed directly from the command line. This mechanism is
+most often employed to experiment with new implementations of the runtime linker. Arguments that are supplied on
+the command line consist of options that are applicable to the runtime linker. Following these options is the name of
+the dynamic object to be executed, and any options required by this object. Effectively, the runtime linker replaces
+any interpreter specified by the dynamic object.
+The following option is supported:
+-e envar Specify a runtime linker specific environment variable. See ENVIRONMENT VARIABLES.
+Each environment variable can be specified with a _32 or _64 suffix. This makes the environment variable specific,
+respectively, to 32-bit or 64-bit processes. This environment variable overrides any non-suffixed version of the envi<hy>
+<beginning of page>
+ronment variable that might be in effect. Environment variables specified without a value, that have a _32 or _64 suf<hy>
+fix, effectively cancel any associated generic environment variable setting.
+LD_AUDIT, LD_AUDIT_32, and LD_AUDIT_64
+A colon-separated list of objects that are loaded by the runtime linker. As each object is loaded, the object is exam<hy>
+ined for Link-Auditing interface routines. The routines that are present are called as specified in the Link-Auditing in<hy>
+terface described in the Linker and Libraries Guide. Also, see the -p and -P options of ld(1).
+LD_BIND_LAZY, LD_BIND_LAZY_32, and LD_BIND_LAZY_64
+The runtime linker's default mode of performing lazy binding can be enforced by setting the environment variable
+LD_BIND_LAZY to any non-null value. This setting causes the runtime linker to perform only lazy reference relo<hy>
+cations for all objects that are loaded into the process. Individual objects can request that lazy reference relocations
+are performed when the object is loaded. See the -z now option of ld(1), and dlopen(3C) with the mode
+RTLD_NOW. Such requests to perform lazy reference relocations are suppressed when LD_BIND_LAZY is in ef<hy>
+fect.
+If both LD_BIND_LAZY and LD_BIND_NOW are specified, then LD_BIND_NOW takes precedence.
+LD_BIND_NOW, LD_BIND_NOW_32, and LD_BIND_NOW_64
+The runtime linker's default mode of performing lazy binding can be overridden by setting the environment variable
+LD_BIND_NOW to any non-null value. This setting causes the runtime linker to perform both immediate reference
+and lazy reference relocations for all objects that are loaded into the process. Individual objects can request that lazy
+reference relocations are performed when the object is loaded. See the -z now option of ld(1), and dlopen(3C) with
+the mode RTLD_NOW.
+If both LD_BIND_NOW and LD_BIND_LAZY are specified, then LD_BIND_NOW takes precedence.
+LD_CONFIG, LD_CONFIG_32, and LD_CONFIG_64
+Provides an alternative configuration file. Configuration files can be employed to alter default search paths, provide a
+directory cache, and provide alternate object dependencies. See crle(1).
+LD_DEBUG, LD_DEBUG_32, and LD_DEBUG_64
+Provides a comma, or colon-separated list of tokens to cause the runtime linker to print debugging information to
+standard error. The special token help indicates the full list of tokens available. The environment variable LD_DE<hy>
+BUG_OUTPUT can also be supplied to specify a file to which the debugging information is sent. The filename is
+suffixed with the process ID of the application generating the debugging information. See lari(1).
+LD_DEMANGLE, LD_DEMANGLE_32, and LD_DEMANGLE_64
+Any symbol name used as part of a diagnostic message is shown as defined within an ELF file. When LD_DE<hy>
+MANGLE is set to any non-null value, the runtime linker attempts to decode (demangle) any C++ symbol name.
+LD_FLAGS, LD_FLAGS_32, and LD_FLAGS_64
+Provides an alternative means of supplying environment variable information. Any of the LD_XXX environment
+variables can be specified as a xxx token. Multiple tokens can be supplied separated by commas. See EXAMPLES.
+LD_LIBRARY_PATH, LD_LIBRARY_PATH_32, and LD_LIBRARY_PATH_64
+The LD_LIBRARY_PATH environment variable, if set, is used to enhance the search path that the runtime linker
+uses to find dynamic dependencies. LD_LIBRARY_PATH specifies a colon-separated list of directories that are
+searched before the default directories. Also notice that LD_LIBRARY_PATH adds additional semantics to ld(1).
+LD_LOADFLTR, LD_LOADFLTR_32, and LD_LOADFLTR_64
+Filters are a form of shared object. Filters allow an alternative shared object to be selected at runtime that provide the
+implementation for any symbols that are defined within the filter. See the -f and -F options of ld(1). By default, the
+<beginning of page>
+alternative shared object processing is deferred until symbol resolution occurs against the filter. When LD_LOAD<hy>
+FLTR is set to any non-null value, any filters are processed immediately when the filter is loaded. Also, see the -z
+loadfltr option of ld(1).
+LD_NOAUDIT, LD_NOAUDIT_32, and LD_NOAUDIT_64
+Local auditing libraries can be defined within applications and shared objects. See the -p and -P options of ld(1).
+When LD_NOAUDIT is set to any non-null value, the runtime linker ignores any local auditing libraries.
+LD_NOAUXFLTR, LD_NOAUXFLTR_32, and LD_NOAUXFLTR_64
+Auxiliary filters are a form of shared object. Auxiliary filters allow an alternative shared object to be selected at run<hy>
+time which provides the implementation for any symbols that are defined within the filter. See the -f option of ld(1).
+When LD_NOAUXFLTR is set to any non-null value, the runtime linker disables this alternative shared object
+lookup.
+LD_NOCONFIG, LD_NOCONFIG_32, and LD_NOCONFIG_64
+By default the runtime linker attempts to open and process a configuration file. When LD_NOCONFIG is set to any
+non-null value, the runtime linker disables this configuration file processing.
+LD_NODIRCONFIG, LD_NODIRCONFIG_32, and LD_NODIRCONFIG_64
+Provides a subset of LD_NOCONFIG in that any directory cache information provided in a configuration file is ig<hy>
+nored.
+LD_NODIRECT, LD_NODIRECT_32, and LD_NODIRECT_64
+Direct binding information instructs the runtime linker to search directly for a symbol in an associated object. See
+the -B direct option of ld(1). Without direct binding, the symbol search performed by the runtime linker follows the
+default model. When LD_NODIRECT is set to any non-null value, the runtime linker ignores any direct binding in<hy>
+formation.
+LD_NOENVCONFIG, LD_NOENVCONFIG_32, and LD_NOENVCONFIG_64
+Provides a subset of LD_NOCONFIG in that any environment variables provided in a configuration file are ig<hy>
+nored.
+LD_NOLAZYLOAD, LD_NOLAZYLOAD_32, and LD_NOLAZYLOAD_64
+Dependencies that are labeled for lazy loading are not loaded into memory until explicit reference to the dependency
+has been made. See the -z lazyload option of ld(1). When LD_NOLAZYLOAD is set to any non-null value, the
+runtime linker ignores a dependencies lazy loading label and loads the dependency immediately.
+LD_NOOBJALTER, LD_NOOBJALTER_32, and LD_NOOBJALTER_64
+Provides a subset of LD_NOCONFIG in that any alternative object dependencies provided in a configuration file
+are ignored.
+LD_NOVERSION, LD_NOVERSION_32, and LD_NOVERSION_64
+By default, the runtime linker verifies version dependencies for the primary executable and all of its dependencies.
+When LD_NOVERSION is set to any non-null value, the runtime linker disables this version checking.
+LD_ORIGIN, LD_ORIGIN_32, and LD_ORIGIN_64
+The immediate processing of $ORIGIN can be triggered by setting the environment variable LD_ORIGIN to any
+non-null value. Before Solaris 9, this option was useful for applications that invoked chdir(2) prior to locating de<hy>
+pendencies that employed the $ORIGIN string token. The establishment of the current working directory by the
+runtime linker is now default thus making this option redundant.
+<beginning of page>
+LD_PRELOAD, LD_PRELOAD_32, and LD_PRELOAD_64
+Provides a list of shared objects, separated by spaces. These objects are loaded after the program being executed but
+before any other shared objects that the program references. Symbol definitions provided by the preloaded objects
+interpose on references made by the shared objects that the program references. Symbol definitions provided by the
+preloaded objects do not interpose on the symbol definitions provided by the program.
+LD_PROFILE, LD_PROFILE_32, and LD_PROFILE_64
+Defines a shared object to be profiled by the runtime linker. When profiling is enabled, a profiling buffer file is creat<hy>
+ed and mapped. The name of the buffer file is the name of the shared object being profiled with a .profile extension.
+By default, this buffer is placed under /var/tmp. The environment variable LD_PROFILE_OUTPUT can also be
+supplied to indicate an alternative directory in which to place the profiling buffer.
+The profiling buffer contains profil(2) and call count information. This information is similar to the gmon.out infor<hy>
+mation generated by programs that have been linked with the -xpg option of cc. Any applications that use the named
+shared object and run while this environment variable is set, accumulate data in the profile buffer. See also NOTES.
+The profile buffer information can be examined using gprof(1).
+The LD_PROFILE profiling technique is an alternative to other techniques that might be provided by the compila<hy>
+tion system. The shared object being profiled does not have to be instrumented in any way, and LD_PROFILE
+should not be combined with a profile-instrumented application. See the Linker and Libraries Guide for more infor<hy>
+mation on profiling shared objects.
+LD_SIGNAL, LD_SIGNAL_32, and LD_SIGNAL_64
+Provides a numeric signal number that the runtime linker uses to kill the process in the event of a fatal runtime er<hy>
+ror. See thr_kill(3C). By default, SIGKILL is used. For example, providing the alternative signal number 6 (SIGA<hy>
+BRT), can provide for the creation of a core file to aid debugging. See also the RTLD_DI_SETSIGNAL request to
+dlinfo(3C).
+Notice that environment variable names beginning with the characters 'LD_' are reserved for possible future en<hy>
+hancements to ld(1) and ld.so.1.
+Secure processes have some restrictions applied to the evaluation of their dependencies and runpaths to prevent ma<hy>
+licious dependency substitution or symbol interposition.
+The runtime linker categorizes a process as secure if the issetugid(2) system call returns true for the process.
+For 32-bit objects, the default trusted directories that are known to the runtime linker are /lib/secure and /usr/lib/se<hy>
+cure. For 64-bit objects, the default trusted directories are /lib/secure/64 and /usr/lib/secure/64. The utility crle(1)
+can be used to specify additional trusted directories that are applicable for secure applications. Administrators who
+use this technique should ensure that the target directories are suitably protected from malicious intrusion.
+If an LD_LIBRARY_PATH family environment variable is in effect for a secure process, only the trusted directo<hy>
+ries specified by this variable are used to augment the runtime linker's search rules.
+In a secure process, runpath components that are provided by the application or any of its dependencies are used,
+provided the component is a full path name, that is, the path name starts with a '/'.
+In a secure process, the expansion of the $ORIGIN string is allowed only if the string expands to a trusted directo<hy>
+ry. However, should a $ORIGIN expansion match a directory that has already provided dependencies, then the di<hy>
+rectory is implicitly secure. This directory can be used to provide additional dependencies.
+In a secure process, LD_CONFIG is ignored. However, a configuration file that is recorded in a secure application
+is used. See the -c option of ld(1). A recorded configuration file must be a full path name, that is, the path name
+starts with a '/'. A recorded configuration file that employs the $ORIGIN string is restricted to known trusted direc<hy>
+tories. Developers who record a configuration file within a secure application should ensure that the configuration
+file directory is suitably protected from malicious intrusion. In the absence of a recorded configuration file, a secure
+process uses the default configuration file, if a configuration file exists. See crle(1).
+In a secure process, LD_SIGNAL is ignored.
+<beginning of page>
+Additional objects can be loaded with a secure process using the LD_PRELOAD, or LD_AUDIT environment vari<hy>
+ables. These objects must be specified as full path names or simple file names. Full path names are restricted to
+known trusted directories. Simple file names, in which no '/' appears in the name, are located subject to the search
+path restrictions previously described. Simple file names resolve only to known trusted directories.
+In a secure process, any dependencies that consist of simple filenames are processed using the path name restrictions
+previously described. Dependencies expressed as full path names or relative path names are used as is. Therefore,
+the developer of a secure process should ensure that the target directory referenced as a full path name or relative
+path name dependency is suitably protected from malicious intrusion.
+When creating a secure process, relative path names should not be used to express dependencies, or to construct
+dlopen(3C) path names. This restriction should be applied to the application and to all dependencies. Example 1
+Using LD_FLAGS to group environment variable information
+The following use of LD_FLAGS is equivalent to setting the individual environment variables LD_BIND_NOW
+and LD_LIBRARY_PATH for 32-bit applications:
+ example% LD_FLAGS_32=bind_now,library_path=/lib/one:/lib/two
+The following use of LD_FLAGS is equivalent to setting the individual environment variables LD_LI<hy>
+BRARY_PATH and LD_PRELOAD for 64-bit applications:
+ example% LD_FLAGS_64=library_path=/lib/one/64,preload=foo.so
+/lib/ld.so.1
+Default runtime linker.
+/lib/libc.so.1
+Alternate interpreter for SVID ABI compatibility.
+/usr/lib/ld.so
+AOUT (BCP) runtime linker.
+/usr/lib/0@0.so.1
+A compatibility library to support null character pointers. See NOTES.
+/lib/secure and /usr/lib/secure
+LD_PRELOAD location for secure applications.
+/lib/secure/64 and /usr/lib/secure/64
+LD_PRELOAD location for secure 64-bit applications.
+/lib/64/ld.so.1
+Default runtime linker for 64-bit applications.
+/usr/lib/64/0@0.so.1
+A 64-bit compatibility library to support null character pointers. See NOTES.
+<beginning of page>
+/var/ld/ld.config
+Default configuration file for 32-bit applications.
+/var/ld/64/ld.config
+Default configuration file for 64-bit applications.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu
+crle(1), gprof(1), lari(1), ld(1), ldd(1), exec(2), issetugid(2), mmapobj(2), profil(2), dladdr(3C), dlclose(3C), dl<hy>
+dump(3C), dlerror(3C), dlinfo(3C), dlopen(3C), dlsym(3C), thr_kill(3C), proc(4), attributes(5)
+Linker and Libraries Guide
+Care should be exercised when using LD_PROFILE in combination with other process monitoring techniques, such
+as users of proc(4). Multiple process monitoring techniques can result in deadlock conditions that leave the profile
+buffer locked. A locked buffer blocks any processes that try to record profiling information. To reduce this likeli<hy>
+hood, the runtime linker's profile implementation determines if the process is being monitored at startup. If so, pro<hy>
+filing of the process is silently disabled. However, this mechanism can not catch monitoring processes that attach to
+the process during its execution.
+The user compatibility library /usr/lib/0@0.so.1 provides a mechanism that establishes a value of 0 at location 0.
+Some applications exist that erroneously assume a null character pointer should be treated the same as a pointer to a
+null string. A segmentation violation occurs in these applications when a null character pointer is accessed. If this li<hy>
+brary is added to such an application at runtime using LD_PRELOAD, the library provides an environment that is
+sympathetic to this errant behavior. However, the user compatibility library is intended neither to enable the genera<hy>
+tion of such applications, nor to endorse this particular programming practice.
+In many cases, the presence of /usr/lib/0@0.so.1 is benign, and it can be pre-loaded into programs that do not re<hy>
+quire it. However, there are exceptions. Some applications, such as the JVM (Java Virtual Machine), require that a
+segmentation violation be generated from a null pointer access. Applications such as the JVM should not preload
+/usr/lib/0@0.so.

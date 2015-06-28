@@ -1,0 +1,56 @@
+<beginning of page>
+sigaltstack <-> set or get signal alternate stack context
+#include <signal.h>
+int sigaltstack(const stack_t *restrict ss, stack_t *restrict oss);
+The sigaltstack() function allows a thread to define and examine the state of an alternate stack area on which signals
+are processed. If ss is non-zero, it specifies a pointer to and the size of a stack area on which to deliver signals, and
+informs the system whether the thread is currently executing on that stack. When a signal's action indicates its han<hy>
+dler should execute on the alternate signal stack (specified with a sigaction(2) call), the system checks whether the
+thread chosen to execute the signal handler is currently executing on that stack. If the thread is not currently execut<hy>
+ing on the signal stack, the system arranges a switch to the alternate signal stack for the duration of the signal han<hy>
+dler's execution.
+The stack_t structure includes the following members:
+ int *ss_sp
+ long ss_size
+ int ss_flags
+If ss is not NULL, it points to a structure specifying the alternate signal stack that will take effect upon successful re<hy>
+turn from sigaltstack(). The ss_sp and ss_size members specify the new base and size of the stack, which is auto<hy>
+matically adjusted for direction of growth and alignment. The ss_flags member specifies the new stack state and
+may be set to the following:
+SS_DISABLE The stack is to be disabled and ss_sp and ss_size are ignored. If SS_DISABLE is not set, the stack
+will be enabled.
+If oss is not NULL, it points to a structure specifying the alternate signal stack that was in effect prior to the call to
+sigaltstack(). The ss_sp and ss_size members specify the base and size of that stack. The ss_flags member specifies
+the stack's state, and may contain the following values:
+SS_ONSTACK The thread is currently executing on the alternate signal stack. Attempts to modify the alternate sig<hy>
+nal stack while the thread is executing on it will fail.
+SS_DISABLE The alternate signal stack is currently disabled.
+Upon successful completion, 0 is return. Otherwise, <mi>1 is returned and errno is set to indicate the error.
+The sigaltstack() function will fail if:
+EFAULT The ss or oss argument points to an illegal address.
+EINVAL The ss argument is not a null pointer, and the ss_flags member pointed to by ss contains flags other than
+SS_DISABLE.
+ENOMEM The size of the alternate stack area is less than MINSIGSTKSZ.
+EPERM An attempt was made to modify an active stack.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Standard _ MT-LevelAsync-Signal-Safe
+<beginning of page>
+getcontext(2), mmap(2), sigaction(2), ucontext.h(3HEAD), attributes(5), standards(5)
+The value SIGSTKSZ is defined to be the number of bytes that would be used to cover the usual case when allocat<hy>
+ing an alternate stack area. The value MINSIGSTKSZ is defined to be the minimum stack size for a signal han<hy>
+dler. In computing an alternate stack size, a program should add that amount to its stack requirements to allow for
+the operating system overhead.
+The following code fragment is typically used to allocate an alternate stack with an adjacent red zone (an unmapped
+page) to guard against stack overflow, as with default stacks:
+ #include <signal.h>
+ #include <sys/mman.h>
+ stack_t sigstk;
+ sigstk.ss_sp = mmap(NULL, SIGSTKSZ, PROT_READ | PROT_WRITE,
+  MAP_PRIVATE | MAP_ANON, -1, 0);
+ if (sigstk.ss_sp == MAP_FAILED)
+  /* error return */;
+ sigstk.ss_size = SIGSTKSZ;
+ sigstk.ss_flags = 0;
+ if (sigaltstack(&sigstk, NULL) < 0)
+  perror("sigaltstack");

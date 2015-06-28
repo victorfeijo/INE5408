@@ -1,0 +1,172 @@
+<beginning of page>
+cancellation <-> overview of concepts related to POSIX thread cancellation
+tab() box; cw(2.18i) |cw(3.32i) lw(2.18i) |lw(3.32i) FUNCTIONACTION _ pthread_cancel()Cancels thread execu<hy>
+tion. pthread_setcancelstate()Sets the cancellation state of a thread. pthread_setcanceltype()Sets the cancellation
+type of a thread. pthread_testcancel()T{ Creates a cancellation point in the calling thread. T}
+pthread_cleanup_push()Pushes a cleanup handler routine. pthread_cleanup_pop()Pops a cleanup handler rou<hy>
+tine.
+Thread cancellation allows a thread to terminate the execution of any application thread in the process. Cancellation
+is useful when further operations of one or more threads are undesirable or unnecessary.
+An example of a situation that could benefit from using cancellation is an asynchronously-generated cancel condi<hy>
+tion such as a user requesting to close or exit some running operation. Another example is the completion of a task
+undertaken by a number of threads, such as solving a maze. While many threads search for the solution, one of the
+threads might solve the puzzle while the others continue to operate. Since they are serving no purpose at that point,
+they should all be canceled.
+Planning and programming for most cancellations follow this pattern: 1. Identify which threads you want to cancel,
+and insert pthread_cancel(3C) statements. 2. Identify system-defined cancellation points where a thread that might
+be canceled could have changed system or program state that should be restored. See the Cancellation Points for a
+list. 3. When a thread changes the system or program state just before a cancellation point, and should restore that
+state before the thread is canceled, place a cleanup handler before the cancellation point with
+pthread_cleanup_push(3C). Wherever a thread restores the changed state, pop the cleanup handler from the
+cleanup stack with pthread_cleanup_pop(3C). 4. Know whether the threads you are canceling call into cancel-un<hy>
+safe libraries, and disable cancellation with pthread_setcancelstate(3C) before the call into the library. See Can<hy>
+cellation State and Cancel-Safe. 5. To cancel a thread in a procedure that contains no cancellation points, insert
+your own cancellation points with pthread_testcancel(3C). This function creates cancellation points by testing for
+pending cancellations and performing those cancellations if they are found. Push and pop cleanup handlers around
+the cancellation point, if necessary (see Step 3, above).
+The system defines certain points at which cancellation can occur (cancellation points), and you can create addition<hy>
+al cancellation points in your application with pthread_testcancel().
+The following cancellation points are defined by the system (system-defined cancellation points): creat(2), aio_sus<hy>
+pend(3C), close(2), creat(2), getmsg(2), getpmsg(2), lockf(3C), mq_receive(3C), mq_send(3C), msgrcv(2), ms<hy>
+gsnd(2), msync(3C), nanosleep(3C), open(2), pause(2), poll(2), pread(2), pthread_cond_timedwait(3C),
+pthread_cond_wait(3C), pthread_join(3C), pthread_testcancel(3C), putmsg(2), putpmsg(2), pwrite(2),
+read(2), readv(2), select(3C), sem_wait(3C), sigpause(3C), sigwaitinfo(3C), sigsuspend(2), sigtimedwait(3C),
+sigwait(2), sleep(3C), sync(2), system(3C), tcdrain(3C), usleep(3C), wait(3C), waitid(2), wait3(3C), wait<hy>
+pid(3C), write(2), writev(2), and fcntl(2), when specifying F_SETLKW as the command.
+When cancellation is asynchronous, cancellation can occur at any time (before, during, or after the execution of the
+function defined as the cancellation point). When cancellation is deferred (the default case), cancellation occurs only
+within the scope of a function defined as a cancellation point (after the function is called and before the function re<hy>
+turns). See Cancellation Type for more information about deferred and asynchronous cancellation.
+Choosing where to place cancellation points and understanding how cancellation affects your program depend upon
+your understanding of both your application and of cancellation mechanics.
+Typically, any call that might require a long wait should be a cancellation point. Operations need to check for pend<hy>
+ing cancellation requests when the operation is about to block indefinitely. This includes threads waiting in
+pthread_cond_wait() and pthread_cond_timedwait(), threads waiting for the termination of another thread in
+pthread_join(), and threads blocked on sigwait().
+A mutex is explicitly not a cancellation point and should be held for only the minimal essential time.
+Most of the dangers in performing cancellations deal with properly restoring invariants and freeing shared resources.
+For example, a carelessly canceled thread might leave a mutex in a locked state, leading to a deadlock. Or it might
+leave a region of memory allocated with no way to identify it and therefore no way to free it.
+When a thread is canceled, it should release resources and clean up the state that is shared with other threads. So,
+whenever a thread that might be canceled changes the state of the system or of the program, be sure to push a
+cleanup handler with pthread_cleanup_push(3C) before the cancellation point.
+<beginning of page>
+When a thread is canceled, all the currently-stacked cleanup handlers are executed in last-in-first-out (LIFO) order.
+Each handler is run in the scope in which it was pushed. When the last cleanup handler returns, the thread-specific
+data destructor functions are called. Thread execution terminates when the last destructor function returns.
+When, in the normal course of the program, an uncanceled thread restores state that it had previously changed, be
+sure to pop the cleanup handler (that you had set up where the change took place) using pthread_cleanup_pop(3C).
+That way, if the thread is canceled later, only currently-changed state will be restored by the handlers that are left in
+the stack.
+The pthread_cleanup_push() and pthread_cleanup_pop() functions can be implemented as macros. The applica<hy>
+tion must ensure that they appear as statements, and in pairs within the same lexical scope (that is, the
+pthread_cleanup_push() macro can be thought to expand to a token list whose first token is '{' with
+pthread_cleanup_pop() expanding to a token list whose last token is the corresponding '}').
+The effect of the use of return, break, continue, and goto to prematurely leave a code block described by a pair of
+pthread_cleanup_push() and pthread_cleanup_pop() function calls is undefined.
+Most programmers will use only the default cancellation state of PTHREAD_CANCEL_ENABLE, but can
+choose to change the state by using pthread_setcancelstate(3C), which determines whether a thread is cancelable at
+all. With the default state of PTHREAD_CANCEL_ENABLE, cancellation is enabled and the thread is cancelable
+at points determined by its cancellation type. See Cancellation Type.
+If the state is PTHREAD_CANCEL_DISABLE, cancellation is disabled, the thread is not cancelable at any point,
+and all cancellation requests to it are held pending.
+You might want to disable cancellation before a call to a cancel-unsafe library, restoring the old cancel state when
+the call returns from the library. See Cancel-Safe for explanations of cancel safety.
+A thread's cancellation type is set with pthread_setcanceltype(3C), and determines whether the thread can be can<hy>
+celed anywhere in its execution or only at cancellation points.
+With the default type of PTHREAD_CANCEL_DEFERRED, the thread is cancelable only at cancellation points,
+and then only when cancellation is enabled.
+If the type is PTHREAD_CANCEL_ASYNCHRONOUS, the thread is cancelable at any point in its execution (as<hy>
+suming, of course, that cancellation is enabled). Try to limit regions of asynchronous cancellation to sequences with
+no external dependencies that could result in dangling resources or unresolved state conditions. Using asynchronous
+cancellation is discouraged because of the danger involved in trying to guarantee correct cleanup handling at abso<hy>
+lutely every point in the program.
+tab() box; cw(1.83i) |cw(1.83i) |cw(1.83i) lw(1.83i) |lw(1.83i) |lw(1.83i) Cancellation Type/State Table TypeState
+Enabled (Default)Disabled _ Deferred (Default)T{ Cancellation occurs when the target thread reaches a cancellation
+point and a cancel is pending. (Default) T}T{ All cancellation requests to the target thread are held pending. T}
+AsynchronousT{ Receipt of a pthread_cancel() call causes immediate cancellation. T}T{ All cancellation requests
+to the target thread are held pending; as soon as cancellation is re-enabled, pending cancellations are executedimme<hy>
+diately. T}
+With the arrival of POSIX cancellation, the Cancel-Safe level has been added to the list of MT-Safety levels. See at<hy>
+tributes(5). An application or library is Cancel-Safe whenever it has arranged for cleanup handlers to restore system
+or program state wherever cancellation can occur. The application or library is specifically Deferred-Cancel-Safe
+when it is Cancel-Safe for threads whose cancellation type is PTHREAD_CANCEL_DEFERRED. See Cancella<hy>
+tion State. It is specifically Asynchronous-Cancel-Safe when it is Cancel-Safe for threads whose cancellation type is
+PTHREAD_CANCEL_ASYNCHRONOUS.
+It is easier to arrange for deferred cancel safety, as this requires system and program state protection only around
+cancellation points. In general, expect that most applications and libraries are not Asynchronous-Cancel-Safe.
+The cancellation functions described in this manual page are available for POSIX threads, only (the Solaris threads
+interfaces do not provide cancellation functions). Example 1 Cancellation example
+The following short C++ example shows the pushing/popping of cancellation handlers, the disabling/enabling of
+cancellation, the use of pthread_testcancel(), and so on. The free_res() cancellation handler in this example is a
+<beginning of page>
+dummy function that simply prints a message, but that would free resources in a real application. The function f2() is
+called from the main thread, and goes deep into its call stack by calling itself recursively.
+Before f2() starts running, the newly created thread has probably posted a cancellation on the main thread since the
+main thread calls thr_yield() right after creating thread2. Because cancellation was initially disabled in the main
+thread, through a call to pthread_setcancelstate(), the call to f2() from main() continues and constructs X at each
+recursive call, even though the main thread has a pending cancellation.
+When f2() is called for the fifty-first time (when "i == 50"), f2() enables cancellation by calling pthread_set<hy>
+cancelstate(). It then establishes a cancellation point for itself by calling pthread_testcancel(). (Because a cancel<hy>
+lation is pending, a call to a cancellation point such as read(2) or write(2) would also cancel the caller here.)
+After the main() thread is canceled at the fifty-first iteration, all the cleanup handlers that were pushed are called in
+sequence; this is indicated by the calls to free_res() and the calls to the destructor for X. At each level, the C++ run<hy>
+time calls the destructor for X and then the cancellation handler, free_res(). The print messages from free_res() and
+X's destructor show the sequence of calls.
+At the end, the main thread is joined by thread2. Because the main thread was canceled, its return status from
+pthread_join() is PTHREAD_CANCELED. After the status is printed, thread2 returns, killing the process (since
+it is the last thread in the process).
+ #include <pthread.h>
+ #include <sched.h>
+ extern "C" void thr_yield(void);
+ extern "C" void printf(...);
+ struct X {
+  int x;
+  X(int i){x = i; printf("X(%d) constructed.\n", i);}
+  ~X(){ printf("X(%d) destroyed.\n", x);}
+ };
+ void
+ free_res(void *i)
+ {
+  printf("Freeing `%d`\n",i);
+ }
+ char* f2(int i)
+ {
+  try {
+  X dummy(i);
+  pthread_cleanup_push(free_res, (void *)i);
+  if (i == 50) {
+  pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+  pthread_testcancel();
+  }
+  f2(i+1);
+  pthread_cleanup_pop(0);
+  }
+  catch (int) {
+  printf("Error: In handler.\n");
+  }
+  return "f2";
+ }
+ void *
+ thread2(void *tid)
+ {
+  void *sts;
+<beginning of page>
+  printf("I am new thread :%d\n", pthread_self());
+  pthread_cancel((pthread_t)tid);
+  pthread_join((pthread_t)tid, &sts);
+  printf("main thread cancelled due to %d\n", sts);
+  return (sts);
+ }
+ main()
+ {
+  pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
+  pthread_create(NULL, NULL, thread2, (void *)pthread_self());
+  thr_yield();
+  printf("Returned from %s\n",f2(0));
+ }
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelMT-Safe
+read(2), sigwait(2), write(2), Intro(3), condition(5), pthread_cleanup_pop(3C), pthread_cleanup_push(3C),
+pthread_exit(3C), pthread_join(3C), pthread_setcancelstate(3C), pthread_setcanceltype(3C), pthread_testcan<hy>
+cel(3C), setjmp(3C), attributes(5), standards(5)

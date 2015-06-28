@@ -1,0 +1,122 @@
+<beginning of page>
+vntsd <-> virtual network terminal server daemon for Logical Domains
+/usr/lib/ldoms/vntsd
+The vntsd daemon is a server that supports connections to the Logical Domains (LDoms) console by using tel<hy>
+net(1). When a telnet session starts, vntsd sends telnet options to the client indicating a willingness to remotely
+echo characters and to suppress go ahead.
+Consoles are organized into groups by the LDoms Manager. Each console group is assigned a unique group name
+and TCP port number. vntsd uses the group's port number to export access to the consoles within that group. To es<hy>
+tablish a connection with a console or console group, a user starts a telnet(1) session with the corresponding group's
+port number. Depending on the number of consoles within that group, vntsd does one of two things: <bu> If there is on<hy>
+ly one console in the group, vntsd connects a session to that LDoms console. <bu> If there are multiple consoles in the
+group, vntsd prompts the user to select the console to which they would like to connect, as shown in "Multiple-Con<hy>
+sole Options," below.
+For each console, vntsd provides write access only to the first user connecting to the console. Subsequent users con<hy>
+necting to the console are allowed only to read from the console and wait for write access. When the first user dis<hy>
+connects, write privileges are transferred to the next user waiting in the queue. If a user who does not have write
+privileges attempts to write to a console, the vntsd displays the following message:
+ You do not have write access
+A user who has no write access can acquire write access forcibly by using the ~w special console command, de<hy>
+scribed in "Special Console Commands," below.
+vntsd can be invoked only with superuser privileges or by someone in the Primary Administrator role.
+The options for vntsd are divided into multiple-console options and console commands.
+The options listed below are supported when there are multiple LDoms consoles in a group. The syntax for the use
+of these options is:
+ <hostname>-vnts-<group-name>: <option>
+For example:
+ myhost-vnts-salesgroup: h
+The h option invokes help, as described below.
+h
+Display the following help text:
+ h -- this help
+ l -- list of consoles
+ q -- quit
+ c{id}, n{name} -- connect to console of domain {id} or domain name
+l
+List all consoles in the group. For example:
+ DOMAIN ID DOMAIN NAME DOMAIN STATE
+ 0 ldg1 online
+ 1 ldg2 connected
+ ... ... ...
+The two domain states and their meanings are:
+<beginning of page>
+online
+No one is connected to the console.
+connected
+At least one user is already connected to the console.
+q
+Disconnect from vntsd.
+c{id}, n{name}
+Connect to specified console. Upon connection, the following message is displayed:
+ Connecting to console <domain-name> in group <group-name>
+ Press ~? for control options ....
+A tilde (~) appearing as the first character of a line is an escape signal that directs vntsd to perform a special console
+command. The tilde-tilde (~~) sequence outputs a tilde. In conjunction with the initial tilde, vntsd accepts the follow<hy>
+ing special console commands:
+~.
+Disconnect from the console or console group.
+~w
+Force write access to the console.
+~p
+Disconnect from this console, and connect to the console that precedes this console in the list of consoles.
+~n
+Disconnect from this console, and connect to the console that follows this console in the list of consoles.
+~#
+Send break.
+~^B
+Send alternate break.
+~?
+Display vntsd help, as follows:
+ ~# - Send break
+ ~^B - Send alternate break
+ ~. - Exit from this console
+ ~w - Force write access
+ ~n - Console next
+ ~p - Console previous
+ ~? - Help
+<beginning of page>
+/usr/lib/ldoms/vntsd
+Binary executable vntsd file.
+/usr/lib/ldoms/vntsd.xml
+Service management facility (smf(5)) manifest file for vntsd.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wldoms _ Interface StabilityEvolving
+telnet(1), svccfg(1M), usermod(1M), auth_attr(4), attributes(5), smf(5)
+The vntsd is managed by the service management facility, smf(5), under the service identifier:
+ svc:/ldoms/vntsd
+You can change the following properties using the svccfg(1M) command:
+vntsd/vcc_device
+Set an instance of the virtual console concentrator (vcc) driver to which vntsd is connected.
+vntsd/listen_addr
+Set the IP address to which vntsd listens, using the following syntax:
+ vntsd/listen_addr:"xxx.xxx.xxx.xxx"
+...where xxx.xxx.xxx.xxx is a valid IP address. The default value of this property is to listen on IP address 127.0.0.1.
+Users can connect to a guest console over a network if the value is set to the IP address of the control domain. Note
+-
+Enabling network access to a console has security implications. Any user can connect to a console and for this rea<hy>
+son it is disabled by default.
+vntsd/timeout_minutes
+Set timeout in minutes. vntsd will timeout (close) telnet connection if there is no activity (input or output) on the
+console. The default value is 0, which disables timeout.
+vntsd/authorization
+Enable the authorization checking of users and roles for the domain console or consoles that are being accessed. The
+default value of this property is false to maintain backward compatibility. To enable authorization checking, use the
+svccfg(1M) command to set the property value to true. While this option is enabled, vntsd listens and accepts con<hy>
+nections on localhost. If the listen_addr property specifies an alternate IP address when this option is enabled,
+vntsd ignores the alternate IP address and continues to listen on localhost. Connections that are initiated from other
+hosts will also fail. Authorizations are available to access all consoles or console groups, or to access specific con<hy>
+soles or console groups. When the vntsd service is enabled, the following authorization is added to the authorization
+description database, auth_attr(4):
+ solaris.vntsd.consoles:::Access All LDoms Guest Consoles::
+Add any fine-grained authorizations based on the name of the console group. For example, if the name of the con<hy>
+<beginning of page>
+sole group to be authorized is ldg1, add the following entry to the auth_attr(4) file:
+ solaris.vntsd.console-ldg1:::Access Specific LDoms Guest Console::
+By default, the authorization to access all consoles is assigned to the root user or role. The Primary Administrator
+(superuser) can use the usermod(1M) command to assign the required authorization or authorizations to other users
+or roles.
+The following example gives user user1 the authorization to access all domain consoles:
+ # usermod -A "solaris.vntsd.consoles" user1
+The following example gives user user1 the authorization to access the console group named ldg1:
+ # usermod -A "solaris.vntsd.console-ldg1" user1

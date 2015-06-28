@@ -1,0 +1,59 @@
+<beginning of page>
+csx_RequestIRQ, csx_ReleaseIRQ <-> request or release IRQ resource
+#include <sys/pccard.h>
+int32_t csx_RequestIRQ(client_handle_t ch, irq_req_t *ir);
+int32_t csx_ReleaseIRQ(client_handle_t ch, irq_req_t *ir);
+Solaris DDI Specific (Solaris DDI)
+ch Client handle returned from csx_RegisterClient(9F).
+ir Pointer to an irq_req_t structure.
+The function csx_RequestIRQ() requests an IRQ resource and registers the client's IRQ handler with Card Ser<hy>
+vices.
+If a client requires an IRQ,csx_RequestIRQ() must be called to request an IRQ resource as well as to register the
+client's IRQ handler with Card Services. The client will not receive callbacks at the IRQ callback handler until
+csx_RequestConfiguration(9F) or csx_ModifyConfiguration(9F) has successfully returned when either of these
+functions are called with the CONF_ENABLE_IRQ_STEERING bit set.
+The function csx_ReleaseIRQ() releases a previously requested IRQ resource.
+The Card Services IRQ resource list is adjusted by csx_ReleaseIRQ(). Depending on the adapter hardware, the host
+bus IRQ connection might also be disabled. Client IRQ handlers always run above lock level and so should take
+care to perform only Solaris operations that are appropriate for an above-lock-level IRQ handler.
+csx_RequestIRQ() fails if it has already been called without a corresponding csx_ReleaseIRQ().
+The structure members of irq_req_t are:
+ uint32_t Socket; /* socket number */
+ uint32_t Attributes; /* IRQ attribute flags */
+ csfunction_t *irq_handler; /* IRQ handler */
+ void *irq_handler_arg; /* IRQ handler argument */
+ ddi_iblock_cookie_t *iblk_cookie; /* IRQ interrupt
+  /* block cookie */
+ ddi_idevice_cookie_t *idev_cookie; /* IRQ interrupt device
+  /* cookie */
+The fields are defined as follows:
+Socket Not used in Solaris, but for portability with other Card Services implementations, it should be set to the logi<hy>
+cal socket number.
+Attributes This field is bit-mapped. It specifies details about the type of IRQ desired by the client. The following
+bits are defined:
+IRQ_TYPE_EXCLUSIVE IRQ is exclusive to this socket. This bit must be set. It indicates that the system IRQ is
+dedicated to this PC Card.
+irq_handler The client IRQ callback handler entry point is passed in the irq_handler field.
+irq_handler_arg The client can use the irq_handler_arg field to pass client-specific data to the client IRQ callback
+handler.
+<beginning of page>
+iblk_cookie
+idev_cookie These fields must be used by the client to set up mutexes that are used in the client's IRQ callback han<hy>
+dler.
+For a specific csx_ReleaseIRQ() call, the values in the irq_req_t structure must be the same as those returned from
+the previous csx_RequestIRQ() call; otherwise, CS_BAD_ARGS is returned and no changes are made to Card
+Services resources or the socket and adapter hardware.
+CS_SUCCESS Successful operation.
+CS_BAD_ARGS IRQ description does not match allocation.
+CS_BAD_ATTRIBUTE IRQ_TYPE_EXCLUSIVE not set, or an unsupported or reserved   bit is set.
+CS_BAD_HANDLE Client handle is invalid or csx_RequestConfiguration(9F) not done.
+CS_BAD_IRQ Unable to allocate IRQ resources.
+CS_IN_USE csx_RequestIRQ() already done or a previous csx_RequestIRQ() has not been done for a corre<hy>
+sponding csx_ReleaseIRQ().
+CS_CONFIGURATION_LOCKED csx_RequestConfiguration(9F) already done or csx_ReleaseConfigura<hy>
+tion(9F) has not been done.
+CS_NO_CARD No PC Card in socket.
+CS_UNSUPPORTED_FUNCTION No PCMCIA hardware installed.
+These functions may be called from user or kernel context.
+csx_ReleaseConfiguration(9F), csx_RequestConfiguration(9F)
+PC Card Card 95 Standard, PCMCIA/JEIDA

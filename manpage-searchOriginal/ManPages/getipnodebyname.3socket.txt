@@ -1,0 +1,170 @@
+<beginning of page>
+getipnodebyname, getipnodebyaddr, freehostent <-> get IP node entry
+cc [ flag... ] file... -lsocket -lnsl [ library... ]
+#include <sys/socket.h>
+#include <netdb.h>
+struct hostent *getipnodebyname(const char *name, int af,
+ int flags, int *error_num);
+struct hostent *getipnodebyaddr(const void *src, size_t len,
+ int af, int *error_num);
+void freehostent(struct hostent *ptr);
+af Address family
+flags Various flags
+name Name of host
+error_num Error storage
+src Address for lookup
+len Length of address
+ptr Pointer to hostent structure
+The getipnodebyname() function searches the ipnodes database from the beginning. The function finds the first
+h_name member that matches the hostname specified by name. The function takes an af argument that specifies the
+address family. The address family can be AF_INET for IPv4 addresses or AF_INET6 for IPv6 addresses. The
+flags argument determines what results are returned based on the value of flags. If the flags argument is set to 0 (ze<hy>
+ro), the default operation of the function is specified as follows: <bu> If the af argument is AF_INET, a query is made
+for an IPv4 address. If successful, IPv4 addresses are returned and the h_length member of the hostent structure is
+4. Otherwise, the function returns a NULL pointer. <bu> If the af argument is AF_INET6, a query is made for an IPv6
+address. If successful, IPv6 addresses are returned and the h_length member of the hostent structure is 16. Other<hy>
+wise, the function returns a NULL pointer.
+The flags argument changes the default actions of the function. Set the flags argument with a logical OR operation
+on any of combination of the following values: <bu> AI_V4MAPPED <bu> AI_ALL <bu> AI_ADDRCONFIG
+The special flags value, AI_DEFAULT, should handle most applications. Porting simple applications to use IPv6 re<hy>
+places the call
+ hptr = gethostbyname(name);
+with
+ hptr = getipnodebyname(name, AF_INET6, AI_DEFAULT, &error_num);
+The flags value 0 (zero) implies a strict interpretation of the af argument: <bu> If flags is 0 and af is AF_INET, the caller
+wants only IPv4 addresses. A query is made for A records. If successful, IPv4 addresses are returned and the
+h_length member of the hostent structure is 4. Otherwise, the function returns a NULL pointer. <bu> If flags is 0 and af
+is AF_INET6, the caller wants only IPv6 addresses. A query is made for AAAA records. If successful, IPv6 ad<hy>
+dresses are returned and the h_length member of the hostent structure is 16. Otherwise, the function returns a
+NULL pointer.
+<beginning of page>
+Logically OR other constants into the flags argument to modify the behavior of the getipnodebyname() function. <bu>
+If the AI_V4MAPPED flag is specified with af set to AF_INET6, the caller can accept IPv4-mapped IPv6 address<hy>
+es. If no AAAA records are found, a query is made for A records. Any A records found are returned as IPv4-mapped
+IPv6 addresses and the h_length is 16. The AI_V4MAPPED flag is ignored unless af equals AF_INET6. <bu> The
+AI_ALL flag is used in conjunction with the AI_V4MAPPED flag, exclusively with the IPv6 address family. When
+AI_ALL is logically ORed with AI_V4MAPPED flag, the caller wants all addresses: IPv6 and IPv4-mapped IPv6
+addresses. A query is first made for AAAA records and, if successful, IPv6 addresses are returned. Another query is
+then made for A records. Any A records found are returned as IPv4-mapped IPv6 addresses and the h_length is 16.
+Only when both queries fail does the function return a NULL pointer. The AI_ALL flag is ignored unless af is set to
+AF_INET6. <bu> The AI_ADDRCONFIG flag specifies that a query for AAAA records should occur only when the
+node is configured with at least one IPv6 source address. A query for A records should occur only when the node is
+configured with at least one IPv4 source address. For example, if a node is configured with no IPv6 source address<hy>
+es, af equals AF_INET6, and the node name queried has both AAAA and A records, then: <bu> A NULL pointer is re<hy>
+turned when only the AI_ADDRCONFIG value is specified. <bu> The A records are returned as IPv4-mapped IPv6
+addresses when the AI_ADDRCONFIG and AI_V4MAPPED values are specified.
+The special flags value, AI_DEFAULT, is defined as
+ #define AI_DEFAULT (AI_V4MAPPED | AI_ADDRCONFIG)
+The getipnodebyname() function allows the name argument to be a node name or a literal address string: a dotted-
+decimal IPv4 address or an IPv6 hex address. Applications do not have to call inet_pton(3SOCKET) to handle liter<hy>
+al address strings.
+Four scenarios arise based on the type of literal address string and the value of the af argument. The two simple cas<hy>
+es occur when name is a dotted-decimal IPv4 address and af equals AF_INET and when name is an IPv6 hex ad<hy>
+dress and af equals AF_INET6. The members of the returned hostent structure are:
+h_name Pointer to a copy of the name argument
+h_aliases NULL pointer.
+h_addrtype Copy of the af argument.
+h_length 4 for AF_INET or 16 for AF_INET6.
+h_addr_list Array of pointers to 4-byte or 16-byte binary addresses. The array is terminated by a NULL pointer.
+Upon successful completion, getipnodebyname() and getipnodebyaddr() return a hostent structure. Otherwise
+they return NULL.
+The hostent structure does not change from the existing definition when used with gethostbyname(3NSL). For ex<hy>
+ample, host entries are represented by the struct hostent structure defined in <netdb.h>:
+ struct hostent {
+  char *h_name; /* canonical name of host */
+  char **h_aliases; /* alias list */
+  int h_addrtype; /* host address type */
+  int h_length; /* length of address */
+  char **h_addr_list; /* list of addresses */
+ };
+An error occurs when name is an IPv6 hex address and af equals AF_INET. The return value of the function is a
+NULL pointer and error_num equals HOST_NOT_FOUND.
+The getipnodebyaddr() function has the same arguments as the existing gethostbyaddr(3NSL) function, but adds
+an error number. As with getipnodebyname(), getipnodebyaddr() is thread-safe. The error_num value is returned
+to the caller with the appropriate error code to support thread-safe error code returns. The following error conditions
+can be returned for error_num:
+<beginning of page>
+HOST_NOT_FOUND Host is unknown.
+NO_DATA No address is available for the name specified in the server request. This error is not a soft error. Another
+type of name server request might be successful.
+NO_RECOVERY An unexpected server failure occurred, which is a non-recoverable error.
+TRY_AGAIN This error is a soft error that indicates that the local server did not receive a response from an authori<hy>
+tative server. A retry at some later time might be successful.
+One possible source of confusion is the handling of IPv4-mapped IPv6 addresses and IPv4-compatible IPv6 address<hy>
+es, but the following logic should apply: 1. If af is AF_INET6, and if len equals 16, and if the IPv6 address is an
+IPv4-mapped IPv6 address or an IPv4-compatible IPv6 address, then skip over the first 12 bytes of the IPv6 address,
+set af to AF_INET, and set len to 4. 2. If af is AF_INET, lookup the name for the given IPv4 address. 3. If af is
+AF_INET6, lookup the name for the given IPv6 address. 4. If the function is returning success, then the single ad<hy>
+dress that is returned in the hostent structure is a copy of the first argument to the function with the same address
+family that was passed as an argument to this function.
+All four steps listed are performed in order.
+This structure, and the information pointed to by this structure, are dynamically allocated by getipnodebyname()
+and getipnodebyaddr(). The freehostent() function frees this memory. Example 1 Getting the Canonical Name,
+Aliases, and Internet IP Addresses for a Given Hostname
+The following is a sample program that retrieves the canonical name, aliases, and all Internet IP addresses, both ver<hy>
+sion 6 and version 4, for a given hostname.
+  #include <stdio.h>
+  #include <string.h>
+  #include <sys/types.h>
+  #include <sys/socket.h>
+  #include <netinet/in.h>
+  #include <arpa/inet.h>
+  #include <netdb.h>
+  main(int argc, const char **argv)
+  {
+  char abuf[INET6_ADDRSTRLEN];
+  int error_num;
+  struct hostent *hp;
+  char **p;
+  if (argc != 2) {
+  (void) printf("usage: %s hostname0, argv[0]);
+  exit (1);
+  }
+  /* argv[1] can be a pointer to a hostname or literal IP address */
+  hp = getipnodebyname(argv[1], AF_INET6, AI_ALL | AI_ADDRCONFIG |
+  AI_V4MAPPED, &error_num);
+  if (hp == NULL) {
+  if (error_num == TRY_AGAIN) {
+  printf("%s: unknown host or invalid literal address "
+  "(try again later)0, argv[1]);
+  } else {
+  printf("%s: unknown host or invalid literal address0,
+  argv[1]);
+  }
+  exit (1);
+  }
+<beginning of page>
+  for (p = hp->h_addr_list; *p != 0; p++) {
+  struct in6_addr in6;
+  char **q;
+  bcopy(*p, (caddr_t)&in6, hp->h_length);
+  (void) printf("%s%s", inet_ntop(AF_INET6, (void *)&in6,
+  abuf, sizeof(abuf)), hp->h_name);
+  for (q = hp->h_aliases; *q != 0; q++)
+  (void) printf(" %s", *q);
+  (void) putchar('0);
+  }
+  freehostent(hp);
+  exit (0);
+  }
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed _ MT-LevelSafe
+getaddrinfo(3SOCKET), gethostbyname(3NSL), htonl(3SOCKET), inet(3SOCKET), netdb.h(3HEAD), hosts(4),
+nsswitch.conf(4), attributes(5)
+No enumeration functions are provided for IPv6. Existing enumeration functions such as sethostent(3NSL) do not
+work in combination with the getipnodebyname() and getipnodebyaddr() functions.
+All the functions that return a struct hostent must always return the canonical in the h_name field. This name, by
+definition, is the well-known and official hostname shared between all aliases and all addresses. The underlying
+source that satisfies the request determines the mapping of the input name or address into the set of names and ad<hy>
+dresses in hostent. Different sources might make such as determination in different ways. If more than one alias and
+more than one address in hostent exist, no pairing is implied between the alias and address.
+The current implementations of these functions return or accept only addresses for the Internet address family (type
+AF_INET) or the Internet address family Version 6 (type AF_INET6).
+IPv4-mapped addresses are not recommended. The getaddrinfo(3SOCKET) function is preferred over getipnode<hy>
+byaddr() because it allows applications to lookup IPv4 and IPv6 addresses without relying on IPv4-mapped ad<hy>
+dresses.
+The form for an address of type AF_INET is a struct in_addr defined in <netinet/in.h>. The form for an address
+of type AF_INET6 is a struct in6_addr, also defined in <netinet/in.h>. The functions described in in<hy>
+et_ntop(3SOCKET) and inet_pton(3SOCKET) that are illustrated in the EXAMPLES section are helpful in con<hy>
+structing and manipulating addresses in either of these forms.

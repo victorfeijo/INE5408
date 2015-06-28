@@ -1,0 +1,99 @@
+<beginning of page>
+ldap <-> LDAP as a naming repository
+LDAP refers to Lightweight Directory Access Protocol, which is an industry standard for accessing directory
+servers. By initializing the client using ldapclient(1M) and using the keyword ldap in the name service switch file,
+/etc/nsswitch.conf, Solaris clients can obtain naming information from an LDAP server. Information such as user<hy>
+names, hostnames, and passwords are stored on the LDAP server in a Directory Information Tree or DIT. The DIT
+consists of entries which in turn are composed of attributes. Each attribute has a type and one or more values.
+Solaris LDAP clients use the LDAP v3 protocol to access naming information from LDAP servers. The LDAP serv<hy>
+er must support the object classes and attributes defined in RFC2307bis (draft), which maps the naming service
+model on to LDAP. As an alternate to using the schema defined in RFC2307bis (draft), the system can be configured
+to use other schema sets and the schema mapping feature is configured to map between the two. Refer to the System
+Administration Guide: Naming and Directory Services (DNS, NIS, and LDAP) for more details.
+The ldapclient(1M) utility can make a Solaris machine an LDAP client by setting up the appropriate directories,
+files, and configuration information. The LDAP client caches this configuration information in local cache files. This
+configuration information is accessed through the ldap_cachemgr(1M) daemon. This daemon also refreshes the in<hy>
+formation in the configuration files from the LDAP server, providing better performance and security. The
+ldap_cachemgr must run at all times for the proper operation of the naming services.
+There are two types of configuration information, the information available through a profile, and the information
+configured per client. The profile contains all the information as to how the client accesses the directory. The creden<hy>
+tial information for proxy user is configured on a per client basis and is not downloaded through the profile.
+The profile contains server-specific parameters that are required by all clients to locate the servers for the desired
+LDAP domain. This information could be the server's IP address and the search base Distinguished Name (DN), for
+instance. It is configured on the client from the default profile during client initialization and is periodically updated
+by the ldap_cachemgr daemon when the expiration time has elapsed.
+Client profiles can be stored on the LDAP server and can be used by the ldapclient utility to initialize an LDAP
+client. Using the client profile is the easiest way to configure a client machine. See ldapclient(1M).
+Credential information includes client-specific parameters that are used by a client. This information could be the
+Bind DN (LDAP "login" name) of the client and the password. If these parameters are required, they are manually
+defined during the initialization through ldapclient(1M).
+The naming information is stored in containers on the LDAP server. A container is a non-leaf entry in the DIT that
+contains naming service information. Containers are similar to maps in NIS and tables in NIS+. A default mapping
+between the NIS databases and the containers in LDAP is presented below. The location of these containers as well
+as their names can be overridden through the use of serviceSearchDescriptors. For more information, see ldap<hy>
+client(1M).
+tab() box; cw(1.83i) |cw(1.83i) |cw(1.83i) lw(1.83i) |lw(1.83i) |lw(1.83i) DatabaseObject ClassContainer _ passwd<hy>
+posixAccountou=people,dc=... shadowAccount _ groupposixGroupou=Group,dc=... _ servicesipServiceou=Ser<hy>
+vices,dc=... _ protocolsipProtocolou=Protocols,dc=... _ rpconcRpcou=Rpc,dc=... _ hostsipHostou=Hosts,dc=...
+ipnodesipHostou=Hosts,dc=... _ ethersieee802Deviceou=Ethers,dc=... _ bootparamsbootableDe<hy>
+viceou=Ethers,dc=... _ networksipNetworkou=Networks,dc=... netmasksipNetwork ou=Networks,dc=... _ net<hy>
+groupnisNetgroupou=Netgroup,dc=... _ aliasesmailGroupou=Aliases,dc=... _ publickeynisKeyObject _ generic<hy>
+nisObjectnisMapName=...,dc=... _ printersprinterServiceou=Printers,dc=... _ auth_attrSolarisAuthAttrou=Solar<hy>
+isAuthAttr,dc=... _ prof_attrSolarisProfAttrou=SolarisProfAttr,dc=... _ exec_attrSolarisExecAttrou=SolarisProfAt<hy>
+tr,dc=... _ user_attrSolarisUserAttrou=people,dc=... _ audit_userSolarisAuditUserou=people,dc=...
+The security model for clients is defined by a combination of the credential level to be used, the authentication
+method, and the PAM modules to be used. The credential level defines what credentials the client should use to au<hy>
+thenticate to the directory server, and the authentication method defines the method of choice. Both these can be set
+with multiple values. The Solaris LDAP supports the following values for credential level :
+ anonymous
+ proxy
+ self
+The Solaris LDAP supports the following values for authentication method:
+ none
+ simple
+<beginning of page>
+ sasl/CRAM-MD5
+ sasl/DIGEST-MD5
+ sasl/GSSAPI
+ tls:simple
+ tls:sasl/CRAM-MD5
+ tls:sasl/DIGEST-MD5
+When the credential level is configured as self, DNS must be configured and the authentication method must be
+sasl/GSSAPI. The hosts and ipnodes in /etc/nsswitch.conf must be configured to use DNS, for example hosts: dns
+files and ipnodes: dns files.
+sasl/GSSAPI automatically uses GSSAPI confidentiality and integrity options, if they are configured on the directo<hy>
+ry server.
+The credential level of self enables per-user naming service lookups, or lookups that use the GSSAPI credentials of
+the user when connecting to the directory server. Currently the only GSSAPI mechanism supported in this model is
+Kerberos V5. Kerberos must be configured before you can use this credential level. See kerberos(5) for details.
+More protection can be provided by means of access control, allowing the server to grant access for certain contain<hy>
+ers or entries. Access control is specified by Access Control Lists (ACLs) that are defined and stored in the LDAP
+server. The Access Control Lists on the LDAP server are called Access Control Instructions (ACIs) by the the
+SunOne Directory Server. Each ACL or ACI specifies one or more directory objects, for example, the cn attribute in
+a specific container, one or more clients to whom you grant or deny access, and one or more access rights that deter<hy>
+mine what the clients can do to or with the objects. Clients can be users or applications. Access rights can be speci<hy>
+fied as read and write, for example. Refer to the System Administration Guide: Naming and Directory Services
+(DNS, NIS, and LDAP) regarding the restrictions on ACLs and ACIs when using LDAP as a naming repository.
+A sample nsswitch.conf(4) file called nsswitch.ldap is provided in the /etc directory. This is copied to /etc/nss<hy>
+witch.conf by the ldapclient(1M) utility. This file uses LDAP as a repository for the different databases in the nss<hy>
+witch.conf file.
+The following is a list of the user commands related to LDAP:
+idsconfig(1M) Prepares a SunOne Directory Server to be ready to support Solaris LDAP clients.
+ldapaddent(1M) Creates LDAP entries from corresponding /etc files.
+ldapclient(1M) Initializes LDAP clients, or generates a configuration profile to be stored in the directory.
+ldaplist(1) Lists the contents of the LDAP naming space.
+/var/ldap/ldap_client_cred
+/var/ldap/ldap_client_file Files that contain the LDAP configuration of the client. Do not manually modify these
+files. Their content is not guaranteed to be human readable. Use ldapclient(1M) to update them.
+/etc/nsswitch.conf Configuration file for the name-service switch.
+/etc/nsswitch.ldap Sample configuration file for the name-service switch configured with LDAP and files.
+/etc/pam.conf PAM framework configuration file.
+ldaplist(1), idsconfig(1M), ldap_cachemgr(1M), ldapaddent(1M), ldapclient(1M), nsswitch.conf(4),
+pam.conf(4), kerberos(5)pam_authtok_check(5), pam_authtok_get(5), pam_authtok_store(5),
+pam_dhkeys(5), pam_ldap(5), pam_passwd_auth(5), pam_unix_account(5), pam_unix_auth(5),
+pam_unix_session(5)
+System Administration Guide: Naming and Directory Services (DNS, NIS, and LDAP)
+The pam_unix(5) module is no longer supported. Similar functionality is provided by pam_authtok_check(5),
+<beginning of page>
+pam_authtok_get(5), pam_authtok_store(5), pam_dhkeys(5), pam_passwd_auth(5), pam_unix_account(5),
+pam_unix_auth(5), andpam_unix_session(5).

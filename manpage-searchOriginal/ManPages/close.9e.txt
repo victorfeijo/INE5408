@@ -1,0 +1,84 @@
+<beginning of page>
+close <-> relinquish access to a device
+#include <sys/types.h>
+#include <sys/file.h>
+#include <sys/errno.h>
+#include <sys/open.h>
+#include <sys/cred.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+int prefixclose(dev_t dev, int flag, int otyp, cred_t *cred_p);
+#include <sys/types.h>
+#include <sys/stream.h>
+#include <sys/file.h>
+#include <sys/errno.h>
+#include <sys/open.h>
+#include <sys/cred.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+int prefixclose(queue_t *q, int flag, cred_t *cred_p);
+Architecture independent level 1 (DDI/DKI). This entry point is required for block devices.
+dev Device number.
+flag File status flag, as set by the open(2) or modified by the fcntl(2) system calls. The flag is for information on<hy>
+ly<em>the file should always be closed completely. Possible values are: FEXCL, FNDELAY, FREAD, FKLYR, and
+FWRITE. Refer to open(9E) for more information.
+otyp Parameter supplied so that the driver can determine how many times a device was opened and for what reasons.
+The flags assume the open() routine may be called many times, but the close() routine should only be called on the
+last close() of a device.
+OTYP_BLK Close was through block interface for the device.
+OTYP_CHR Close was through the raw/character interface for the device.
+OTYP_LYR Close a layered process (a higher-level driver called the close() routine of the device).
+*cred_p Pointer to the user credential structure.
+*q Pointer to queue(9S) structure used to reference the read side of the driver. (A queue is the central node of a col<hy>
+lection of structures and routines pointed to by a queue.)
+flag File status flag.
+*cred_p Pointer to the user credential structure.
+For STREAMS drivers, the close() routine is called by the kernel through the cb_ops(9S) table entry for the device.
+(Modules use the fmodsw table.) A non-null value in the d_str field of the cb_ops entry points to a streamtab
+<beginning of page>
+structure, which points to a qinit(9S) containing a pointer to the close() routine. Non-STREAMS close() routines
+are called directly from the cb_ops table.
+close() ends the connection between the user process and the device, and prepares the device (hardware and soft<hy>
+ware) so that it is ready to be opened again.
+A device may be opened simultaneously by multiple processes and the open() driver routine is called for each open.
+For all otyp values other than OTYP_LYR, the kernel calls the close() routine when the last-reference occurs. For
+OTYP_LYR each close operation will call the driver.
+Kernel accounting for last-reference occurs at (dev, otyp) granularity. Note that a device is referenced once its asso<hy>
+ciated open(9E) routine is entered, and thus open(9E)'s which have not yet completed will prevent close() from be<hy>
+ing called. The driver's close() call associated with the last-reference going away is typically issued as result of a
+close(2), exit(2), munmap(2), or umount(2). However, a failed open(9E) call can cause this last-reference close()
+call to be issued as a result of an open(2) or mount(2).
+The kernel provides open() close() exclusion guarantees to the driver at the same devp, otyp granularity as last-refer<hy>
+ence accounting. The kernel delays new calls to the open() driver routine while the last-reference close() call is ex<hy>
+ecuting. For example, a driver that blocks in close() will not see new calls to open() until it returns from close().
+This effectively delays invocation of other cb_ops(9S) driver entry points that also depend on an open(9E) estab<hy>
+lished device reference. If the driver has indicated that an EINTR return is safe via the D_OPEN_RETURNS_EIN<hy>
+TR cb_flag, then a delayed open() may be interrupted by a signal, resulting in an EINTR return from open() prior
+to calling open(9E).
+Last-reference accounting and open() close() exclusion typically simplify driver writing. In some cases, however,
+they might be an impediment for certain types of drivers. To overcome any impediment, the driver can change minor
+numbers in open(9E), as described below, or implement multiple minor nodes for the same device. Both techniques
+give the driver control over when close() calls occur and whether additional open() calls will be delayed while
+close() is executing.
+In general, a close() routine should always check the validity of the minor number component of the dev parameter.
+The routine should also check permissions as necessary, by using the user credential structure (if pertinent), and the
+appropriateness of the flag and otyp parameter values.
+close() could perform any of the following general functions: <bu> disable interrupts <bu> hang up phone lines <bu> rewind a
+tape <bu> deallocate buffers from a private buffering scheme <bu> unlock an unsharable device (that was locked in the
+open() routine) <bu> flush buffers <bu> notify a device of the close <bu> deallocate any resources allocated on open
+The close() routines of STREAMS drivers and modules are called when a stream is dismantled or a module popped.
+The steps for dismantling a stream are performed in the following order. First, any multiplexor links present are un<hy>
+linked and the lower streams are closed. Next, the following steps are performed for each module or driver on the
+stream, starting at the head and working toward the tail: 1. The write queue is given a chance to drain. 2. The
+close() routine is called. 3. The module or driver is removed from the stream.
+close() should return 0 for success, or the appropriate error number. Return errors rarely occur, but if a failure is de<hy>
+tected, the driver should decide whether the severity of the problem warrants either displaying a message on the con<hy>
+sole or, in worst cases, triggering a system panic. Generally, a failure in a close() routine occurs because a problem
+occurred in the associated device.
+If you use qwait_sig(9F), cv_wait_sig(9F) or cv_timedwait_sig(9F), you should note that close() may be called in
+contexts in which signals cannot be received. The ddi_can_receive_sig(9F) function is provided to determine when
+this hazard exists.
+close(2), fcntl(2), open(2), umount(2), detach(9E), open(9E), ddi_can_receive_sig(9F), cb_ops(9S), qinit(9S),
+queue(9S)
+Writing Device Drivers
+STREAMS Programming Guide

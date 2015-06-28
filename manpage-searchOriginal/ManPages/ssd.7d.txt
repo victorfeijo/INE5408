@@ -1,0 +1,140 @@
+<beginning of page>
+ssd <-> Fibre Channel Arbitrated Loop disk device driver
+ssd@port,target:partition
+ The ssd driver supports Fibre Channel disk devices.
+The specific type of each disk is determined by the SCSI inquiry command and reading the volume label stored on
+block 0 of the drive. The volume label describes the disk geometry and partitioning; it must be present or the disk
+cannot be mounted by the system.
+The block-files access the disk using the system's normal buffering mechanism and are read and written without re<hy>
+gard to physical disk records. A "raw" interface provides for direct transmission between the disk and the read or
+write buffer. A single read or write call usually results in one I/O operation; raw I/O is therefore more efficient when
+many bytes are transmitted. Block file names are found in /dev/dsk; the names of the raw files are found in /dev/rd<hy>
+sk.
+I/O requests (such as lseek(2)) to the SCSI disk must have an offset that is a multiple of 512 bytes (DEV_BSIZE),
+or the driver returns an EINVAL error. If the transfer length is not a multiple of 512 bytes, the transfer count is
+rounded up by the driver.
+Partition 0 is normally used for the root file system on a disk, with partition 1 as a paging area (for example, swap).
+Partition 2 is used to back up the entire disk. Partition 2 normally maps the entire disk and may also be used as the
+mount point for secondary disks in the system. The rest of the disk is normally partition 6. For the primary disk, the
+user file system is located here.
+The device has associated error statistics. These must include counters for hard errors, soft errors and transport er<hy>
+rors. Other data may be implemented as required.
+The device maintains I/O statistics for the device and for partitions allocated for that device. For each device/parti<hy>
+tion, the driver accumulates reads, writes, bytes read, and bytes written. The driver also initiates hi-resolution time
+stamps at queue entry and exit points to enable monitoring of residence time and cumulative residence-length prod<hy>
+uct for each queue.
+Not all device drivers make per-partition IO statistics available for reporting. ssd and sd(7D) per-partition statistics
+are enabled by default but may be disabled in their configuration files.
+Refer to dkio(7I).
+EACCES Permission denied.
+EBUSY The partition was opened exclusively by another thread.
+EFAULT The argument was a bad address.
+EINVAL Invalid argument.
+EIO An I/O error occurred.
+ENOTTY The device does not support the requested ioctl function.
+ENXIO When returned during open(2), this error indicates the device does not exist.
+EROFS The device is a read-only device.
+You configure the ssd driver by defining properties in the ssd.conf file. The ssd driver supports the following prop<hy>
+erties:
+<beginning of page>
+enable-partition-kstats The default value is 1, which causes partition IO statistics to be maintained. Set this value
+to zero to prevent the driver from recording partition statistics. This slightly reduces the CPU overhead for IO, mim<hy>
+imizes the amount of sar(1) data collected and makes these statistics unavailable for reporting by iostat(1M) even
+though the -p/-P option is specified. Regardless of this setting, disk IO statistics are always maintained.
+In addition to the above properties, some device-specific tunables can be configured in ssd.conf using the 'ssd-con<hy>
+fig-list' global property. The value of this property is a list of duplets. The formal syntax is:
+ ssd-config-list =  <duplet> [, <duplet> ]* ;
+ where
+ <duplet>:= "<vid+pid>" , "<tunable-list>"
+ and
+ <tunable-list>:= <tunable> [, <tunable> ]*;
+ <tunable> = <name> : <value>
+ The <vid+pid> is the string that is returned by the target device
+ on a SCSI inquiry command.
+ The <tunable-list> contains one or more tunables to apply to
+ all target devices with the specified <vid+pid>.
+ Each <tunable> is a <name> : <value> pair. Supported
+ tunable names are:
+  delay-busy: when busy, nsecs of delay before retry.
+  retries-timeout: retries to perform on an IO timeout.
+ The following is an example of a global ssd-config-list property:
+  ssd-config-list =
+  "SUN T4", "delay-busy:600, retries-timeout:6",
+  "SUN StorEdge_3510", "retries-timeout:3";
+ssd.conf Driver configuration file
+/dev/dsk/cntndnsn block files
+/dev/rdsk/cntndnsn raw files
+cn is the controller number on the system.
+tn 7-bit disk loop identifier, such as switch setting
+dn SCSI lun n
+sn partition n (0-7)
+sar(1), format(1M), iostat(1M), ioctl(2), lseek(2), open(2), read(2), write(2), scsi(4)driver.conf(4), cdio(7I),
+dkio(7I)
+ANSI Small Computer System Interface-2 (SCSI-2)
+<beginning of page>
+ANSI X3.272-1996, Fibre Channel Arbitrated Loop (FC-AL)
+Fibre Channel - Private Loop SCSI Direct Attach (FC-PLDA)
+ Error for command '<command name>' Error Level: Fatal Requested Block <n>,
+ Error Block: <m>, Sense Key: <sense key name>, Vendor '<vendor name>':
+ ASC = 0x<a> (<ASC name>), ASCQ = 0x<b>, FRU = 0x<c>
+The command indicated by <command name> failed. The Requested Block is the block where the transfer started
+and the Error Block is the block that caused the error. Sense Key, ASC, and ASCQ information is returned by the
+target in response to a request sense command.
+ Check Condition on REQUEST SENSE
+A REQUEST SENSE command completed with a check condition. The original command will be retried a number
+of times.
+ Label says <m> blocks Drive says <n> blocks
+There is a discrepancy between the label and what the drive returned on the READ CAPACITY command.
+ Not enough sense information
+The request sense data was less than expected.
+ Request Sense couldn't get sense data
+The REQUEST SENSE command did not transfer any data.
+ Reservation Conflict
+The drive was reserved by another initiator.
+ SCSI transport failed: reason 'xxxx' : {retrying|giving up}
+The host adapter has failed to transport a command to the target for the reason stated. The driver will either retry the
+command or, ultimately, give up.
+ Unhandled Sense Key <n>
+The REQUEST SENSE data included an invalid sense key.
+ Unit not Ready. Additional sense code 0x<n>
+The drive is not ready.
+ corrupt label - bad geometry
+<beginning of page>
+The disk label is corrupted.
+ corrupt label - label checksum failed
+The disk label is corrupted.
+ corrupt label - wrong magic number
+The disk label is corrupted.
+ device busy too long
+The drive returned busy during a number of retries.
+ disk not responding to selection
+The drive was probably powered down or died.
+ i/o to invalid geometry
+The geometry of the drive could not be established.
+ incomplete read/write - retrying/giving up
+There was a residue after the command completed normally.
+ logical unit not ready
+The drive is not ready.
+ no bp for disk label
+A bp with consistent memory could not be allocated.
+ no mem for property
+Free memory pool exhausted.
+ no memory for disk label
+Free memory pool exhausted.
+ no resources for dumping
+<beginning of page>
+A packet could not be allocated during dumping.
+ offline
+Drive went offline; probably powered down.
+ requeue of command fails<n>
+Driver attempted to retry a command and experienced a transport error.
+ ssdrestart transport failed <n>
+Driver attempted to retry a command and experienced a transport error.
+ transfer length not modulo <n>
+Illegal request size.
+ transport rejected <n>
+Host adapter driver was unable to accept a command.
+ unable to read label
+Failure to read disk label.
+ unit does not respond to selection
+Drive went offline; probably powered down.

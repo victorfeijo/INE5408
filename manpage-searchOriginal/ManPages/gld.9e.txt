@@ -1,0 +1,139 @@
+<beginning of page>
+gld, gldm_reset, gldm_start, gldm_stop, gldm_set_mac_addr, gldm_set_multicast, gldm_set_promiscuous,
+gldm_send, gldm_intr, gldm_get_stats, gldm_ioctl <-> Generic LAN Driver entry points
+#include <sys/gld.h>
+int prefix_reset(gld_mac_info_t *macinfo);
+int prefix_start(gld_mac_info_t *macinfo);
+int prefix_stop(gld_mac_info_t *
+ macinfo);
+int prefix_set_mac_addr(gld_mac_info_t *
+ macinfo, unsigned char *macaddr);
+int prefix_set_multicast(gld_mac_info_t *
+ macinfo, unsigned char *multicastaddr,
+ int multiflag);
+int prefix_set_promiscuous(gld_mac_info_t *macinfo,
+ int promiscflag);
+int prefix_send(gld_mac_info_t *macinfo,
+ mblk_t *mp);
+uint_t prefix_intr(gld_mac_info_t *macinfo);
+int prefix_get_stats(gld_mac_info_t *macinfo,
+ struct gld_stats *stats);
+int prefix_ioctl(gld_mac_info_t *macinfo,
+ queue_t *q, mblk_t *mp);
+Solaris architecture specific (Solaris DDI).
+macinfo Pointer to a gld_mac_info(9S) structure.
+macaddr Pointer to the beginning of a character array containing a valid MAC address. The array will be of the
+length specified by the driver in the gldm_addrlen element of the gld_mac_info(9S) structure.
+multicastaddr Pointer to the beginning of a character array containing a multicast, group, or functional address. The
+array will be of the length specified by the driver in the gldm_addrlen element of the gld_mac_info(9S) structure.
+multiflag A flag indicating whether reception of the multicast address is to be enabled or disabled. This argument is
+specified as GLD_MULTI_ENABLE or GLD_MULTI_DISABLE.
+promiscflag A flag indicating what type of promiscuous mode, if any, is to be enabled. This argument is specified as
+GLD_MAC_PROMISC_PHYS, GLD_MAC_PROMISC_MULTI, or GLD_MAC_PROMISC_NONE.
+mp Pointer to a STREAMS message block containing the packet to be transmitted or the ioctl to be executed.
+stats Pointer to a gld_stats(9S) structure to be filled in with the current values of statistics counters.
+q Pointer to the queue(9S) structure to be used in the reply to the ioctl.
+These entry points must be implemented by a device-specific network driver designed to interface with the Generic
+LAN Driver (GLD).
+<beginning of page>
+As described in gld(7D), the main data structure for communication between the device-specific driver and the GLD
+module is the gld_mac_info(9S) structure. Some of the elements in that structure are function pointers to the entry
+points described here. The device-specific driver must, in its attach(9E) routine, initialize these function pointers be<hy>
+fore calling gld_register().
+gldm_reset() resets the hardware to its initial state.
+gldm_start() enables the device to generate interrupts and prepares the driver to call gld_recv() for delivering re<hy>
+ceived data packets to GLD.
+gldm_stop() disables the device from generating any interrupts and stops the driver from calling gld_recv() for de<hy>
+livering data packets to GLD. GLD depends on the gldm_stop() routine to ensure that the device will no longer in<hy>
+terrupt, and it must do so without fail.
+gldm_set_mac_addr() sets the physical address that the hardware is to use for receiving data. This function should
+program the device to the passed MAC address macaddr.
+gldm_set_multicast() enables and disables device-level reception of specific multicast addresses. If the third argu<hy>
+ment multiflag is set to GLD_MULTI_ENABLE, then the function sets the interface to receive packets with the
+multicast address pointed to by the second argument; if multiflag is set to GLD_MULTI_DISABLE, the driver is
+allowed to disable reception of the specified multicast address.
+This function is called whenever GLD wants to enable or disable reception of a multicast, group, or functional ad<hy>
+dress. GLD makes no assumptions about how the device does multicast support and calls this function to enable or
+disable a specific multicast address. Some devices may use a hash algorithm and a bitmask to enable collections of
+multicast addresses; this is allowed, and GLD will filter out any superfluous packets that are not required. If dis<hy>
+abling an address could result in disabling more than one address at the device level, it is the responsibility of the de<hy>
+vice driver to keep whatever information it needs to avoid disabling an address that GLD has enabled but not dis<hy>
+abled.
+gldm_set_multicast() will not be called to enable a particular multicast address that is already enabled, nor to dis<hy>
+able an address that is not currently enabled. GLD keeps track of multiple requests for the same multicast address
+and only calls the driver's entry point when the first request to enable, or the last request to disable a particular multi<hy>
+cast address is made.
+gldm_set_promiscuous() enables and disables promiscuous mode. This function is called whenever GLD wants to
+enable or disable the reception of all packets on the medium, or all multicast packets on the medium. If the second
+argument promiscflag is set to the value of GLD_MAC_PROMISC_PHYS, then the function enables physical-lev<hy>
+el promiscuous mode, resulting in the reception of all packets on the medium. If promiscflag is set to
+GLD_MAC_PROMISC_MULTI, then reception of all multicast packets will be enabled. If promiscflag is set to
+GLD_MAC_PROMISC_NONE, then promiscuous mode is disabled.
+In the case of a request for promiscuous multicast mode, drivers for devices that have no multicast-only promiscuous
+mode must set the device to physical promiscuous mode to ensure that all multicast packets are received. In this case
+the routine should return GLD_SUCCESS. The GLD software will filter out any superfluous packets that are not re<hy>
+quired.
+For forward compatibility, gldm_set_promiscuous() routines should treat any unrecognized values for promiscflag
+as though they were GLD_MAC_PROMISC_PHYS.
+gldm_send() queues a packet to the device for transmission. This routine is passed a STREAMS message containing
+the packet to be sent. The message may comprise multiple message blocks, and the send routine must chain through
+all the message blocks in the message to access the entire packet to be sent. The driver should be prepared to handle
+and skip over any zero-length message continuation blocks in the chain. The driver should check to ensure that the
+packet does not exceed the maximum allowable packet size, and must pad the packet, if necessary, to the minimum
+allowable packet size. If the send routine successfully transmits or queues the packet, it should return GLD_SUC<hy>
+CESS.
+The send routine should return GLD_NORESOURCES if it cannot immediately accept the packet for transmission;
+in this case GLD will retry it later. If gldm_send() ever returns GLD_NORESOURCES, the driver must, at a later
+time when resources have become available, call gld_sched() to inform GLD that it should retry packets that the
+driver previously failed to queue for transmission. (If the driver's gldm_stop() routine is called, the driver is ab<hy>
+solved from this obligation until it later again returns GLD_NORESOURCES from its gldm_send() routine; how<hy>
+ever, extra calls to gld_sched() will not cause incorrect operation.)
+If the driver's send routine returns GLD_SUCCESS, then the driver is responsible for freeing the message when the
+<beginning of page>
+driver and the hardware no longer need it. If the send routine copied the message into the device, or into a private
+buffer, then the send routine may free the message after the copy is made. If the hardware uses DMA to read the data
+directly out of the message data blocks, then the driver must not free the message until the hardware has completed
+reading the data. In this case the driver will probably free the message in the interrupt routine, or in a buffer-reclaim
+operation at the beginning of a future send operation. If the send routine returns anything other than GLD_SUC<hy>
+CESS, then the driver must not free the message.
+gldm_intr() is called when the device might have interrupted. Since it is possible to share interrupts with other de<hy>
+vices, the driver must check the device status to determine whether it actually caused an interrupt. If the device that
+the driver controls did not cause the interrupt, then this routine must return DDI_INTR_UNCLAIMED. Otherwise
+it must service the interrupt and should return DDI_INTR_CLAIMED. If the interrupt was caused by successful re<hy>
+ceipt of a packet, this routine should put the received packet into a STREAMS message of type M_DATA and pass
+that message to gld_recv().
+gld_recv() will pass the inbound packet upstream to the appropriate next layer of the network protocol stack. It is
+important to correctly set the b_rptr and b_wptr members of the STREAMS message before calling gld_recv().
+The driver should avoid holding mutex or other locks during the call to gld_recv(). In particular, locks that could be
+taken by a transmit thread may not be held during a call to gld_recv(): the interrupt thread that calls gld_recv() may
+in some cases carry out processing that includes sending an outgoing packet, resulting in a call to the driver's
+gldm_send() routine. If the gldm_send() routine were to try to acquire a mutex being held by the gldm_intr() rou<hy>
+tine at the time it calls gld_recv(), this could result in a panic due to recursive mutex entry.
+The interrupt code should increment statistics counters for any errors. This includes failure to allocate a buffer need<hy>
+ed for the received data and any hardware-specific errors such as CRC errors or framing errors.
+gldm_get_stats() gathers statistics from the hardware and/or driver private counters, and updates the gld_stats(9S)
+structure pointed to by stats. This routine is called by GLD when it gets a request for statistics, and provides the
+mechanism by which GLD acquires device dependent statistics from the driver before composing its reply to the sta<hy>
+tistics request. See gld_stats(9S) and gld(7D) for a description of the defined statistics counters.
+gldm_ioctl() implements any device-specific ioctl commands. This element may be specified as NULL if the driver
+does not implement any ioctl functions. The driver is responsible for converting the message block into an ioctl reply
+message and calling the qreply(9F) function before returning GLD_SUCCESS. This function should always return
+GLD_SUCCESS; any errors the driver may wish to report should be returned via the message passed to qreply(9F).
+If the gldm_ioctl element is specified as NULL, GLD will return a message of type M_IOCNAK with an error of
+EINVAL.
+gldm_intr() must return:
+DDI_INTR_CLAIMED if and only if the device definitely interrupted.
+DDI_INTR_UNCLAIMED if the device did not interrupt.
+The other functions must return:
+GLD_SUCCESS on success. gldm_stop() and gldm_ioctl() should always return this value.
+GLD_NORESOURCES if there are insufficient resources to carry out the request at this time. Only
+gldm_set_mac_addr(), gldm_set_multicast(), gldm_set_promiscuous(), and gldm_send() may return this value.
+GLD_NOLINK if gldm_send() is called when there is no physical connection to a network or link partner.
+GLD_NOTSUPPORTED if the requested function is not supported. Only gldm_set_mac_addr(), gldm_set_mul<hy>
+ticast(), and gldm_set_promiscuous() may return this value.
+GLD_BADARG if the function detected an unsuitable argument, for example, a bad multicast address, a bad MAC
+address, or a bad packet or packet length.
+<beginning of page>
+GLD_FAILURE on hardware failure.
+gld(7D), gld(9F), gld_mac_info(9S), gld_stats(9S), dlpi(7P), attach(9E), ddi_add_intr(9F)
+Writing Device Drivers

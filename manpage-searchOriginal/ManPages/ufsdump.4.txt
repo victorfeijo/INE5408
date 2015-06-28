@@ -1,0 +1,197 @@
+<beginning of page>
+ufsdump, dumpdates <-> incremental dump format
+#include <sys/types.h>
+#include <sys/inode.h>
+#include <protocols/dumprestore.h>
+/etc/dumpdates
+Tapes used by ufsdump(1M) and ufsrestore(1M) contain: <bu> a header record <bu> two groups of bit map records <bu> a
+group of records describing directories <bu> a group of records describing files
+The format of the header record and the format of the first record of each description in the <protocols/dumpre<hy>
+store.h> include file are:
+ #define TP_BSIZE_MAX 65536
+ #define TP_BSIZE_MIN 1024
+ #define ESIZE_SHIFT_MAX 6
+ #ifdef SUPPORTS_MTB_TAPE_FORMAT
+ #define TP_BUFSIZE TP_BSIZE_MAX
+ #else
+ #define TP_BSIZE 1024
+ #define TP_BUFSIZE TP_BSIZE
+ #endif /* SUPPORTS_MTB_TAPE_FORMAT */
+ #define NTREC 10
+ #define HIGHDENSITYTREC 32
+ #define CARTRIDGETREC 63
+ #define TP_NINDIR (TP_BSIZE_MIN/2)
+ #define TP_NINOS (TP_NINDIR / sizeof (long))
+ #define LBLSIZE 16
+ #define NAMELEN 64
+ #define OFS_MAGIC (int)60011
+ #define NFS_MAGIC (int)60012
+ #define MTB_MAGIC (int)60013
+ #define CHECKSUM (int)84446
+ union u_data {
+  char s_addrs[TP_NINDIR];
+  int32_t s_inos[TP_NINOS];
+ };
+ union u_shadow {
+  struct s_nonsh {
+  int32_t c_level;
+  char c_filesys[NAMELEN];
+  char c_dev[NAMELEN];
+  char c_host[NAMELEN];
+  } c_nonsh;
+  char c_shadow[1];
+ };
+ union u_spcl {
+  char dummy[TP_BUFSIZE];
+  struct s_spcl {
+  int32_t c_type;
+  time32_t c_date;
+  time32_t c_ddate;
+  int32_t c_volume;
+  daddr32_t c_tapea;
+  ino32_t c_inumber;
+  int32_t c_magic;
+<beginning of page>
+  int32_t c_checksum;
+  struct dinode c_dinode;
+  int32_t c_count;
+  union u_data c_data;
+  char c_label[LBLSIZE];
+  union u_shadow c_shadow;
+  int32_t c_flags;
+  int32_t c_firstrec;
+ #ifdef SUPPORTS_MTB_TAPE_FORMAT
+  int32_t c_tpbsize;
+  int32_t c_spare[31];
+ #else
+  int32_t c_spare[32];
+ #endif /* SUPPORTS_MTB_TAPE_FORMAT */
+ } s_spcl;
+ } u_spcl;
+ int32_t c_type;
+ time32_t c_date;
+ time32_t c_ddate;
+ int32_t c_volume;
+ daddr32_t c_tapea;
+ ino32_t c_inumber;
+ int32_t c_magic;
+ int32_t c_checksum;
+ struct dinode c_dinode;
+ int32_t c_count;
+ union u_data c_data;
+ char c_label[LBLSIZE];
+ union u_shadow c_shadow;
+ int32_t c_flags;
+ int32_t c_firstrec;
+ #ifdef SUPPORTS_MTB_TAPE_FORMAT
+ int32_t c_tpbsize;
+ int32_t c_spare[31];
+ #else
+ int32_t c_spare[32];
+ #endif /*
+  SUPPORTS_MTB_TAPE_FORMAT */
+  } s_spcl;
+ } u_spcl;
+ #define spcl u_spcl.s_spcl
+ #define c_addr c_data.s_addrs
+ #define c_inos c_data.s_inos
+ #define c_level c_shadow.c_nonsh.c_level
+ #define c_filesys c_shadow.c_nonsh.c_filesys
+ #define c_dev c_shadow.c_nonsh.c_dev
+ #define c_host c_shadow.c_nonsh.c_host
+ #define TS_TAPE 1
+ #define TS_INODE 2
+ #define TS_ADDR 4
+ #define TS_BITS 3
+ #define TS_CLRI 6
+ #define TS_END 5
+ #define TS_EOM 7
+ #define DR_NEWHEADER 1
+ #define DR_INODEINFO 2
+ #define DR_REDUMP 4
+ #define DR_TRUEINC 8
+ #define DR_HASMETA 16
+<beginning of page>
+This header describes three formats for the ufsdump/ufsrestore interface: <bu> An old format, non-MTB, that supports
+dump sizes of less than 2 terabytes. This format is represented by NFS_MAGIC. <bu> A new format, MTB, that sup<hy>
+ports dump sizes of greater than 2 terabytes using a variable block size and 2 new constants: TP_BSIZE_MIN and
+TP_BSIZE_MAX. This format is represented by MTB_MAGIC. <bu> A much older format that might be found on
+existing backup tapes. The ufsrestore command can restore tapes of this format, but no longer generates tapes of
+this format. Backups in this format have the OFS_MAGIC magic number in their tape headers.
+The constants are described as follows:
+TP_BSIZE Size of file blocks on the dump tapes for the old format. Note that TP_BSIZE must be a multiple of
+DEV_BSIZE This is applicable for dumps of type NFS_MAGIC or OFS_MAGIC, but is not applicable for dumps
+of type MTB_MAGIC.
+TP_BSIZE_MIN Minimum size of file blocks on the dump tapes for the new MTB format (MTB_MAGIC) only.
+TP_BSIZE_MAX Maximum size of file blocks on the dump tapes for the new MTB format (MTB_MAGIC) only.
+NTREC Number of TP_BSIZE blocks that are written in each tape record.
+HIGHDENSITYNTREC Number of TP_BSIZE blocks that are written in each tape record on 6250 BPI or higher
+density tapes.
+CARTRIDGETREC Number of TP_BSIZE blocks that are written in each tape record on cartridge tapes.
+TP_NINDIR Number of indirect pointers in a TS_INODE or TS_ADDR record. It must be a power of 2.
+TP_NINOS The maximum number of volumes on a tape.
+LBLSIZE The maximum size of a volume label.
+NAMELEN The maximum size of a host's name.
+OFS_MAGIC Magic number that is used for the very old format.
+NFS_MAGIC Magic number that is used for the non-MTB format.
+MTB_MAGIC Magic number that is used for the MTB format.
+CHECKSUM Header records checksum to this value.
+The TS_ entries are used in the c_type field to indicate what sort of header this is. The types and their meanings are
+as follows:
+TS_TAPE Tape volume label.
+TS_INODE A file or directory follows. The c_dinode field is a copy of the disk inode and contains bits telling what
+sort of file this is.
+<beginning of page>
+TS_ADDR A subrecord of a file description. See s_addrs below.
+TS_BITS A bit map follows. This bit map has a one bit for each inode that was dumped.
+TS_CLRI A bit map follows. This bit map contains a zero bit for all inodes that were empty on the file system when
+dumped.
+TS_END End of tape record.
+TS_EOM diskette EOMindicates that the restore is compatible with old dump
+The flags are described as follows:
+DR_NEWHEADER New format tape header.
+DR_INFODEINFO Header contains starting inode info.
+DR_REDUMP Dump contains recopies of active files.
+DR_TRUEINC Dump is a "true incremental".
+DR_HASMETA The metadata in this header.
+DUMPOUTFMT Name, incon, and ctime (date) for printf.
+DUMPINFMT Inverse for scanf.
+The fields of the header structure are as follows:
+s_addrs An array of bytes describing the blocks of the dumped file. A byte is zero if the block associated with that
+byte was not present on the file system; otherwise, the byte is non-zero. If the block was not present on the file lsys<hy>
+tem, no block was dumped; the block will be stored as a hole in the file. If there is not sufficient space in this
+record to describe all the blocks in a file, TS_ADDR records will be scattered through the file, each one picking up
+where the last left off
+s_inos The starting inodes on tape.
+c_type The type of the record.
+c_date The date of the previous dump.
+c_ddate The date of this dump.
+c_volume The current volume number of the dump.
+c_tapea The logical block of this record.
+<beginning of page>
+c_inumber The number of the inode being dumped if this is of type TS_INODE.
+c_magic This contains the value MAGIC above, truncated as needed.
+c_checksum This contains whatever value is needed to make the record sum to CHECKSUM.
+c_dinode This is a copy of the inode as it appears on the file system.
+c_count The count of bytes in s_addrs.
+u_data c_data The union of either u_data c_data The union of either s_addrs or s_inos.
+c_label Label for this dump.
+c_level Level of this dump.
+c_filesys Name of dumped file system.
+c_dev Name of dumped service.
+c_host Name of dumped host.
+c_flags Additional information.
+c_firstrec First record on volume.
+c_spare Reserved for future uses.
+c_tpbsize Tape block size for MTB format only.
+Each volume except the last ends with a tapemark (read as an end of file). The last volume ends with a TS_END
+record and then the tapemark.
+The dump history is kept in the file /etc/dumpdates. It is an ASCII file with three fields separated by white space: <bu>
+The name of the device on which the dumped file system resides. <bu> The level number of the dump tape; see ufs<hy>
+dump(1M). <bu> The date of the incremental dump in the format generated by ctime(3C).
+DUMPOUTFMT is the format to use when using printf(3C) to write an entry to /etc/dumpdates; DUMPINFMT
+is the format to use when using scanf(3C) to read an entry from /etc/dumpdates.
+See attributes(5) for a description of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Stability LevelUn<hy>
+stable
+ufsdump(1M), ufsrestore(1M), ctime(3C), printf(3C), scanf(3C), types.h(3HEAD), attributes(5),

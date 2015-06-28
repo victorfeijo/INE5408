@@ -1,0 +1,120 @@
+<beginning of page>
+swapctl <-> manage swap space
+#include <sys/stat.h>
+#include <sys/swap.h>
+int swapctl(int cmd, void *arg);
+The swapctl() function adds, deletes, or returns information about swap resources. cmd specifies one of the follow<hy>
+ing options contained in <sys/swap.h>:
+ SC_ADD /* add a resource for swapping */
+ SC_LIST /* list the resources for swapping */
+ SC_REMOVE /* remove a resource for swapping */
+ SC_GETNSWP /* return number of swap resources */
+When SC_ADD or SC_REMOVE is specified, arg is a pointer to a swapres structure containing the following
+members:
+ char *sr_name; /* pathname of resource */
+ off_t sr_start; /* offset to start of swap area */
+ off_t sr_length; /* length of swap area */
+The sr_start and sr_length members are specified in 512-byte blocks. A swap resource can only be removed by
+specifying the same values for the sr_start and sr_length members as were specified when it was added. Swap re<hy>
+sources need not be removed in the order in which they were added.
+When SC_LIST is specified, arg is a pointer to a swaptable structure containing the following members:
+ int swt_n; /* number of swapents following */
+ struct swapent swt_ent[]; /* array of swt_n swapents */
+A swapent structure contains the following members:
+ char *ste_path; /* name of the swap file */
+ off_t ste_start; /* starting block for swapping */
+ off_t ste_length; /* length of swap area */
+ long ste_pages; /* number of pages for swapping */
+ long ste_free; /* number of ste_pages free */
+ long ste_flags; /* ST_INDEL bit set if swap file */
+  /* is now being deleted */
+The SC_LIST function causes swapctl() to return at most swt_n entries. The return value of swapctl() is the num<hy>
+ber actually returned. The ST_INDEL bit is turned on in ste_flags if the swap file is in the process of being deleted.
+When SC_GETNSWP is specified, swapctl() returns as its value the number of swap resources in use. arg is ig<hy>
+nored for this operation.
+The SC_ADD and SC_REMOVE functions will fail if calling process does not have appropriate privileges.
+Upon successful completion, the function swapctl() returns a value of 0 for SC_ADD or SC_REMOVE, the num<hy>
+ber of struct swapent entries actually returned for SC_LIST, or the number of swap resources in use for
+SC_GETNSWP. Upon failure, the function swapctl() returns a value of <mi>1 and sets errno to indicate an error.
+Under the following conditions, the function swapctl() fails and sets errno to:
+EEXIST Part of the range specified by sr_start and sr_length is already being used for swapping on the specified
+resource (SC_ADD).
+EFAULT Either arg, sr_name, or ste_path points to an illegal address.
+<beginning of page>
+EINVAL The specified function value is not valid, the path specified is not a swap resource (SC_REMOVE), part
+of the range specified by sr_start and sr_length lies outside the resource specified (SC_ADD), or the specified
+swap area is less than one page (SC_ADD).
+EISDIR The path specified for SC_ADD is a directory.
+ELOOP Too many symbolic links were encountered in translating the pathname provided to SC_ADD or SC_RE<hy>
+MOVE.
+ENAMETOOLONG The length of a component of the path specified for SC_ADD or SC_REMOVE exceeds
+NAME_MAX characters or the length of the path exceeds PATH_MAX characters and _POSIX_NO_TRUNC is
+in effect.
+ENOENT The pathname specified for SC_ADD or SC_REMOVE does not exist.
+ENOMEM An insufficient number of struct swapent structures were provided to SC_LIST, or there were insuffi<hy>
+cient system storage resources available during an SC_ADD or SC_REMOVE, or the system would not have
+enough swap space after an SC_REMOVE.
+ENOSYS The pathname specified for SC_ADD or SC_REMOVE is not a file or block special device.
+ENOTDIR Pathname provided to SC_ADD or SC_REMOVE contained a component in the path prefix that was
+not a directory.
+EPERM The {PRIV_SYS_MOUNT} was not asserted in the effective set of the calling process.
+EROFS The pathname specified for SC_ADD is a read-only file system.
+Additionally, the swapctl() function will fail for 32-bit interfaces if:
+EOVERFLOW The amount of swap space configured on the machine is too large to be represented by a 32-bit
+quantity.
+Example 1 The usage of the SC_GETNSWP and SC_LIST commands.
+The following example demonstrates the usage of the SC_GETNSWP and SC_LIST commands.
+ #include <sys/stat.h>
+ #include <sys/swap.h>
+ #include <stdio.h>
+ #define MAXSTRSIZE 80
+ main(argc, argv)
+  int argc;
+  char *argv[];
+ {
+  swaptbl_t *s;
+  int i, n, num;
+  char *strtab; /* string table for path names */
+ again:
+  if ((num = swapctl(SC_GETNSWP, 0)) == -1) {
+  perror("swapctl: GETNSWP");
+  exit(1);
+<beginning of page>
+  }
+  if (num == 0) {
+  fprintf(stderr, "No Swap Devices Configured\n");
+  exit(2);
+  }
+  /* allocate swaptable for num+1 entries */
+  if ((s = (swaptbl_t *)
+  malloc(num * sizeof(swapent_t) +
+  sizeof(struct swaptable))) ==
+  (void *) 0) {
+  fprintf(stderr, "Malloc Failed\n");
+  exit(3);
+  }
+  /* allocate num+1 string holders */
+  if ((strtab = (char *)
+  malloc((num + 1) * MAXSTRSIZE)) == (void *) 0) {
+  fprintf(stderr, "Malloc Failed\n");
+  exit(3);
+  }
+  /* initialize string pointers */
+  for (i = 0; i < (num + 1); i++) {
+  s->swt_ent[i].ste_path = strtab + (i * MAXSTRSIZE);
+  }
+  s->swt_n = num + 1;
+  if ((n = swapctl(SC_LIST, s)) < 0) {
+  perror("swapctl");
+  exit(1);
+  }
+  if (n > num) { /* more were added */
+  free(s);
+  free(strtab);
+  goto again;
+  }
+  for (i = 0; i < n; i++)
+  printf("%s %ld\n",
+  s->swt_ent[i].ste_path, s->swt_ent[i].ste_pages);
+ }
+privileges(5)

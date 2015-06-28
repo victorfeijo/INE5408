@@ -1,0 +1,296 @@
+<beginning of page>
+stmfadm <-> SCSI target mode framework command line interface
+stmfadm add-hg-member -g, --group-name group-name group-member...
+stmfadm add-tg-member -g, --group-name group-name group-member...
+stmfadm add-view [-n, --lun logical-unit-number
+ -t, --target-group group-name -h, --host-group group-name] lu-name
+stmfadm create-hg group-name
+stmfadm create-lu [-p, --lu-prop logical-unit-property=val
+ -s, --size size] lu-file
+stmfadm create-tg group-name
+stmfadm delete-hg group-name
+stmfadm delete-lu lu-name
+stmfadm delete-tg group-name
+stmfadm import-lu lu-file
+stmfadm list-hg [-v] [host-group-name...]
+stmfadm list-tg [-v] [target-group-name...]
+stmfadm list-lu [-v] [lu-name...]
+stmfadm list-target [-v] [target-name...]
+stmfadm list-view -l, --lu-name lu-name [entry-name...]
+stmfadm list-state
+stmfadm modify-lu [-p, --lu-prop logical-unit-property=val
+ -s, --size size, -f, --file] lu-name|lu-file
+stmfadm online-lu lu-name
+stmfadm offline-lu lu-name
+stmfadm online-lu target-name
+stmfadm offline-lu target-name
+stmfadm remove-hg-member -g, --group-name group-name group-member...
+stmfadm remove-tg-member -g, --group-name group-name group-member...
+stmfadm remove-view -l, --lu-name lu-name entry-name
+The stmfadm command configures logical units within the SCSI Target Mode Framework (STMF) framework. The
+framework and this man page use the following terminology:
+initiator
+A device responsible for issuing SCSI I/O commands to a SCSI target and logical unit.
+target
+A device responsible for receiving SCSI I/O commands for a logical unit.
+<beginning of page>
+logical unit
+A device within a target responsible for executing SCSI I/O commands.
+logical unit number
+The identifier of a logical unit within a target.
+initiator group
+An initiator group is a set of one or more initiators that are combined for the purposes of being applied to a view (see
+below). An initiator cannot be a member of more than one initiator group.
+target group
+A target group is a set of one or more SCSI target ports that are treated the same when creating a view (see below).
+The set of logical units that a particular SCSI initiator can see is determined by the combined set of views.
+Each logical unit has a set of view entries, and each view entry specifies a target group, host group, and a LUN. An
+initiator from that host group, when connecting through that target group, is able to identify and connect to that logi<hy>
+cal unit using the specified LUN. You can use views to restrict the set of logical units that a specific initiator can see,
+and assign the set of LUNs that will be used.
+view
+A view defines the association of an initiator group, a target group, and a logical unit number with a specified logical
+unit. Any view entry added to a logical unit must not be in conflict with existing view entries for that logical unit. A
+view entry is considered to be in conflict when an attempt is made to duplicate the association of any given initiator,
+target and logical unit number. As an example, logical unit LU_0 has the following view entry associated with it:
+ Logical Unit: LU_0
+    View Entry: 0 
+     initiator group: HostA
+     target group: All targets
+     logical unit number: 32
+If you attempted the following:
+ # stmf add-view -n 31 -h HostA LU_0
+...the operation would return an error with a message indicating that the view entry is in conflict with one or more
+existing view entries. This conflict arises because the existing view entry, 0, already has mapped LU_0 to logical
+unit number 32 for the initiator group HostA.
+The stmfadm command supports the subcommands listed below.
+add-view [-n, --lun logical-unit-number -t, --target-group group-name -h, --host-group group-name] lu-name
+Adds a logical unit view entry to a logical unit lu-name, where lu-name is the STMF name for the logical unit as dis<hy>
+played by the list-lu subcommand. The add-view subcommand provides the user with a mechanism to implement
+access control for a logical unit and also provides a means of assigning a logical unit number to a logical unit for a
+given set of initiators and targets. A logical unit will not be available to any initiators until at least one view is ap<hy>
+plied. Each view entry gets assigned an entry name, which can be used to reference the entry in the remove-view
+and list-view subcommands.
+add-view supports the following options:
+-n, --lun logical-unit-number
+logical-unit-number is an integer in the range 0-16383 to be assigned to the logical unit for this view entry. If this
+option is not specified, a logical unit number will be assigned by the STMF framework.
+<beginning of page>
+-t, --target-group group-name
+group-name is the name of a target group previously created using the STMF create-tg subcommand. If this option
+is not specified, the logical unit will be available through all targets.
+-h, -host-group group-name
+group-name is the name of an host group previously created using the STMF create-hg subcommand. If this option
+is not specified, the logical unit will be available to all initiators that log in to the STMF framework.
+add-hg-member -g group-name group member...
+Add a host group member to a host group. group-name must be an existing group created using the create-hg sub<hy>
+command. group member can be specified as name_type.name_value, where name_type can be one of the following:
+ wwn
+ iqn
+ eui
+...and name_value is the value of the initiator name. As an example, to add a fibre channel initiator port world-wide
+name 200000e08b909221 to the host group HostA, the command would be:
+ # stmfadm add-hg-member -g HostA wwn.200000e08b909221
+To add an ISCSI initiator node member with the name iqn.1986-03.com.sun:01.46f7e262 to HostA, the command
+would be:
+ # stmfadm add-hg-member -g HostA iqn.1986-03.com.sun:01.46f7e262
+Alternatively, members can be specified using their SCSI name string identifiers. To add the two initiators above us<hy>
+ing their SCSI name string identifiers, the commands would be:
+ # stmfadm add-hg-member -g HostA eui.200000e08b909221
+ # stmfadm add-hg-member -g HostA iqn.1986-03.com.sun:01.46f7e262
+A host group member cannot be a member of more than one host group.
+add-tg-member -g group-name group member...
+Add a target group member to a target group. group-name must be an existing group created using the create-tg sub<hy>
+command. group member can be specified as name_type.name_value, where name_type can be one of the following:
+ wwn
+ iqn
+ eui
+...and name_value is the value of the target name. As an example, to add a fibre channel target port world-wide name
+501000e092376af7 to the target group TG0, the command would be:
+ # stmfadm add-tg-member -g TG0 wwn.501000e092376af7
+To add an ISCSI target member with the name iqn.1986-03.com.sun:target.01.01110 to TG0, the command would
+be:
+ # stmfadm add-tg-member -g TG0 iqn.1986-03.com.sun:target.01.01110
+<beginning of page>
+Alternatively, members can be specified using their SCSI name string identifiers. To add the two targets above using
+their SCSI name string identifiers, the commands would be:
+ # stmfadm add-tg-member -g TG0 eui.501000e092376af7
+ # stmfadm add-tg-member -g TG0 iqn.1986-03.com.sun:target.01.01110
+A target group member cannot be a member of more than one target group.
+create-hg group-name
+Create an initiator group with the name group-name. group-name is a string of Unicode characters with a maximum
+length of 255. The group name must be unique within the STMF system.
+create-lu [-p, --lu-prop logical-unit-property=val --s, --size size] lu-file
+Create a logical unit that can be registered with STMF. For the -p option, logical-unit-property can be one of the fol<hy>
+lowing properties:
+alias
+Up to 255 characters, representing a user-defined name for the device. The default is the name of the backing store.
+blk
+Specifies the block size for the device. The default is 512.
+guid
+Thirty-two hexadecimal ASCII characters representing a valid NAA Registered Extended Identifier. The default is
+set by the STMF to a generated value.
+meta
+Metadata file name. When specified, will be used to hold the SCSI metadata for the logical unit. There is no default.
+mgmt-url
+Up to 1024 characters representing a Management Network Address URL. More than one URL can be passed as a
+single parameter by using space-delimited URLs enclosed inside a single pair of quotation marks (").
+oui
+Organizational Unique Identifier. Six hexadecimal ASCII characters representing the IEEE OUI company ID assign<hy>
+ment. This will be used to generate the device identifier (GUID). The default is 00144F.
+pid
+Sixteen characters of product identification SCSI SPC-3. This value will be reflected in the Standard INQUIRY data
+returned for the device. The default is COMSTAR.
+serial
+Serial Number. Specifies the SCSI Vital Product Data Serial Number (page 80h). It is a character value up to 252
+bytes in length. There is no default value.
+vid
+Eight characters of vendor identification per SCSI SPC-3. This value will be reflected in the Standard INQUIRY da<hy>
+ta returned for the device. The default is SUN.
+<beginning of page>
+wcd
+Write-back cache disable. Specify true or falseto determine write-back cache disable behavior. The default is the
+write-back cache setting of the backing store device specified by the lu-file argument.
+wp
+Write-protect bit. Specify true or false to determine whether the device reports as write-protected. The default is
+false.
+For the -s option, size is an integer followed by one of the following letters, to indicate a unit of size:
+k kilobyte
+m megabyte
+g gigabyte
+t terabyte
+p petabyte
+e exabyte
+lu-file is the file to be used as the backing store for the logical unit. If the -s option is not specified, the size of the
+specified lu-file will be used as the size of the logical unit. Logical units registered with the STMF require space for
+the metadata to be stored. When a zvol is specified as the backing store device, the default will be to use a special
+property of the zvol to contain the metadata. For all other devices, the default behavior will be to use the first 64k of
+the device. An alternative approach would be to use the meta property in a create-lu command to specify an alter<hy>
+nate file to contain the metadata. It is advisable to use a file that can provide sufficient storage of the logical unit
+metadata, preferably 64k.
+create-tg group-name
+Create a target group with the name group-name. group-name is a string of Unicode characters with a maximum
+length of 255. The group name must be unique within the STMF system.
+delete-hg group-name
+Delete the host group that identified by group-name.
+delete-lu lu-name
+Deletes an existing logical unit that was created using stmfadm create-lu. This effectively unloads the logical unit
+from the STMF framework. Any existing data on the logical unit remains intact.
+delete-tg group-name
+Delete the target group that identified by group-name.
+import-lu lu-file
+Imports and loads a logical unit into the STMF that was previously created using stmfadm create-lu and was then
+deleted from the STMF using stmfadm delete-lu. On success, the logical unit is again made available to the STMF.
+lu-file is the filename used in the stmfadm create-lu command. If this logical unit is using a separate metadata file,
+the filename in the meta property value that was used in the stmfadm create-lu command must be used here.
+<beginning of page>
+list-hg [-v,--verbose] [host-group-name...]
+Lists information for the host group in the system referenced by host-group-name. If host-group-name is not speci<hy>
+fied, all host groups in the system will be listed. If the --v or --verbose option is specified, all members within a host
+group are displayed.
+list-lu [-v,--verbose] [lu-name...]
+Lists information for the logical unit in the system referenced by lu-name. If lu-name is not specified, all logical
+units in the system will be listed. If the -v or --verbose option is specified, additional information about the logical
+unit will be displayed.
+list-target [-v,--verbose] [target-name...]
+Lists information for the target port in the system referenced by target-name. If target name is not specified, all tar<hy>
+get ports in the system will be listed. If the -v or --verbose option is specified, additional information about the tar<hy>
+get along with SCSI session information for logged-in initiators is displayed.
+list-tg [-v,--verbose] [target-group-name...]
+Lists information for the target group in the system referenced by target-group-name. If target-group-name is not
+specified, all target groups in the system will be listed. If the --v or --verbose option is specified, all members within
+a target group are displayed.
+list-view --l, --lu-name lu-name [entry-name...]
+Lists the view entry for the logical unit referenced by lu-name. If entry-name is not specified, all view entries for the
+specified logical unit will be listed.
+modify-lu [-p, --lu-prop logical-unit-property=val --s, --size size, -f, --file] lu-name|lu-file
+Modifies attributes of a logical unit created using the stmfadm create-lu command. For the -p option, logical-unit-
+property can be one of the following properties:
+alias
+Up to 255 characters, representing a user-defined name for the device. The default is the name of the backing store.
+mgmt-url
+Up to 1024 characters representing a Management Network Address URL. More than one URL can be passed as a
+single parameter by using space-delimited URLs enclosed inside a single pair of quotation marks (").
+wcd
+Write-back cache disable. Specify true or falseto determine write-back cache disable behavior. The default is the
+write-back cache setting of the backing store device specified by the lu-file argument.
+wp
+Write-protect bit. Specify true or false to determine whether the device reports as write-protected. The default is
+false.
+For the -s option, size is an integer followed by one of the following letters, to indicate a unit of size:
+k kilobyte
+m megabyte
+<beginning of page>
+g gigabyte
+t terabyte
+p petabyte
+e exabyte
+lu-name is the guid of the logical unit to be modified. If the -f option is specified, the operand is interpreted as a file
+name. This provides the ability to modify a logical unit that is not currently imported into the STMF.
+online-lu lu-name
+Online a logical unit currently registered with the STMF.
+online-target target-name
+Online the specified target.
+offline-lu lu-name
+Offline a logical unit currently registered with the STMF.
+offline-target target-name
+Online the specified target.
+list-state
+Lists the operational and configuration state of the STMF.
+remove-hg-member -g group-name group member
+Removes a host group member from a host group. group-name must be an existing group created using the create-
+hg subcommand. group member can be specified as name_type.name_value, where name_type can be one of the fol<hy>
+lowing:
+ wwn
+ iqn
+ eui
+...and name_value is the value of the initiator name. As an example, to remove the fibre channel initiator port world-
+wide name 200000e08b909221 from the host group HostA, the command would be:
+ # stmfadm remove-hg-member -g HostA wwn.200000e08b909221
+To remove the ISCSI initiator node member with the name iqn.1986-03.com.sun:01.46f7e262 from HostA, the
+command would be:
+ # stmfadm remove-hg-member -g HostA iqn.1986-03.com.sun:01.46f7e262
+Alternatively, members can be specified using their SCSI name string identifiers. To remove the two initiators above
+using their SCSI name string identifiers, the commands would be:
+ # stmfadm remove-hg-member -g HostA eui.200000e08b909221
+ # stmfadm remove-hg-member -g HostA iqn.1986-03.com.sun:01.46f7e262
+<beginning of page>
+remove-tg-member -g group-name group member
+Removes a target group member from a target group. group-name must be an existing group created using the cre<hy>
+ate-tg subcommand. group member can be specified as name_type.name_value, where name_type can be one of the
+following:
+ wwn
+ iqn
+ eui
+...and name_value is the value of the target name. As an example, to remove the fibre channel target port world-wide
+name 501000e092376af7 from the target group TG0, the command would be:
+ # stmfadm remove-tg-member -g TG0 wwn.501000e092376af7
+To remove the ISCSI target member with the name iqn.1986-03.com.sun:target.01.01110 from TG0, the command
+would be:
+ # stmfadm remove-tg-member -g TG0 iqn.1986-03.com.sun:target.01.01110
+Alternatively, members can be specified using their SCSI name string identifiers. To remove the two targets above
+using their SCSI name string identifiers, the commands would be:
+ # stmfadm remove-tg-member -g TG0 eui.501000e092376af7
+ # stmfadm remove-tg-member -g TG0 iqn.1986-03.com.sun:target.01.01110
+remove-view --l, --lu-name lu-name entry-name
+Removes one or more logical unit view entries from a logical unit.
+Example 1 Creating a Host group with Two Initiator Ports
+The following commands use the create-hg and add-hg-member subcommands to create a host group and add two
+initiator ports to that host group.
+ # stmfadm create-hg host-group-a
+ # stmfadm add-hg-member -g host-group-a wwn.210105b0000d92d0
+Example 2 Adding a View Entry to a Logical Unit
+The following command uses the add-view subcommand to allow access from host-group-a to a logical unit.
+ # stmfadm add-view -h host-group-a 6000AE40C5000000000046FC4FEA001C
+Example 3 Listing a View Entry
+The following command uses the list-view subcommand to list all view entries for the specified logical unit.
+ # stmfadm list-view -l 6000AE40C5000000000046FC4FEA001C
+ View Entry: 0
+     Host group : host-group-a
+     Target group : All
+     LUN : 0
+<beginning of page>
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUNW<hy>
+stmfu _ Interface StabilityCommitted
+sbdadm(1M), attributes(5)

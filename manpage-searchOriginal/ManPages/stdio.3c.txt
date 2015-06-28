@@ -1,0 +1,119 @@
+<beginning of page>
+stdio <-> standard buffered input/output package
+#include <stdio.h>
+extern FILE *stdin;
+extern FILE *stdout;
+extern FILE *stderr;
+The standard I/O functions described in section 3C of this manual constitute an efficient, user-level I/O buffering
+scheme. The in-line macros getc() and putc() handle characters quickly. The macros getchar(3C) and putchar(3C),
+and the higher-level routines fgetc(3C), fgets(3C), fprintf(3C), fputc(3C), fputs(3C), fread(3C), fscanf(3C),
+fwrite(3C), gets(3C), getw(3C), printf(3C), puts(3C), putw(3C), and scanf(3C) all use or act as if they use getc()
+and putc(); they can be freely intermixed.
+A file with associated buffering is called a stream (see Intro(3)) and is declared to be a pointer to a defined type
+FILE. The fopen(3C) function creates certain descriptive data for a stream and returns a pointer to designate the
+stream in all further transactions. Normally, there are three open streams with constant pointers declared in the
+<stdio.h> header and associated with the standard open files:
+stdin standard input file
+stdout standard output file
+stderr standard error file
+The following symbolic values in <unistd.h> define the file descriptors that will be associated with the C-language
+stdin, stdout and stderr when the application is started:
+tab(); lw(1.38i) lw(1.65i) lw(.31i) lw(2.17i) lw(1.38i) lw(1.65i) lw(.31i) lw(2.17i) STDIN_FILENOStandard input
+value0stdin STDOUT_FILENOStandard output value1stdout STDERR_FILENOStandard error value2stderr
+The constant NULL designates a null pointer.
+The integer-constant EOF is returned upon end-of-file or error by most integer functions that deal with streams (see
+the individual descriptions for details).
+The integer constant BUFSIZ specifies the size of the buffers used by the particular implementation.
+The integer constant FILENAME_MAX specifies the number of bytes needed to hold the longest pathname of a file
+allowed by the implementation. If the system does not impose a maximum limit, this value is the recommended size
+for a buffer intended to hold a file's pathname.
+The integer constant FOPEN_MAX specifies the minimum number of files that the implementation guarantees can
+be open simultaneously. Note that no more than 255 files may be opened using fopen(), and only file descriptors 0
+through 255 can be used in a stream.
+The functions and constants mentioned in the entries of section 3S of this manual are declared in that header and
+need no further declaration. The constants and the following "functions" are implemented as macros (redeclaration
+of these names is perilous): getc(), getchar(), putc(), putchar(), ferror(3C), feof(3C), clearerr(3C), and
+fileno(3C). There are also function versions of getc(), getchar(), putc(), putchar(), ferror(), feof(), clearerr(), and
+fileno().
+Output streams, with the exception of the standard error stream stderr, are by default buffered if the output refers to
+a file and line-buffered if the output refers to a terminal. The standard error output stream stderr is by default un<hy>
+buffered, but use of freopen() (see fopen(3C)) will cause it to become buffered or line-buffered. When an output
+stream is unbuffered, information is queued for writing on the destination file or terminal as soon as written; when it
+is buffered, many characters are saved up and written as a block. When it is line-buffered, each line of output is
+queued for writing on the destination terminal as soon as the line is completed (that is, as soon as a new-line charac<hy>
+<beginning of page>
+ter is written or terminal input is requested). The setbuf() or setvbuf() functions (both described on the setbuf(3C)
+manual page) may be used to change the stream's buffering strategy.
+A single open file description can be accessed both through streams and through file descriptors. Either a file de<hy>
+scriptor or a stream will be called a handle on the open file description to which it refers; an open file description
+may have several handles.
+Handles can be created or destroyed by user action without affecting the underlying open file description. Some of
+the ways to create them include fcntl(2), dup(2), fdopen(3C), fileno(3C) and fork(2) (which duplicates existing
+ones into new processes). They can be destroyed by at least fclose(3C) and close(2), and by the exec functions (see
+exec(2)), which close some file descriptors and destroy streams.
+A file descriptor that is never used in an operation and could affect the file offset (for example read(2), write(2), or
+lseek(2)) is not considered a handle in this discussion, but could give rise to one (as a consequence of fdopen(),
+dup(), or fork(), for example). This exception does include the file descriptor underlying a stream, whether created
+with fopen() or fdopen(), as long as it is not used directly by the application to affect the file offset. (The read()
+and write() functions implicitly affect the file offset; lseek() explicitly affects it.)
+If two or more handles are used, and any one of them is a stream, their actions shall be coordinated as described be<hy>
+low. If this is not done, the result is undefined.
+A handle that is a stream is considered to be closed when either an fclose() or freopen(3C) is executed on it (the re<hy>
+sult of freopen() is a new stream for this discussion, which cannot be a handle on the same open file description as
+its previous value) or when the process owning that stream terminates the exit(2) or abort(3C). A file descriptor is
+closed by close(), _exit() (see exit(2)), or by one of the exec functions when FD_CLOEXEC is set on that file de<hy>
+scriptor.
+For a handle to become the active handle, the actions below must be performed between the last other user of the
+first handle (the current active handle) and the first other user of the second handle (the future active handle). The
+second handle then becomes the active handle. All activity by the application affecting the file offset on the first han<hy>
+dle shall be suspended until it again becomes the active handle. (If a stream function has as an underlying function
+that affects the file offset, the stream function will be considered to affect the file offset. The underlying functions
+are described below.)
+The handles need not be in the same process for these rules to apply. Note that after a fork(), two handles exist
+where one existed before. The application shall assure that, if both handles will ever be accessed, that they will both
+be in a state where the other could become the active handle first. The application shall prepare for a fork() exactly
+as if it were a change of active handle. (If the only action performed by one of the processes is one of the exec func<hy>
+tions or _exit(), the handle is never accessed in that process.) 1. For the first handle, the first applicable condition
+below shall apply. After the actions required below are taken, the handle may be closed if it is still open. a. If it is a
+file descriptor, no action is required. b. If the only further action to be performed on any handle to this open file de<hy>
+scription is to close it, no action need be taken. c. If it is a stream that is unbuffered, no action need be taken. d. If
+it is a stream that is line-buffered and the last character written to the stream was a newline (that is, as if a putc('\n')
+was the most recent operation on that stream), no action need be taken. e. If it is a stream that is open for writing or
+append (but not also open for reading), either an fflush(3C) shall occur or the stream shall be closed. f. If the
+stream is open for reading and it is at the end of the file ( feof(3C) is true), no action need be taken. g. If the stream
+is open with a mode that allows reading and the underlying open file description refers to a device that is capable of
+seeking, either an fflush() shall occur or the stream shall be closed. h. Otherwise, the result is undefined. 2. For
+the second handle: if any previous active handle has called a function that explicitly changed the file offset, except as
+required above for the first handle, the application shall perform an lseek() or an fseek(3C) (as appropriate to the
+type of the handle) to an appropriate location. 3. If the active handle ceases to be accessible before the requirements
+on the first handle above have been met, the state of the open file description becomes undefined. This might occur,
+for example, during a fork() or an _exit(). 4. The exec functions shall be considered to make inaccessible all
+streams that are open at the time they are called, independent of what streams or file descriptors may be available to
+the new process image. 5. Implementation shall assure that an application, even one consisting of several processes,
+shall yield correct results (no data is lost or duplicated when writing, all data is written in order, except as requested
+by seeks) when the rules above are followed, regardless of the sequence of handles used. If the rules above are not
+followed, the result is unspecified. When these rules are followed, it is implementation defined whether, and under
+what conditions, all input is seen exactly once.
+All the stdio functions are safe unless they have the _unlocked suffix. Each FILE pointer has its own lock to guar<hy>
+antee that only one thread can access it. In the case that output needs to be synchronized, the lock for the FILE
+pointer can be acquired before performing a series of stdio operations. For example:
+ FILE iop;
+ flockfile(iop);
+<beginning of page>
+ fprintf(iop, "hello ");
+ fprintf(iop, "world);
+ fputc(iop, 'a');
+ funlockfile(iop);
+will print everything out together, blocking other threads that might want to write to the same file between calls to
+fprintf().
+An unlocked interface is available in case performace is an issue. For example:
+ flockfile(iop);
+ while (!feof(iop)) {
+  *c++ = getc_unlocked(iop);
+ }
+ funlockfile(iop);
+Invalid stream pointers usually cause grave disorder, possibly including program termination. Individual function de<hy>
+scriptions describe the possible error conditions.
+close(2), lseek(2), open(2), pipe(2), read(2), write(2), ctermid(3C), cuserid(3C), fclose(3C), ferror(3C),
+fopen(3C), fread(3C), fseek(3C), flockfile(3C), getc(3C), gets(3C), popen(3C), printf(3C), putc(3C), puts(3C),
+scanf(3C), setbuf(3C), system(3C), tmpfile(3C), tmpnam(3C), ungetc(3C)

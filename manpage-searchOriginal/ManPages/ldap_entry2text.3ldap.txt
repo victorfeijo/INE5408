@@ -1,0 +1,107 @@
+<beginning of page>
+ldap_entry2text, ldap_entry2text_search, ldap_entry2html, ldap_entry2html_search, ldap_vals2html, ldap_vals2text
+<-> LDAP entry display functions
+cc[ flag... ] file... -lldap[ library... ]
+#include <lber.h>
+#include <ldap.h>
+int ldap_entry2text(LDAP *ld, char *buf, LDAPMessage *entry,
+ struct ldap_disptmpl *tmpl, char **defattrs, char ***defvals,
+ int (*writeproc)(), void *writeparm, char *eol, int rdncount,
+ unsigned long opts);
+int ldap_entry2text_search(LDAP *ld, char *dn, char *base,
+ LDAPMessage *entry, struct ldap_disptmpl *tmpllist,
+ char **defattrs, char ***defvals, int (*writeproc)(),
+ void *writeparm, char *eol,int rdncount,
+ unsigned long opts);
+int ldap_vals2text(LDAP *ld, char *buf, char **vals, char *label,
+ int labelwidth, unsigned longsyntaxid, int (*writeproc)(),
+ void *writeparm, char *eol, int rdncount);
+int ldap_entry2html(LDAP *ld, char *buf, LDAPMessage *entry,
+ struct ldap_disptmpl *tmpl, char **defattrs, char ***defvals,
+ int (*writeproc)(),void *writeparm, char *eol, int rdncount,
+ unsigned long opts, char *urlprefix, char *base);
+int ldap_entry2html_search(LDAP *ld, char *dn, LDAPMessage *entry,
+ struct ldap_disptmpl *tmpllist, char **defattrs, char ***defvals,
+ int (*writeproc)(), void *writeparm, char *eol, int rdncount,
+ unsigned long opts, char *urlprefix);
+int ldap_vals2html(LDAP *ld, char *buf, char **vals,
+ char *label, int labelwidth, unsigned long syntaxid,
+ int (*writeproc)(), void *writeparm, char *eol, int rdncount,
+ char *urlprefix);
+#define LDAP_DISP_OPT_AUTOLABELWIDTH 0x00000001
+#define LDAP_DISP_OPT_HTMLBODYONLY 0x00000002
+#define LDAP_DTMPL_BUFSIZ 2048
+These functions use the LDAP display template functions (see ldap_disptmpl(3LDAP) and ldap_tem<hy>
+plates.conf(4)) to produce a plain text or an HyperText Markup Language (HTML) display of an entry or a set of
+values. Typical plain text output produced for an entry might look like:
+  "Barbara J Jensen, Information Technology Division"
+  Also Known As:
+  Babs Jensen
+  Barbara Jensen
+  Barbara J Jensen
+  E-Mail Address:
+  bjensen@terminator.rs.itd.umich.edu
+  Work Address:
+  535 W. William
+  Ann Arbor, MI 48103
+  Title:
+  Mythical Manager, Research Systems
+  ...
+The exact output produced will depend on the display template configuration. HTML output is similar to the plain
+text output, but more richly formatted.
+ldap_entry2text() produces a text representation of entry and writes the text by calling the writeproc function. All
+<beginning of page>
+of the attributes values to be displayed must be present in entry; no interaction with the LDAP server will be per<hy>
+formed within ldap_entry2text. ld is the LDAP pointer obtained by a previous call to ldap_open. writeproc should
+be declared as:
+ int writeproc( writeparm, p, len )
+  void *writeparm;
+  char *p;
+  int len;
+where p is a pointer to text to be written and len is the length of the text. p is guaranteed to be zero-terminated.
+Lines of text are terminated with the string eol. buf is a pointer to a buffer of size LDAP_DTMPL_BUFSIZ or larg<hy>
+er. If buf is NULL then a buffer is allocated and freed internally. tmpl is a pointer to the display template to be used
+(usually obtained by calling ldap_oc2template). If tmpl is NULL, no template is used and a generic display is pro<hy>
+duced. defattrs is a NULL-terminated array of LDAP attribute names which you wish to provide default values for
+(only used if entry contains no values for the attribute). An array of NULL-terminated arrays of default values cor<hy>
+responding to the attributes should be passed in defvals. The rdncount parameter is used to limit the number of Dis<hy>
+tinguished Name (DN) components that are actually displayed for DN attributes. If rdncount is zero, all components
+are shown. opts is used to specify output options. The only values currently allowed are zero (default output),
+LDAP_DISP_OPT_AUTOLABELWIDTH which causes the width for labels to be determined based on the long<hy>
+est label in tmpl, and LDAP_DISP_OPT_HTMLBODYONLY. The LDAP_DISP_OPT_HTMLBODYONLY
+option instructs the library not to include <HTML>, <HEAD>, <TITLE>, and <BODY> tags. In other words, an
+HTML fragment is generated, and the caller is responsible for prepending and appending the appropriate HTML
+tags to construct a correct HTML document.
+ldap_entry2text_search() is similar to ldap_entry2text, and all of the like-named parameters have the same mean<hy>
+ing except as noted below. If base is not NULL, it is the search base to use when executing search actions. If it is
+NULL, search action template items are ignored. If entry is not NULL, it should contain the objectClass attribute
+values for the entry to be displayed. If entry is NULL, dn must not be NULL, and ldap_entry2text_search will re<hy>
+trieve the objectClass values itself by calling ldap_search_s. ldap_entry2text_search will determine the appropri<hy>
+ate display template to use by calling ldap_oc2template, and will call ldap_search_s to retrieve any attribute values
+to be displayed. The tmpllist parameter is a pointer to the entire list of templates available (usually obtained by call<hy>
+ing ldap_init_templates or ldap_init_templates_buf). If tmpllist is NULL, ldap_entry2text_search will attempt to
+read a load templates from the default template configuration file ETCDIR/ldaptemplates.conf
+ldap_vals2text produces a text representation of a single set of LDAP attribute values. The ld, buf, writeproc,
+writeparm, eol, and rdncount parameters are the same as the like-named parameters for ldap_entry2text. vals is a
+NULL-terminated list of values, usually obtained by a call to ldap_get_values. label is a string shown next to the
+values (usually a friendly form of an LDAP attribute name). labelwidth specifies the label margin, which is the num<hy>
+ber of blank spaces displayed to the left of the values. If zero is passed, a default label width is used. syntaxid is a
+display template attribute syntax identifier (see ldap_disptmpl(3LDAP) for a list of the pre-defined LDAP_SYN_...
+values).
+ldap_entry2html produces an HTML representation of entry. It behaves exactly like ldap_entry2text(3LDAP), ex<hy>
+cept for the formatted output and the addition of two parameters. urlprefix is the starting text to use when construct<hy>
+ing an LDAP URL. The default is the string ldap:/// The second additional parameter, base, the search base to use
+when executing search actions. If it is NULL, search action template items are ignored.
+ldap_entry2html_search behaves exactly like ldap_entry2text_search(3LDAP), except HTML output is pro<hy>
+duced and one additional parameter is required. urlprefix is the starting text to use when constructing an LDAP URL.
+The default is the string ldap:///
+ldap_vals2html behaves exactly like ldap_vals2text,exceptHTMLoutputis and one additional parameter is re<hy>
+quired. urlprefix is the starting text to use when constructing an LDAP URL. The default is the string ldap:///
+These functions all return an LDAP error code. LDAP_SUCCESS is returned if no error occurs. See ldap_er<hy>
+ror(3LDAP) for details. The ld_errno field of the ld parameter is also set to indicate the error.
+ETCDIR/ldaptemplates.conf
+See attributes(5) for a description of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE AvailabilitySUNWcsl
+(32-bit) SUNWcslx (64-bit) Interface StabilityEvolving
+<beginning of page>
+ldap(3LDAP), ldap_disptmpl(3LDAP), ldaptemplates.conf(4) , attributes(5)

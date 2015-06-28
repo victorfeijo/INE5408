@@ -1,0 +1,388 @@
+<beginning of page>
+ike.config <-> configuration file for IKE policy
+/etc/inet/ike/config
+The /etc/inet/ike/config file contains rules for matching inbound IKE requests. It also contains rules for preparing
+outbound IKE requests.
+You can test the syntactic correctness of an /etc/inet/ike/config file by using the -c or -f options of in.iked(1M). You
+must use the -c option to test a config file. You might need to use the -f option if it is not in /etc/inet/ike/config.
+On any line, an unquoted # character introduces a comment. The remainder of that line is ignored. Additionally, on
+any line, an unquoted // sequence introduces a comment. The remainder of that line is ignored.
+There are several types of lexical tokens in the ike.config file:
+num
+A decimal, hex, or octal number representation is as in 'C'.
+IPaddr/prefix/range
+An IPv4 or IPv6 address with an optional /NNN suffix, (where NNN is a num) that indicates an address (CIDR) pre<hy>
+fix (for example, 10.1.2.0/24). An optional /ADDR suffix (where ADDR is a second IP address) indicates an ad<hy>
+dress/mask pair (for example, 10.1.2.0/255.255.255.0). An optional -ADDR suffix (where ADDR is a second IPv4
+address) indicates an inclusive range of addresses (for example, 10.1.2.0-10.1.2.255). The / or - can be surrounded
+by an arbitrary amount of white space.
+XXX | YYY | ZZZ
+Either the words XXX, YYY, or ZZZ, for example, {yes,no}.
+p1-id-type
+An IKE phase 1 identity type. IKE phase 1 identity types include:
+ dn, DN
+ dns, DNS
+ fqdn, FQDN
+ gn, GN
+ ip, IP
+ ipv4
+ ipv4_prefix
+ ipv4_range
+ ipv6
+ ipv6_prefix
+ ipv6_range
+ mbox, MBOX
+ user_fqdn
+"string"
+A quoted string.
+Examples include:"Label foo", or "C=US, OU=Sun Microsystems\, Inc., N=olemcd@eng.example.com"
+A backslash (\) is an escape character. If the string needs an actual backslash, two must be specified.
+cert-sel
+A certificate selector, a string which specifies the identities of zero or more certificates. The specifiers can conform
+to X.509 naming conventions.
+A cert-sel can also use various shortcuts to match either subject alternative names, the filename or slot of a certifi<hy>
+cate in /etc/inet/ike/publickeys, or even the ISSUER. For example:
+<beginning of page>
+ "SLOT=0"
+ "EMAIL=postmaster@domain.org"
+ "webmaster@domain.org" # Some just work w/o TYPE=
+ "IP=10.0.0.1"
+ "10.21.11.11" # Some just work w/o TYPE=
+ "DNS=www.domain.org"
+ "mailhost.domain.org" # Some just work w/o TYPE=
+ "ISSUER=C=US, O=Sun Microsystems\, Inc., CN=Sun CA"
+Any cert-sel preceded by the character ! indicates a negative match, that is, not matching this specifier. These are the
+same kind of strings used in ikecert(1M).
+ldap-list
+A quoted, comma-separated list of LDAP servers and ports.
+For example, "ldap1.example.com", "ldap1.example.com:389", "ldap1.example.com:389,ldap2.exam<hy>
+ple.com".
+The default port for LDAP is 389.
+parameter-list
+A list of parameters.
+There are four main types of entries: <bu> global parameters <bu> IKE phase 1 transform defaults <bu> IKE rule defaults <bu> IKE
+rules
+The global parameter entries are as follows:
+cert_root cert-sel
+The X.509 distinguished name of a certificate that is a trusted root CA certificate.It must be encoded in a file in the
+/etc/inet/ike/publickeys directory. It must have a CRL in /etc/inet/ike/crls. Multiple cert_root parameters aggre<hy>
+gate.
+cert_trust cert-sel
+Specifies an X.509 distinguished name of a certificate that is self-signed, or has otherwise been verified as trustwor<hy>
+thy for signing IKE exchanges. It must be encoded in a file in /etc/inet/ike/publickeys. Multiple cert_trust parame<hy>
+ters aggregate.
+expire_timer integer
+The number of seconds to let a not-yet-complete IKE Phase I (Main Mode) negotiation linger before deleting it. De<hy>
+fault value: 300 seconds.
+ignore_crls
+If this keyword is present in the file, in.iked(1M) ignores Certificate Revocation Lists (CRLs) for root CAs (as giv<hy>
+en in cert_root)
+ldap_server ldap-list
+A list of LDAP servers to query for certificates. The list can be additive.
+pkcs11_path string
+The string that follows is a name of a shared object (.so) that implements the PKCS#11 standard. The name is
+passed directly into dlopen(3C) for linking, with all of the semantics of that library call. By default, in.iked(1M)
+runs the same ISA as the running kernel, so a library specified using pkcs11_path and an absolute pathname must
+<beginning of page>
+match the same ISA as the kernel. One can use the start/exec SMF property (see svccfg(1M)) to change in.iked's
+ISA, but it is not recommended.
+If this setting is not present, the default value is set to libpkcs11.so. Most cryptographic providers go through the de<hy>
+fault library, and this parameter should only be used if a specialized provider of IKE-useful cryptographic services
+cannot interface with the Solaris Cryptographic Framework. See cryptoadm(1M).
+This option is now deprecated, and may be removed in a future release.
+retry_limit integer
+The number of retransmits before any IKE negotiation is aborted. Default value: 5 times.
+retry_timer_init integer or float
+The initial interval (in seconds) between retransmits. This interval is doubled until the retry_timer_max value (see
+below) is reached. Default value: 0.5 seconds.
+retry_timer_max integer or float
+The maximum interval (in seconds) between retransmits. The doubling retransmit interval stops growing at this lim<hy>
+it. Default value: 30 seconds. Note -
+This value is never reached with the default configuration. The longest interval is 8 (0.5 * 2 ^ (5 - 1)) seconds.
+proxy string
+The string following this keyword must be a URL for an HTTP proxy, for example, http://proxy:8080.
+socks string
+The string following this keyword must be a URL for a SOCKS proxy, for example, socks://socks-proxy.
+use_http
+If this keyword is present in the file, in.iked(1M) uses HTTP to retrieve Certificate Revocation Lists (CRLs).
+The following IKE phase 1 transform parameters can be prefigured using file-level defaults. Values specified within
+any given transform override these defaults.
+The IKE phase 1 transform defaults are as follows:
+p1_lifetime_secs num
+The proposed default lifetime, in seconds, of an IKE phase 1 security association (SA).
+p1_nonce_len num
+The length in bytes of the phase 1 (quick mode) nonce data. This cannot be specified on a per-rule basis.
+The following IKE rule parameters can be prefigured using file-level defaults. Values specified within any given rule
+override these defaults, unless a rule cannot.
+p2_lifetime_secs num
+The proposed default lifetime, in seconds, of an IKE phase 2 security association (SA). This value is optional. If
+omitted, a default value is used.
+<beginning of page>
+p2_softlife_secs num
+The soft lifetime of a phase 2 SA, in seconds. If this value is specified, the SA soft expires after the number of sec<hy>
+onds specified by p2_softlife_secs. This causes in.iked to renegotiate a new phase 2 SA before the original SA ex<hy>
+pires.
+This value is optional, if omitted soft expiry occurs after 90% of the lifetime specified by p2_lifetime_secs. The val<hy>
+ue specified by p2_softlife_secs is ignored if p2_lifetime_secs is not specified.
+Setting p2_softlife_secs to the same value as p2_lifetime_secs disables soft expires.
+p2_idletime_secs num
+The idle lifetime of a phase 2 SA, in seconds. If the value is specified, the value specifies the lifetime of the SA, if
+the security association is not used before the SA is revalidated.
+p2_lifetime_kb num
+The lifetime of an SA can optionally be specified in kilobytes. This parameter specifies the default value. If lifetimes
+are specified in both seconds and kilobytes, the SA expires when either the seconds or kilobyte threshholds are
+passed.
+p2_softlife_kb num
+This value is the number of kilobytes that can be protected by an SA before a soft expire occurs (see p2_soft<hy>
+life_secs, above).
+This value is optional. If omitted, soft expiry occurs after 90% of the lifetime specified by p2_lifetime_kb. The val<hy>
+ue specified by p2_softlife_kb is ignored if p2_lifetime_kb is not specified.
+p2_nonce_len num
+The length in bytes of the phase 2 (quick mode) nonce data. This cannot be specified on a per-rule basis.
+local_id_type p1-id-type
+The local identity for IKE requires a type. This identity type is reflected in the IKE exchange. The type can be one of
+the following: <bu> an IP address (for example, 10.1.1.2) <bu> DNS name (for example, test.domain.com) <bu> MBOX RFC
+822 name (for example, root@domain.com) <bu> DNX.509 distinguished name (for example, C=US, O=Sun Mi<hy>
+crosystems Inc., CN=Sun Test cert)
+p1_xform '{' parameter-list '}
+A phase 1 transform specifies a method for protecting an IKE phase 1 exchange. An initiator offers up lists of phase
+1 transforms, and a receiver is expected to only accept such an entry if it matches one in a phase 1 rule. There can be
+several of these, and they are additive. There must be either at least one phase 1 transform in a rule or a global de<hy>
+fault phase 1 transform list. In a configuration file without a global default phase 1 transform list and a rule without
+a phase, transform list is an invalid file. Unless specified as optional, elements in the parameter-list must occur exact<hy>
+ly once within a given transform's parameter-list:
+oakley_group number
+The Oakley Diffie-Hellman group used for IKE SA key derivation. The group numbers are defined in RFC 2409,
+Appendix A, and RFC 3526. Acceptable values are currently:
+ 1 (768-bit)
+ 2 (1024-bit)
+ 5 (1536-bit)
+ 14 (2048-bit)
+ 15 (3072-bit)
+ 16 (4096-bit)
+<beginning of page>
+encr_alg {3des, 3des-cbc, blowfish, blowfish-cdc, des, des-cbc, aes, aes-cbc}
+An encryption algorithm, as in ipsecconf(1M). However, of the ciphers listed above, only aes and aes-cbc allow op<hy>
+tional key-size setting, using the "low value-to-high value" syntax. To specify a single AES key size, the low value
+must equal the high value. If no range is specified, all three AES key sizes are allowed.
+auth_alg {md5, sha, sha1, sha256, sha384, sha512}
+An authentication algorithm.
+Use ipsecalgs(1M) with the -l option to list the IPsec protocols and algorithms currently defined on a system. The
+cryptoadm list command diplays a list of installed providers and their mechanisms. See cryptoadm(1M).
+auth_method {preshared, rsa_sig, rsa_encrypt, dss_sig}
+The authentication method used for IKE phase 1.
+p1_lifetime_secs num
+Optional. The lifetime for a phase 1 SA.
+p2_lifetime_secs num
+If configuring the kernel defaults is not sufficient for different tasks, this parameter can be used on a per-rule basis to
+set the IPsec SA lifetimes in seconds.
+p2_pfs num
+Use perfect forward secrecy for phase 2 (quick mode). If selected, the oakley group specified is used for phase 2
+PFS. Acceptable values are:
+ 0 (do not use Perfect Forward Secrecy for IPsec SAs)
+ 1 (768-bit)
+ 2 (1024-bit)
+ 5 (1536-bit)
+ 14 (2048-bit)
+ 15 (3072-bit)
+ 16 (4096-bit)
+An IKE rule starts with a right-curly-brace ({), ends with a left-curly-brace (}), and has the following parameters in
+between:
+label string
+Required parameter. The administrative interface to in.iked looks up phase 1 policy rules with the label as the search
+string. The administrative interface also converts the label into an index, suitable for an extended ACQUIRE mes<hy>
+sage from PF_KEY - effectively tying IPsec policy to IKE policy in the case of a node initiating traffic. Only one la<hy>
+bel parameter is allowed per rule.
+local_addr <IPaddr/prefix/range>
+Required parameter. The local address, address prefix, or address range for this phase 1 rule. Multiple local_addr
+parameters accumulate within a given rule.
+remote_addr <IPaddr/prefix/range>
+Required parameter. The remote address, address prefix, or address range for this phase 1 rule. Multiple remote_ad<hy>
+dr parameters accumulate within a given rule.
+<beginning of page>
+local_id_type p1-id-type
+Which phase 1 identity type I uses. This is needed because a single certificate can contain multiple values for use in
+IKE phase 1. Within a given rule, all phase 1 transforms must either use preshared or non-preshared authentication
+(they cannot be mixed). For rules with preshared authentication, the local_id_type parameter is optional, and de<hy>
+faults to IP. For rules which use non-preshared authentication, the 'local_id_type' parameter is required. Multiple
+'local_id_type' parameters within a rule are not allowed.
+local_id cert-sel
+Disallowed for preshared authentication method; required parameter for non-preshared authentication method. The
+local identity string or certificate selector. Only one local identity per rule is used, the first one stated.
+remote_id cert-sel
+Disallowed for preshared authentication method; required parameter for non-preshared authentication method. Se<hy>
+lector for which remote phase 1 identities are allowed by this rule. Multiple remote_id parameters accumulate with<hy>
+in a given rule. If a single empty string ("") is given, then this accepts any remote ID for phase 1. It is recommended
+that certificate trust chains or address enforcement be configured strictly to prevent a breakdown in security if this
+value for remote_id is used.
+p2_lifetime_secs num
+If configuring the kernel defaults is not sufficient for different tasks, this parameter can be used on a per-rule basis to
+set the IPsec SA lifetimes in seconds.
+p2_pfs num
+Use perfect forward secrecy for phase 2 (quick mode). If selected, the oakley group specified is used for phase 2
+PFS. Acceptable values are:
+ 0 (do not use Perfect Forward Secrecy for IPsec SAs)
+ 1 (768-bit)
+ 2 (1024-bit)
+ 5 (1536-bit)
+ 14 (2048-bit)
+ 15 (3072-bit)
+ 16 (4096-bit)
+p1_xform { parameter-list }
+A phase 1 transform specifies a method for protecting an IKE phase 1 exchange. An initiator offers up lists of phase
+1 transforms, and a receiver is expected to only accept such an entry if it matches one in a phase 1 rule. There can be
+several of these, and they are additive. There must be either at least one phase 1 transform in a rule or a global de<hy>
+fault phase 1 transform list. A ike.config file without a global default phase 1transform list and a rule without a
+phase 1 transform list is an invalid file. Elements within the parameter-list; unless specified as optional, must occur
+exactly once within a given transform's parameter-list:
+oakley_group number
+The Oakley Diffie-Hellman group used for IKE SA key derivation. Acceptable values are currently:
+ 1 (768-bit)
+ 2 (1024-bit)
+ 5 (1536-bit)
+ 14 (2048-bit)
+ 15 (3072-bit)
+ 16 (4096-bit)
+encr_alg {3des, 3des-cbc, blowfish, blowfish-cdc, des, des-cbc, aes, aes-cbc}
+An encryption algorithm, as in ipsecconf(1M). However, of the ciphers listed above, only aes and aes-cbc allow op<hy>
+tional key-size setting, using the "low value-to-high value" syntax. To specify a single AES key size, the low value
+must equal the high value. If no range is specified, all three AES key sizes are allowed.
+<beginning of page>
+auth_alg {md5, sha, sha1}
+An authentication algorithm, as specified in ipseckey(1M).
+auth_method {preshared, rsa_sig, rsa_encrypt, dss_sig}
+The authentication method used for IKE phase 1.
+p1_lifetime_secs num
+Optional. The lifetime for a phase 1 SA.
+Example 1 A Sample ike.config File
+The following is an example of an ike.config file:
+ ### BEGINNING OF FILE
+ ### First some global parameters...
+ ### certificate parameters...
+ # Root certificates. I SHOULD use a full Distinguished Name.
+ # I must have this certificate in my local filesystem, see ikecert(1m).
+ cert_root "C=US, O=Sun Microsystems\, Inc., CN=Sun CA"
+ # Explicitly trusted certs that need no signatures, or perhaps
+ # self-signed ones. Like root certificates, use full DNs for them
+ # for now.
+ cert_trust "EMAIL=root@domain.org"
+ # Where do I send LDAP requests?
+ ldap_server "ldap1.domain.org,ldap2.domain.org:389"
+ ## phase 1 transform defaults...
+ p1_lifetime_secs 14400
+ p1_nonce_len 20
+ ## Parameters that might also show up in rules.
+ p1_xform { auth_method preshared oakley_group 5 auth_alg sha
+  encr_alg 3des }
+ p2_pfs 2
+ ### Now some rules...
+ {
+  label "simple inheritor"
+  local_id_type ip
+  local_addr 10.1.1.1
+  remote_addr 10.1.1.2
+ }
+ {
+  label "simple inheritor IPv6"
+  local_id_type ipv6
+  local_addr fe80::a00:20ff:fe7d:6
+  remote_addr fe80::a00:20ff:fefb:3780
+ }
+ {
+<beginning of page>
+  # an index-only rule. If I'm a receiver, and all I
+  # have are index-only rules, what do I do about inbound IKE requests?
+  # Answer: Take them all!
+  label "default rule"
+  # Use whatever "host" (e.g. IP address) identity is appropriate
+  local_id_type ipv4
+  local_addr 0.0.0.0/0
+  remote_addr 0.0.0.0/0
+  p2_pfs 5
+  # Now I'm going to have the p1_xforms
+  p1_xform
+  {auth_method preshared oakley_group 5 auth_alg md5 encr_alg \
+  blowfish } p1_xform
+  {auth_method preshared oakley_group 5 auth_alg md5 encr_alg 3des }
+  # After said list, another keyword (or a '}') stops xform
+  # parsing.
+ }
+ {
+  # Let's try something a little more conventional.
+  label "host to .80 subnet"
+  local_id_type ip
+  local_id "10.1.86.51"
+  remote_id "" # Take any, use remote_addr for access control.
+  local_addr 10.1.86.51
+  remote_addr 10.1.80.0/24
+  p1_xform
+  { auth_method rsa_sig oakley_group 5 auth_alg md5 encr_alg 3des }
+  p1_xform
+  { auth_method rsa_sig oakley_group 5 auth_alg md5 encr_alg \
+  blowfish }
+  p1_xform
+  { auth_method rsa_sig oakley_group 5 auth_alg sha1 encr_alg 3des }
+  p1_xform
+  { auth_method rsa_sig oakley_group 5 auth_alg sha1 encr_alg \
+  blowfish }
+ }
+ {
+  # Let's try something a little more conventional, but with ipv6.
+  label "host to fe80::/10 subnet"
+  local_id_type ip
+  local_id "fe80::a00:20ff:fe7d:6"
+  remote_id "" # Take any, use remote_addr for access control.
+  local_addr fe80::a00:20ff:fe7d:6
+  remote_addr fe80::/10
+  p1_xform
+  { auth_method rsa_sig oakley_group 5 auth_alg md5 encr_alg 3des }
+  p1_xform
+  { auth_method rsa_sig oakley_group 5 auth_alg md5 encr_alg \
+  blowfish }
+  p1_xform
+  { auth_method rsa_sig oakley_group 5 auth_alg sha1 encr_alg \
+<beginning of page>
+  3des }
+  p1_xform
+  { auth_method rsa_sig oakley_group 5 auth_alg sha1 encr_alg \
+  blowfish }
+ }
+ {
+  # How 'bout something with a different cert type and name?
+  label "punchin-point"
+  local_id_type mbox
+  local_id "ipsec-wizard@domain.org"
+  remote_id "10.5.5.128"
+  local_addr 0.0.0.0/0
+  remote_addr 10.5.5.128
+  p1_xform
+  { auth_method rsa_sig oakley_group 5 auth_alg md5 encr_alg \
+  blowfish }
+ }
+ {
+  label "receiver side"
+  remote_id "ipsec-wizard@domain.org"
+  local_id_type ip
+  local_id "10.5.5.128"
+  local_addr 10.5.5.128
+  remote_addr 0.0.0.0/0
+  p1_xform
+  { auth_method rsa_sig oakley_group 5 auth_alg md5 encr_alg blowfish }
+  # NOTE: Specifying preshared null-and-voids the remote_id/local_id
+  # fields.
+  p1_xform
+  { auth_method preshared oakley_group 5 auth_alg md5 encr_alg \
+  blowfish}
+ }
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsr _ Interface StabilityCommitted
+cryptoadm(1M), ikeadm(1M), in.iked(1M), ikecert(1M), ipseckey(1M), ipsecalgs(1M), ipsecconf(1M), svc<hy>
+cfg(1M), dlopen(3C), attributes(5), random(7D)
+Harkins, Dan and Carrel, Dave. RFC 2409, Internet Key Exchange (IKE). Cisco Systems, November 1998.
+Maughan, Douglas et. al. RFC 2408, Internet Security Association and Key Management Protocol (ISAKMP). Na<hy>
+tional Security Agency, Ft. Meade, MD. November 1998.
+Piper, Derrell. RFC 2407, The Internet IP Security Domain of Interpretation for ISAKMP. Network Alchemy. Santa
+Cruz, California. November 1998.
+Kivinen, T. RFC 3526, More Modular Exponential (MODP) Diffie-Hellman Groups for Internet Key Exchange
+(IKE). The Internet Society, Network Working Group. May 2003.

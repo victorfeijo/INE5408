@@ -1,0 +1,61 @@
+<beginning of page>
+biodone <-> release buffer after buffer I/O transfer and notify blocked threads
+#include <sys/types.h>
+#include <sys/buf.h>
+void biodone(struct buf *bp);
+Architecture independent level 1 (DDI/DKI).
+bp Pointer to a buf(9S) structure.
+The biodone() function notifies blocked processes waiting for the I/O to complete, sets the B_DONE flag in the
+b_flags field of the buf(9S) structure, and releases the buffer if the I/O is asynchronous. biodone() is called by either
+the driver interrupt or strategy(9E) routines when a buffer I/O request is complete.
+The biodone() function provides the capability to call a completion routine if bp describes a kernel buffer. The ad<hy>
+dress of the routine is specified in the b_iodone field of the buf(9S) structure. If such a routine is specified,
+biodone() calls it and returns without performing any other actions. Otherwise, it performs the steps above.
+The biodone() function can be called from user, interrupt, or kernel context.
+Generally, the first validation test performed by any block device strategy(9E) routine is a check for an end-of-file
+(EOF) condition. The strategy(9E) routine is responsible for determining an EOF condition when the device is ac<hy>
+cessed directly. If a read(2) request is made for one block beyond the limits of the device (line 10), it will report an
+EOF condition. Otherwise, if the request is outside the limits of the device, the routine will report an error condi<hy>
+tion. In either case, report the I/O operation as complete (line 27).
+  1 #define RAMDNBLK 1000 /* Number of blocks in RAM disk */
+  2 #define RAMDBSIZ 512 /* Number of bytes per block */
+  3 char ramdblks[RAMDNBLK][RAMDBSIZ]; /* Array containing RAM disk */
+  4
+  5 static int
+  6 ramdstrategy(struct buf *bp)
+  7 {
+  8 daddr_t blkno = bp->b_blkno;/* get block number */
+  9
+ 10 if ((blkno < 0) || (blkno >= RAMDNBLK)) {
+ 11 /*
+ 12 * If requested block is outside RAM disk
+ 13 * limits, test for EOF which could result
+ 14 * from a direct (physio) request.
+ 15 */
+ 16 if ((blkno == RAMDNBLK) && (bp->b_flags & B_READ)) {
+ 17 /*
+ 18 * If read is for block beyond RAM disk
+ 19 * limits, mark EOF condition.
+ 20 */
+ 21 bp->b_resid = bp->b_bcount; /* compute return value */
+ 22
+ 23 } else { /* I/O attempt is beyond */
+ 24 bp->b_error = ENXIO; /* limits of RAM disk */
+ 25 bp->b_flags |= B_ERROR; /* return error */
+ 26 }
+ 27 biodone(bp); /* mark I/O complete (B_DONE) */
+ 28 /*
+ 29 * Wake any processes awaiting this I/O
+ 30 * or release buffer for asynchronous
+ 31 * (B_ASYNC) request.
+ 32 */
+ 33 return (0);
+ 34 }
+  ...
+<beginning of page>
+read(2), strategy(9E), biowait(9F), ddi_add_intr(9F), delay(9F), timeout(9F), untimeout(9F), buf(9S)
+Writing Device Drivers
+After calling biodone(), bp is no longer available to be referred to by the driver. If the driver makes any reference to
+bp after calling biodone(), a panic may result.
+Drivers that use the b_iodone field of the buf(9S) structure to specify a substitute completion routine should save the
+value of b_iodone before changing it, and then restore the old value before calling biodone() to release the buffer.

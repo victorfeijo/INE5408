@@ -1,0 +1,136 @@
+<beginning of page>
+mount_smbfs, umount_smbfs <-> mount and unmount a shared resource from a CIFS file server
+/sbin/mount [-F smbfs] [generic-options] [-o name=value] [-O] resource
+/sbin/mount [-F smbfs] [generic-options] [-o name=value] [-O] mount-point
+/sbin/mount [-F smbfs] [generic-options] [-o name=value]
+ [-O] resource mount-point
+/sbin/umount [-F smbfs] [generic-options] mount-point
+The mount utility attaches a named resource, resource, to the file system hierarchy at the path name location,
+mount-point, which must already exist.
+If mount-point has any contents prior to the mount operation, those contents remain hidden until the resource is un<hy>
+mounted. An authorized user with the SYS_MOUNT privilege can perform a mount operation. Also, a user can
+perform SMBFS mount operations on a directory the user owns.
+If the resource is listed in the /etc/vfstab file, you can specify either resource or mount-point as the mount command
+will consult the /etc/vfstab file for more information. If the -F option is omitted, mount takes the file system type
+from the entry in the /etc/vfstab file.
+If the resource is not listed in the /etc/vfstab file, the command line must specify both resource and mount-point.
+The umount utility detaches a mounted file system from the file system hierarchy. An authorized user with the
+SYS_MOUNT privilege can perform a umount operation. Also, a user can perform SMBFS unmount operations on
+a directory the user owns.
+The network/smb/client service must be enabled to successfully mount a CIFS share. This service is enabled, by
+default.
+To enable the service, enter the following svcadm(1M) command:
+ # svcadm enable network/smb/client
+The mount command supports the following operands:
+resource //[workgroup;][user[:password]@]server/share
+The name of the resource to be mounted. In addition to its name, you can specify the following information about
+the resource: <bu> password is the password associated with user. If password is not specified, the mount first attempts
+to use the password stored by the smbutil login command (if any). If that password fails to authenticate, the
+mount_smbfs prompts you for a password. <bu> server is the DNS or NetBIOS name of the remote computer. <bu> share
+is the resource name on the remote server. <bu> user is the remote user name. If user is omitted, the logged in user ID is
+used. <bu> workgroup is the name of the workgroup or the Windows domain in which the user name is defined.
+If the resource includes a workgroup, you must escape the semicolon that appears after the workgroup name to pre<hy>
+vent it from being interpreted by the command shell. For instance, surround the entire resource name with double
+quotes: mount -F smbfs "//SALES;george@RSERVER" /mnt.
+mount-point
+The path to the location where the file system is to be mounted or unmounted. The mount command maintains a ta<hy>
+ble of mounted file systems in the /etc/mnttab file. See the mnttab(4) man page.
+See the mount(1M) man page for the list of supported generic-options.
+-o name=value or
+-o name
+Sets the file system-specific properties. You can specify more than one name-value pair as a list of comma-separated
+pairs. No spaces are permitted in the list. The properties are as follows:
+<beginning of page>
+dirperms=octaltriplet
+Specifies the permissions to be assigned to directories. The value must be specified as an octal triplet, such as 755.
+The default value for the directory mode is taken from the fileperms setting, with execute permission added where
+fileperms has read permission.
+Note that these permissions have no relation to the rights granted by the CIFS server.
+fileperms=octaltriplet
+Specifies the permissions to be assigned to files. The value must be specified as an octal triplet, such as 644. The de<hy>
+fault value is 700.
+Note that these permissions have no relation to the rights granted by the CIFS server.
+gid=groupid
+Assigns the specified group ID to files. The default value is the group ID of the directory where the volume is
+mounted.
+intr|nointr
+Enable (or disable) cancellation of smbfs(7FS) I/O operations when the user interrupts the calling thread (for exam<hy>
+ple, by hitting Ctrl-C while an operation is underway). The default is intr (interruption enabled), so cancellation is
+normally allowed.
+noprompt
+Suppresses the prompting for a password when mounting a share. This property enables you to permit anonymous
+access to a share. Anonymous access does not require a password.
+The mount operation fails if a password is required, the noprompt property is set, and no password is stored by the
+smbutil login command.
+retry_count=number
+Specifies the number of SMBFS retries to attempt before the connection is marked as broken. By default, 4 attempts
+are made.
+The retry_count property value set by the mount command overrides the global value set in SMF or the value set in
+your .nsmbrc file.
+timeout=seconds
+Specifies the CIFS request timeout. By default, the timeout is 15 seconds.
+The timeout property value set by the mount command overrides the global value set in SMF or the value set in
+your .nsmbrc file.
+uid=userid
+Assigns the specified user ID files. The default value is the owner ID of the directory where the volume is mounted.
+xattr|noxattr
+Enable (or disable) Solaris Extended Attributes in this mount point. This option defaults to xattr (enabled Extended
+Attributes), but note: if the CIFS server does not support CIFS "named streams", smbfs(7FS) forces this option to
+noxattr. When a mount has the noxattr option, attempts to use Solaris Extended attributes fail with EINVAL.
+<beginning of page>
+-O
+Overlays mount. Allow the file system to be mounted over an existing mount point, making the underlying file sys<hy>
+tem inaccessible. If a mount is attempted on a pre-existing mount point without setting this flag, the mount fails, pro<hy>
+ducing the error "device busy."
+Example 1 Mounting an SMBFS Share
+The following example shows how to mount the /tmp share from the nano server in the SALES workgroup on the
+local /mnt mount point. You must supply the password for the root user to successfully perform the mount opera<hy>
+tion.
+ # mount -F smbfs "//SALES;root@nano.sfbay/tmp" /mnt
+ Password:
+Example 2 Verifying That an SMBFS File System Is Mounted
+The following example shows how to mount the /tmp share from the nano server on the local /mnt mount point.
+You must supply the password for the root user to successfully perform the mount operation.
+ # mount -F smbfs //root@nano.sfbay/tmp /mnt
+ Password:
+You can verify that the share is mounted in the following ways: <bu> View the file system entry in the /etc/mnttab file.
+ # grep root /etc/mnttab
+ //root@nano.sfbay/tmp /mnt smbfs dev=4900000 1177097833
+<bu> View the output of the mount command.
+ # mount | grep root
+ /mnt on //root@nano.sfbay/tmp read/write/setuid/devices/dev=4900000 on
+ Fri Apr 20 13:37:13 2007
+<bu> View the output of the df /mnt command.
+ # df /mnt
+ /mnt (//root@nano.sfbay/tmp): 3635872 blocks -1 files
+Obtain information about the mounted share by viewing the output of the df -k /mnt command.
+ # df -k /mnt
+ Filesystem kbytes used avail capacity Mounted on
+ //root@nano.sfbay/tmp
+  1882384 64448 1817936 4% /mnt
+Example 3 Unmounting a CIFS Share
+This example assumes that a CIFS share has been mounted on the /mnt mount point. The following command line
+unmounts the share from the mount point.
+ # umount /mnt
+<beginning of page>
+/etc/mnttab
+Table of mounted file systems.
+/etc/dfs/fstypes
+Default distributed file system type.
+/etc/vfstab
+Table of automatically mounted resources.
+$HOME/.nsmbrc
+User-settable mount point configuration file to store the description for each connection.
+See the attributes(5) man page for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wsmbfscu _ Interface StabilityCommitted
+smbutil(1), mount(1M), mountall(1M), svcadm(1M), acl(2), fcntl(2), link(2), mknod(2), mount(2), symlink(2),
+umount(2), mnttab(4), nsmbrc(4), vfstab(4), attributes(5), pcfs(7FS), smbfs(7FS)
+This manual page contains material originally authored by Boris Popov, bpATbutya.kz, bpATFreeBSD.org.
+The Solaris CIFS client always attempts to use gethostbyname() to resolve host names. If the host name cannot be
+resolved, the CIFS client uses NetBIOS name resolution (NBNS). By default, the Solaris CIFS client permits the use
+of NBNS to enable Solaris CIFS clients in Windows environments to work without additional configuration.
+Since NBNS has been exploited in the past, you might want to disable it. To disable NBNS, set the nbns-enabled
+service management facility property to false. By default, nbns-enabled is set to true.
+If the directory on which a file system is to be mounted is a symbolic link, the file system is mounted on the directo<hy>
+ry to which the symbolic link refers, rather than being mounted on top of the symbolic link itself.

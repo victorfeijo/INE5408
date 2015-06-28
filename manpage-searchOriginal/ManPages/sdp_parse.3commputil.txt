@@ -1,0 +1,218 @@
+<beginning of page>
+sdp_parse <-> parse the SDP description
+cc [ flag...] file... -lcommputil [ library...]
+#include <sdp.h>
+int sdp_parse(const char *sdp_info, int len, int flags,
+ sdp_session_t **session, uint_t *p_error);
+The sdp_parse() function parses the SDP description present in sdp_info and populates the sdp_session_t structure.
+The len argument specifies the length of the character buffer sdp_info. The flags argument is not used, but must be
+set to 0, otherwise the call fails with the error value of EINVAL and *session set to NULL. The function allocates
+the memory required for the sdp_session_t structure and hence the caller is responsible for freeing the parsed ses<hy>
+sion structure (sdp_session_t) using sdp_free_session(), described on the sdp_new_session(3COMMPUTIL) man<hy>
+ual page.
+The p_error argument identifies any field that had a parsing error. It cannot be NULL and can take any of the follow<hy>
+ing values:
+tab(); lw(2.75i) lw(2.75i) lw(2.75i) lw(2.75i) SDP_VERSION_ERROR0x00000001 SDP_ORIGIN_ER<hy>
+ROR0x00000002 SDP_NAME_ERROR0x00000004 SDP_INFO_ERROR0x00000008 SDP_URI_ER<hy>
+ROR0x00000010 SDP_EMAIL_ERROR0x00000020 SDP_PHONE_ERROR0x00000040 SDP_CONNEC<hy>
+TION_ERROR0x00000080 SDP_BANDWIDTH_ERROR0x00000100 SDP_TIME_ERROR0x00000200
+SDP_REPEAT_TIME_ERROR0x00000400 SDP_ZONE_ERROR0x00000800 SDP_KEY_ER<hy>
+ROR0x00001000 SDP_ATTRIBUTE_ERROR0x00002000 SDP_MEDIA_ERROR0x00004000
+SDP_FIELDS_ORDER_ERROR0x00008000 SDP_MISSING_FIELDS0x00010000
+RFC 4566 states that the fields in the SDP description need to be in a strict order. If the fields are not in the order
+specified in the RFC, SDP_FIELDS_ORDER_ERROR will be set.
+RFC 4566 mandates certain fields to be present in SDP description. If those fields are missing then SDP_MISS<hy>
+ING_FIELDS will be set.
+Applications can check for presence of parsing error using the bit-wise operators.
+If there was an error on a particular field, that field information will not be in the sdp_session_t structure. Also,
+parsing continues even if there was a field with a parsing error.
+The sdp_session_t structure is defined in the header file <sdp.h> and contains the following members:
+ typedef struct sdp_session {
+  int sdp_session_version; /* SDP session verstion */
+  int s_version; /* SDP version field */
+  sdp_origin_t *s_origin; /* SDP origin field */
+  char *s_name; /* SDP name field */
+  char *s_info; /* SDP info field */
+  char *s_uri; /* SDP uri field */
+  sdp_list_t *s_email; /* SDP email field */
+  sdp_list_t *s_phone; /* SDP phone field */
+  sdp_conn_t *s_conn; /* SDP connection field */
+  sdp_bandwidth_t *s_bw; /* SDP bandwidth field */
+  sdp_time_t *s_time; /* SDP time field */
+  sdp_zone_t *s_zone; /* SDP zone field */
+  sdp_key_t *s_key; /* SDP key field */
+  sdp_attr_t *s_attr; /* SDP attribute field */
+  sdp_media_t *s_media; /* SDP media field */
+ } sdp_session_t;
+The sdp_session_version member is used to track the version of the structure. Initially it is set to SDP_SES<hy>
+SION_VERSION_1 (= 1).
+The sdp_origin_t structure contains the following members:
+<beginning of page>
+ typedef struct sdp_origin {
+  char *o_username; /* username of the originating host */
+  uint64_t o_id; /* session id */
+  uint64_t o_version; /* version number of this session */
+  /* description */
+  char *o_nettype; /* type of network */
+  char *o_addrtype; /* type of the address */
+  char *o_address; /* address of the machine from which */
+  /* session was created */
+ } sdp_origin_t;
+The sdp_conn_t structure contains the following members:
+ typedef struct sdp_conn {
+  char *c_nettype; /* type of network */
+  char *c_addrtype; /* type of the address */
+  char *c_address; /* unicast-address or multicast */
+  /* address */
+  int c_addrcount; /* number of addresses (case of */
+  /* multicast address with layered */
+  /* encodings */
+  struct sdp_conn *c_next; /* pointer to next connection */
+  /* structure; there could be several */
+  /* connection fields in SDP description */
+  uint8_t c_ttl; /* TTL value for IPV4 multicast address */
+ } sdp_conn_t;
+The sdp_bandwidth_t structure contains the following members:
+ typedef struct sdp_bandwidth {
+  char *b_type; /* info needed to interpret b_value */
+  uint64_t b_value; /* bandwidth value */
+  struct sdp_bandwidth *b_next; /* pointer to next bandwidth structure*/
+  /* (there could be several bandwidth */
+  /* fields in SDP description */
+ } sdp_bandwidth_t;
+The sdp_list_t structure is a linked list of void pointers. This structure holds SDP fields like email and phone, in
+which case the void pointers point to character buffers. It to hold information in cases where the number of elements
+is not predefined (for example, offset (in repeat field) where void pointer holds integer values or format (in media
+field) where void pointers point to character buffers). The sdp_list_t structure is defined as:
+ typedef struct sdp_list {
+  void *value; /* string values in case of email, phone and */
+  /* format (in media field) or integer values */
+  /* in case of offset (in repeat field) */
+  struct sdp_list *next; /* pointer to the next node in the list */
+ } sdp_list_t;
+The sdp_repeat_t structure contains the following members:
+ typedef struct sdp_repeat {
+  uint64_t r_interval; /* repeat interval, e.g. 86400 seconds */
+  /* (1 day) */
+  uint64_t r_duration; /* duration of session, e.g. 3600 */
+  /* seconds (1 hour) */
+  sdp_list_t *r_offset; /* linked list of offset values; each */
+  /* represents offset from start-time */
+  /* in SDP time field */
+  struct sdp_repeat *r_next; /* pointer to next repeat structure; */
+  /* there could be several repeat */
+  /* fields in SDP description */
+<beginning of page>
+The sdp_repeat_t structure will always be part of the time structure sdp_time_t, since the repeat field does not ap<hy>
+pear alone in SDP description and is always associated with the time field.
+The sdp_time_t structure contains the following members:
+ typedef struct sdp_time {
+  uint64_t t_start; /* start-time for a session */
+  uint64_t t_stop; /* end-time for a session */
+  sdp_repeat_t *t_repeat; /* points to the SDP repeat field */
+  struct sdp_time *t_next; /* pointer to next time field; there */
+  /* could there could be several time */
+  /* fields in SDP description */
+ } sdp_time_t;
+The sdp_zone_t structure contains the following members:
+ typedef struct sdp_zone {
+  uint64_t z_time; /* base time */
+  char *z_offset; /* offset added to z_time to determine */
+  /* session time; mainly used for daylight */
+  /* saving time conversions */
+  struct sdp_zone *z_next; /* pointer to next zone field; there */
+  /* could be several <adjustment-time> */
+  /* <offset> pairs within a zone field */
+ } sdp_zone_t;
+The sdp_key_t structure contains the following members:
+ typedef struct sdp_key {
+  char *k_method; /* key type */
+  char *k_enckey; /* encryption key */
+ } sdp_key_t;
+The sdp_attr_t structure contains the following members:
+ typedef struct sdp_attr {
+  char *a_name; /* name of the attribute */
+  char *a_value; /* value of the attribute */
+  struct sdp_attr *a_next; /* pointer to the next attribute */
+  /* structure; there could be several */
+  /* attribute fields within SDP description */
+ } sdp_attr_t;
+The sdp_media_t structure contains the following members:
+ typedef struct sdp_media {
+  char *m_name; /* name of the media such as "audio", */
+  /* "video", "message" */
+  uint_t m_port; /* transport layer port information */
+  int m_portcount; /* number of ports in case of */
+  /* hierarchically encoded streams */
+  char *m_proto; /* transport protocol */
+  sdp_list_t *m_format; /* media format description */
+  char *m_info; /* media info field */
+  sdp_conn_t *m_conn; /* media connection field */
+  sdp_bandwidth_t *m_bw; /* media bandwidth field */
+  sdp_key_t *m_key; /* media key field */
+  sdp_attr_t *m_attr; /* media attribute field */
+  struct sdp_media *m_next; /* pointer to next media structure; */
+  /* there could be several media */
+<beginning of page>
+  /* sections in SDP description */
+  sdp_session_t *m_session; /* pointer to the session structure */
+ } sdp_media_t;
+The sdp_parse() function returns 0 on success and the appropriate error value on failure. The value of errno is not
+changed by these calls in the event of an error.
+The sdp_parse() function will fail if:
+EINVAL Arguments to the function were invalid.
+ENOMEM Memory allocation failed while parsing sdp_info.
+Example 1 sdp_parse() example
+If the SDP description was
+ v=0\r\n
+ o=jdoe 23423423 234234234 IN IP4 192.168.1.1\r\n
+ s=SDP seminar\r\n
+ i=A seminar on the session description protocol\r\n
+ e=test@host.com
+ c=IN IP4 156.78.90.1\r\n
+ t=2873397496 2873404696\r\n
+then after call to sdp_parse() function the sdp_session_t structure would be
+ session {
+  sdp_session_version = 1
+  s_version = 0
+  s_origin {
+  o_username = "jdoe"
+  o_id = 23423423ULL
+  o_version = 234234234ULL
+  o_nettype = "IN"
+  o_addrtype = "IP4"
+  o_address = "192.168.1.1"
+  }
+  s_name = "SDP seminar"
+  s_info = "A seminar on the session description protocol"
+  s_uri = (nil)
+  s_email {
+  value = "test@host.com"
+  next = (nil)
+  }
+  s_phone = (nil)
+  s_conn {
+  c_nettype = "IN"
+  c_addrtype = "IP4"
+  c_address = "156.78.90.1"
+  c_addrcount = 0
+  c_ttl = 0
+  c_next = (nil)
+  }
+  s_bw = (nil)
+  s_time {
+  t_start = 2873397496ULL
+  t_stop = 2873404696ULL
+  t_repeat = (nil)
+  t_next = (nil)
+  }
+<beginning of page>
+  s_zone = (nil)
+  s_key = (nil)
+  s_attr = (nil)
+  s_media = (nil)
+ }
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed _ MT-LevelSafe
+libcommputil(3LIB), sdp_new_session(3COMMPUTIL), attributes(5)

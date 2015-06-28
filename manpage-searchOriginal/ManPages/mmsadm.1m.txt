@@ -1,0 +1,711 @@
+<beginning of page>
+mmsadm <-> administration command for the Media Management System
+/usr/sbin/mmsadm [-h | -?]
+mmsadm discover [-H] [-t library|drive|vol] [-S ACSLS-host[:port]] -a
+mmsadm create -t library|drive|mpool|dpool|app|voltype
+ -o option=x [-o option2=y...] name
+mmsadm delete -t library|drive|mpool|dpool|app|voltype
+ [-f] name
+mmsadm set -t library|drive|mpool|dpool|app|voltype
+ -o option=x [-o option2=y...] name
+mmsadm list [-vH] -t library|drive|mpool|dpool|app|voltype
+ -o option=x [-o option2=y...] [-F filter [-F filter2...] [name]
+mmsadm passwd [-P file] name
+mmsadm online -t library|drive name
+mmsadm offline -t library|drive name
+mmsadm add-volume -l library -o voltype=type -x vol1[,vol2,...] mpool
+mmsadm remove-volume -x [-l library] [-x vol1[,vol2,...]] mpool
+mmsadm label [-n] [-A application] [-l library]
+ [-P file]volume[,volume,...]]
+mmsadm showreq [-H] [drivename]
+mmsadm accept [-r "reason"] requestid
+mmsadm reject [-r "reason"] requestid
+mmsadm dbbackup directory
+mmsadm dbrestore file
+mmsadm mount [-n] [-N] [-d drive] [-D density] -A application -l library
+ [-P passwordfile] [-u username] [-b blocksize] [-R]
+ [-M mode[,mode...] volume
+mmsadm unmount [-A application] [-P file] [-f] volume|pseudodevice
+The Media Management System (MMS) is a software interface that manages removable storage media such as tape
+libraries, tape drives, media pools, tape volumes, and disk resources that emulate tape drives and tape volumes. It is
+an implementation of the IEEE 1244 specification for removable media.
+The MMS consists of an MM server and database that control various library managers and drive managers. Admin<hy>
+istrators use mmsadm and its subcommands to configure and maintain storage resources from a variety of vendors.
+The MMS management commands, such as mmsadm, construct and issue the most frequently-used Media Manage<hy>
+ment Protocol (MMP) commands, handling all events and acknowledgments. The MMP is defined in the IEEE 1244
+specification.
+The mmsinit(1M) command must be run to initialize MMS on a system before you can use the mmsadm command.
+The mmsadm command is RBAC-compliant. (See rbac(5).) Required authorizations vary among individual sub<hy>
+commands and are listed in the descriptions of those subcommands.
+The mmsadm supports the subcommands listed below. Each subcommand description includes a description of that
+subcommand's options and operands. A mmsadm command takes the form:
+ # mmsadm subcommand [options]
+<beginning of page>
+The discover subcommand displays the library, drives, or volumes on an Automated Control System Library Server
+(ACSLS) server, or the tape drives connected to the local system. Use this command to determine what resources are
+available and whether they have been configured for use with MMS.
+discover requires the solaris.smf.read.mms authorization. The subcommand has the following syntax:
+ mmsadm discover [-H] [-t library|drive|vol]
+  [-S ACSLS-host[:port]] -a
+The subcommand options are described as follows.
+-a
+Displays all discovered resources, including those configured for MMS. By default, only unconfigured resources are
+displayed.
+-H
+Displays the resources in a manner parseable by scripts. The display does not include headers and it separates fields
+with a tab character.
+-S ACSLS-host[:port]
+Displays resources managed by the specified server and port. The default port number is 50004. If the -S option is
+not used, the command displays tape drives connected to the local system.
+-t library|drive|vol
+Displays only the specified type of resource:
+-t library
+Shows discovered libraries.
+-t drive
+Shows discovered drives.
+-t vol
+Shows discovered volumes.
+If this option is not used, library and drive resources are included in the display. The number of volumes can be large
+so their discovery must be requested explicitly.
+The create subcommand configures the resource to be managed by MMS. The set subcommand modifies the at<hy>
+tributes of a resource managed by MMS. These subcommands share a common set of options.
+ACSLS-controlled libraries and disk archiving libraries are supported. Libraries must be configured before any drive
+pool and drives managed in that library can be configured, or any volumes managed by the library added to media
+pools. voltype must be configured before adding volumes to media pools.
+The create and set subcommands require the solaris.smf.modify.mms, solaris.smf.value.mms, solaris.mms.*, and
+solaris.smf.read.mms authorizations, with the exception of changing tracing attributes. If changing the size of trace
+files or trace level, only solaris.mms.device.log and solaris.smf.read.mms authorizations are required.
+These subcommands have the following syntax:
+<beginning of page>
+ create -t library|drive|mpool|dpool|app|voltype
+  -o option=x [-o option2=y...] name
+ set -t library|drive|mpool|dpool|app|voltype
+  -o option=x [-o option2=y...] name
+The subcommand options and operand are described as follows.
+-t type
+Specifies the type of resource being created or modified. type can be one of:
+library Tape library
+drive Tape or disk archiving drive
+mpool Media pool
+dpool Drive pool
+app MMS-aware application
+voltype An MMS construct to map tape cartridge types (such as LTO3) to a user-defined type. Allows the user to
+specify a default cartridge size for this type of tape.
+-o option=x [-o option2=y...]
+Options are key/value pairs and are specific to the resource type.
+Library Options:
+hwtype=type
+Specify one of the supported library types: L180, L500, L700, SL500, SL8500, or SL3000. This option is required
+for create operations.
+For disk archiving libraries, specify DISK.
+The following are options for real network attached libraries.
+acs=acs_number
+Specifies the ACSLS ACS number for the library, as shown by the discover subcommand. Required for create.
+lsm=lsm_number
+Specifies the ACSLS LSM number for the library, as shown by the discover subcommand. Required for create.
+serialno=serial_num
+Specifies the serial number of the library as reported by the discover subcommand. Required for create.
+acsls=host[:port]
+Identifies the host and port number of the ACSLS server controlling the library. If not specified, the default port is
+50004. Required for create.
+<beginning of page>
+The following are options for disk archiving libraries.
+dkpath=path
+Defines the default path of the DISK library. The path specifies the parent directory of the library and its name must
+not be the last component of the path.
+dkaltpath=host1@directory1[,host2@directory2]
+Defines the path of a DISK library in a host which cannot use the default path to access the DISK library. The path
+specifies the parent directory of the library and its name must not be the last component of the path.
+All libraries have the following options.
+msg-level=emergency|alert|critical|error|warning|notice|
+information|debug
+Specifies the level of detail in messages written to the log file. The default level is error.
+trace-level=emergency|alert|critical|error|warning|
+notice|information|debug
+Specifies the level of detail in messages written to the trace file. The default level is error.
+trace-file-size=size
+Specifies the maximum size of the trace file before it is rotated and restarted. Specify the size using a value and the
+character that identifies the unit: <bu> K for kilobytes <bu> M for megabytes <bu> G for gigabytes The default size is 10
+megabytes. To set the maximum size of the trace file to 15 megabytes (for example), enter:
+ trace-file-size=15M
+Drive Options:
+hwtype=type
+Specifies the drive type as reported from the discover subcommand. Required for create.
+serialno=serial
+Specifies the serial number of the drive as reported from the discover subcommand. Required for create.
+library=library_name
+Defines the MMS identifier of the library controlling this drive as reported from the list subcommand. Required for
+create.
+connection=host,[host]
+Identifies the host name or IP address to which the drive is physically connected. If the drive is multiported, enter
+each host separated by a comma. Required for create.
+apps=app1[,app2,...]
+Specifies which applications registered with MMS can use this drive. To specify that more than one application can
+use this drive, enter each application name, separated by commas.
+msg-level=emergency|alert|critical|error|warning|notice|
+information|debug
+Specifies the level of detail in messages written to the log file. The default level is error.
+<beginning of page>
+trace-level=emergency|alert|critical|error|warning|
+notice|information|debug
+Specifies the level of detail in messages written to the trace file. The default level is error.
+trace-file-size=size
+Specifies the maximum size of the trace file before it is rotated and restarted. Specify the size using a value and the
+character that identifies the unit: <bu> K for kilobytes <bu> M for megabytes <bu> G for gigabytes The default size is 10
+megabytes. To set the maximum size of the trace file to 15 megabytes (for example), enter:
+ trace-file-size=15M
+unload-time=num_minutes
+Specifies the maximum time an unused volume is left in a drive before it is ejected. After an application has finished
+using a volume, it is often left in the drive. This is to speed up requests if the same volume is needed again in a short
+amount of time. This option ensures the drive is emptied and available to load other volumes when requested. The
+default number of minutes is 60.
+reserve=yes|no
+Defines whether access to a drive is enforced. Use yes to use SCSI reserve and release commands to enforce access
+to the drive. Use no to not use SCSI reservations. Use no only if the drive behaves improperly when access is en<hy>
+forced, or if the drive does not support the SCSI reservation commands. The default value is yes.
+Drive Pool Options
+Specifies which applications registered with MMS can use this drive pool. To specify that more than one application
+can use this pool, enter each application name, separated by commas.
+Media Pool Options
+apps=app1[,app2,...]
+Specifies which applications registered with MMS can use this media pool. To specify that more than one applica<hy>
+tion can use this pool, enter each application name, separated by commas.
+Application Options
+retain=num_days
+Specifies the number of days that the volume's data is preserved after the expiration date defined by the application
+for a volume. The default value is 0.
+validate-expiration=yes|no
+Specifies whether overwriting unexpired files is allowed. Use no to allow overwriting of unexpired volume files. Use
+yes to prevent overwriting unexpired volume files. The default value is no.
+validate-volid=yes|no
+Specifies whether the volume identifier is verified. Use yes to verify that the volume ID obtained from the mmsadm
+mount command matches the volume identifier on the volume label. Use no to specify that this verification is not
+done. The default value is yes.
+validate-filename=yes|no
+Specifies whether the file name is verified. Use yes to verify that the file name obtained from the mmsadm mount
+command matches the file name on the HDR1 header label of the file. Use no to specify that this verification is not
+<beginning of page>
+done. The default value is no.
+overwrite-existing=yes|no|ask
+This option is only for unlabeled volumes that are not blank. It specifies whether the data on an unlabeled volume
+can be overwritten. The default is yes to indicate data can be overwritten. Use no to reject any write requests. Use
+ask to prompt an operator for his wish when a write request is received.
+System Options
+log-level=emergency|alert|critical|error|warning|notice|
+information|debug
+Specifies the level of detail in messages written to the log file. The default level is error.
+num-restarts=num
+Specifies the number of attempts to start a failed daemon before the drive or library associated with the daemon is
+disabled and requires the mmsadm online command to be run after the problem with the system or device is re<hy>
+solved. Use a value of -1 for unlimited restart attempts. The default value is 3.
+attended=yes|no
+Specify whether MMS makes operator requests when an operation cannot be automatically satisfied. An example of
+such a case would be if a mount request was made for a tape volume that had been physically removed from a li<hy>
+brary. The default action, yes, indicates that an operator is available to respond. Use no to specify that no operator is
+available. If no operator is available, all operator requests are rejected.
+num-sockets=num
+Specifies the number of open file descriptors the MM daemon can have at one time. On a resource-constrained sys<hy>
+tem, set this value to a number between 30 and 65536. It is not recommended to set the value to less than 256. The
+default value is -1, meaning an unlimited number of file descriptors.
+disk-timeout=seconds
+Specifies the time a disk archiving drive manager waits for the file system containing a disk archiving volume to be<hy>
+come available. It is strongly recommended to set the time to a minimum of 120 seconds (two minutes). Use a value
+of 0 to specify no expiration time.
+dkvol Options
+dirname=path
+Required by (and only valid for) create. Specifies the directory in which the new disk archiving volume will created.
+size=num
+Valid only for create. Specifies the size, in megabytes, of the disk archiving volume.
+readonly=true|false
+Sets the volume to read-only or to allow write operations. The default is false, meaning that the disk archiving vol<hy>
+ume is writeable.
+mpool=pool_name
+Media pool to which this disk archiving volume will be added after it is created. This option is required for create.
+dkdrive Options
+<beginning of page>
+apps=app1[,app2,...]
+Specifies which applications registered with MMS can use this drive. To specify that more than one application can
+use this drive, enter each application name, separated by commas.
+msg-level=emergency|alert|critical|error|warning|notice|
+information|debug
+Specifies the level of detail in messages written to the log file. The default level is error.
+trace-level=emergency|alert|critical|error|warning|
+notice|information|debug
+Specifies the level of detail in messages written to the trace file. The default level is error.
+trace-file-size=size
+Specifies the maximum size of the trace file before it is rotated and restarted. Specify the size using a value and the
+character that identifies the unit: <bu> K for kilobytes <bu> M for megabytes <bu> G for gigabytes The default size is 10
+megabytes. To set the maximum size of the trace file to 15 megabytes (for example), enter:
+ trace-file-size=15M
+unload-time=num_minutes
+Specifies the maximum time an unused volume is left in a drive before it is ejected. After an application has finished
+using a volume, it is often left in the drive. This is to speed up requests if the same volume is needed again in a short
+amount of time. This option ensures the drive is emptied and available to load other volumes when requested. The
+default number of minutes is 60.
+voltype Options
+mediatype=type
+One of the supported media types: 9940, 9940_worm, 9840, 9840_worm, 9840C_worm, 9840D_worm, LTO1,
+LTO2, LTO3, LTO3_worm, LTO4, LTO4_worm, SDLT2, and DISK. This option is required for create.
+
+size=num
+The size, in megabytes, of the this volume type. This option is required for create.
+The create and set subcommands have the following operand.
+name
+Specifies the name of the resource being added or modified. With the exception of applications, names are simple
+text strings, and they must be unique for their resource type. Recommended naming conventions are:
+For a library: LIB_type_serial
+Example: LIB_L180_MPC02209500
+For a drive: DRV_type_serial
+Example: DRV_T9940B_479000010675
+For a disk archive volume: VOL_xxxxxx
+Application names must reflect the name the application itself is going to use when communicating with MMS.
+Check the application documentation to find this value.
+<beginning of page>
+The delete subcommand deletes the entry for the specified resource from the MMS configuration. Use caution when
+removing media pools, as this might result in data loss. If the resource to be deleted is determined to be in use, the
+operation will be rejected unless the -f option is specified.
+Deleting a library involves deleting all associated drives, and removing volumes managed by this library from media
+pools. Deleting a library is prohibited if any of its associated drives is actively in use, or any of its volumes have
+been used by an application.
+Deleting a drive is prohibited if it is actively in use.
+Deleting a drive pool is prohibited if any of its drives is being used by an application.
+Deleting a media pool is prohibited if any of its volumes is being used by an application.
+Deleting an application will cause all volumes that have been used by that application to be recycled and made avail<hy>
+able for reuse. Ensure that all required data has been copied from these volumes before deleting the application.
+Deleting a voltype is prohibited if any volumes are assigned that type. The -f option cannot be used to force this op<hy>
+eration.
+The delete subcommand requires the solaris.smf.value.mms and solaris.mms.* authorizations.
+This subcommand has the following syntax:
+ mmsadm delete -t library|drive|mpool|dpool|app|voltype
+  [-f] name
+The subcommand has the following options:
+-f
+Forces the removal of the specified resource, subject to the restrictions outlined above.
+-t library|drive|mpool|dpool|app|voltype
+Specifies the type of resource being deleted.
+The subcommand has the following operand:
+name
+Identifies the resource as reported by the list subcommand.
+The list subcommand displays all of the storage resources or messages that meet the criteria specified in the options,
+filter, and name parameters. This subcommand is available to any user.
+This subcommand has the following syntax:
+ mmsadm list [-vH] -t library|drive|mpool|dpool|app|voltype
+  -o option[,-o option2,...] [-F filter [-F filter2...] [name]
+The list subcommand has all of the options that are supported by the create and set subcommands. See the section
+on these subcommands for descriptions of those options. In addition to these options, list has the options and oper<hy>
+and listed below.
+-v
+Verbose.
+<beginning of page>
+-H
+Displays the information in a manner parseable by scripts. The display does not include headers and it separates
+fields with a tab character.
+-t type
+One of: <bu> app <bu> drive <bu> library <bu> mpool <bu> dpool <bu> voltype
+-o option[,-o option2,...]
+Specifies which properties of a resource are displayed. For example, to list only drive names and their respective
+states, enter:
+ % mmsadm list -t drive -o name,state
+-F filter [-F filter2...]
+Restricts the listed items to those with specified filter. Filter names are the same as option names, and results are re<hy>
+stricted to those resources that match the option value. For example, to show all drives of type LTO4, enter:
+ # mmsadm list -t drive -F hwtype=LTO4
+Each resource type has its own options. All options are listed below. Most options are in common with the create
+subcommand; see the section on that subcommand for descriptions of these common options. Those options that are
+supported only by the list subcommand have their descriptions below.
+Library Options
+Options in common with set: <bu> acs <bu> acsls <bu> hwtype <bu> lsm <bu> msg-level <bu> serialno <bu> trace-file-size <bu> trace-level The
+following library options are unique to list.
+create-time
+The date and time when the library was added to the MMS.
+state
+The current state of the library, one of ready, offline, or broken.
+Drive Options
+Options in common with set: <bu> apps <bu> connection <bu> hwtype <bu> library <bu> msg-level <bu> reserve <bu> serialno <bu> trace-file-
+size <bu> trace-level <bu> unload-time The following drive options are unique to list.
+create-time
+The date and time when the drive was added to the MMS.
+device-name
+The Unix device name of the drive, if available.
+last-mount
+The date and time when the drive was last mounted.
+<beginning of page>
+state
+The current state of the drive, one of ready, offline, or broken.
+total-mount-time
+The total amount of time the drive has had tapes mounted.
+volume
+The volume name of the volume loaded in the drive, if any.
+Media Pool Options
+There is one option in common with create, apps.
+The following media pool options are unique to list.
+create-time
+The date and time the media pool was created.
+free
+The total amount of free space remaining on volumes in the media pool.
+size
+The total capacity of the media pool.
+used
+The total amount of data on volumes in the media pool.
+Application Options
+All of the application options are in common with create. These options are as follows: <bu> overwrite-existing <bu> re<hy>
+tain <bu> validate-expiration <bu> validate-filename <bu> validate-volid System Options
+Options in common with set: <bu> acsls-install-dir <bu> attended <bu> disk-timeout <bu> host <bu> log-file <bu> log-level <bu> port <bu> num-
+restarts <bu> num-sockets There is one system option unique to list.
+active-sessions
+Brief listing of active sessions.
+Volume Options
+All of the volume options are unique to list.
+apps
+Lists the application that has stored data on this volume.
+create-time
+Date and time this volume was added to the MMS.
+free
+Amount of free space on the volume.
+<beginning of page>
+last-mounted
+Date and time this volume was last mounted.
+library
+Lists the library controlling this volume.
+mpool
+Media pool, of which this volume is a member.
+num-mounts
+Number of times this volume has been mounted.
+size
+Size of the volume.
+total-mount-time
+Total amount of time this volume has been mounted.
+used
+Amount of data written to the volume.
+voltype
+Lists the volume type as was specified when the volume was added to a media pool.
+Volume Type Options
+Both of the volume type options are unique to list.
+mtype
+MMS media type associated with this voltype.
+size
+Default size, in megabytes, for volumes of this type.
+The passwd subcommand changes the password for the MMS administrator, MMS Database administrator, or for
+MMS applications. If the -P option is not specified, the user will be prompted to enter the password.
+The passwd subcommand has the following syntax.
+ mmsadm passwd [-P passwdfile] name
+This subcommand requires the solaris.smf.value.mms and solaris.mms.* authorizations.
+The passwd subcommand has the following option.
+-P passwdfile
+Path to a temporary file containing the password.
+<beginning of page>
+The passwd subcommand has the following operand.
+name
+Use admin to change the MMS administrative password. Use dbadmin to change the MMS database administrative
+password. Use the application name to change the password for any other application.
+The online and offline subcommands control whether the specified library or drive is available to clients. If a library
+is set to offline, all drives and volumes managed by that library are unavailable. If a drive is set to offline, no volume
+can be mounted or accessed on that drive.
+The syntax for the online and offline subcommands is as follows:
+ mmsadm online -t library | drive name
+ mmsadm offline -t library | drive name
+The online and offline subcommands require the solaris.smf.read.mms and solaris.mms.device.state.* authoriza<hy>
+tions.
+The online and offline subcommands have the following option.
+-t library | drive
+Specifies the type of resource to make unavailable or to restore.
+drive
+Tape or disk archiving drive.
+library
+Tape library.
+The online and offline subcommands have the following operand.
+name
+Name of the library or drive, as reported by the list subcommand
+The label subcommand labels specified volumes. The subcommand has the following syntax:
+ mmsadm label [-n] -l library -A application [-P file]
+  volume[,volume,...]
+The label subcommand requires the solaris.smf.read.mms and solaris.mms.media.* authorizations.
+The label subcommand has the following options.
+-l library
+Name of the library holding the volume.
+-n
+Do not mount the volume. If this is not specified, the specified volume will be mounted and header labels will be
+written.
+<beginning of page>
+-A application
+Name of the application to which this volume will be assigned after labeling.
+-P file
+Path to a file containing the application password. If a file name is not provided, the user is prompted for the pass<hy>
+word.
+The label subcommand has the following operand.
+volume[,volume,...]
+Volume(s) to be labeled.
+The add-volume subcommand adds new volumes to the specified media pool. The subcommand has the following
+syntax:
+ mmsadm add-volume -l library_name -o voltype=type
+  -x vol1[,vol2,...] mpool
+The add-volume subcommand requires the solaris.smf.read.mms and solaris.mms.media.* authorizations.
+The add-volume subcommand has the following options.
+-l library_name
+Name of the library from which volumes are selected.
+-o voltype=type
+Volumes to be added will be assigned the voltype specified here. To add volumes of different types to the same me<hy>
+dia pool, use the mmsadm add-volume command multiple times, specifying a different voltype each time.
+-x vol1[,vol2,...]
+A comma-separated list of unused volumes in the specified library.
+The add-volume subcommand has the following operand.
+mpool
+Name of the media pool as reported by the list subcommand.
+The remove-volume subcommand removes volumes from the specified media pools. If a volume is being used by an
+application, the force option, -f, is required. If the option is not included in the command, the request is rejected.
+This subcommand prompts for confirmation unless -f is provided. The subcommand has the following syntax:
+ mmsadm remove-volume -f -x [-l library] vol1[,vol2,...] mpool
+The remove-volume subcommand requires the solaris.smf.read.mms and solaris.mms.media.* authorizations.
+The remove-volume subcommand has the following options.
+-f
+Forces the removal of the specified volume(s), even if they are in use by an application.
+<beginning of page>
+-l library_name
+Name of the library from which volumes are removed.
+-x vol1[,vol2,...]
+A comma-separated list of volumes.
+The remove-volume subcommand has the following operand.
+mpool
+Name of the media pool as reported by the list subcommand.
+The showreq subcommand lists any pending operator requests, each with a request identifier. The subcommand has
+the following syntax:
+ mmsadm showreq [-H] [drivename]
+The showreq subcommand does not require any authorizations.
+The showreq subcommand has the following option.
+-H
+Displays the requests in a manner parseable by scripts. The display does not include headers; fields are separated
+with a tab character.
+The showreq subcommand has the following operand.
+drivename
+Displays the requests only for the specified drive.
+The accept subcommand accepts the operator request so that the MMS can proceed with the operation. The subcom<hy>
+mand has the following syntax.
+ mmsadm accept [-r "response text"] requestid
+The accept subcommand requires the solaris.mms.request.* and solaris.smf.read.mms authorizations.
+The accept subcommand has the following option.
+-r "response text"
+Displays the text that explains the reason for the action.
+The accept subcommand has the following operand.
+requestid
+The identifier of the operator request, as displayed by the mmsadm showreq command.
+The reject subcommand rejects the operator request. The subcommand has the following syntax.
+ mmsadm reject [-r "response text"] requestid
+<beginning of page>
+The reject subcommand requires the solaris.mms.request.* and solaris.smf.read.mms authorizations.
+The reject subcommand has the following option.
+-r "response text"
+Displays the text that explains the reason for the action.
+The reject subcommand has the following operand.
+requestid
+The identifier of the operator request, as displayed by the mmsadm showreq command.
+The dbbackup subcommand creates a backup file containing the contents of the MMS database. This file can be
+used to restore the MMS database in the case of accidental removal, corruption, or other destructive event. It is
+strongly suggested this backup file be created on a regular basis, and backed up as part of the system backups. The
+subcommand has the following syntax.
+ mmsadm dbbackup directory
+The dbbackup subcommand requires the solaris.smf.manage.mms, solaris.smf.value.mms, and solaris.mms.* au<hy>
+thorizations.
+The dbbackup subcommand has the following operand.
+directory
+Specifies the location where the database backup files will be stored.
+The dbrestore subcommand restores the MMS database from the specified file. The database is restored to the state
+it was in at the time the file was created by the mmsadm dbbackup command. The subcommand has the following
+syntax
+ mmsadm dbrestore filename
+The dbrestore subcommand requires the solaris.smf.manage.mms and solaris.smf.value.mms authorizations.
+The dbrestore subcommand has the following operand.
+filename
+Specifies the complete pathname to the file containing the backup of the MMS database.
+The mount subcommand mounts a specified volume. The subcommand has the following syntax.
+ mmsadm mount [-n] [-N] [-d drive] [-D density]
+  -A application -l library [-P file] [-u username]
+  [-b blocksize] [-R] [-M mode[,mode...] volume
+The mount subcommand requires the solaris.mms.io.[read|write|*] authorization.
+The mount subcommand has the following options.
+<beginning of page>
+-A application
+Application name to be used when authenticating with the MM server. The name is the identifer used by the applica<hy>
+tion itself, according to its API documentation.
+-b blocksize
+Specifies the largest block that the application can write to the tape drive for both variable and fixed blocks. Default
+is 262144. The maximum size depends on the drive type:
+9940 and 9840
+1 - 262144. If you specify fixed for the -M option (described below), must be an even number.
+LTO (all models)
+1 - 16777215. If you specify fixed for the -M option (described below).
+The choice of variable or fixed block is specified in the argument to the -M (mode) option. If you specify fixed, then
+-b is the block size because you can only read and write blocks in the block size you specified.
+-d drive
+Drive on which to mount a volume. If this option is not specified, the MM server selects a drive based on availability
+and capability.
+-D density
+Specifies the output density. Can be one of: <bu> high <bu> medium <bu> low <bu> compressed <bu> den_9840 <bu> den_T9840C <bu>
+den_T9940A <bu> den_T9940B
+-l library_name
+Library containing the volume to be mounted.
+-M mode[,mode...]
+The mode argument can be one or more of creat, old, st_nobsd, st_tm, raw, mms, compression, nocompression,
+variable, block.
+-n
+Specifies norewind.
+-N
+Specifies nowait.
+-P file
+Path to a file containing the application password. If a file name is not provided, the user is prompted for the pass<hy>
+word.
+-R
+Specifies a read-only mount. The default is read/write.
+-u username
+Specifies the user who will own the pseudodevice created by mount.
+<beginning of page>
+The mount subcommand has the following operand.
+volume
+Volume to be mounted.
+The unmount subcommand unmounts the specified volume or MMS pseudodevice. The subcommand has the fol<hy>
+lowing syntax.
+ mmsadm unmount [-f] [-l library_name] [-A application]
+  [-P file] volume|pseudodevice
+The unmount subcommand requires the solaris.mms.io.[read|write|*] authorization.
+The unmount subcommand has the following options.
+-A application
+Application name to be used when authenticating with the MM server.
+-f
+Forces an unmount operation of this volume even if it is in use by another user.
+-l library_name
+Library containing the mounted volume. Required only if using the volume name operand.
+-P file
+Path to a temporary file containing the application password.
+The unmount subcommand has one of the following operands.
+pseudodevice
+Device path as returned from the mmsadm mount command. If this form of unmount is used, the library need not
+be specified.
+volume
+Volume to be unmounted.
+Example 1 Displaying Available Libraries
+To display all libraries available to be managed by the MMS, enter:
+ # mmsadm discover -t library -S my-acsls-server
+Example 2 Creating a Library
+To create a library in the MMS, enter:
+ # mmsadm create -t library -o acsls=my-acsls-server -o acs=0 \
+ -o lsm=1 -o hwtype=L180 -o serialno=7493476 LIB_L180_7493476
+<beginning of page>
+Example 3 Creating a Drive
+To create a drive in the MMS, enter:
+ # mmsadm create -t drive -o library=LIB_L180_7493476 \
+ -o hwtype=LTO2 -o serialno=6453805873 \
+ -o connection=myhost DRV_LTO2_6453805873
+Example 4 Making Library Available
+To make a library available for use, enter:
+ # mmsadm online LIB_L180_7493476
+Example 5 Registering an Application
+To register an application, enter:
+ # mmsadm create -t app -P /var/tmp/app_passwd MyBackupApp
+Example 6 Allowing an Application to Use a Drive
+To allow the MyBackupApp application to use a drive, enter:
+ # mmsadm set -t drive -o apps=MyBackupApp DRV_LTO2_6453805873
+Example 7 Listing Volumes in a Library
+To show volumes in library L700_99987004 of type LT03, enter:
+ # mmsadm list -t vol -o library=L700_99987004 -F mtype=LTO3
+Example 8 Listing Unconfigured Volumes
+To show volumes not yet configured for the MMS, enter:
+ # mmsadm discover -t vol -S my_acsls_server
+Example 9 Configure an MMS for Three Applications
+The following sequence of commands illustrates the process of configuring a Media Management System for three
+applications, engineering, finance, and backup.
+Initialize the MM server and set the administrator password to mmsadm2008 in the password file, mmsadm_pass<hy>
+wd:
+ # mmsinit -P ~/mmsadm_passwd
+Create an application for the engineering application:
+<beginning of page>
+ # mmsadm create -t app -P ~/eng_passwd eng
+Create an application for the finance application:
+ # mmsadm create -t app -P ~/finance_passwd finance
+Create an application for the backup application:
+ # mmsadm create -t app -P ~/backup_passwd backup
+Create an L700 library named library1:
+ # mmsadm create -t library -o acsls=mms-280-1 -o hwtype=L700 \
+ -o acs=0 -o lsm=0 -o serialno=MPC02201638 library1
+Create a drive pool named org_dpool, to be shared between the engineering and finance applications:
+ # mmsadm create -t dpool -o apps=eng,finance org_dpool
+Create a drive pool named shared_dpool, to be shared by the engineering, finance, and backup applications:
+ # mmsadm create -t dpool -o apps=eng,finance,backup shared_dpool
+Create an exclusive drive pool for the backup application named bk_dpool:
+ # mmsadm create -t dpool -o apps=backup bk_dpool
+Add a 9940 drive named drive1 shared by the engineering and finance applications:
+ # mmsadm create -t drive -o hwtype=9940 -o serialno=479000002009 \
+ -o library=library1 -o dpool=org_dpool drive1
+Add a 9940 drive named drive2 shared by the engineering, finance, and backup applications:
+ # mmsadm create -t drive -o hwtype=9940 -o serialno=479000001954 \
+ -o library=library1 -o dpool=shared_dpool drive2
+Add an exclusive 9940 drive named drive3 for the backup application:
+<beginning of page>
+ # mmsadm create -t drive -o hwtype=9940 -o serialno=479000001944 \
+ -o library=library1 -o dpool=bk_dpool drive3
+Create media pool for the engineering and finance applications named org_mpool:
+ # mmsadm create -t mpool -o apps=eng,finance org_mpool
+Create an exclusive media pool for the backup application named bk_mpool:
+ # mmsadm create -t mpool -o apps=backup bk_mpool
+Add three volumes to the engineering and finance media pool:
+ # mmsadm add-volume -l library1 -o voltype=9940 \
+ -x 000220,000221,000222 org_mpool
+Add two volumes to the backup media pool:
+ # mmsadm add-volume -l library1 -o voltype=9940 \
+ -x 000230,000231 bk_mpool
+Write a volume label on the volume. The volume becomes owned by the engineering application. The finance or
+backup applications are, as a result, not able to use the volume:
+ # mmsadm label -P ~/eng_passwd -l library1 -A eng 000220
+Verify that the engineering application owns the volume:
+ # mmsadm label -P ~/finance_passwd -l library1 -A finance 000220
+Write a volume label for the finance application:
+ # mmsadm label -P ~/finance_passwd -l library1 -A finance 000221
+Write a volume label for the backup application:
+ # mmsadm label -P ~/backup_passwd -l library1 -A backup 000230
+Mount media for the engineering, finance and backup applications. The handle returned by the mount command
+<beginning of page>
+will be used as a normal /dev/rmt entry:
+ # mmsadm mount -P ~/eng_passwd -l library1 -A eng 000220
+ # mmsadm mount -P ~/finance_passwd -l library1 -A finance 000221
+ # mmsadm mount -P ~/backup_passwd -l library1 -A backup 000230
+Unmount the media and unload the drives:
+ # mmsadm unmount -P ~/eng_passwd -U -l library1 -A eng 000220
+ # mmsadm unmount -P ~/finance_passwd -U -l library1 -A finance 000221
+ # mmsadm unmount -P ~/backup_passwd -U -l library1 -A backup 000230
+Example 10 Configure an MMS for Disk Archiving
+The following sequence of commands configures a Media Management System for disk archiving.
+Create a test application:
+ # mmsadm create -t app -P ~/test_passwd test
+Create a disk archiving library named dklib1:
+ # mmsadm create -t library -o hwtype=DISK -o dkpath=/dskpool dklib1
+Create a disk archiving media pool named dkcarts:
+ # mmsadm create -t mpool -o apps=test dkcarts
+Create three 100 GB volumes for disk archiving and place the volumes in the media pool:
+ # mmsadm add-volume -l dklib1 -o voltype=DISK -x 000000,000001,000002 \
+ -o size=100g dkcarts
+Create a disk archiving drive pool named dkdrives:
+ # mmsadm create -t dpool -o apps=test dkdrives
+Create a disk archiving drive and place it in the drive pool:
+ # mmsadm create -t drive -o hwtype=DISK -o library=dklib1 \
+ -o dpool=dkdrives dkdrive1
+<beginning of page>
+Create volume labels. The volume will be labeled when it is mounted:
+ # mmsadm label -P ~/test_passwd -n -l dklib1 -A test 000000
+ # mmsadm label -P ~/test_passwd -n -l dklib1 -A test 000001
+ # mmsadm label -P ~/test_passwd -n -l dklib1 -A test 000002
+Mount the volume 000000. Use the returned tape handle in a subsequent tar command:
+ # mmsadm mount -P ~/test_passwd -n -l dklib1 -A test 000000
+Show the file sizes of the disk archiving volume before creating tar archive:
+ % ls -la /dskpool/dklib1/000000
+Create a disk archiving tar archive:
+ # tar -cvf <mms_handle> /var > /tmp/out$$ 2>&1
+Show the file sizes of the disk archiving volume after creating the tar archive:
+ % ls -la /dskpool/dklib1/000000
+Unmount and unload the volume from the drive:
+ # mmsadm unmount -P ~/test_passwd -U -l dklib1 -A test 000000
+0
+Command succeeded.
+>0
+An error occurred.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wmmsu _ Interface StabilityCommitted
+mmsclient(1M), mmsexplorer(1M), mmsinit(1M), mount(1M), attributes(5), mms(5), rbac(5)

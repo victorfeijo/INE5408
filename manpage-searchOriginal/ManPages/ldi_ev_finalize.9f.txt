@@ -1,0 +1,52 @@
+<beginning of page>
+ldi_ev_finalize <-> propagate disposition of a state change event
+#include <sys/sunldi.h>
+void ldi_ev_finalize(dev_info_t *dip, minor_t minor, int spec_type,
+ int ldi_result, ldi_ev_cookie_t cookie, void *ev_data);
+Solaris DDI specific (Solaris DDI)
+dev_info_t *dip
+The devinfo node of the layered consumer exporting the minor device.
+minor_t minor
+The minor number of the exported minor device.
+int spec_type
+The type of minor device (S_IFCHR or S_IFBLK).
+int ldi_result
+The final disposition of the state change.
+ldi_ev_cookie_t cookie
+An opaque event cookie for the event type returned by a previous call to ldi_ev_get_cookie(9F).
+void *ev_data
+Event specific data.
+The ldi_ev_finalize() function propagates the final disposition of an event up the software stack. It may result in two
+actions: <bu> Invocation of "finalize" LDI callback handlers registered by layered drivers up the software stack. <bu> De<hy>
+vice contract "negotiation end" (CT_EV_NEGEND) events generated on minors exported to userland.
+The event propagated up the software stack may be different than the event received by the layered driver invoking
+ldi_ev_finalize(). For example, a volume manager may receive an "offline" event on one of it's LDI opened disks,
+but may choose to propagate a "degraded" event on minors it exports to userland (since it may have more than one
+copy of the data). The event cookie argument to ldi_ev_notify(9F) may be different from the event cookie currently
+possessed by the layered driver. If that is the case, the layered driver must generate another event cookie via a new
+ldi_ev_get_cookie(9F) call.
+None.
+This function can be called from user and kernel contexts only. Example 1 Invoking ldi_ev_finalize(9F) from wid<hy>
+get's finalize callback
+The following example shows how the ldi_ev_finalize() function is invoked from a widget's finalize callback:
+ static void
+ widget_finalize(ldi_handle_t lh, ldi_ev_cookie_t foo_cookie,
+  int ldi_result, void *arg, void *ev_data)
+ {
+  ASSERT(strcmp(ldi_ev_get_type(foo_cookie), LDI_EV_FOO) == 0);
+  /* Map imported minor to exported minors */
+  widget_map(lh, &minor, &spec_type);
+  if (ldi_result == LDI_EV_SUCCESS) {
+<beginning of page>
+  ldi_ev_finalize(dip, minor, spec_type,
+  LDI_EV_SUCCESS, foo_cookie, ev_data);
+  }
+  /*
+  * The event foo failed. Reconfigure yourself
+  * *before* propagating
+  */
+  widget_reconfigure(lh, LDI_EV_FOO, REACQUIRE);
+  ldi_ev_finalize(dip, minor, spec_type, LDI_EV_FAILURE,
+  foo_cookie, ev_data);
+ }
+ldi_ev_get_cookie(9F), ldi_ev_register_callbacks(9F), ldi_ev_remove_callbacks(9F)

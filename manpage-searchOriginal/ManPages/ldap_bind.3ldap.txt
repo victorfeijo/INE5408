@@ -1,0 +1,87 @@
+<beginning of page>
+ldap_bind, ldap_bind_s, ldap_sasl_bind, ldap_sasl_bind_s, ldap_simple_bind, ldap_simple_bind_s, ldap_unbind,
+ldap_unbind_s, ldap_unbind_ext, ldap_set_rebind_proc, ldap_sasl_interactive_bind_s <-> LDAP bind functions
+cc [ flag... ] file... -lldap [ library... ]
+#include <lber.h>
+#include <ldap.h>
+int ldap_bind(LDAP *ld, char *who, char *cred, int method);
+int ldap_bind_s(LDAP *ld, char *who, char *cred, int method);
+int ldap_simple_bind(LDAP *ld, char *who, char *passwd);
+int ldap_simple_bind_s(LDAP *ld, char *who, char *passwd);
+int ldap_unbind(LDAP *ld);
+int ldap_unbind_s(LDAP *ld);
+int ldap_unbind_ext(LDAP *ld, LDAPControl **serverctrls,
+ LDAPControl **clientctrls);
+void ldap_set_rebind_proc(LDAP *ld, int (*rebindproc);
+int ldap_sasl_bind(LDAP *ld, char *dn, char *mechanism,
+ struct berval **serverctrls, LDAPControl **clientctrls,
+ int *msgidp);
+int ldap_sasl_bind_s(LDAP *ld, char *dn, char *mechanism,
+ struct berval *cred, LDAPControl **serverctrls,
+ LDAPControl **clientctrls);
+int ldap_sasl_interactive_bind_s(LDAP *ld, char *dn,
+ char *saslMechanism, LDAPControl **sctrl, LDAPControl **cctrl,
+ LDAPControl **unsigned flags, LDAP_SASL_INTERACT_PROC *callback,
+ void *defaults);
+These functions provide various interfaces to the LDAP bind operation. After a connection is made to an LDAP
+server, the ldap_bind() function returns the message ID of the request initiated. The ldap_bind_s() function returns
+an LDAP error code.
+The simplest form of the bind call is ldap_simple_bind_s(). The function takes the DN (Distinguished Name) of the
+dn parameter and the userPassword associated with the entry in passwd to return an LDAP error code. See ldap_er<hy>
+ror(3LDAP).
+The ldap_simple_bind() call is asynchronous. The function takes the same parameters as ldap_simple_bind_s()
+but initiates the bind operation and returns the message ID of the request sent. The result of the operation can be ob<hy>
+tained by a subsequent call to ldap_result(3LDAP).
+The ldap_bind() and ldap_bind_s() functions are used to select the authentication method at runtime. Both func<hy>
+tions take an extra method parameter to set the authentication method. For simple authentication, the method param<hy>
+eter is set to LDAP_AUTH_SIMPLE. The ldap_bind() function returns the message id of the request initiated. The
+ldap_bind_s() function returns an LDAP error code.
+The ldap_sasl_bind() and ldap_sasl_bind_s() functions are used for general and extensible authentication over
+LDAP through the use of the Simple Authentication Security Layer. The routines both take the DN to bind as the au<hy>
+thentication method. A dotted-string representation of an OID identifies the method, and the berval structure holds
+the credentials. The special constant value LDAP_SASL_SIMPLE ("") can be passed to request simple authentica<hy>
+tion. Otherwise, the ldap_simple_bind() function or the ldap_simple_bind_s() function can be used.
+The ldap_sasl_interactive_bind_s() helper function takes its data and performs the necessary ldap_sasl_bind() and
+associated SASL library authentication sequencing with the LDAP server that uses the provided connection (ld).
+Upon a successful bind, the ldap_sasl_bind() function will, if negotiated by the SASL interface, install the neces<hy>
+sary internal libldap plumbing to enable SASL integrity and privacy (over the wire encryption) with the LDAP serv<hy>
+er.
+<beginning of page>
+The LDAP_SASL_INTERACTIVE option flag is passed to the libldap API through the flags argument of the API.
+The flag tells the API to use the SASL interactive mode and to have the API request SASL authentication data
+through the LDAP_SASL_INTERACTIVE_PROC callback as needed. The callback provided is in the form:
+ typedef int (LDAP_SASL_INTERACT_PROC)
+  (LDAP *ld, unsigned flags, void* defaults, void *interact);
+The user-provided SASL callback is passed to the current LDAP connection pointer, the current flags field, an op<hy>
+tional pointer to user-defined data, and the list of sasl_interact_t authentication values requested by libsasl(3LIB) to
+complete authentication.
+The user-defined callback collects and returns the authentication information in the sasl_interact_t array according
+to libsasl rules. The authentication information can include user IDs, passwords, realms, or other information de<hy>
+fined by SASL. The SASL library uses this date during sequencing to complete authentication.
+The ldap_unbind() call is used to unbind from a directory, to terminate the current association, and to free the re<hy>
+sources contained in the ld structure. Once the function is called, the connection to the LDAP server is closed and
+the ld structure is invalid. The ldap_unbind_s() and ldap_unbind() calls are identical and synchronous in nature.
+The ldap_unbind_ext() function is used to unbind from a directory, to terminate the current association, and to free
+the resources contained in the LDAP structure. Unlike ldap_unbind() and ldap_unbind_s(), both server and client
+controls can be explicitly included with ldap_unbind_ext() requests. No server response is made to an unbind re<hy>
+quest and responses should not be expected from server controls included with unbind requests.
+The ldap_set_rebind_proc() call is used to set a function called back to obtain bind credentials. The credentials are
+used when a new server is contacted after an LDAP referral. If ldap_set_rebind_proc() is never called, or if it is
+called with a NULL rebindproc parameter, an unauthenticated simple LDAP bind is always done when chasing re<hy>
+ferrals.
+The rebindproc() function is declared as shown below:
+ int rebindproc(LDAP *ld, char **whop, char **credp,
+  int *methodp, int freeit);
+The LDAP library first calls the rebindproc() to obtain the referral bind credentials. The freeit parameter is zero.
+The whop, credp, and methodp parameters should be set as appropriate. If rebindproc() returns LDAP_SUCCESS,
+referral processing continues. The rebindproc() is called a second time with a non-zero freeit value to give the ap<hy>
+plication a chance to free any memory allocated in the previous call.
+If anything but LDAP_SUCCESS is returned by the first call to rebindproc(), referral processing is stopped and the
+error code is returned for the original LDAP operation.
+Make a call to ldap_result(3LDAP) to obtain the result of a bind operation.
+Asynchronous functions will return <mi>1 in case of error. See ldap_error(3LDAP) for more information on error
+codes returned. If no credentials are returned, the result parameter is set to NULL.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stabili<hy>
+tyEvolving _ MT-LevelSafe
+ldap(3LDAP), ldap_error(3LDAP), ldap_open(3LDAP), ldap_result(3LDAP), libsasl(3LIB), attributes(5)

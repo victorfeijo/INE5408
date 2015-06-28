@@ -1,0 +1,176 @@
+<beginning of page>
+init, telinit <-> process control initialization
+/sbin/init [0123456abcQqSs]
+/etc/telinit [0123456abcQqSs]
+init is the default primordial user process. (Options given to the kernel during boot may result in the invocation of an
+alternative primordial user process, as described on kernel(1M)). init initiates the core components of the service
+management facility, svc.configd(1M) and svc.startd(1M), and restarts these components if they fail. For backwards
+compatibility, init also starts and restarts general processes according to /etc/inittab, as desribed below.
+The run levels and system booting descriptions given below are provided for compatibility purposes only, and other<hy>
+wise made obsolete by the service management facility, smf(5).
+If init exits for any reason other than system shutdown, it will be restarted with process-ID 1.
+At any given time, the system is in one of eight possible run levels. A run level is a software configuration under
+which only a selected group of processes exists. Processes spawned by init for each of these run levels are defined in
+/etc/inittab. init can be in one of eight run levels, 0<mi>6 and S or s (S and s are identical). The run level changes when
+a privileged user runs /sbin/init.
+When the system is booted, init is invoked and the following occurs. First, it reads /etc/default/init to set environ<hy>
+ment variables. This is typically where TZ (time zone) and locale-related environments such as LANG or
+LC_CTYPE get set. (See the FILES section at the end of this page.) init then looks in /etc/inittab for the initde<hy>
+fault entry (see inittab(4)). If the initdefault entry:
+exists
+init usually uses the run level specified in that entry as the initial run level to enter only if the options/milestone
+property has not been specified for svc.startd(1M).
+does not exist
+The service management facility, smf(5), examines its configuration specified in svc.startd(1M), and enters the
+milestone specified by the options/milestone property.
+The initdefault entry in /etc/inittab corresponds to the following run levels:
+S or s
+init goes to the single-user state. In this state, the system console device (/dev/console) is opened for reading and
+writing and the command /sbin/su, (see su(1M)), is invoked. Use either init or telinit to change the run level of the
+system. Note that if the shell is terminated (using an end-of-file), init only re-initializes to the single-user state if
+/etc/inittab does not exist.
+0-6
+init enters the corresponding run level. Run levels 0, 5, and 6 are reserved states for shutting the system down. Run
+levels 2, 3, and 4 are available as multi-user operating states.
+If this is the first time since power up that init has entered a run level other than single-user state, init first scans
+/etc/inittab for boot and bootwait entries (see inittab(4)). These entries are performed before any other processing
+of /etc/inittab takes place, providing that the run level entered matches that of the entry. In this way any special ini<hy>
+tialization of the operating system, such as mounting file systems, can take place before users are allowed onto the
+system. init then scans /etc/inittab and executes all other entries that are to be processed for that run level.
+To spawn each process in /etc/inittab, init reads each entry and for each entry that should be respawned, it forks a
+child process. After it has spawned all of the processes specified by /etc/inittab, init waits for one of its descendant
+processes to die, a powerfail signal, or a signal from another init or telinit process to change the system's run level.
+When one of these conditions occurs, init re-examines /etc/inittab.
+New entries can be added to /etc/inittab at any time; however, init still waits for one of the above three conditions to
+occur before re-examining /etc/inittab. To get around this, init Q or init q command wakes init to re-examine
+/etc/inittab immediately.
+<beginning of page>
+When init comes up at boot time and whenever the system changes from the single-user state to another run state,
+init sets the ioctl(2) states of the console to those modes saved in the file /etc/ioctl.syscon. init writes this file when<hy>
+ever the single-user state is entered.
+When a run level change request is made, init or a designate sends the warning signal (SIGTERM) to all processes
+that are undefined in the target run level. A minimum interval of five seconds is observed before init or its designate
+forcibly terminates these processes by sending a kill signal (SIGKILL). Additionally, init informs svc.startd(1M)
+that the run level is changing. svc.startd(1M) then restricts the system to the set of services which the milestone cor<hy>
+responding to the run-level change depends on.
+When init receives a signal telling it that a process it spawned has died, it records the fact and the reason it died in
+/var/adm/utmpx and /var/adm/wtmpx if it exists (see who(1)). A history of the processes spawned is kept in
+/var/adm/wtmpx.
+If init receives a powerfail signal (SIGPWR) it scans /etc/inittab for special entries of the type powerfail and pow<hy>
+erwait. These entries are invoked (if the run levels permit) before any further processing takes place. In this way init
+can perform various cleanup and recording functions during the powerdown of the operating system.
+You can set default values for environment variables, for such items as timezone and character formatting, in
+/etc/default/init. See the FILES section, below, for a list of these variables.
+telinit, which is linked to /sbin/init, is used to direct the actions of init. It takes a one-character argument and sig<hy>
+nals init to take the appropriate action.
+init uses pam(3PAM) for session management. The PAM configuration policy, listed through /etc/pam.conf, speci<hy>
+fies the session management module to be used for init. Here is a partial pam.conf file with entries for init using the
+UNIX session management module.
+ init session required pam_unix_session.so.1
+If there are no entries for the init service, then the entries for the "other" service will be used.
+0
+Go into firmware.
+1
+Put the system in system administrator mode. All local file systems are mounted. Only a small set of essential kernel
+processes are left running. This mode is for administrative tasks such as installing optional utility packages. All files
+are accessible and no users are logged in on the system.
+This request corresponds to a request for smf(5) to restrict the system milestone to svc:/milestone/single-user:de<hy>
+fault.
+2
+Put the system in multi-user mode. All multi-user environment terminal processes and daemons are spawned. This
+state is commonly referred to as the multi-user state.
+This request corresponds to a request for smf(5) to restrict the system milestone to svc:/milestone/multi-user:default.
+3
+Extend multi-user mode by making local resources available over the network.
+This request corresponds to a request for smf(5) to restrict the system milestone to svc:/milestone/multi-user-serv<hy>
+er:default.
+4
+Is available to be defined as an alternative multi-user environment configuration. It is not necessary for system oper<hy>
+<beginning of page>
+ation and is usually not used.
+5
+Shut the machine down so that it is safe to remove the power. Have the machine remove power, if possible.
+6
+Stop the operating system and reboot to the state defined by the initdefault entry in /etc/inittab.
+On x86 systems, service svc:/system/boot-config:default is enabled by default. When the config/fastreboot_de<hy>
+fault property is set to true, init 6 will bypass the firmware.
+a,b,c
+Process only those /etc/inittab entries having the a, b, or c run level set. These are pseudo-states, which may be de<hy>
+fined to run certain commands, but which do not cause the current run level to change.
+Q,q
+Re-examine /etc/inittab.
+S, s
+Enter single-user mode. This is the only run level that doesn't require the existence of a properly formatted /etc/init<hy>
+tab file. If this file does not exist, then by default, the only legal run level that init can enter is the single-user mode.
+When in single-user mode, the filesystems required for basic system operation will be mounted. When the system
+comes down to single-user mode, these file systems will remain mounted (even if provided by a remote file server),
+and any other local filesystems will also be left mounted. During the transition down to single-user mode, all pro<hy>
+cesses started by init or init.d scripts that should only be running in multi-user mode are killed. In addition, any
+process that has a utmpx entry will be killed. This last condition insures that all port monitors started by the SAC
+are killed and all services started by these port monitors, including ttymon login services, are killed.
+This request corresponds to a request for smf(5) to restrict the system milestone to svc:/milestone/single-user:de<hy>
+fault.
+/dev/console
+System console device.
+/etc/default/init
+Contains environment variables and their default values. For example, for the timezone variable, TZ, you might
+specify TZ=US/Pacific. The variables are:
+TZ
+Either specifies the timezone information (see ctime(3C)) or the name of a timezone information file
+/usr/share/lib/zoneinfo.
+Refer to the TIMEZONE(4) man page before changing this setting.
+CMASK
+The mask (see umask(1)) that init uses and that every process inherits from the init process. If not set, init uses the
+mask it inherits from the kernel. Note that init always attempts to apply a umask of 022 before creating a file, re<hy>
+gardless of the setting of CMASK
+LC_CTYPE
+Character characterization information
+<beginning of page>
+LC_MESSAGES
+Message translation
+LC_MONETARY
+Monetary formatting information
+LC_NUMERIC
+Numeric formatting information
+LC_TIME
+Time formatting information
+LC_ALL
+If set, all other LC_* environmental variables take-on this value.
+LANG
+If LC_ALL is not set, and any particular LC_* is also not set, the value of LANG is used for that particular envi<hy>
+ronmental variable.
+/etc/inittab
+Controls process dispatching by init.
+/etc/ioctl.syscon
+ioctl states of the console, as saved by init when single-user state is entered.
+/etc/svc/volatile/init.state
+init state necessary to recover from failure.
+/var/adm/utmpx
+User access and administration information.
+/var/adm/wtmpx
+History of user access and administration information.
+/var/run/initpipe
+A named pipe used for internal communication.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu
+<beginning of page>
+login(1), sh(1), stty(1), who(1), kernel(1M), shutdown(1M), su(1M), svc.configd(1M), svc.startd(1M), tty<hy>
+mon(1M), ioctl(2), kill(2), ctime(3C), pam(3PAM), init.d(4), inittab(4), pam.conf(4), TIMEZONE(4), utmpx(4),
+attributes(5), pam_unix_session(5), smf(5), termio(7I)
+If init finds that it is respawning an entry from /etc/inittab more than ten times in two minutes, it assumes that there
+is an error in the command string in the entry and generates an error message on the system console. It then refuses
+to respawn this entry until either five minutes has elapsed or it receives a signal from a user-spawned init or telinit
+command. This prevents init from eating up system resources when someone makes a typographical error in the
+inittab file, or a program is removed that is referenced in /etc/inittab.
+init and telinit can be run only by a privileged user.
+The S or s state must not be used indiscriminately in /etc/inittab. When modifying this file, it is best to avoid adding
+this state to any line other than initdefault.
+If a default state is not specified in the initdefault entry in /etc/inittab, state 6 is entered. Consequently, the system
+will loop by going to firmware and rebooting continuously.
+If the utmpx file cannot be created when booting the system, the system will boot to state "s" regardless of the state
+specified in the initdefault entry in /etc/inittab. This can occur if the /var file system is not accessible.
+When a system transitions down to the S or s state, the /etc/nologin file (see nologin(4)) is created. Upon subsequent
+transition to run level 2, this file is removed.
+init uses /var/run/initpipe, a named pipe, for internal communication.
+The pam_unix(5) module is no longer supported. Similar functionality is provided by pam_unix_session(5).

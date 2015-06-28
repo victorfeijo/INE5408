@@ -1,0 +1,51 @@
+<beginning of page>
+scsi_alloc_consistent_buf <-> allocate an I/O buffer for SCSI DMA
+#include <sys/scsi/scsi.h>
+struct buf *scsi_alloc_consistent_buf(structscsi_address*ap,
+ struct buf *bp, size_t datalen, uint_t bflags,
+ int (*callback)(caddr_t), caddr_t arg);
+Solaris DDI specific (Solaris DDI).
+ap Pointer to the scsi_address(9S) structure.
+bp Pointer to the buf(9S) structure.
+datalen Number of bytes for the data buffer.
+bflags Flags setting for the allocated buffer header. This should either be B_READ or B_WRITE.
+callback A pointer to a callback function, NULL_FUNC or SLEEP_FUNC.
+arg The callback function argument.
+The scsi_alloc_consistent_buf() function returns allocates a buffer header and the associated data buffer for direct
+memory access (DMA) transfer. This buffer is allocated from the iobp space, which is considered consistent memo<hy>
+ry. For more details, see ddi_dma_mem_alloc(9F) and ddi_dma_sync(9F).
+For buffers allocated via scsi_alloc_consistent_buf(), and marked with the PKT_CONSISTENT flag via sc<hy>
+si_init_pkt(9F), the HBA driver must ensure that the data transfer for the command is correctly synchronized before
+the target driver's command completion callback is performed.
+If bp is NULL, a new buffer header will be allocated using getrbuf(9F). In addition, if datalen is non-zero, a new
+buffer will be allocated using ddi_dma_mem_alloc(9F).
+callback indicates what the allocator routines should do when direct memory access (DMA) resources are not avail<hy>
+able; the valid values are:
+NULL_FUNC Do not wait for resources. Return a NULL pointer.
+SLEEP_FUNC Wait indefinitely for resources.
+Other Values callback points to a function that is called when resources may become available. callback must re<hy>
+turn either 0 (indicating that it attempted to allocate resources but failed to do so), in which case it is put back on a
+list to be called again later, or 1 indicating either success in allocating resources or indicating that it no longer cares
+for a retry. The last argument arg is supplied to the callback function when it is invoked.
+The scsi_alloc_consistent_buf() function returns a pointer to a buf(9S) structure on success. It returns NULL if re<hy>
+sources are not available even if waitfunc was not SLEEP_FUNC.
+If callback is SLEEP_FUNC, then this routine may be called only from user-level code. Otherwise, it may be called
+fromuser, interrupt, or kernel context. The callback function may not block or call routines that block. Example 1
+Allocate a request sense packet with consistent DMA resources attached.
+  bp = scsi_alloc_consistent_buf(&devp->sd_address, NULL,
+  SENSE_LENGTH, B_READ, SLEEP_FUNC, NULL);
+  rqpkt = scsi_init_pkt(&devp->sd_address,
+<beginning of page>
+  NULL, bp, CDB_GROUP0, 1, 0,
+  PKT_CONSISTENT, SLEEP_FUNC, NULL);
+Example 2 Allocate an inquiry packet with consistent DMA resources attached.
+  bp = scsi_alloc_consistent_buf(&devp->sd_address, NULL,
+  SUN_INQSIZE, B_READ, canwait, NULL);
+  if (bp) {
+   pkt = scsi_init_pkt(&devp->sd_address, NULL, bp,
+   CDB_GROUP0, 1, PP_LEN, PKT_CONSISTENT,
+   canwait, NULL);
+  }
+ddi_dma_mem_alloc(9F), ddi_dma_sync(9F), getrbuf(9F), scsi_destroy_pkt(9F), scsi_init_pkt(9F), sc<hy>
+si_free_consistent_buf(9F), buf(9S), scsi_address(9S)
+Writing Device Drivers

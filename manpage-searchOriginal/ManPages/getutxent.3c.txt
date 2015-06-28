@@ -1,0 +1,121 @@
+<beginning of page>
+getutxent, getutxid, getutxline, pututxline, setutxent, endutxent, utmpxname, getutmp, getutmpx, updwtmp, updwtm<hy>
+px <-> user accounting database functions
+#include <utmpx.h>
+struct utmpx *getutxent(void);
+struct utmpx *getutxid(const struct utmpx *id);
+struct utmpx *getutxline(const struct utmpx *line);
+struct utmpx *pututxline(const struct utmpx *utmpx);
+void setutxent(void);
+void endutxent(void);
+int utmpxname(const char *file);
+void getutmp(struct utmpx *utmpx, struct utmp *utmp);
+void getutmpx(struct utmp *utmp, struct utmpx *utmpx);
+void updwtmp(char *wfile, struct utmp *utmp);
+void updwtmpx(char *wfilex, struct utmpx *utmpx);
+These functions provide access to the user accounting database, utmpx (see utmpx(4)). Entries in the database are
+described by the definitions and data structures in <utmpx.h>.
+The utmpx structure contains the following members:
+ char ut_user[32]; /* user login name */
+ char ut_id[4]; /* /etc/inittab id */
+  /* (usually line #) */
+ char ut_line[32]; /* device name */
+  /* (console, lnxx) */
+ pid_t ut_pid; /* process id */
+ short ut_type; /* type of entry */
+ struct exit_status ut_exit; /* exit status of a process */
+  /* marked as DEAD_PROCESS */
+ struct timeval ut_tv; /* time entry was made */
+ int ut_session; /* session ID, used for */
+  /* windowing */
+ short ut_syslen; /* significant length of */
+  /* ut_host */
+  /* including terminating null */
+ char ut_host[257]; /* host name, if remote */
+The exit_status structure includes the following members:
+ short e_termination; /* termination status */
+ short e_exit; /* exit status */
+The getutxent() function reads in the next entry from a utmpx database. If the database is not already open, it opens
+it. If it reaches the end of the database, it fails.
+The getutxid() function searches forward from the current point in the utmpx database until it finds an entry with a
+ut_type matching id->ut_type, if the type specified is RUN_LVL, BOOT_TIME, DOWN_TIME, OLD_TIME,
+or NEW_TIME. If the type specified in id is INIT_PROCESS, LOGIN_PROCESS, USER_PROCESS, or
+DEAD_PROCESS, then getutxid() will return a pointer to the first entry whose type is one of these four and whose
+ut_id member matches id->ut_id. If the end of database is reached without a match, it fails.
+The getutxline() function searches forward from the current point in the utmpx database until it finds an entry of the
+<beginning of page>
+type LOGIN_PROCESS or USER_PROCESS which also has a ut_line string matching the line->ut_line string.
+If the end of the database is reached without a match, it fails.
+The pututxline() function writes the supplied utmpx structure into the utmpx database. It uses getutxid() to search
+forward for the proper place if it finds that it is not already at the proper place. It is expected that normally the user
+of pututxline() will have searched for the proper entry using one of the getutx() routines. If so, pututxline() will
+not search. If pututxline() does not find a matching slot for the new entry, it will add a new entry to the end of the
+database. It returns a pointer to the utmpx structure. When called by a non-root user, pututxline() invokes a setu<hy>
+id() root program to verify and write the entry, since the utmpx database is normally writable only by root. In this
+event, the ut_name member must correspond to the actual user name associated with the process; the ut_type
+member must be either USER_PROCESS or DEAD_PROCESS; and the ut_line member must be a device special
+file and be writable by the user.
+The setutxent() function resets the input stream to the beginning. This should be done before each search for a new
+entry if it is desired that the entire database be examined.
+The endutxent() function closes the currently open database.
+The utmpxname() function allows the user to change the name of the database file examined from /var/adm/utmpx
+to any other file, most often /var/adm/wtmpx. If the file does not exist, this will not be apparent until the first at<hy>
+tempt to reference the file is made. The utmpxname() function does not open the file, but closes the old file if it is
+currently open and saves the new file name. The new file name must end with the "x" character to allow the name of
+the corresponding utmp file to be easily obtainable.; otherwise, an error value of 0 is returned. The function returns
+1 on success.
+The getutmp() function copies the information stored in the members of the utmpx structure to the corresponding
+members of the utmp structure. If the information in any member of utmpx does not fit in the corresponding utmp
+member, the data is silently truncated. (See getutent(3C) for utmp structure)
+The getutmpx() function copies the information stored in the members of the utmp structure to the corresponding
+members of the utmpx structure. (See getutent(3C) for utmp structure)
+The updwtmp() function can be used in two ways.
+If wfile is /var/adm/wtmp, the utmp format record supplied by the caller is converted to a utmpx format record and
+the /var/adm/wtmpx file is updated (because the /var/adm/wtmp file no longer exists, operations on wtmp are con<hy>
+verted to operations on wtmpx by the library functions.
+If wfile is a file other than /var/adm/wtmp, it is assumed to be an old file in utmp format and is updated directly
+with the utmp format record supplied by the caller.
+The updwtmpx() function writes the contents of the utmpx structure pointed to by utmpx to the database.
+The values of the e_termination and e_exit members of the ut_exit structure are valid only for records of type
+DEAD_PROCESS. For utmpx entries created by init(1M), these values are set according to the result of the wait()
+call that init performs on the process when the process exits. See the wait(3C), manual page for the values init uses.
+Applications creating utmpx entries can set ut_exit values using the following code example:
+ u->ut_exit.e_termination = WTERMSIG(process->p_exit)
+ u->ut_exit.e_exit = WEXITSTATUS(process->p_exit)
+See wait.h(3HEAD) for descriptions of the WTERMSIG and WEXITSTATUS macros.
+The ut_session member is not acted upon by the operating system. It is used by applications interested in creating
+utmpx entries.
+For records of type USER_PROCESS, the nonuser() and nonuserx() macros use the value of the ut_exit.e_exit
+member to mark utmpx entries as real logins (as opposed to multiple xterms started by the same user on a window
+system). This allows the system utilities that display users to obtain an accurate indication of the number of actual
+users, while still permitting each pty to have a utmpx record (as most applications expect.). The NONROOT_US<hy>
+ER macro defines the value that login places in the ut_exit.e_exit member.
+Upon successful completion, getutxent(), getutxid(), and getutxline() each return a pointer to a utmpx structure
+containing a copy of the requested entry in the user accounting database. Otherwise a null pointer is returned.
+<beginning of page>
+The return value may point to a static area which is overwritten by a subsequent call to getutxid () or getutxline().
+Upon successful completion, pututxline() returns a pointer to a utmpx structure containing a copy of the entry
+added to the user accounting database. Otherwise a null pointer is returned.
+The endutxent() and setutxent() functions return no value.
+A null pointer is returned upon failure to read, whether for permissions or having reached the end of file, or upon
+failure to write.
+These functions use buffered standard I/O for input, but pututxline() uses an unbuffered write to avoid race condi<hy>
+tions between processes trying to modify the utmpx and wtmpx files.
+Applications should not access the utmpx and wtmpx databases directly, but should use these functions to ensure
+that these databases are maintained consistently.
+/var/adm/utmpx user access and accounting information
+/var/adm/wtmpx history of user access and accounting information
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+See below. _ MT-LevelUnsafe
+The endutxent(), getutxent(), getutxid(), getutxline(), pututxline(), and setutxent() functions are Standard.
+getutent(3C), ttyslot(3C), wait(3C), wait.h(3HEAD), utmpx(4), attributes(5), standards(5)
+The most current entry is saved in a static structure. Multiple accesses require that it be copied before further ac<hy>
+cesses are made. On each call to either getutxid() or getutxline(), the routine examines the static structure before
+performing more I/O. If the contents of the static structure match what it is searching for, it looks no further. For this
+reason, to use getutxline() to search for multiple occurrences it would be necessary to zero out the static after each
+success, or getutxline() would just return the same structure over and over again. There is one exception to the rule
+about emptying the structure before further reads are done. The implicit read done by pututxline() (if it finds that it
+is not already at the correct place in the file) will not hurt the contents of the static structure returned by the getutx<hy>
+ent(), getutxid(), or getutxline() routines, if the user has just modified those contents and passed the pointer back to
+pututxline().

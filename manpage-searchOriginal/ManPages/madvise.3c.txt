@@ -1,0 +1,66 @@
+<beginning of page>
+madvise <-> provide advice to VM system
+#include <sys/types.h>
+#include <sys/mman.h>
+int madvise(caddr_t addr, size_t len, int advice);
+The madvise() function advises the kernel that a region of user mapped memory in the range [addr, addr + len) will
+be accessed following a type of pattern. The kernel uses this information to optimize the procedure for manipulating
+and maintaining the resources associated with the specified mapping range.
+Values for advice are defined in <sys/mman.h> as:
+ #define MADV_NORMAL 0x0 /* No further special treatment */
+ #define MADV_RANDOM 0x1 /* Expect random page references */
+ #define MADV_SEQUENTIAL 0x2 /* Expect sequential page references */
+ #define MADV_WILLNEED 0x3 /* Will need these pages */
+ #define MADV_DONTNEED 0x4 /* Don't need these pages */
+ #define MADV_FREE 0x5 /* Contents can be freed */
+ #define MADV_ACCESS_DEFAULT 0x6 /* default access */
+ #define MADV_ACCESS_LWP 0x7 /* next LWP to access heavily */
+ #define MADV_ACCESS_MANY 0x8 /* many processes to access heavily */
+MADV_NORMAL This is the default system characteristic where accessing memory within the address range
+causes the system to read data from the mapped file. The kernel reads all data from files into pages which are re<hy>
+tained for a period of time as a "cache." System pages can be a scarce resource, so the kernel steals pages from other
+mappings when needed. This is a likely occurrence, but adversely affects system performance only if a large amount
+of memory is accessed.
+MADV_RANDOM Tell the kernel to read in a minimum amount of data from a mapped file on any single particular
+access. If MADV_NORMAL is in effect when an address of a mapped file is accessed, the system tries to read in
+as much data from the file as reasonable, in anticipation of other accesses within a certain locality.
+MADV_SEQUENTIAL Tell the system that addresses in this range are likely to be accessed only once, so the sys<hy>
+tem will free the resources mapping the address range as quickly as possible.
+MADV_WILLNEED Tell the system that a certain address range is definitely needed so the kernel will start read<hy>
+ing the specified range into memory. This can benefit programs wanting to minimize the time needed to access mem<hy>
+ory the first time, as the kernel would need to read in from the file.
+MADV_DONTNEED Tell the kernel that the specified address range is no longer needed, so the system starts to
+free the resources associated with the address range.
+MADV_FREE Tell the kernel that contents in the specified address range are no longer important and the range will
+be overwritten. When there is demand for memory, the system will free pages associated with the specified address
+range. In this instance, the next time a page in the address range is referenced, it will contain all zeroes. Otherwise,
+it will contain the data that was there prior to the MADV_FREE call. References made to the address range will not
+make the system read from backing store (swap space) until the page is modified again.
+This value cannot be used on mappings that have underlying file objects.
+MADV_ACCESS_LWP Tell the kernel that the next LWP to touch the specified address range will access it most
+heavily, so the kernel should try to allocate the memory and other resources for this range and the LWP accordingly.
+MADV_ACCESS_MANY Tell the kernel that many processes and/or LWPs will access the specified address range
+randomly across the machine, so the kernel should try to allocate the memory and other resources for this range ac<hy>
+cordingly.
+<beginning of page>
+MADV_ACCESS_DEFAULT Reset the kernel's expectation for how the specified range will be accessed to the de<hy>
+fault.
+The madvise() function should be used by applications with specific knowledge of their access patterns over a mem<hy>
+ory object, such as a mapped file, to increase system performance.
+Upon successful completion, madvise() returns 0; otherwise, it returns <mi>1 and sets errno to indicate the error.
+EAGAIN Some or all mappings in the address range [addr, addr + len) are locked for I/O.
+EBUSY Some or all of the addresses in the range [addr, addr + len) are locked and MS_SYNC with the MS_IN<hy>
+VALIDATE option is specified.
+EFAULT Some or all of the addresses in the specified range could not be read into memory from the underlying ob<hy>
+ject when performing MADV_WILLNEED. The madvise() function could return prior to this condition being de<hy>
+tected, in which case errno will not be set to EFAULT.
+EINVAL The addr argument is not a multiple of the page size as returned by sysconf(3C), the length of the speci<hy>
+fied address range is equal to 0, or the advice argument was invalid.
+EIO An I/O error occurred while reading from or writing to the file system.
+ENOMEM Addresses in the range [addr, addr + len) are outside the valid range for the address space of a process,
+or specify one or more pages that are not mapped.
+ESTALE Stale NFS file handle.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stabili<hy>
+tyStable _ MT-LevelMT-Safe
+meminfo(2), mmap(2), sysconf(3C), attributes(5)

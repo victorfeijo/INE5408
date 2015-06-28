@@ -1,0 +1,77 @@
+<beginning of page>
+devmap_unmap <-> device mapping unmap entry point
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+void prefixdevmap_unmap(devmap_cookie_t dhp, void *pvtp,
+ offset_t off, size_tlen, devmap_cookie_t new_dhp1,
+ void **new_pvtp1, devmap_cookie_tnew_dhp2, void **new_pvtp2);
+Solaris DDI specific (Solaris DDI).
+dhp An opaque mapping handle that the system uses to describe the mapping.
+pvtp Driver private mapping data.
+off User offset within the logical device memory at which the unmapping begins.
+len Length (in bytes) of the memory being unmapped.
+new_dhp1 The opaque mapping handle that the system uses to describe the new region that ends at (off - 1) .
+new_dhp1 may be NULL.
+new_pvtp1 A pointer to be filled in by the driver with the driver private mapping data for the new region that ends at
+(off - 1); ignored if new_dhp1 is NULL.
+new_dhp2 The opaque mapping handle that the system uses to describe the new region that begins at (off + len);
+new_dhp2 may be NULL.
+new_pvtp2 A pointer to be filled in by the driver with the driver private mapping data for the new region that begins
+at (off + len); ignored if new_dhp2 is NULL.
+devmap_unmap() is called when the system removes the mapping in the range [ off, off + len ], such as in the mun<hy>
+map(2) or exit(2) system calls. Device drivers use devmap_unmap() to free up the resources allocated in de<hy>
+vmap_map(9E).
+dhp is the mapping handle that uniquely identifies the mapping. The driver stores the mapping attributes in the driv<hy>
+er's private data, pvtp, when the mapping is created. See devmap_map(9E) for details.
+off and len define the range to be affected by devmap_unmap(). This range is within the boundary of the mapping
+described by dhp.
+If the range [ off, off + len ] covers the entire mapping, the system passes NULL to new_dhp1, new_pvtp1,
+new_dhp2, and new_pvtp2. The system expects device drivers to free all resources allocated for this mapping.
+If off is at the beginning of the mapping and len does not cover the entire mapping, the system sets NULL to
+new_dhp1 and to new_pvtp1. The system expects the drivers to allocate new driver private data for the region that
+starts at off + len and to set *new_pvtp2 to point to it. new_dhp2 is the mapping handle of the newly mapped object.
+If off is not at the beginning of the mapping, but off + len is at the end of the mapping the system passes NULL to
+new_dhp2 and new_pvtp2. The system then expects the drivers to allocate new driver private data for the region that
+begins at the beginning of the mapping (for example, stored in pvtp) and to set *new_pvtp1 to point to it. new_dhp1
+is the mapping handle of the newly mapped object.
+The drivers should free up the driver private data, pvtp, previously allocated in devmap_map(9E) before returning
+to the system. Example 1 devmap_unmap() implementation
+<beginning of page>
+ static void
+ xxdevmap_unmap(devmap_cookie_t dhp, void *pvtp, offset_t off,
+  size_t len, devmap_cookie_t new_dhp1, void **new_pvtp1,
+  devmap_cookie_t new_dhp2, void **new_pvtp2)
+ {
+  struct xxpvtdata *ptmp;
+  struct xxpvtdata *p = (struct xxpvtdata *)pvtp;
+  struct xx_softc *softc = p->softc;
+  mutex_enter(&softc->mutex);
+  /*
+  * If new_dhp1 is not NULL, create a new driver private data
+  * for the region from the beginning of old mapping to off.
+  */
+  if (new_dhp1 != NULL) {
+  ptmp = kmem_zalloc(sizeof (struct xxpvtdata), KM_SLEEP);
+  ptmp->dhp = new_dhp1;
+  ptmp->off = pvtp->off;
+  ptmp->len = off - pvtp->off;
+  *new_pvtp1 = ptmp;
+  }
+  /*
+  * If new_dhp2 is not NULL, create a new driver private data
+  * for the region from off+len to the end of the old mapping.
+  */
+  if (new_dhp2 != NULL) {
+  ptmp = kmem_zalloc(sizeof (struct xxpvtdata), KM_SLEEP);
+  ptmp->off = off + len;
+  ptmp->len = pvpt->len - (off + len - pvtp->off);
+  ptmp->dhp = new_dhp2;
+  *new_pvtp2 = ptmp;
+  }
+  /* Destroy the driver private data - Device dependent */
+  ...
+  kmem_free(pvtp, sizeof (struct xxpvtdata));
+  mutex_exit(&softc->mutex);
+ }
+exit(2), munmap(2), devmap_map(9E), devmap_callback_ctl(9S)
+Writing Device Drivers

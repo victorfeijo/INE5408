@@ -1,0 +1,60 @@
+<beginning of page>
+ddi_peek, ddi_peek8, ddi_peek16, ddi_peek32, ddi_peek64, ddi_peekc, ddi_peeks, ddi_peekl, ddi_peekd <-> read a
+value from a location
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+int ddi_peek8(dev_info_t *dip, int8_t *addr, int8_t *valuep);
+int ddi_peek16(dev_info_t *dip, int16_t *addr, int16_t *valuep);
+int ddi_peek32(dev_info_t *dip, int32_t *addr, int32_t *valuep);
+int ddi_peek64(dev_info_t *dip, int64_t *addr, int64_t *valuep);
+Solaris DDI specific (Solaris DDI). The ddi_peekc(), ddi_peeks(), ddi_peekl(), and ddi_peekd() functions are ob<hy>
+solete. Use, respectively, ddi_peek8(), ddi_peek16(), ddi_peek32(), and ddi_peek64(), instead.
+dip A pointer to the device's dev_info structure.
+addr Virtual address of the location to be examined.
+valuep Pointer to a location to hold the result. If a null pointer is specified, then the value read from the location will
+simply be discarded.
+These routines cautiously attempt to read a value from a specified virtual address, and return the value to the caller,
+using the parent nexus driver to assist in the process where necessary.
+If the address is not valid, or the value cannot be read without an error occurring, an error code is returned.
+The routines are most useful when first trying to establish the presence of a device on the system in a driver's
+probe(9E) or attach(9E) routines.
+DDI_SUCCESS The value at the given virtual address was successfully read, and if valuep is non-null, *valuep will
+have been updated.
+DDI_FAILURE An error occurred while trying to read the location. *valuep is unchanged.
+These functions can be called from user, interrupt, or kernel context. Example 1 Checking to see that the status reg<hy>
+ister of a device is mapped into the kernel address space:
+ if (ddi_peek8(dip, csr, (int8_t *)0) != DDI_SUCCESS) {
+  cmn_err(CE_WARN, "Status register not mapped");
+  return (DDI_FAILURE);
+ }
+Example 2 Reading and logging the device type of a particular device:
+ int
+ xx_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
+ {
+  ...
+  /* map device registers */
+  ...
+  if (ddi_peek32(dip, id_addr, &id_value) != DDI_SUCCESS) {
+  cmn_err(CE_WARN, "%s%d: cannot read device identifier",
+  ddi_get_name(dip), ddi_get_instance(dip));
+  goto failure;
+  } else
+<beginning of page>
+  cmn_err(CE_CONT, "!%s%d: device type 0x%x\n",
+  ddi_get_name(dip), ddi_get_instance(dip), id_value);
+   ...
+   ...
+  ddi_report_dev(dip);
+  return (DDI_SUCCESS);
+ failure:
+  /* free any resources allocated */
+  ...
+  return (DDI_FAILURE);
+ }
+attach(9E), probe(9E), ddi_poke(9F)
+Writing Device Drivers
+The functions described in this manual page previously used symbolic names which specified their data access size;
+the function names have been changed so they now specify a fixed-width data size. See the following table for the
+new name equivalents:
+tab() box; lw(2.75i) lw(2.75i) lw(2.75i) lw(2.75i) Previous NameNew Name ddi_peekcddi_peek8 ddi_peeksd<hy>
+di_peek16 ddi_peeklddi_peek32 ddi_peekdddi_peek64

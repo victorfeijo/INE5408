@@ -1,0 +1,330 @@
+<beginning of page>
+iiadm <-> command-line interface to control Sun StorageTek Availability Suite Point-in-Time Copy operations
+iiadm -e {ind | shd} master_vol shadow_vol bitmap_vol
+iiadm -ne ind master_vol shadow_vol bitmap_vol
+iiadm [-p] [-n] {-c | -u} {s | m} volume_set
+iiadm [-adDilR] volume_set
+iiadm [-p] [-n] -w volume_set
+iiadm [-hilLv]
+iiadm -P delay units volume_set
+iiadm -P volume_set
+iiadm -A overflow_vol volume_set
+iiadm [-OQ] overflow_vol
+iiadm -E volume_set
+iiadm [-IJ] volume_set bitmap
+iiadm -g group_name [-aAcdDeEilLmPRuw]
+iiadm [-C] cluster_tag [options]
+Point-in-Time Copy software is a point-in-time snapshot feature of the Solaris operating system.
+A Point-in-Time Copy snapshot is an instantly-available, time-fixed, replicated view of a momentarily quiesced vol<hy>
+ume. Once a snapshot is taken, Point-in-Time Copy software allows immediate read/write access to both the master
+and shadow volume data.
+Point-in-Time Copy software tracks the differences between the master and shadow volumes (caused by writes)
+from the moment that the snapshot was established. This capability allows applications accessing the master vol<hy>
+ume's data to move forward in time independently of applications accessing the shadow volume's data, and vice-ver<hy>
+sa.
+The Point-in-Time Copy software's tracking of differences between the master and shadow volumes facilitates a fast
+resynchronization or a full copy at a later time. The volume resynchronization can occur from either shadow to mas<hy>
+ter or master to shadow.
+Instantly after the point-in-time is (re-)established (either when the CLI prompt returns or the next shell script com<hy>
+mand is read), the master volume can be remounted or the applications using them can be resumed. Also, the shad<hy>
+ow volume can be mounted and immediately accessed.
+The iiadm command line utility performs only one action per command invocation. Because of this, you cannot
+combine multiple options, except in combination with the following overall command modifiers: <bu> If no action item
+is entered, iiadm displays the list of Point-in-Time Copy sets (non-suspended) currently configured. If more than
+one action item, or an incorrectly specified action item is entered, iiadm displays the specific error message to stderr,
+followed by a brief usage summary. <bu> For the Point-in-Time Copy options ENABLE (-e), COPY (-c) and UPDATE
+(-u), there are two associated shadow volume selection qualifiers, {ind|dep}, that are used to specify the type of
+Point-in-Time Copy volume set to create.
+An independent (ind) snapshot causes Point-in-Time Copy software to perform a full volume copy operation from
+the master to the shadow. When the copy completes, the shadow volume data is identical to the master volume data
+at the moment that it was established. Create an independent shadow if you require two physical copies of the data.
+An independent shadow volume must be the same size or greater than the size of the master volume. Sun recom<hy>
+mends that the master and shadow volumes be the same size for environments where resynchronization from shadow
+to master is a consideration.
+A dependent (dep) snapshot causes Point-in-Time Copy software not to perform a full volume copy. The resulting
+shadow volume relies on the master volume for all unmodified data blocks, which are not copied until requested.
+<beginning of page>
+Create a dependent shadow when you do not require two physical copies of the data. A dependent shadow volume
+can be either the same size or smaller than the master volume. A smaller shadow volume is called a Compact De<hy>
+pendent Shadow Volume, and is typically used when the amount of change that occurs to a Point-in-Time Copy
+volume set is small compared to the entire size of the master volume.
+The following syntax allows you to create an exportable independent shadow volume in a Sun Cluster environment:
+ # iiadm -ne ind master shadow bitmap
+An issue arises when using a Compact Dependent Shadow Volume in that its size is established at the time that the
+Point-in-Time Copy volume set is enabled. If the amount of change to the entire volume set over the duration of its
+usage exceeds the space allocated for the shadow volume, the shadow volume is marked as out of space. It is possi<hy>
+ble to read from the shadow volume even after it is out of space, until a portion of the data for which there was no
+room is requested. Once that happens, the read fails and the shadow volume is marked offline.
+To address this issue, Point-in-Time Copy supports the ability to associate an overflow volume to an existing Point-
+in-Time Copy dependent volume set. Thus, if the size of the Compact Dependent Shadow Volume is too small, or an
+unscheduled amount of change occurs to the volume set, changed data can be redirected to the associated overflow
+volume. To facilitate efficient usage of this overflow volume, it can be associated with multiple Point-in-Time Copy
+volume sets on an as-needed basis.
+Prior to invoking an Point-in-Time Copy enable, copy or update operation, Point-in-Time Copy assures that the
+shadow volume is not mounted, to prevent a file system panic from occurring. Also, it is suggested that you either
+unmount or suspend (quiesce) all applications using the master volume, for only the instant when the point-in-time
+snapshot is taken. This assures that an atomically consistent point-in-time snapshot is taken.
+It is suggested that, if the master volume was suspended rather than unmounted, the new point-in-time shadow vol<hy>
+ume's integrity be validated using volume validation utilities, such as fsck(1M). The reason is that Point-in-Time
+Copy has made a point-in-time copy of a mounted master volume to an unmounted shadow volume. During the
+mounting of the shadow volume, the file system detects that it is in the mounted state. Typically this state occurs on<hy>
+ly when a system crashes, so the file system attempts to validate the integrity of the volume assuming a system fail<hy>
+ure occurred, not an Point-in-Time Copy.
+The ii_bitmap variable in the /usr/kernel/drv/ii.conf configuration file determines the bitmap volume operational
+semantics as follows:
+0 Indicates that the bitmap is maintained in memory only or resume operation.
+1 Indicates that the bitmap is maintained in memory and on disk. This is the default value.
+If a system failure occurrs while using ii_bitmap=0, the shadow volume might be inconsistent and fast resynchro<hy>
+nization would not be possible.
+If Point-in-Time Copy is used in conjunction with the Network Storage component Remote Mirror or in a Sun Clus<hy>
+ter, set ii_bitmap=1.
+The ii_debug variable in the /usr/kernel/drv/ii.conf configuration file determines the amount of information log<hy>
+ging that is output to the system console /dev/console during Point-in-Time Copy processing.
+0 Indicates that no logging is sent to the system console.
+1 Indicates that informational logging is sent to the system console.
+2 Indicates that developmental logging is sent to the system console.
+The iiadm utility supports the following options.
+-e{ind|dep} master_vol shadow_vol bitmap_vol
+Enable Point-in-Time Copy for the specified master, shadow, and bitmap volumes.
+<beginning of page>
+The enable shadow set processing assures that the specified volumes are accessible, that the shadow_vol is not
+mounted, and that the bitmap_vol is correctly sized for the type of shadow set being created. Additionally, it assures
+that the volumes are under control of the SV driver ( if they are not, it puts them there), initializes the bitmap vol<hy>
+ume, and, if the volume set is an independent shadow set, a full copy operation is initiated.
+On a successful enable, Point-in-Time Copy stores the specified master_vol, shadow_vol and bitmap_vol names,
+plus the enabling type (ind or dep), into the Point-in-Time Copy configuration store. The configuration store con<hy>
+tains all currently configured Point-in-Time Copy Volume Sets and their associated configuration attributes. (See dis<hy>
+cussion above on independent and dependent shadow volume semantics.)
+master_vol is the volume from which a point-in-time snapshot is made.
+shadow_vol is the volume that contains the point-in-time snapshot.
+bitmap_vol is used for tracking differences between the shadow and master volumes. When Point-in-Time Copy
+shadow operations are suspended or resumed, the bitmap volume (maintained in kernel memory) can be stored in or
+retrieved from permanent storage. The storage associated with the bitmap volume should be as redundant as that of
+the shadow volume storage.
+The shadow_vol name is the name that the Point-in-Time Copy Shadow Set is known by for all iiadm options re<hy>
+quiring specification of a volume_set name.
+-d volume_set
+Disable the Point-in-Time Copy volume set associated with the specified volume_set.
+If Point-in-Time Copy was running in independent mode as specified in the -e ind options, above, the shadow vol<hy>
+ume data contains the same data as it did before it was disabled (assuming no writes have occurred). Users can ac<hy>
+cess the master and shadow volumes, as they are now standalone point-in-time copies.
+During the time that the full copy is active, an independent volume operates as though it is a dependent volume. To
+assure that the volume is no longer in full copy mode, issue the following command to wait for the full copy to com<hy>
+plete:
+ # iiadm -w volume_set
+[-p] -u s volume_set
+Update the shadow volume from the master.
+Updates a point-in-time copy of the master volume to the shadow volume. volume_set is the Point-in-Time Copy
+shadow set containing the master and shadow volumes. This option provides a fast resynchronization of the shadow
+volume, creating an incremental copy of the master. This update copies all 32KB segments flagged as different be<hy>
+tween the master and shadow volumes. It does not copy all master volume data, only changed data. While the data is
+being copied, the shadow is dependent upon the master volume.
+Before using this option, momentarily quiesce the workload to the volumes; stop the host application from writing to
+the volumes. This ensures that the point-in-time data is consistent. You can visually check the status of this copy or
+update operation with iiadm -i volume_set, or interactively (by means of a shell or script) with iiadm -w volume_set,
+before using the target volume for any other operations.
+This command supports PID (Process IDentifier) locking, by using the option -p, iiadm -p -u s. Enabling this option
+prevents other processes from taking a new point-in-time snapshot, thus invalidating prior point-in-time data.
+[-p] [-n] -u m volume_set
+Updates a point-in-time copy of the master volume from the shadow. volume_set is the Point-in-Time Copy volume
+set containing the master and shadow. This option provides a fast resynchronization of the master volume, creating
+an incremental copy of the shadow. This update copies all 32KB segments flagged as different between the master
+and shadow volumes. It does not copy all shadow volume data, only changed data. While the data is being copied,
+the master is dependent upon the shadow volume.
+<beginning of page>
+Before using this option, momentarily quiesce the workload to the volumes; stop the host application from writing to
+the volumes. This ensures that the point-in-time data is consistent. You can visually check the status of this copy or
+update operation with iiadm -i volume_set, or interactively (by means of a shell or script) with iiadm -w volume_set,
+before using the target volume for any other operations.
+This command is query enabled to prevent accidentally overwriting the data on a master volume. When this com<hy>
+mand option is used in scripts, add the -n option to prevent the query from occurring.
+This command supports PID (Process IDentifier) locking, by using the option -p, iiadm -p -u m. Enabling this op<hy>
+tion prevents other processes from taking a new point-in-time snapshot, thus invalidating prior point-in-time data.
+[-p] -c s volume_set
+Copy the master volume to the shadow.
+Creates a point-in-time copy of the master volume to the shadow volume. volume_set is the Point-in-Time Copy vol<hy>
+ume set containing the master and shadow. This option writes all data in the point-in-time copy of the master volume
+to the shadow volume. While the data is being copied from master to shadow, the shadow is dependent on the master
+volume.
+This option performs a full volume copy. Use iiadm -u s unless the integrity of the data on the independent shadow
+volume is in doubt. Otherwise, use this option to synchronize the master and shadow volumes; that is, make the data
+on each volume match.
+Before using this option, momentarily quiesce the workload to the volumes; stop the host application from writing to
+the volumes. This ensures that the point-in-time data is consistent. You can visually check the status of this copy or
+update operation with iiadm -i volume_set, or interactively (by means of a shell or script) with iiadm -w volume_set,
+before using the target volume for any other operations.
+This command supports PID (Process IDentifier) locking, by using the -p option, iiadm -p -c s. Enabling this option
+prevents other processes from taking a new point-in-time snapshot, thus invalidating prior point-in-time data.
+-c m volume_set
+Copy the shadow volume to the master.
+Creates a point-in-time copy of the shadow volume to the master volume. volume_set is the Point-in-Time Copy vol<hy>
+ume set containing the master and shadow volumes. This option writes all data in the point-in-time copy of the shad<hy>
+ow volume to the master volume. While the data is being copied from the shadow to the master, the master is depen<hy>
+dent upon the shadow volume.
+This option performs a full volume copy. Use iiadm -u m unless the integrity of the data on the independent master
+is in doubt. Otherwise, use this option to synchronize the master and shadow volumes; that is, make the data on each
+volume match.
+Before using this option, momentarily quiesce the workload to the volumes; stop the host application from writing to
+the volumes. This ensures that the point-in-time data is consistent. You can visually check the status of this copy or
+update operation with iiadm -i volume_set, or interactively (by means of a shell or script) with iiadm -w volume_set,
+before using the target volume for any other operations.
+This command is query-enabled to prevent accidentally overwriting the data on a master volume. When this com<hy>
+mand option is used in scripts, add the -n option to prevent the query from occurring.
+This command supports PID (Process IDentifier) locking, by using the -p option, iiadm -p -c m. Enabling this op<hy>
+tion prevents other processes from taking a new point-in-time snapshot, thus invalidating prior point-in-time data.
+-a volume_set
+Abort any current copy operation that might be active between the master and shadow volumes. volume_set is the
+Point-in-Time Copy volume set containing the master and shadow volumes. After executing iiadm -a, the update or
+copy to the target (master or shadow) volume is incomplete. The target volume is now a dependent copy of the
+source volume. Reissue the update or copy command option to resynchronize the volumes.
+<beginning of page>
+[-p] [-n] -w volume_set
+Wait until any in-progress copy or update operation completes or is aborted. volume_set is the Point-in-Time Copy
+volume set containing the master and shadow volumes.
+This option waits until the current Point-in-Time Copy operation is complete, thus preventing a subsequent iiadm
+command (from a shell or script) from executing. Use this command option when you need to be sure the copy or
+update operation has completed.
+This command supports PID (Process IDentifier) unlocking. If a prior copy or update, using a command iiadm -p
+{-c|-u} {m|s}, was invoked with the -p option, upon completion of the wait processing, if the current PID was the
+PID that locked the point-in-time data, this option unlocks the data.
+-i volume_set
+Display status for the Point-in-Time Copy currently-enabled or -suspended volume set. volume_set is the Point-in-
+Time Copy volume set containing the master and shadow volumes. If no volume_set is specified, status is displayed
+for all Point-in-Time Copy volume sets that are configured.
+-l
+List all currently configured Point-in-Time Copy volumes.
+-O overflow_vol
+This option causes Point-in-Time Copy to initialize the specified overflow_vol for subsequent use as an overflow vol<hy>
+ume in conjunction with Compact Dependent Shadow Volumes. To facilitate efficient, shared usage of this overflow
+volume, it can be associated with multiple Point-in-Time Copy volume sets on an as-needed basis.
+During initialization of the overflow_vol, the initiator of this option, must answer the following question: "Initialize
+this overflow volume? yes/no" A response of either "yes/no" is required before proceeding.
+This option supports the -n option, so that the requested action is performed without prompting. This option is useful
+for inclusion in a script. The -n option must be specified first. For example, "iiadm -nO vol" is valid; "iiadm -On
+vol" is not.
+Make sure you want to initialize the data on the specified overflow_vol, especially when using the -n option.
+-A overflow_vol volume_set
+This option enables the specified overflow_vol, for subsequent use as an overflow volume in a situation where the
+size of the Compact Dependent Shadow Volume is too small, or an unscheduled amount of change occurs to the vol<hy>
+ume set. Overflow changed data would be redirected to the associated overflow volume. volume_set is the Point-in-
+Time Copy volume set containing the master and shadow volumes.
+If the overflow_vol has not been initialized, this option initializes the overflow_vol (see -O option), then attaches the
+overflow_vol to the volume_set.
+If overflow_vol was previously initialized, this option attaches the overflow_vol to the volume_set.
+This option supports the -n option, so that the requested action is performed without prompting. This option is useful
+for inclusion in a script. The -n option must be specified first. For example, "iiadm -nA vol" is valid; "iiadm -An
+vol" is not.
+Make sure you want to initialize the data on the specified overflow_vol, especially when using the -n option.
+-D volume_set
+This option removes the overflow volume currently associated with the specified volume_set. If the overflow volume
+is currently in use by the volume_set, this operation fails with an "Overflow volume still in use" error message. To
+resolve this situation, perform one of the operations described below on the volume_set. These operations momentar<hy>
+ily clear out all overflow writes that are associated with this volume set.
+<beginning of page>
+abort(-a)
+Abort copy operation.
+disable(-d)
+Dissolve the volume set.
+update(-u)
+Update the volume set.
+-L
+This option lists all overflow volumes which are associated with one or more volume sets.
+-Q overflow_vol
+This option displays the current status of the overflow_vol.
+-E volume_set
+Export the independent shadow volume of the Point-in-Time Copy volume set specified by volume_set. The shadow
+volume is to be made available to another host for read/write access, by means of an enabling technology, such as
+multi-ported devices. This other host is responsible for maintaining a bitmap of differences that is used to merge
+with locally recorded differences to the master when the shadow volume is rejoined to its master volume. While a
+shadow volume is exported it must not be subject to an update or copy operation. Perform an iiadm -w volume_set
+command prior to invoking an export command.
+-I volume_set bitmap_vol
+Import the independent shadow volume of the Point-in-Time Copy volume set specified by volume_set. The shadow
+volume must have been previously exported from a host by means of an enabling technology, such as multi-ported
+devices. The import operation causes this host to start maintaining a bitmap of differences as the volume is modified.
+The bitmap_vol should not be the same as that used when the shadow volume was originally formed into a shadow
+group.
+After the exported/imported independent shadow volume is no longer needed by the other node, you must enter a
+disable command so that the bitmap_vol and its associated shadow_vol are consistent, prior to performing a join op<hy>
+eration. For example,
+ # iiadm -d volume_set
+-J volume_set bitmap_vol
+Join the volume_set, using the bitmap_vol, with the master volume set of the Point-in-Time Copy volume set. The
+bitmap volume supplied is read and merged with the original volume to reconstruct the original volume set consist<hy>
+ing of the master, shadow, and bitmap volumes. The bitmap_vol to be merged is the one obtained on the node that
+had imported the independent shadow volume. There must be no write activity to the shadow volume on the import<hy>
+ing machine from the time the bitmap is copied over until the shadow is once again imported.
+-g group_name -m volume_set [volume_set2 ...]
+Add one or more existing Point-in-Time Copy volume_set(s) into a user specified group_name. This association of
+one or more Point-in-Time Copy volume sets in a group allows the list of iiadm options shown below to be per<hy>
+formed on all volume sets within the group_name as a whole.
+Only the commands COPY (-c) and UPDATE (-u) are performed atomically across all Point-in-Time Copy sets
+within the group. All other grouped, iiadm commands are performed sequentially on each member of the group.
+<beginning of page>
+The syntax of an iiadm group command is as follows:
+ iiadm -g group_name [options]
+The options are as follows:
+-a
+Abort copy operation on all sets within group_name.
+-A
+Attach overflow_vol to all sets within group_name.
+-c {s | m}
+Copy shadow/master for all sets within group_name.
+-D
+Detach overflow_vol from all sets within group_name.
+-d
+Disable all sets within group_name.
+-E
+Export all volume sets within group_name.
+-i
+Status of all volume sets within group_name.
+-l
+List all volume sets within group_name.
+-L
+List all groups.
+-n
+Do not ask if an update of the master volume is what the user really intended.
+-P
+Set parameters on all volume sets within group_name.
+-R
+Reset all volume sets within group_name.
+-u {s | m}
+Update shadow/master for all sets within group_name.
+<beginning of page>
+-w
+Wait for all volume sets within group_name.
+-g -" " -m volume_set [volume_set2 ...]
+Remove one or more existing Point-in-Time Copy volume_set(s) from their currently associated group_name. By
+default, or until moved into a user specified group_name, all Point-in-Time Copy volume_set(s) are in the blank ("
+") group. This association allows all the previously documented iiadm group commands to be performed against the
+blank (" ") iiadm group_name.
+-C cluster_tag
+This Point-in-Time Copy option is a modifier that limits configuration operations to only those volumes belonging to
+a Sun Cluster Resource Group, or Disk Group.
+In a Sun Cluster where the volume manager is Sun Cluster-aware, iiadm automatically obtains the correct Disk
+Group information, therefore this option is typically not required unless the volumes are part of an encompassing
+Resource Group.
+In a Sun Cluster where the volumes are accessible on the local node only, the special cluster_tag of local is used to
+indicate volumes that are not part of a Sun Cluster Resource Group or Disk Group.
+If "-L" is given as a the cluster_tag argument, then iiadm lists all cluster tags associated with Point-in-Time Copy.
+This option is invalid when used on a Solaris system on which the Sun Cluster package has not been installed or
+configured.
+-h
+Prints the iiadm usage summary.
+-v
+Display the current version of the Point-in-Time Copy software components.
+Contact Sun Enterprise Services for assistance in using the remaining commands in this section.
+-P delay unit volume_set
+Alter the Point-in-Time Copy volume set tuning parameters for the specified volume_set to delay ticks, every unit
+I/O's. Delay ranges from 2 to 10000 inclusive; unit ranges from 100 to 60000 inclusive.
+-R volume
+After a volume has failed, Point-in-Time Copy places it offline. After replacing the volume, place it back online us<hy>
+ing this option. Associated dependent volumes in the Point-in-Time Copy volume set are also placed online. After
+the volume is placed online, this command also starts any necessary point-in-time volume updates.
+0 Command completed successfully.
+>0 An error occurred.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+<beginning of page>
+Wiir, SUNWiiu _ Interface StabilityEvolving
+dscfg(1M), svadm(1M), ds.log(4), rdc.cf(4), attributes(5), ii(7D), sv(7D)

@@ -1,0 +1,397 @@
+<beginning of page>
+crle <-> configure runtime linking environment
+crle [-64] [-a name] [-A name] [-c conf] [-e env] [-E env]
+ [-f flags] [-i name] [-I name] [-g name] [-G name]
+ [-l dir] [-o dir] [-s dir] [-t [ ELF | AOUT]] [-u] [-v]
+The crle utility provides for the creation and display of a runtime linking configuration file. The configuration file is
+read and interpreted by the runtime linker, ld.so.1(1), during process startup. The runtime linker attempts to read a
+default configuration file for all processes. For 32-bit processes, the default configuration file is /var/ld/ld.config.
+For 64-bit processes, the default configuration file is /var/ld/64/ld.config.
+Without any arguments, or with just the -c option, crle displays configuration information. This information includes
+the contents of a configuration file, any system defaults and the command-line required to regenerate the configura<hy>
+tion file. When used with any other options, a new configuration file is created or updated.
+The runtime linker can also be directed to an alternative configuration file by setting one of the LD_CONFIG fami<hy>
+ly of environment variable. LD_CONFIG applies to both 32-bit and 64-bit programs. Since 32-bit and 64-bit con<hy>
+figuration files differ, a single configuration file cannot be used for both class of object. Hence, LD_CONFIG can
+adversely affect program execution in cases where a program of one class executes a program of the other class. In
+particular, it is common practice for the 32-bit version of standard Solaris utilities to execute their 64-bit counterpart.
+LD_CONFIG cannot be successfully used in this case. Therefore, the use of the LD_CONFIG_32 and LD_CON<hy>
+FIG_64 environment variables, that precisely target the appropriate class of process, is recommended.
+Creating an incorrect configuration file in the standard location, /var/ld, can prevent programs from running, and can
+therefore be difficult to recover from. To guard against this situation, it is recommented that new configuration files
+first be created in a temporary location. Then set the appropriate LD_CONFIG environment variable to this new
+configuration file. This setting causes the new configuration file to be used by the runtime linker instead of any de<hy>
+fault. After verification, the new configuration file can be moved to the default location if desired. At any time, the
+environment variable LD_NOCONFIG can be set to any value to instruct the runtime linker to ignore any configu<hy>
+ration files. This setting can prove useful during experimentation.
+A configuration file can contain the following information.
+Default Search Paths
+The runtime linker uses a prescribed search path for locating the dynamic dependencies of an object. This search
+path starts with the components of any LD_LIBRARY_PATH definition, followed by the components of an ob<hy>
+ject's runpath. Finally, any default search paths specific to the object's class are used. This last component of the
+search path can be expressed within the configuration file. Typically, use of this facility should be augmented with
+any system default. See the -l and -u options.
+Trusted Directories
+When processing a secure application, the runtime linker restricts the use of LD_LIBRARY_PATH searches, and
+$ORIGIN token expansion. See Security in Linker and Libraries Guide. In addition, the directories from which
+preload and audit libraries can be located are also restricted. The path names that are associated with preload and au<hy>
+dit libraries are restricted to known trusted directories. Trusted directories can be expressed within the configuration
+file. Typically, use of this facility should be augmented with any system defaults. See the -s and -u options.
+Environment Variables
+Any environment variable interpreted by the runtime linker can be specified within the configuration file.
+Directory Cache
+The location of shared objects within defined directories can be maintained as a cache within the configuration file.
+This directory cache can reduce the overhead of searching for application dependencies.
+Alternative Objects
+In conjunction with the directory cache, shared objects can have alternative objects specified for use at runtime.
+These alternate objects, can be supplied by the user. Alternative objects can also be created by crle as copies of
+shared objects fixed to known memory locations. These fixed alternative objects can require less processing at run<hy>
+time than their original shared object counterpart.
+<beginning of page>
+Defining additional default search paths, or additional trusted directories can be useful for administrators who wish
+to install third party software in a central location, or otherwise alter the search path of applications that might not
+have been coded with a suitable runpath.
+The declaration of alternative objects provides a means of replacing dependencies other than by using symbolic links
+or requiring LD_LIBRARY_PATH settings.
+The declaration of environment variables that are interpreted by the runtime linker provides a means of centralizing
+their definition for all applications.
+The directory cache, and crle generated alternate objects, can provide a means of reducing the runtime startup over<hy>
+head of applications. Alternative objects can be useful for applications that require many dependencies, or whose de<hy>
+pendencies are expensive to relocate. Shared objects that contain position-dependent code are often expensive to re<hy>
+locate. Note, the system has many caching facilities that help mitigate expenses such as negative path lookups, and
+thus employing crle to create a directory cache may have minimal effect other than for some very specific cases.
+When alternate objects that are generated by crle are specified within a configuration file, the runtime linker per<hy>
+forms some minimal consistency verification. The alternative objects are verified against their originating objects.
+This verification is intended to avert application failure should an applications configuration information become
+out-of-sync with the underlying system components. When this situation arises the flexibility offered by dynamic
+linking system components can be compromised. This type of application failure can be very difficult to diagnose.
+No verification of directory cache information is performed. Any changes to the directory structure are not seen by a
+process until the cache is rebuilt.
+System shared objects are often well tuned, and can show little benefit from being cached. The directory cache and
+alternative object features are typically applicable to user applications and shared objects, and may only show im<hy>
+provement in some very specific cases.
+crle creates alternate objects for the shared objects that are discovered when using the -I and -G options, using dl<hy>
+dump(3C). The alternate object is created in the directory specified by the preceding -o option, or defaults to the di<hy>
+rectory in which the configuration file is created. The flags used by dldump() are specified using the -f option, or de<hy>
+fault to RTLD_REL_RELATIVE.
+The following options are supported.
+-64
+Specify to process 64-bit objects, the default is 32-bit. Use -64 to create a 64-bit specific configuration file.
+-a name
+Create an alternative path name for name. The alternative path name is added to the configuration file.
+The actual alternative file must be supplied by the user. Multiple occurrences of this option are permitted. If name is
+a directory, each shared object within the directory is added to the cache. If name does not exist, then name is
+marked in the cache as a nonexistent file.
+Typically, this option is used with the -o option.
+-A name
+Create an optional alternative path name for name. This alternative path name is added to the configuration file.
+This option mimics the -a option, except that if the alternative is unavailable at runtime, the original object name is
+used. This model mimics the use of auxiliary filters. See Generating Auxiliary Filters in Linker and Libraries Guide.
+Typically, this option is used with the -o option.
+-c conf
+Specify to use the configuration file name conf. If this option is not supplied, the default configuration file is used.
+<beginning of page>
+-e env
+Specify a replaceable environment variable, env. Only environment variables that are applicable to the runtime link<hy>
+er are meaningful. Multiple occurrences of this option are permitted. This option is similar to the -E option. Howev<hy>
+er, the options differs in how configuration file definitions, and process environment definitions of the same name are
+resolved at runtime.
+A definition established in a configuration file can be overridden by a process environment definition, or be sup<hy>
+pressed by a null-value process environment definition.
+In other words, these configuration file definitions can be replaced, or removed by the process environment at run<hy>
+time.
+-E env
+Specify a permanent environment variable, env. Only environment variables that are applicable to the runtime link<hy>
+er are meaningful. Multiple occurrences of this option are permitted. This option is similar to the -e option. Howev<hy>
+er, the option differs in how configuration file definitions, and process environment definitions of the same name are
+resolved at runtime.
+Environment variable definitions that are meaningful to the runtime linker fall into one of two categories. Singular
+definitions are definitions such as LD_NOLAZYLOAD=1 and LD_DEBUG_OUTPUT=file. List definitions,
+which can take one or more values, are definitions such as LD_LIBRARY_PATH=path, and LD_DEBUG=files,de<hy>
+tails.
+A singular definition that is established in a configuration file takes precedence over a process environment defini<hy>
+tion. A list definition that is established in a configuration file is appended to a process environment definition. Any
+definition that is established in a configuration file can not be suppressed by a null-value process environment defini<hy>
+tion.
+In other words, these configuration file definitions can not be replaced, or removed by the process environment at
+runtime.
+-f flags
+Provide the symbolic flags argument to the dldump(3C) calls used to generate alternate objects. Any of the
+RTLD_REL flags that are defined in /usr/include/dlfcn.h can be used. Multiple flags can be or'ed together using
+the "|" character. In this case, the string should be quoted to avoid expansion by the shell. If no flags values are pro<hy>
+vided the default flag is RTLD_REL_RELATIVE.
+-i name
+Add an individual name to the configuration cache. Multiple occurrences of this option are permitted. name can be a
+shared object or a directory. If name is a directory, each shared object within the directory is added to the cache. If
+name does not exist, the name is marked in the cache as a nonexistent directory.
+-I name
+Mimic the -i, and in addition any shared object that is processed has an alternative created using dldump(3C). If the
+-f flag contains RTLD_REL_EXEC, then name can be a dynamic executable, for which an alternative is created.
+Only one dynamic executable can be specified in this manner, as the cache that is created is specific to this applica<hy>
+tion.
+-g name
+Add the group name to the configuration cache. Each object is expanded to determine its dependencies. Multiple oc<hy>
+currences of this option are permitted. name can be a dynamic executable, shared object or a directory. If name is a
+shared object, the shared object and its dependencies are added to the cache. If name is a directory, each shared ob<hy>
+ject within the directory, and its dependencies, are added to the cache.
+-G name
+Mimic the -g option, and in addition any shared object that is processed has an alternative created using dl<hy>
+<beginning of page>
+dump(3C). If name is a dynamic executable, and the -f flag contains RTLD_REL_EXEC, then an alternative for
+the dynamic executable is also created. Only one dynamic executable can be specified in this manner as the cache
+that is created is specific to this application.
+-l dir
+Specify a new default search directory dir for ELF or AOUT objects. Multiple occurrences of this option are per<hy>
+mitted. The type of object that is applicable to the search, is specified by the preceding -t option, or defaults to ELF.
+The default search paths for 32-bit ELF objects are /lib followed by /usr/lib. For 64-bit ELF objects, the default
+search paths are /lib/64 followed by /usr/lib/64.
+The default search paths for AOUT objects are /usr/4lib, followed by /usr/lib and finally /usr/local/lib.
+Use of this option replaces the default search path. Therefore, a -l option is normally required to specify the original
+system default in relation to any new paths that are being applied. However, if the -u option is in effect, and a config<hy>
+uration file does not exist, the system defaults are added to the new configuration file. These defaults are added be<hy>
+fore the new paths specified with the -l option.
+-o dir
+When used with either the -a or -A options, specifies the directory dir in which any alternate objects exist. When al<hy>
+ternative objects are created by crle, this option specified where the alternative are created. Without this option, al<hy>
+ternate objects exist in the directory in which the configuration file is created. Multiple occurrences of this option are
+permitted, the directory dir being used to locate alternatives for any following command-line options. Alternative
+objects are not permitted to override their associated originals.
+Typically, this option is used with the -a or -A options.
+-s dir
+Specify a new trusted directory dir for secure ELF or AOUT objects. See SECURITY in ld.so.1(1) for a definition
+of secure objects. See Security in Linker and Libraries Guide for a discussion of runtime restrictions imposed on se<hy>
+cure applications.
+Multiple occurrences of this option are permitted. The type of object that is applicable to the search is specified by
+the preceding -t option, or defaults to ELF.
+The default trusted directories for secure 32-bit ELF objects, and AOUT objects, are /lib/secure followed by
+/usr/lib/secure. For 64-bit secure ELF objects, the default trusted directories are /lib/secure/64 followed by
+/usr/lib/secure/64.
+Use of this option replaces the default trusted directories. Therefore, a -s option is normally required to specify the
+original system default in relation to any new directories that are being applied. However, if the -u option is in effect,
+and a configuration file does not exist, the system defaults are added to the new configuration file. These defaults are
+added before the new directories specified with the -l option.
+-t ELF | AOUT
+Toggle the object type that is applicable to any -l or -s options that follow. The default object type is ELF.
+-u
+Request that a configuration file be updated, possibly with the addition of new information. Without other options,
+any existing configuration file is inspected and its contents recomputed. Additional arguments allow information to
+be appended to the recomputed contents. See NOTES.
+If a configuration file does not exist, the configuration file is created as directed by the other arguments. In the case
+of the -l and -s options, any system defaults are first applied to the configuration file before the directories specified
+with these options.
+The configuration file can be in the older format that lacks the system identification information that is normally
+written at the beginning of the file. In this case, crle does not place system identification information into the result<hy>
+<beginning of page>
+ing file, preserving compatibility of the file with older versions of Solaris. See NOTES.
+-v
+Specify verbose mode. When creating a configuration file, a trace of the files that are being processed is written to
+the standard out. When printing the contents of a configuration file, more extensive directory and file information is
+provided.
+By default, the runtime linker attempts to read the configuration file /var/ld/ld.config for each 32-bit application pro<hy>
+cessed. /var/ld/64/ld.config is read for each 64-bit application. When processing an alternative application, the run<hy>
+time linker uses a $ORIGIN/ld.config.app-name configuration file if present. See NOTES. Applications can refer<hy>
+ence an alternative configuration file by setting the LD_CONFIG environment variable. An alternative configuration
+file can also be specified by recording the configuration file name in the application at the time the application is
+built. See the -c option of ld(1). Example 1 Experimenting With a Temporary Configuration File
+The following example creates a temporary configuration file with a new default search path for ELF objects. The
+environment variable LD_CONFIG_32 is used to instruct the runtime linker to use this configuration file for all
+32-bit processes.
+ $ crle -c /tmp/ld.config -u -l /local/lib
+ $ crle -c /tmp/ld.config
+ Configuration file [version 4]: /tmp/ld.config
+  Platform: 32-bit MSB SPARC
+  Default Library Path (ELF): /lib:/usr/lib:/local/lib
+  Trusted Directories (ELF): /lib/secure:/usr/lib/secure \
+  (system default)
+ Command line:
+  crle -c /tmp/ld.config -l /lib:/usr/lib:/local/lib
+ $ LD_CONFIG_32=/tmp/ld.config date
+ Thu May 29 17:42:00 PDT 2008
+Example 2 Updating and Displaying a New Default Search Path for ELF Objects
+The following example updates and displays a new default search path for ELF objects.
+ # crle -u -l /local/lib
+ # crle
+ Configuration file [version 4]: /var/ld/ld.config
+  Platform: 32-bit MSB SPARC
+  Default Library Path (ELF): /lib:/usr/lib:/local/lib
+  Trusted Directories (ELF): /lib/secure:/usr/lib/secure \
+  (system default)
+ Command line:
+  crle -l /lib:/usr/lib:/local/lib
+ # crle -u -l /ISV/lib
+ # crle
+ Configuration file [version 4]: /var/ld/ld.config
+  Platform 32-bit MSB SPARC
+  Default Library Path (ELF): /lib:/usr/lib:/local/lib:/ISV/lib
+  Trusted Directories (ELF): /lib/secure:/usr/lib/secure \
+  (system default)
+ Command line:
+  crle -l /lib:/usr/lib:/local/lib:/usr/local/lib
+<beginning of page>
+In this example, the default configuration file initially did not exist. Therefore, the new search path /local/lib is ap<hy>
+pended to the system default. The next update appends the search path /ISV/lib to those paths already established in
+the configuration file.
+Example 3 Recovering From a Bad Configuration File
+The following example creates a bad configuration file in the default location. The file can be removed by instructing
+the runtime linker to ignore any configuration file with the LD_NOCONFIG environment variable. Note, it is rec<hy>
+ommended that temporary configuration files be created and the environment variable LD_CONFIG used to experi<hy>
+ment with these files.
+ # crle -l /local/lib
+ # date
+ ld.so.1: date: fatal: libc.so.1: open failed: \
+  No such file or directory
+ Killed
+ # LD_NOCONFIG=yes rm /var/ld/ld.config
+ # date
+ Thu May 29 17:52:00 PDT 2008
+Note, the reason the configuration file is bad is because the system default search paths are not present. Hence, the
+date utility is not able to locate the system dependencies that it required. In this case, the -u option should have been
+used. Example 4 Creating and Displaying a New Default Search Path and New Trusted Directory for ELF Objects
+The following example creates and displays a new default search path and new trusted directory for ELF objects.
+ # crle -l /local/lib -l /lib -l /usr/lib -s /local/lib
+ # crle
+ Configuration file [version 4]: /var/ld/ld.config
+  Platform: 32-bit MSB SPARC
+  Default Library Path (ELF): /local/lib:/lib:/usr/lib
+  Trusted Directories (ELF): /local/lib
+ Command line:
+  crle -l /local/lib:/lib:/usr/lib -s /local/lib
+With this configuration file, third party applications could be installed in /local/bin and their associated dependen<hy>
+cies in /local/lib. The default search path allows the applications to locate their dependencies without the need to set
+LD_LIBRARY_PATH. The default trusted directories have also been replaced with this example.
+Example 5 Creating a Directory Cache for ELF Objects
+The following example creates a directory cache for ELF objects.
+ $ crle -i /usr/dt/lib -i /usr/openwin/lib -i /lib -i /usr/lib \
+  -c config
+ $ ldd -s ./main
+ ....
+  find object=libc.so.1; required by ./main
+  search path=/usr/dt/lib:/usr/openwin/lib (RUNPATH/RPATH ./main)
+  trying path=/usr/dt/lib/libc.so.1
+  trying path=/usr/openwin/lib/libc.so.1
+  search path=/lib (default)
+  trying path=/lib/libc.so.1
+  libc.so.1 => /lib/libc.so.1
+<beginning of page>
+ $ LD_CONFIG=config ldd -s ./main
+ ....
+  find object=libc.so.1; required by ./main
+  search path=/usr/dt/lib:/usr/openwin/lib (RUNPATH/RPATH ./main)
+  search path=/lib (default)
+  trying path=/lib/libc.so.1
+  libc.so.1 => /lib/libc.so.1
+With this configuration, the cache reflects that the system library libc.so.1 does not exist in the directories /usr/dt/lib
+or /usr/openwin/lib. Therefore, the search for this system file ignores these directories even though the application's
+runpath indicates these paths should be searched.
+Example 6 Creating an Alternative Object Cache for an ELF Executable
+The following example creates an alternative object cache for an ELF executable.
+ $ crle -c /local/$HOST/.xterm/ld.config.xterm \
+  -f RTLD_REL_ALL -G /usr/openwin/bin/xterm
+ $ ln -s /local/$HOST/.xterm/xterm /local/$HOST/xterm
+ $ ldd /usr/local/$HOST/xterm
+  libXaw.so.5 => /local/$HOST/.xterm/libWaw.so.5 (alternate)
+  libXmu.so.4 => /local/$HOST/.xterm/libXmu.so.4 (alternate)
+  ....
+  libc.so.1 => /local/$HOST/.xterm/libc.so.1 (alternate)
+  ....
+With this configuration, a new xterm and its dependencies are created. These new objects are fully relocated to each
+other, and result in faster startup than the originating objects. The execution of this application uses its own specific
+configuration file. This model is generally more flexible than using the environment variable LD_CONFIG, as the
+configuration file can not be erroneously used by other applications such as ldd(1) or truss(1).
+Example 7 Creating an Alternative Object Cache to Replace an ELF Shared Object
+The following example creates an alternative object cache to replace an ELF shared object.
+ $ ldd /usr/bin/vi
+  libcurses.so.1 => /lib/libcurses.so.1
+  ....
+ # crle -a /lib/libcurses.so.1 -o /usr/ucblib
+ # crle
+ Configuration file [version 4]: /var/ld/ld.config
+  Platform: 32-bit MSB SPARC
+  Default Library Path (ELF): /lib:/usr/lib (system default)
+  Trusted Directories (ELF): /lib/secure:/usr/lib/secure \
+  (system default)
+ Directory: /lib
+  libcurses.so.1 (alternate: /usr/ucblib/libcurses.so.1)
+ ....
+ $ ldd /usr/bin/vi
+  libcurses.so.1 => /usr/ucblib/libcurses.so.1 (alternate)
+  ....
+With this configuration, any dependency that would normally resolve to /usr/lib/libcurses.so.1 instead resolves to
+/usr/ucblib/libcurses.so.1.
+<beginning of page>
+Example 8 Setting Replaceable and Permanent Environment Variables
+The following example sets replaceable and permanent environment variables.
+ # crle -e LD_LIBRARY_PATH=/local/lib \
+  -E LD_PRELOAD=preload.so.1
+ # crle
+ .....
+ Environment Variables:
+  LD_LIBRARY_PATH=/local/lib (replaceable)
+  LD_PRELOAD=preload.so.1 (permanent)
+ .....
+ $ LD_DEBUG=files LD_PRELOAD=preload.so.2 ./main
+ .....
+ 18764: file=preload.so.2; preloaded
+ 18764: file=/local/lib/preload.so.2 [ ELF ]; generating link map
+ .....
+ 18764: file=preload.so.1; preloaded
+ 18764: file=/local/lib/preload.so.1 [ ELF ]; generating link map
+ .....
+With this configuration file, a replaceable search path has been specified together with a permanent preload object
+which becomes appended to the process environment definition.
+The creation or display of a configuration file results in a 0 being returned. Otherwise, any error condition is accom<hy>
+panied with a diagnostic message and a non-zero value being returned.
+The ability to tag an alternative application to use an application-specific configuration file, is possible if the original
+application contains one of the .dynamic tags DT_FLAGS_1 or DT_FEATURE_1. Without these entries, a config<hy>
+uration file must be specified using the LD_CONFIG environment variable. Care should be exercised with this lat<hy>
+ter method as this environment variable is visible to any forked applications.
+The use of the -u option requires at least version 2 of crle. This version level is evident from displaying the contents
+of a configuration file.
+ $ crle
+ Configuration file [2]: /var/ld/ld.config
+  ......
+With a version 2 configuration file, crle is capable of constructing the command-line arguments required to regener<hy>
+ate the configuration file. This command-line construction, provides full update capabilities using the -u option. Al<hy>
+though a version 1 configuration file update is possible, the configuration file contents might be insufficient for crle
+to compute the entire update requirements.
+Configuration files contain platform specific binary data. A given configuration file can only be interpreted by soft<hy>
+ware with the same machine class and byte ordering. However, the information necessary to enforce this restriction
+was not included in configuration files until SXCE build 41. As of this SXCE build, configuration files have system
+identification information at the beginning of the file. This additional information is used by crle and the runtime to
+check their compatibility with configuration files. This information also allows the file(1) command to properly
+identify configuration files. For backward compatibility, older files that are missing this information are still accept<hy>
+ed, although without the identification and error checking that would otherwise be possible. When processing an up<hy>
+date (-u) operation for an older file that lacks system information, crle does not add system identification informa<hy>
+tion to the result.
+/var/ld/ld.config
+Default configuration file for 32-bit applications.
+<beginning of page>
+/var/ld/64/ld.config
+Default configuration file for 64-bit applications.
+/var/tmp
+Default location for temporary configuration file. See tempnam(3C).
+/usr/lib/lddstub
+Stub application that is employed to dldump(3C) 32-bit objects.
+/usr/lib/64/lddstub
+Stub application that is employed to dldump(3C) 64-bit objects.
+/usr/lib/libcrle.so.1
+Audit library that is employed to dldump(3C) 32-bit objects.
+/usr/lib/64/libcrle.so.1
+Audit library that is employed to dldump(3C) 64-bit objects.
+There are no environment variables that are referenced by crle. However, several environment variables affect the
+runtime linkers behavior in regard to the processing of configuration files that are created by crle.
+LD_CONFIG, LD_CONFIG_32 and LD_CONFIG_64
+Provide an alternative configuration file.
+LD_NOCONFIG, LD_NOCONFIG_32 and LD_NOCONFIG_64
+Disable configuration file processing.
+LD_NODIRCONFIG, LD_NODIRCONFIG_32 and LD_NODIRCONFIG_64
+Disable directory cache processing from a configuration file.
+LD_NOENVCONFIG, LD_NOENVCONFIG_32 and LD_NOENVCONFIG_64
+Disable environment variable processing from a configuration file.
+LD_NOOBJALTER, LD_NOOBJALTER_32 and LD_NOOBJALTER_64
+Disable alternative object processing from a configuration file.
+See attributes(5) for descriptions of the following attributes.
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Availability<hy>
+SUNWtoo _ Interface StabilityCommitted
+file(1), ld(1), ld.so.1(1), dldump(3C), tempnam(3C), attributes(5)
+Linker and Libraries Guide

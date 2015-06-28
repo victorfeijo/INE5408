@@ -1,0 +1,219 @@
+<beginning of page>
+sd <-> SCSI disk and ATAPI/SCSI CD-ROM device driver
+sd@target,lun:partition
+To open a device without checking if the vtoc is valid, use the O_NDELAY flag. When the device is opened using
+O_NDELAY, the first read or write to the device that happens after the open results in the label being read if the la<hy>
+bel is not currently valid. Once read, the label remains valid until the last close of the device. Except for reading the
+label, O_NDELAY has no impact on the driver.
+The sd SCSI and SCSI/ATAPI driver supports embedded SCSI-2 and CCS-compatible SCSI disk and CD-ROM
+drives, ATAPI 2.6 (SFF-8020i)-compliant CD-ROM drives, SFF-8090-compliant SCSI/ATAPI DVD-ROM drives,
+IOMEGA SCSI/ATAPI ZIP drives, SCSI JAZ drives, and USB mass storage devices (refer to scsa2usb(7D)).
+To determine the disk drive type, use the SCSI/ATAPI inquiry command and read the volume label stored on block
+0 of the drive. (The volume label describes the disk geometry and partitioning and must be present for the disk to be
+mounted by the system.) A volume label is not required for removable, re-writable or read-only media.
+The sddriver supports embedded SCSI-2 and CCS-compatible SCSI disk and CD-ROM drives, ATAPI 2.6
+(SFF-8020i)-compliant CD-ROM drives, SFF-8090-compliant SCSI/ATAPI DVD-ROM drives, IOMEGA SC<hy>
+SI/ATAPI ZIP drives, and SCSI JAZ drives.
+The x86 BIOS legacy requires a master boot record (MBR) and fdisk table in the first physical sector of the bootable
+media. If the x86 hard disk contains a Solaris disk label, it is located in the second 512-byte sector of the FDISK
+partition.
+Block-files access the disk using normal buffering mechanism and are read-from and written-to without regard to
+physical disk records. A raw interface enables direct transmission between the disk and the user's read or write buf<hy>
+fer. A single read or write call usually results in a single I/O operation, therefore raw I/O is more efficient when
+many bytes are transmitted. Block files names are found in /dev/dsk; raw file names are found in /dev/rdsk.
+I/O requests to the raw device must be aligned on a 512-byte (DEV_BSIZE) boundary and all I/O request lengths
+must be in multiples of 512 bytes. Requests that do not meet these requirements will trigger an EINVAL error.
+There are no alignment or length restrictions on I/O requests to the block device.
+A CD-ROM disk is single-sided and contains approximately 640 megabytes of data or 74 minutes of audio. When
+the CD-ROM is opened, the eject button is disabled to prevent manual removal of the disk until the last close() is
+called. No volume label is required for a CD-ROM. The disk geometry and partitioning information are constant and
+never change. If the CD-ROM contains data recorded in a Solaris-aware file system format, it can be mounted using
+the appropriate Solaris file system support.
+DVD-ROM media can be single or double-sided and can be recorded upon using a single or double layer structure.
+Double-layer media provides parallel or opposite track paths. A DVD-ROM can hold from between 4.5 Gbytes and
+17 Gbytes of data, depending on the layer structure used for recording and if the DVD-ROM is single or double-sid<hy>
+ed.
+When the DVD-ROM is opened, the eject button is disabled to prevent the manual removal of a disk until the last
+close() is called. No volume label is required for a DVD-ROM. If the DVD-ROM contains data recorded in a So<hy>
+laris-aware file system format, it can be mounted using the appropriate Solaris file system support.
+ZIP/JAZ media provide varied data capacity points; a single JAZ drive can store up to 2 GBytes of data, while a
+ZIP-250 can store up to 250MBytes of data. ZIP/JAZ drives can be read-from or written-to using the appropriate
+drive.
+When a ZIP/JAZ drive is opened, the eject button is disabled to prevent the manual removal of a disk until the last
+close() is called. No volume label is required for a ZIP/JAZ drive. If the ZIP/JAZ drive contains data recorded in a
+Solaris-aware file system format, it can be mounted using the appropriate Solaris file system support.
+Each device maintains I/O statistics for the device and for partitions allocated for that device. For each device/parti<hy>
+tion, the driver accumulates reads, writes, bytes read, and bytes written. The driver also initiates hi-resolution time
+stamps at queue entry and exit points to enable monitoring of residence time and cumulative residence-length prod<hy>
+uct for each queue.
+Not all device drivers make per-partition IO statistics available for reporting. sd and ssd(7D) per-partition statistics
+are enabled by default but may disabled in their configuration files.
+Refer to dkio(7I), and cdio(7I)
+<beginning of page>
+EACCES Permission denied
+EBUSY The partition was opened exclusively by another thread
+EFAULT The argument features a bad address
+EINVAL Invalid argument
+ENOTTY The device does not support the requested ioctl function
+ENXIO During opening, the device did not exist. During close, the drive unlock failed
+EROFS The device is read-only
+EAGAIN Resource temporarily unavailable
+EINTR A signal was caught during the execution of the ioctl() function
+ENOMEM Insufficient memory
+EPERM Insufficent access permission
+EIO An I/O error occurred. Refer to notes for details on copy-protected DVD-ROM media.
+The sd driver can be configured by defining properties in the sd.conf file. The sd driver supports the following prop<hy>
+erties:
+enable-partition-kstats The default value is 1, which causes partition IO statistics to be maintained. Set this value
+to zero to prevent the driver from recording partition statistics. This slightly reduces the CPU overhead for IO, mim<hy>
+imizes the amount of sar(1) data collected and makes these statistics unavailable for reporting by iostat(1M) even
+though the -p/-P option is specified. Regardless of this setting, disk IO statistics are always maintained.
+qfull-retries The supplied value is passed as the qfull-retries capability value of the HBA driver. See scsi_ifset<hy>
+cap(9F) for details.
+qfull-retry-interval The supplied value is passed as the qfull-retry interval capability value of the HBA driver. See
+scsi_ifsetcap(9F) for details.
+allow-bus-device-reset The default value is 1, which allows resetting to occur. Set this value to 0 (zero) to prevent
+the sd driver from calling scsi_reset(9F) with a second argument of RESET_TARGET when in error-recovery
+mode. This scsi_reset(9F) call may prompt the HBA driver to send a SCSI Bus Device Reset message. The scsi_re<hy>
+set(9F) call with a second argument of RESET_TARGET may result from an explicit request via the USCSICMD
+ioctl. Some high-availability multi-initiator systems may wish to prohibit the Bus Device Reset message; to do this,
+set the allow-bus-device-reset property to 0.
+optical-device-bind Controls the binding of the driver to non self-identifying SCSI target optical devices. (See sc<hy>
+si(4)). The default value is 1, which causes sd to bind to DTYPE_OPTICAL devices (as noted in scsi(4)). Setting
+this value to 0 prevents automatic binding. The default behavior for the SPARC-based sd driver prior to Solaris 9
+was not to bind to optical devices.
+<beginning of page>
+power-condition Boolean type, when set to False, it indicates that the disk does not support power condition field
+in the START STOP UNIT command.
+In addition to the above properties, some device-specific tunables can be configured in sd.conf using the sd-config-
+list global property. The value of this property is a list of duplets. The formal syntax is:
+ sd-config-list = <duplet> [, <duplet> ]* ;
+ where
+ <duplet>:= "<vid+pid>" , "<tunable-list>"
+ and
+ <tunable-list>:= <tunable> [, <tunable> ]*;
+ <tunable> = <name> : <value>
+ The <vid+pid> is the string that is returned by the target device
+ on a SCSI inquiry command.
+ The <tunable-list> contains one or more tunables to apply to
+ all target devices with the specified <vid+pid>.
+ Each <tunable> is a <name> : <value> pair. Supported
+ tunable names are:
+  delay-busy: when busy, nsecs of delay before retry.
+  retries-timeout: retries to perform on an IO timeout.
+mmc-gesn-polling For optical drives compliant with MMC-3 and supporting the GET EVENT STATUS NOTIFI<hy>
+CATION command, this command is used for periodic media state polling, usually initiated by the DKIOCSTATE
+dkio(7I) ioctl. To disable the use of this command, set this boolean property to false. In that case, either the TEST
+UNIT READY or zero-length WRITE(10) command is used instead.
+ The following is an example of a global sd-config-list property:
+  sd-config-list =
+  "SUN T4", "delay-busy:600, retries-timeout:6",
+  "SUN StorEdge_3510", "retries-timeout:3";
+/kernel/drv/sd.conf Driver configuration file
+/dev/dsk/cntndnsn Block files
+/dev/rdsk/cntndnsn Raw files
+Where:
+cn controller n
+tn SCSI target id n (0-6)
+dn SCSI LUN n (0-7 normally; some HBAs support LUNs to 15 or 32. See the specific manpage for details)
+<beginning of page>
+sn partition n (0-7)
+/dev/rdsk/cntndnpn raw files
+Where:
+pn Where n=0 the node corresponds to the entire disk.
+sar(1), cfgadm_scsi(1M), fdisk(1M), format(1M), iostat(1M), close(2), ioctl(2), lseek(2), read(2), write(2), driv<hy>
+er.conf(4), scsi(4), filesystem(5), scsa2usb(7D), ssd(7D), hsfs(7FS), pcfs(7FS), udfs(7FS), cdio(7I), dkio(7I), sc<hy>
+si_ifsetcap(9F), scsi_reset(9F)
+ANSI Small Computer System Interface-2 (SCSI-2)
+ATA Packet Interface for CD-ROMs, SFF-8020i
+Mt.Fuji Commands for CD and DVD, SFF8090v3
+http://www.sun.com/io
+ Error for Command:<command name>
+ Error Level: Fatal
+ Requested Block: <n>
+ Error Block: <m>
+ Vendor:'<vendorname>'
+ Serial Number:'<serial number>'
+ Sense Key:<sense key name>
+ASC: 0x<a> (<ASC name>), ASCQ: 0x<b>, FRU: 0x<c>
+The command indicated by <command name> failed. The Requested Block is the block where the transfer started
+and the Error Block is the block that caused the error. Sense Key, ASC, and ASCQ information is returned by the
+target in response to a request sense command.
+Caddy not inserted in drive
+The drive is not ready because no caddy has been inserted.
+Check Condition on REQUEST SENSE
+A REQUEST SENSE command completed with a check condition. The original command will be retried a number
+of times.
+Label says <m> blocks Drive says <n> blocks
+There is a discrepancy between the label and what the drive returned on the READ CAPACITY command.
+Not enough sense information
+The request sense data was less than expected.
+Request Sense couldn't get sense data
+The REQUEST SENSE command did not transfer any data.
+<beginning of page>
+Reservation Conflict
+The drive was reserved by another initiator.
+SCSI transport failed: reason 'xxxx': {retrying|giving up}
+The host adapter has failed to transport a command to the target for the reason stated. The driver will either retry the
+command or, ultimately, give up.
+Unhandled Sense Key<n>
+The REQUEST SENSE data included an invalid sense.
+Unit not ready. Additional sense code 0x
+<n> The drive is not ready.
+Can't do switch back to mode 1
+A failure to switch back to read mode 1.
+Corrupt label - bad geometry
+The disk label is corrupted.
+Corrupt label - label checksum failed
+The disk label is corrupted.
+Corrupt label - wrong magic number
+The disk label is corrupted.
+Device busy too long
+The drive returned busy during a number of retries.
+Disk not responding to selection
+The drive is powered down or died
+Failed to handle UA
+A retry on a Unit Attention condition failed.
+I/O to invalid geometry
+The geometry of the drive could not be established.
+Incomplete read/write - retrying/giving up
+There was a residue after the command completed normally.
+No bp for direct access device format geometry
+A bp with consistent memory could not be allocated.
+<beginning of page>
+No bp for disk label
+A bp with consistent memory could not be allocated.
+No bp for fdisk
+A bp with consistent memory could not be allocated.
+No bp for rigid disk geometry
+A bp with consistent memory could not be allocated.
+No mem for property
+Free memory pool exhausted.
+No memory for direct access device format geometry
+Free memory pool exhausted.
+No memory for disk label
+Free memory pool exhausted.
+No memory for rigid disk geometry
+The disk label is corrupted.
+No resources for dumping
+A packet could not be allocated during dumping.
+Offline
+Drive went offline; probably powered down.
+Requeue of command fails
+Driver attempted to retry a command and experienced a transport error.
+sdrestart transport failed()
+Driver attempted to retry a command and experienced a transport error.
+Transfer length not modulo
+Illegal request size.
+Transport of request sense fails()
+Driver attempted to submit a request sense command and failed.
+Transport rejected()
+Host adapter driver was unable to accept a command.
+<beginning of page>
+Unable to read label
+Failure to read disk label.
+Unit does not respond to selection
+Drive went offline; probably powered down.
+DVD-ROM media containing DVD-Video data may follow/adhere to the requirements of content scrambling system
+or copy protection scheme. Reading of copy-protected sector will cause I/O error. Users are advised to use the ap<hy>
+propriate playback software to view video contents on DVD-ROM media containing DVD-Video data.

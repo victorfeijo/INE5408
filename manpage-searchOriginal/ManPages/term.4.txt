@@ -1,0 +1,83 @@
+<beginning of page>
+term <-> format of compiled term file
+/usr/share/lib/terminfo/?/*
+The term file is compiled from terminfo(4) source files using tic(1M). Compiled files are organized in a directory
+hierarchy under the first letter of each terminal name. For example, the vt100 file would have the pathname
+/usr/lib/terminfo/v/vt100. The default directory is /usr/share/lib/terminfo. Synonyms for the same terminal are im<hy>
+plemented by multiple links to the same compiled file.
+The format has been chosen so that it is the same on all hardware. An 8-bit byte is assumed, but no assumptions
+about byte ordering or sign extension are made. Thus, these binary terminfo files can be transported to other hard<hy>
+ware with 8-bit bytes.
+Short integers are stored in two 8-bit bytes. The first byte contains the least significant 8 bits of the value, and the
+second byte contains the most significant 8 bits. (Thus, the value represented is 256*second+first.) The value <mi>1 is
+represented by 0377,0377, and the value <mi>2 is represented by 0376,0377; other negative values are illegal. The <mi>1
+generally means that a capability is missing from this terminal. The <mi>2 means that the capability has been cancelled
+in the terminfo source and also is to be considered missing.
+The compiled file is created from the source file descriptions of the terminals (see the -I option of infocmp) by using
+the terminfo compiler, tic, and read by the routine setupterm (see curses(3CURSES)). The file is divided into six
+parts in the following order: the header, terminal names, boolean flags, numbers, strings, and string table.
+The header section begins the file six short integers in the format described below. These integers are: 1. the magic
+number (octal 0432); 2. the size, in bytes, of the names section; 3. the number of bytes in the boolean section 4. the
+number of short integers in the numbers section; 5. the number of offsets (short integers) in the strings section; 6.
+the size, in bytes, of the string table.
+The terminal name section comes next. It contains the first line of the terminfo description, listing the various names
+for the terminal, separated by the bar ( | ) character (see term(5)). The section is terminated with an ASCII NUL
+character.
+The terminal name section is followed by the Boolean section, number section, string section, and string table.
+The boolean flags section consists of one byte for each flag. This byte is either 0 or 1 as the flag is present or absent.
+The value of 2 means that the flag has been cancelled. The capabilities are in the same order as the file <term.h>.
+Between the boolean flags section and the number section, a null byte is inserted, if necessary, to ensure that the
+number section begins on an even byte offset. All short integers are aligned on a short word boundary.
+The numbers section is similar to the boolean flags section. Each capability takes up two bytes, and is stored as a
+short integer. If the value represented is <mi>1 or <mi>2, the capability is taken to be missing.
+The strings section is also similar. Each capability is stored as a short integer, in the format above. A value of <mi>1 or
+<mi>2 means the capability is missing. Otherwise, the value is taken as an offset from the beginning of the string table.
+Special characters in ^X or \c notation are stored in their interpreted form, not the printing representation. Padding
+information ($<nn>) and parameter information (%x) are stored intact in uninterpreted form.
+The final section is the string table. It contains all the values of string capabilities referenced in the string section.
+Each string is null terminated.
+Note that it is possible for setupterm to expect a different set of capabilities than are actually present in the file. Ei<hy>
+ther the database may have been updated since setupterm has been recompiled (resulting in extra unrecognized en<hy>
+tries in the file) or the program may have been recompiled more recently than the database was updated (resulting in
+missing entries). The routine setupterm must be prepared for both possibilities<em>this is why the numbers and sizes
+are included. Also, new capabilities must always be added at the end of the lists of boolean, number, and string capa<hy>
+bilities.
+As an example, here is terminal information on the AT&T Model 37 KSR terminal as output by the infocmp -I
+tty37 command:
+ 37|tty37|AT&T model 37 teletype,
+  hc, os, xon,
+  bel=^G, cr=\r, cub1=\b, cud1=\n, cuu1=\E7, hd=\E9,
+  hu=\E8, ind=\n,
+<beginning of page>
+The following is an octal dump of the corresponding term file, produced by the od -c /usr/share/lib/termin<hy>
+fo/t/tty37 command:
+ 0000000 032 001 \0 032 \0 013 \0 021 001 3 \0 3 7 | t
+ 0000020 t y 3 7 | A T & T m o d e l
+ 0000040 3 7 t e l e t y p e \0 \0 \0 \0 \0
+ 0000060 \0 \0 \0 001 \0 \0 \0 \0 \0 \0 \0 001 \0 \0 \0 \0
+ 0000100 001 \0 \0 \0 \0 \0 377 377 377 377 377 377 377 377 377 377
+ 0000120 377 377 377 377 377 377 377 377 377 377 377 377 377 377 & \0
+ 0000140 \0 377 377 377 377 377 377 377 377 377 377 377 377 377 377
+ 0000160 377 377 " \0 377 377 377 377 ( \0 377 377 377 377 377 377
+ 0000200 377 377 0 \0 377 377 377 377 377 377 377 377 - \0 377 377
+ 0000220 377 377 377 377 377 377 377 377 377 377 377 377 377 377 377 377
+  *
+ 0000520 377 377 377 377 377 377 377 377 377 377 377 377 377 377 $ \0
+ 0000540 377 377 377 377 377 377 377 377 377 377 377 377 377 377 * \0
+ 0000560 377 377 377 377 377 377 377 377 377 377 377 377 377 377 377 377
+  *
+ 0001160 377 377 377 377 377 377 377 377 377 377 377 377 377 377 3 7
+ 0001200 | t t y 3 7 | A T & T m o d e
+ 0001220 l 3 7 t e l e t y p e \0 \r \0
+ 0001240 \n \0 \n \0 007 \0 \b \0 033 8 \0 033 9 \0 033 7
+ 0001260 \0 \0
+ 0001261
+Some limitations: total compiled entries cannot exceed 4096 bytes; all entries in the name field cannot exceed 128
+bytes.
+/usr/share/lib/terminfo/?/*
+compiled terminal description database
+/usr/include/term.h
+terminfo header
+/usr/xpg4/include/term.h
+X/Open Curses terminfo header
+infocmp(1M), curses(3CURSES), curses(3XCURSES), terminfo(4), term(5)

@@ -1,0 +1,84 @@
+<beginning of page>
+ddi_dma_req <-> DMA Request structure
+#include <sys/ddidmareq.h>
+Solaris DDI specific (Solaris DDI). This interface is obsolete.
+A ddi_dma_req structure describes a request for DMA resources. A driver can use it to describe forms of alloca<hy>
+tions and ways to allocate DMA resources for a DMA request.
+ ddi_dma_lim_t *dmar_limits; /* Caller's dma engine
+  constraints */
+ uint_t dmar_flags; /* Contains info for
+  mapping routines */
+ int (*dmar_fp)(caddr_t);/* Callback function */
+ caddr_t dmar_arg; /* Callback function's argument */
+ ddi_dma_obj_t dmar_object; /* Descrip. of object
+  to be mapped */
+For the definition of the DMA limits structure, which dmar_limits points to, see ddi_dma_lim_sparc(9S) or
+ddi_dma_lim_x86(9S).
+Valid values for dmar_flags are:
+ DDI_DMA_WRITE /* Direction memory --> IO */
+ DDI_DMA_READ /* Direction IO --> memory */
+ DDI_DMA_RDWR /* Both read and write */
+ DDI_DMA_REDZONE /* Establish MMU redzone at end of mapping */
+ DDI_DMA_PARTIAL /* Partial mapping is allowed */
+ DDI_DMA_CONSISTENT /* Byte consistent access wanted */
+ DDI_DMA_SBUS_64BIT /* Use 64 bit capability on SBus */
+DDI_DMA_WRITE, DDI_DMA_READ, and DDI_DMA_RDWR describe the intended direction of the DMA
+transfer. Some implementations might explicitly disallow DDI_DMA_RDWR.
+DDI_DMA_REDZONE asks the system to establish a protected red zone after the object. The DMA resource al<hy>
+location functions do not guarantee the success of this request, as some implementations might not have the hard<hy>
+ware ability to support it.
+DDI_DMA_PARTIAL lets the system know that the caller can accept partial mapping. That is, if the size of the ob<hy>
+ject exceeds the resources available, the system allocates only a portion of the object and returns status indicating
+this partial allocation. At a later point, the caller can use ddi_dma_curwin(9F) and ddi_dma_movwin(9F) to
+change the valid portion of the object that has resources allocated.
+DDI_DMA_CONSISTENT gives a hint to the system that the object should be mapped for byte consistent access.
+Normal data transfers usually use a streaming mode of operation. They start at a specific point, transfer a fairly
+large amount of data sequentially, and then stop, usually on an aligned boundary. Control mode data transfers for
+memory-resident device control blocks (for example, Ethernet message descriptors) do not access memory in such a
+sequential fashion. Instead, they tend to modify a few words or bytes, move around and maybe modify a few more.
+Many machine implementations make this non-sequential memory access difficult to control in a generic and seam<hy>
+less fashion. Therefore, explicit synchronization steps using ddi_dma_sync(9F) or ddi_dma_free(9F) are required
+to make the view of a memory object shared between a CPU and a DMA device consistent. However, proper use of
+the DDI_DMA_CONSISTENT flag can create a condition in which a system will pick resources in a way that
+makes these synchronization steps are as efficient as possible.
+DDI_DMA_SBUS_64BIT tells the system that the device can perform 64-bit transfers on a 64-bit SBus. If the SBus
+does not support 64-bit data transfers, data will be transferred in 32-bit mode.
+The callback function specified by the member dmar_fp indicates how a caller to one of the DMA resource alloca<hy>
+tion functions wants to deal with the possibility of resources not being available. (See ddi_dma_setup(9F).) If
+dmar_fp is set to DDI_DMA_DONTWAIT, then the caller does not care if the allocation fails, and can deal with
+an allocation failure appropriately. Setting dmar_fp to DDI_DMA_SLEEP indicates the caller wants to have the al<hy>
+location routines wait for resources to become available. If any other value is set, and a DMA resource allocation
+fails, this value is assumed to be a function to call later, when resources become available. When the specified func<hy>
+<beginning of page>
+tion is called, it is passed the value set in the structure member dmar_arg. The specified callback function must re<hy>
+turn either:
+0 Indicating that it attempted to allocate a DMA resource but failed to do so, again, in which case the callback func<hy>
+tion will be put back on a list to be called again later.
+1 Indicating either success at allocating DMA resources or that it no longer wants to retry.
+The callback function is called in interrupt context. Therefore, only system functions and contexts that are accessible
+from interrupt context are available. The callback function must take whatever steps necessary to protect its critical
+resources, data structures, and queues.
+It is possible that a call to ddi_dma_free(9F), which frees DMA resources, might cause a callback function to be
+called and, unless some care is taken, an undesired recursion can occur. This can cause an undesired recursive mu<hy>
+tex_enter(9F), which makes the system panic.
+The dmar_object member of the ddi_dma_req structure is itself a complex and extensible structure:
+ uint_t dmao_size; /* size, in bytes, of the object */
+ ddi_dma_atyp_t dmao_type; /* type of object */
+ ddi_dma_aobj_t dmao_obj; /* the object described */
+The dmao_size element is the size, in bytes, of the object resources allocated for DMA.
+The dmao_type element selects the kind of object described by dmao_obj. It can be set to DMA_OTYP_VADDR,
+indicating virtual addresses.
+The last element, dmao_obj, consists of the virtual address type:
+ struct v_address virt_obj;
+It is specified as:
+ struct v_address {
+  caddr_t v_addr; /* base virtual address */
+  struct as *v_as; /* pointer to address space */
+  void *v_priv; /* priv data for shadow I/O */
+ };
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Obsolete
+ddi_dma_addr_setup(9F), ddi_dma_buf_setup(9F), ddi_dma_curwin(9F), ddi_dma_free(9F),
+ddi_dma_movwin(9F), ddi_dma_setup(9F), ddi_dma_sync(9F), mutex(9F)
+Writing Device Drivers

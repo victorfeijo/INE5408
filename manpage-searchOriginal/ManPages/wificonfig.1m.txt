@@ -1,0 +1,360 @@
+<beginning of page>
+wificonfig <-> WLAN configuration
+wificonfig [-R root_path] [-i interface] autoconf
+ [wait={n|forever}]
+wificonfig [-R root_path] [-i interface] connect profile
+ [wait={n|forever}]
+wificonfig [-R root_path] [-i interface] connect essid
+ [wait={n|forever}]
+wificonfig [-R root_path] [-i interface] disconnect
+wificonfig [-R root_path] [-i interface] getparam
+ [parameter []...]
+wificonfig [-R root_path] [-i interface] setparam
+ [parameter=value []...]
+wificonfig [-R root_path] [-i interface] restoredef
+wificonfig [-R root_path] [-i interface] scan
+wificonfig [-R root_path] [-i interface] showstatus
+wificonfig [-R root_path] [-i interface] setwepkey 1|2|3|4
+wificonfig [-R root_path] createprofile profile
+ [parameter=value []...]
+wificonfig [-R root_path] deleteprofile profile1
+ [profile2 []...]
+wificonfig [-R root_path] showprofile [profile]
+wificonfig [-R root_path] setprofilewepkey profile 1|2|3|4
+wificonfig [-R root_path] getprofileparam profile
+ [parameter []...]
+wificonfig [-R root_path] setprofileparam
+ [parameter=value []...]
+wificonfig [-R root_path] history
+wificonfig [-R root_path] listprefer
+wificonfig [-R root_path] removeprefer profile
+wificonfig [-R root_path] setprefer profile [n]
+wificonfig defines a set of subcommands and parameters to configure WiFi interfaces in the system. A driver may
+support all parameters or a subset of these parameters.
+wificonfig uses rbac(5) to control user access to the interface. Only users with the "solaris.network.wifi.config" au<hy>
+thorization can manage a WiFi interface, while only users with "solaris.network.wifi.wep"authorizations can config<hy>
+ure the WEP (Wired Equivalent Privacy) key. Other users can only read parameters from the interface. By default,
+the "solaris.network.wifi.config" and "solaris.network.wifi.wep" authorizations are not granted to any user apart
+from root.
+Wificonfig comes in two classes of forms. The first class, shown as the first set of synopsis combined with the op<hy>
+tional interface name, is the subcommands used to a manipulate a particular WiFi network interface. The second
+class, shown as the second set of synopsis, is used to create and operate on WiFi Configuration Profiles. A Configu<hy>
+ration Profile allows the user to pre-specify a set of parameters which can later be applied to a WiFi network inter<hy>
+face using the connect or autoconf subcommands.
+<beginning of page>
+In the interface subcommands, if the interface is not specified (that is, the -i option is missing), wificonfig selects a
+random interface from the known WiFi interfaces on the system. If there are multiple WiFi network interfaces on
+the system, then the selection will be the same over time as long as the number of and names of the WiFi interfaces
+does not change.
+A Configuration Profile can be created for a WLAN by using the createprofile subcommand (see the SUBCOM<hy>
+MANDS section). The actual WLAN may be present or not.
+wificonfig also maintains a list of Configuration Profiles called the Preference List. This list makes automatic config<hy>
+uration possible. When the autoconf subcommand is used, wificonfig tries to connect to each pre-configured
+WLAN according to the order of the Preference List. If the Preference List is empty or none of the WLANs in the
+Preference List can be found, wificonfig uses its built-in heuristics to automatically configure the interface. (See the
+autoconf subcommand for the heuristics). A few subcommands (listprefer, setprefer, removeprefer) are defined to
+manipulate the Preference List.
+The following options are supported:
+-i interface Specifies a wireless network interface to do the configuration.
+-R root_path Defines the full path name of a directory to use as the root_path. This affects the location of the private
+files where wificonfig stores the Configuration Profiles and WEP keys.
+The following operand is supported:
+profile The name of a WiFi profile. It can be a string between 1 and 32 characters. However, "all", "{preference}",
+"{history}", "{active_profile}", and any strings contained in brackets, such as "[foo]", are not allowed as a profile
+name.
+The following subcommands are supported:
+autoconf [wait={n|forever}]
+Configures the interface automatically. The interface is configured according to the previously saved Preference List
+found in /etc/inet/wifi. wificonfig first gets a list of available WLANs by scanning the radio. It then compares the
+list of available WLANs with the Preference List. If the Preference List is empty, or if none of the WLANs in the
+Preference List can be found, wificonfig chooses a WLAN to connect to using the following priorities: 1) the
+WLANs without encryption, 2) the WLANs with stronger signal strength, and 3) the WLANs with higher transmit
+rates.
+If the WLANs in the Preference list are available, the user can specify the number of seconds to wait before auto<hy>
+conf returns using the wait option. By default (without the wait option), autoconf returns within 10 seconds. If "for<hy>
+ever" or -1 follows the wait option, wificonfig waits until the NIC is successfully connected to the WLAN specified
+by the profile in the Preference list.
+The "solaris.network.wifi.config" authorization is required for this subcommand.
+The WiFi device driver can not guarantee to retain the state for the connection when it is not held open. For this rea<hy>
+son, it is strongly recommended that the plumb subcommand for ifconfig(1M) is done before the wificonfig auto<hy>
+conf subcommand is given.
+connect profile[wait={n|forever}]
+connect essid[wait={n|forever}]
+Connects to a wireless network according to a pre-configured "profile". If the specified Configuration Profile exists
+in /etc/inet/wifi, the connect subcommand uses that Configuration Profile to configure the interface. That profile sub<hy>
+sequently becomes the current active profile of the interface after the connect subcommand succeeds. If no existing
+Configuration Profile matches the specified name, the behavior of the connect subcommand is equivalent to the re<hy>
+storedef subcommand, except that the "essid" parameter is set as "profile".
+If the WLANs in the Preference list are available, the user can specify the number of seconds to wait before connect
+returns using the wait option. By default (without the wait option), connect trys for 10 seconds. If "forever" or -1
+follows the wait option, wificonfig tries until the NIC is successfully connected to the profile or essid that was speci<hy>
+fied.
+<beginning of page>
+The connect subcommand prints one of the following lines depending on whether or not a Configuration Profile was
+  found for the specified name:
+ Connecting to profile <name> 
+ Connecting to essid <name>
+The "solaris.network.wifi.config" authorization is required for this subcommand.
+The WiFi device driver can not guarantee to retain the state for the connection when it is not held open. For this rea<hy>
+son, it is strongly recommended that the plumb subcommand for ifconfig(1M) is done before the wificonfig auto<hy>
+conf subcommand is given.
+disconnect
+Disconnects the interface from the currently associated wireless network. The interface associates with none of the
+wireless networks.
+The "solaris.network.wifi.config" authorization is required for this subcommand.
+getparam [parameter [...]]
+setparam [parameter=value [...]]
+Gets or sets parameters in the network interface. This does not affect any profile. The setprofileparam subcommand
+can be used to set and change parameters in a profile that has already been created.
+The setparam subcommand without any parameters displays the set of  parameters supported by the network inter<hy>
+face, including whether they are read/write or read only. The getparam subcommand without any parameters dis<hy>
+plays all the parameters and their values.
+The setparam wepkey1|wepkey2|wepkey3|wepkey4 subcommand requires the "solaris.network.wifi.wep" autho<hy>
+rization. For all other parameters, the setparam subcommand requires the "solaris.network.wifi.config"authoriza<hy>
+tion.
+For example,
+ $ wificonfig setparam <parameter1=value1> [parameter2=value2 [...]]
+ $ wificonfig getparam <parameter1> [parameter2 [...]]
+wificonfig currently supports the following parameters (the values are case insensitive).
+bssid
+MAC address of the associated Access Point. The valid value is a hex value of 6 bytes. The bssid can also be the IB<hy>
+SSID in an ad-hoc configuration. If the network interface is not connected to any WLAN, then the string "none" is
+shown instead of a 6 byte MAC address. Otherwise, the network interface is connected to a WLAN. The default val<hy>
+ue is "none". This parameter is read-only.
+essid
+Network name. The valid value is a string of up to 32 chars. If essid is an empty string, the driver automatically
+scans and joins the WLAN using the built-in heuristics. The default value is an empty string.
+bsstype
+Specifies whether the Infrastructure Mode or Ad-Hoc Mode is used. The valid values are "ap", "bss", or "infrastruc<hy>
+ture" to join a WLAN through an Access Point, that is, to use infrastructure mode. The valid values are "ibss" or
+"ad-hoc" to join a peer-to-peer WLAN (also named "ad-hoc"). The valid value of "auto" automatically switches be<hy>
+tween the two types. The default value is "infrastructure'".
+<beginning of page>
+createibss
+Specifies whether to create an ad-hoc network (also called an IBSS if the connect does not result in finding the de<hy>
+sired network. This enables the user to start an ad-hoc network so that other hosts can join. The valid values are YES
+to start a new ad-hoc WLAN (instead of joining one) and NO to not start an ad-hoc WLAN. The default value is
+NO. The NIC always tries to join a WLAN first. If this is successful, the setting of createibss is ignored.
+channel
+An integer indicating the operating frequency. This channel number varies by regulatory domain. When the channel
+number is obtained by the getparam subcommand, the value indicates the actual channel the card uses to connect to
+the network. The channel number is set by the setparam subcommand, and the value is only applicable when the
+card is in ad-hoc mode. It indicates the operating channel of the IBSS. The default value is the channel number on
+the card.
+rates
+Specifies the transmission rates. The valid values (in Mbit/s) are 1, 2, 5.5, 6, 9, 11, 12, 18, 22, 24, 33, 36, 48, and 54.
+A NIC may support multiple transmission rates depending on its capability. This is the only parameter that accepts
+multiple values. When multiple values are supplied to set this parameter, each value must be separated by a comma
+(,). See the EXAMPLES section for details. The default values are the data rates supported by the chip.
+powermode
+Specifies the power management mode. The valid values are "off" to disable power management, "mps" for maxi<hy>
+mum power saving, and "fast" for the best combination of speed and power saving. The default value is "off".
+authmode
+Specifies the authorization type. The valid values are "opensystem" for an open system, where anyone can be au<hy>
+thenticated and "shared_key" for a Shared Key authentication mode. The default value is "opensystem".
+encryption
+Specifies the encryption algorithm to be used. The valid values are "none" for no encryption algorithm and "wep" to
+turn on WEP encryption. The default value is "none".
+wepkey1|wepkey2|wepkey3|wepkey4
+A maximum of 4 WEP keys (indexed 1 through 4) can be set in an NIC. They are write-only parameters which can
+be set by the setparam subcommand, but cannot be read back by the getparam subcommand. WEP keys can either
+be set by the setwepkey or the setparam subcommand. setparam uses plain text but it's scriptable. See the setwep<hy>
+key subcommand for more information about how a WEP key is encoded. Setting WEP keys requires "solaris.net<hy>
+work.wifi.wep"authorization.
+When these subcommands are used to set a WEP key, any user on the system can read the key from the ps(1) out<hy>
+put. Thus, the setwepkey subcommand is recommended for setting the WEP keys since it does not allow ps(1) to
+read the keys.
+wepkeyindex
+Specifies the encryption keys. The valid values are 1 to use wepkey1, 2 to use wepkey2, 3 to use wepkey3, and 4 to
+use wepkey4. The default value is 1. This subcommand is only valid when WEP is on.
+signal
+Specifies the strength of the received radio signal. The valid values are 0 - 15 , where 0 is the weakest signal and 15
+is the strongest signal. This parameter is read-only and indicates the radio signal strength received by the NIC.
+<beginning of page>
+radio
+Specifies whether the radio is turned on or off. The valid values are "on" to turn on the radio and "off" to turn off the
+radio. The default value is "on".
+restoredef
+Forces the NIC to restore the network interface to use the default values for all the parameters. See the getparam
+and setparam subcommands for the default values of the parameters.
+The "solaris.network.wifi.config" authorization is required for this subcommand.
+scan
+Scans and lists the currently available WLANs.
+showstatus
+Display the basic status of a WLAN interface. If the WLAN interface is connected, the basic status includes: the
+name of the current active profile, the name of the network, the bssid, whether the network is encrypted or not, and
+the signal strength.
+setwepkey 1|2|3|4
+Sets one of the 4 WEP encryption keys.  WEP keys are used to encrypt the content of the network packets
+which are transmitted on air. There are 4 WEP keys in the NIC according to the 802.11 standards. The setwepkey
+subcommand is used to update one of the 4 keys by prompting the user for the key. The user must enter the key
+twice. The input is not echoed. For example, to update setwepkey2:
+ example% wificonfig -i ath0 setwepkey 2
+ input wepkey2: < user input here>
+ confirm wepkey2: < user input here>
+A WEP key can be 5 bytes or 13 bytes long. There are two ways to enter a WEP key, by ASCII values or by hex
+values. If the user enters 5 or 13 characters, it is considered the ASCII representation of the key. If the user enters 10
+or 26 characters, it is considered the hex representation of the key. For example "1234" is equivalent to
+"6162636465". If the user enters other number of characters, the subcommand fails. WEP keys are write-only; they
+cannot be read back via wificonfig.
+The WEP keys can also be set in plain text form by the setparam subcommand. This makes setting WEP keys
+scriptable (see the parameters of setparam for the details).
+The "solaris.network.wifi.wep" authorization is required for this subcommand.
+The following profile subcommands are supported:
+createprofile profile [parameter=value] [...]
+Creates a Configuration Profile named profile off-line. The specified parameters are saved as items of this Configura<hy>
+tion Profile. The user can specify a group of parameters. At a minimum, the essid must be specified.
+The "solaris.network.wifi.config" authorization is required for this subcommand.
+deleteprofile profile1 [profile2 [...]]
+Deletes one or more Configuration Profiles according to the specified names. If the specified Configuration Profile
+does not exist, this subcommand fails. The wild-card "all" can be used to delete all profiles.
+The "solaris.network.wifi.config" authorization is required for this subcommand.
+<beginning of page>
+showprofile [profile]
+Displays the parameters in the Configuration Profile according to the specified profile. WEP (wired equivalent pri<hy>
+vacy) keys are not printed because they are write-only parameters. If no profile is specified, all the profiles are
+shown.
+setprofilewepkey 1|2|3|4
+Sets one of the 4 WEP encryption keys in the specified Configuration Profile "profile". Like the other profile sub<hy>
+commands, setprofilewepkey does not affect the configuration of a network interface, even if a WiFi interface is
+currently running with the specified profile. In order for the modified profile to be applied to the   network inter<hy>
+face, the connect or autoconf subcommands have to be used after the profile has been updated.
+Other than that difference, the usage of setprofilewepkey is the same as the setwepkey subcommand. For example,
+to update wepkey 2 in profile "home":
+ example% wificonfig setprofilewepkey home 2
+ input wepkey2: < user input here>
+ confirm wepkey2: < user input here>
+The "solaris.network.wifi.wep" authorization is required for this subcommand.
+getprofileparam profile [parameter]  [...]]
+setprofileparam profile [parameter=value]  [...]]
+Gets or sets parameters in the specified Configuration Profile "profile". Like   the other profile subcommands,
+these subcommands do not affect the configuration of a network interface, even if a WiFi  interface is currently run<hy>
+ning with the specified profile.   In order for the modified profile to be applied to the   network interface, the
+connect or autoconf subcommands have to be used after the profile has been updated.
+A getprofileparam without any parameters will display all the parameters and their values.
+"Solaris.network.wifi.wep" authorization is required when the setparam subcommand is used with the wep<hy>
+key1|wepkey2|wepkey3|wepkey4 parameter. For all other parameters, the setparam subcommand requires "so<hy>
+laris.network.wifi.config"authorization.
+For example, to change the settings for the "home" Configuration Profile, use:
+ $ wificonfig setprofileparam home <parameter1=value1> \
+ [parameter2=value2 [...]]
+ $ wificonfig getprofileparam home <parameter1> [parameter2 [...]]
+The set of parameters and their allowed values are the same as those specified for the setparam subcommand.
+history
+Lists the WLANs in the History List. wificonfig automatically records the WLANs that appear in every scanning at<hy>
+tempt. The History List contains a maximum of 10 records of the most recent WLANs, sorted by time. These
+records can be listed by using this subcommand.
+listprefer
+Lists the content of the Preference List.
+removeprefer profile
+Removes one or more profiles from the Preference List. The wild-card "all" can be used to delete all profiles.
+The "solaris.network.wifi.config" authorization is required for this subcommand.
+<beginning of page>
+setprefer profile [n]
+Sets the position of a profile in the Preference List. This may add or change the position of a profile in the Preference
+List. The valid values of "n" range from 1 to 10. If "n" is missing, the default value of 1 is assumed. If the specified
+position is already occupied, the occupying profile is moved lower on the list. If "n" is off the end of the list, profile
+is added to the end of the list. The Preference List can also be created by using this subcommand. If the autoconf
+subcommand is used at a later time, wificonfig tries to join the WLANs according to the Preference List.
+The "solaris.network.wifi.config" authorization is required for this subcommand.
+Example 1 Listing the Parameters Supported by a Driver
+To display what parameters the ath driver supports and the read/write modes of the parameters:
+ % wificonfig -i ath0 setparam
+  parameter property
+  bssid read only
+  essid read/write
+  bsstype read/write
+  rates read/write
+  authmode read/write
+  encryption read/write
+  wepkeyindex read/write
+  signal read only
+Example 2 Getting and Setting Parameters on the WiFi interface
+To get the current rates and signal strength from the driver:
+ % wificonfig -i ath0 getparam rates signal
+  ath0:
+  rates = 1,2,5.5,11
+  signal = 10
+Example 3 Managing Configuration Profiles
+A Configuration Profile can be created offline and then connected to the network with the created Configuration Pro<hy>
+file. The following series of commands creates the Configuration Profile, displays the contents of that profile, and
+connects to the network with the Configuration Profile:
+ % wificonfig createprofile myXXX essid=rover encryption=WEP \
+    wepkey1=12345
+ % wificonfig showprofile myXXX
+  [myXXX]
+  essid=rover
+  encryption=WEP
+  wepkey1=[secret]
+ % ifconfig ath0 plumb
+ % wificonfig -i ath0 connect myXXX
+Example 4 Managing the Preference List
+A profile can be added to the Preference List and then used by the autoconf subcommand. The following series of
+commands adds a profile named myXXX to the top of the Preference List, automatically connects ath0 to the first
+available WLAN in the Preference List, and removes my_neighbor from the Preference List
+ % wificonfig setprefer myXXX 1
+ % ifconfig ath0 plumb
+<beginning of page>
+ % wificonfig -i ath0 autoconf
+ % wificonfig removeprefer my_neighbor
+Example 5 Viewing the History List
+To display the history of the WLANs:
+ % wificonfig history
+  WLAN history:
+  essid  bssid  encryption last seen
+  myXXX 00:0f:24:11:12:14 WEP  Fri Sep 13 09:15:24 2004
+  my_office_ssid 00:0f:24:11:12:15 WEP  Fri Sep 13 13:20:04 2004
+  my_neighbor1 00:0f:24:11:12:16 NONE  Fri Sep 14 08:01:26 2004
+  my_neighbor2 00:0f:24:11:12:17 WEP Fri Sep 18 21:33:12 2004
+Example 6 Automatic Configuration
+To configure the interface according to the previously saved Preference List:
+ % ifconfig ath0 plumb
+ % wificonfig -i ath0 autoconf
+If the Preference List is empty, or none of the WLANs listed by the Proference List can be found, wificonfig uses
+the default configuration, directs the interface to scan and join the WLAN using the built-in heuristics specified
+above.
+Example 7 Connecting To a WLAN
+To search for a Configuration Profile with the name myXXX and configure the interface accordingly:
+ % ifconfig ath0 plumb
+ % wificonfig -i ath0 connect myXXX
+If the specified Configuration Profile does not exist, wificonfig interprets it as an essid and sets ath0 to use essid
+myXXX, and no other parameters are set.
+Example 8 Displaying the Content of a Configuration Profile
+To print the parameters of the previously Configured Profile named my_home_ssid:
+ % wificonfig showprofile my_home_ssid
+Example 9 Monitoring the link status
+To monitor the link status:
+ % wificonfig -i ath0 showstatus
+  ath0:
+  linkstatus: not connected,
+<beginning of page>
+or
+  ath0:
+  linkstatus: connected
+  active profile: [home]
+  essid: myhome
+  bssid: 00:0b:0e:12:e2:02
+  encryption: WEP
+  signal: medium(10)
+Example 10 Scanning for available networks
+To scan for available networks:
+ % wificonfig -i ath0 scan
+ essid bssid type encryption signal
+  level
+ ietf64-secure 00:0b:0e:12:e2:02 access point WEP 9
+ roomlinx 00:40:96:a1:13:70 access point none 6
+ ietf64 00:0b:0e:13:32:00 access point none 3
+ ietf64-secure 00:0b:0e:13:32:02 access point WEP 3
+ ietf64 00:0b:0e:12:e2:00 access point none 9
+ ietf64-secure 00:0b:0e:12:e4:c2 access point WEP 8
+ ietf64 00:0b:0e:12:e4:c0 access point none 8
+ roomlinx 00:40:96:a0:aa:aa access point none 1
+ roomlinx 00:40:96:a0:ab:39 access point none 8
+0 Successful operation
+1 Fatal Error; the operation failed. For example, a connect failed to associate with an Access Point.
+2 Improper Use; help information will be printed
+3 Minor error
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wwlanr, SUNWwlanu _ Interface StabilityUnstable
+ps(1), ifconfig(1M), attributes(5), ath(7D)

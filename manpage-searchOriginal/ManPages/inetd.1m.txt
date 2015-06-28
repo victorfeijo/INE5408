@@ -1,0 +1,255 @@
+<beginning of page>
+inetd <-> Solaris Management Facility delegated restarter for inet services
+inetd [configuration-file] start | stop | refresh
+ svc:/network/inetd:default
+inetd is the delegated restarter for internet services for the Service Management Facility (SMF). Its basic responsi<hy>
+bilities are to manage service states in response to administrative requests, system failures, and service failures; and,
+when appropriate, to listen for network requests for services.
+Services are no longer managed by editing the inetd configuration file, inetd.conf(4). Instead, you use inetconv(1M)
+to convert the configuration file content into SMF format services, then manage these services using inetadm(1M)
+and svcadm(1M). Once a service has been converted by inetconv, any changes to the legacy data in the inetd config
+file will not become effective. However, inetd does alert the administrator when it notices change in the configura<hy>
+tion file. See the start description under the "inetd Methods" section for further information.
+Also note that the current inetd cannot be run from outside the SMF. This means it cannot be run from the command
+line, as was supported by the previous inetd. If you attempt to do this, a message is sent to stderr displaying map<hy>
+pings between the options supported by the previous inetd to the SMF version of inetd.
+inetd listens for connections on behalf of all services that are in either the online or degraded state. A service enters
+one of these states when the service is enabled by the user and inetd manages to listen on its behalf. A listen attempt
+can fail if another server (whether standalone or a third-party internet service) is already listening on the same port.
+When this occurs, inetd logs this condition and continues trying to bind to the port at configured intervals a config<hy>
+ured number of times. See the property bind_fail_max under "Service Properties," below, for more details.
+The configuration of all inetd's managed SMF services is read when it is started. It is reread when inetd is re<hy>
+freshed, which occurs in response to an SMF request, or when it receives a SIGHUP signal. See the refresh descrip<hy>
+tion under "inetd Methods" for the behavior on configuration refresh.
+You can use the inetadm(1M) or svccfg(1M) utilities to make configuration changes to Internet services within the
+SMF repository. inetadm has the advantage over svccfg in that it provides an Internet/RPC service context.
+As part of its service management duties, inetd implements a state machine for each of its managed services. The
+states in this machine are made up of the smf(5) set of states. The semantics of these states are as follows:
+uninitialized
+inetd has yet to process this service.
+online
+The service is handling new network requests and might have existing connections active.
+degraded
+The service has entered this state because it was able to listen and process requests for some, but not all, of the pro<hy>
+tocols specified for the service, having exhausted its listen retries. Existing network connections might be active.
+offline
+Connections might be active, but no new requests are being handled. This is a transient state. A service might be off<hy>
+line for any of the following reasons: <bu> The service's dependencies are unmet. When its dependencies become met
+the service's state will be re-evaluated. <bu> The service has exceeded its configured connection rate limit,
+max_con_rate. The service's state is re-evaluated when its connection offline timer, con_rate_offline, expires. <bu>
+The service has reached its allowed number of active connections, max_copies. The service's state is re-evaluated
+when the number of active connections drops below max_copies. <bu> inetd failed to listen on behalf of the service on
+all its protocols. As mentioned above, inetd retries up to a configured maximum number of times, at configured in<hy>
+tervals.The service's state is re-evaluated when either a listen attempt is successful or the retry limit is reached.
+disabled
+The service has been turned off by an administrator, is not accepting new connections, and has none active. Admin<hy>
+istrator intervention is required to exit this state.
+<beginning of page>
+maintenance
+A service is in this state because it is either malfunctioning and needs adminstrator attention or because an adminis<hy>
+trator has requested it.
+Events constituting malfunctioning include: inetd's inability to listen on behalf on any of the service's protocols be<hy>
+fore exceeding the service's bind retry limit, non-start methods returning with non-success return values, and the ser<hy>
+vice exceeding its failure rate.
+You request the maintenance state to perform maintenance on the service, such as applying a patch. No new requests
+are handled in this state, but existing connections might be active. Administrator intervention is required to exit this
+state.
+Use inetadm(1M) to obtain the current state of a managed service.
+As part of certain state transitions inetd will execute, if supplied, one of a set of methods provided by the service.
+The set of supported methods are:
+inetd_start
+Executed to handle a request for an online or degraded service. Since there is no separate state to distinguish a ser<hy>
+vice with active connections, this method is not executed as part of a state transition.
+inetd_offline
+Executed when a service is taken from the online or degraded state to the offline state. For a wait-type service that
+at the time of execution is performing its own listening, this method should result in it ceasing listening. This
+method will be executed before the disable method in the case an online/degraded service is disabled. This method
+is required to be implemented for a wait-type service.
+inetd_online
+Executed when a service transitions from the offline state to the online state. This method allows a service author to
+carry out some preparation prior to a service starting to handle requests.
+inetd_disable
+Executed when a service transitions from the offline state to the disabled state. It should result in any active connec<hy>
+tions for a service being terminated.
+inetd_refresh
+Executed when both of the following conditions are met: <bu> inetd is refreshed, by means of the framework or a
+SIGHUP, or a request comes in to refresh the service, and <bu> the service is currently in the online state and there are
+no configuration changes that would result in the service needing to be taken offline and brought back again.
+The only compulsory method is the inetd_start method. In the absence of any of the others, inetd runs no method
+but behaves as if one was run successfully.
+Configuration for SMF-managed services is stored in the SMF repository. The configuration is made up of the basic
+configuration of a service, the configuration for each of the service's methods, and the default configuration applica<hy>
+ble to all inetd-managed services.
+For details on viewing and modifying the configuration of a service and the defaults, refer to inetadm(1M).
+The basic configuration of a service is stored in a property group named inetd in the service. The properties com<hy>
+prising the basic configuration are as follows:
+bind_addr
+The address of the network interface to which the service should be bound. An empty string value causes the service
+<beginning of page>
+to accept connections on any network interface.
+bind_fail_interval
+The time interval in seconds between a failed bind attempt and a retry. The values 0 and -1 specify that no retries are
+attempted and the first failure is handled the same as exceeding bind_fail_max.
+bind_fail_max
+The maximum number of times inetd retries binding to a service's associated port before giving up. The value -1
+specifies that no retry limit is imposed. If none of the service's protocols were bound to before any imposed limit is
+reached, the service goes to the maintenance state; otherwise, if not all of the protocols were bound to, the service
+goes to the degraded state.
+con_rate_offline
+The time in seconds a service will remain offline if it exceeds its configured maximum connection rate,
+max_con_rate. The values 0 and -1 specify that connection rate limiting is disabled.
+connection_backlog
+The backlog queue size. Represents a limit on the number of incoming client requests that can be queued at the lis<hy>
+tening endpoints for servers.
+endpoint_type
+The type of the socket used by the service or the value tli to signify a TLI-based service. Valid socket type values
+are: stream, dgram, raw, seqpacket.
+failrate_cnt
+The count portion of the service's failure rate limit. The failure rate limit applies to wait-type services and is reached
+when count instances of the service are started within a given time. Exceeding the rate results in the service being
+transitioned to the maintenance state. This is different from the behavior of the previous inetd, which continued to
+retry every 10 minutes, indefinitely. The failrate_cnt check accounts for badly behaving servers that fail before con<hy>
+suming the service request and which would otherwise be continually restarted, taxing system resources. Failure rate
+is equivalent to the -r option of the previous inetd. The values 0 and -1 specify that this feature is disabled.
+failrate_interval
+The time portion in seconds of the service's failure rate. The values 0 and -1 specify that the failure rate limit feature
+is disabled.
+inherit_env
+If true, pass inetd's environment on to the service's start method. Regardless of this setting, inetd will set the vari<hy>
+ables SMF_FMRI, SMF_METHOD, and SMF_RESTARTER in the start method's environment, as well as any
+environment variables set in the method context. These variables are described in smf_method(5).
+isrpc
+If true, this is an RPC service.
+max_con_rate
+The maximum allowed connection rate, in connections per second, for a nowait-type service. The values 0 and -1
+specify that that connection rate limiting is disabled.
+<beginning of page>
+max_copies
+The maximum number of copies of a nowait service that can run concurrently. The values 0 and -1 specify that
+copies limiting is disabled.
+name
+Can be set to one of the following values: <bu> a service name understood by getservbyname(3SOCKET); <bu> if isrpc is
+set to true, a service name understood by getrpcbyname(3NSL); <bu> if isrpc is set to true, a valid RPC program num<hy>
+ber.
+proto
+In the case of socket-based services, this is a list of protocols supported by the service. Valid protocols are: tcp,
+tcp6, tcp6only, udp, udp6, and udp6only. In the case of TLI services, this is a list of netids recognized by getnet<hy>
+configent(3NSL) supported by the service, plus the values tcp6only and udp6only. RPC/TLI services also support
+nettypes in this list, and inetd first tries to interpret the list member as a nettype for these service types. The values
+tcp6only and udp6only are new to inetd; these values request that inetd listen only for and pass on true IPv6 re<hy>
+quests (not IPv4 mapped ones). See "Configuring Protocols for Sockets-Based Services," below.
+rpc_low_version
+Lowest supported RPC version. Required when isrpc is set to true.
+rpc_high_version
+Highest supported RPC version. Required when isrpc is set to true.
+tcp_trace
+If true, and this is a nowait-type service, inetd logs the client's IP address and TCP port number, along with the
+name of the service, for each incoming connection, using the syslog(3C) facility. inetd uses the syslog facility code
+daemon and notice priority level. See syslog.conf(4) for a description of syslog codes and severity levels. This log<hy>
+ging is separate from the logging done by the TCP wrappers facility.
+tcp_trace is equivalent to the previous inetd's -t option (and the /etc/default/inetd property ENABLE_CONNEC<hy>
+TION_LOGGING).
+tcp_wrappers
+If true, enable TCP wrappers access control. This applies only to services with endpoint_type set to streams and
+wait set to false. The syslog facility code daemon is used to log allowed connections (using the notice severity lev<hy>
+el) and denied traffic (using the warning severity level). See syslog.conf(4) for a description of syslog codes and
+severity levels. The stability level of the TCP wrappers facility and its configuration files is External. As the TCP
+wrappers facility is not controlled by Sun, intra-release incompatibilities are not uncommon. See attributes(5).
+For more information about configuring TCP wrappers, you can refer to the tcpd(1M) and hosts_access(4) man
+pages, which are delivered as part of the Solaris operating system at /usr/sfw/man. These pages are not part of the
+standard Solaris man pages, available at /usr/man.
+tcp_wrappers is equivalent to the previous inetd's /etc/default/inetd property ENABLE_TCPWRAPPERS.
+wait
+If true this is a wait-type service, otherwise it is a nowait-type service. A wait-type service has the following char<hy>
+acteristics: <bu> Its inetd_start method will take over listening duties on the service's bound endpoint when it is execut<hy>
+ed. <bu> inetd will wait for it to exit after it is executed before it resumes listening duties. Datagram servers must be
+configured as being of type wait, as they are always invoked with the original datagram endpoint that will participate
+in delivering the service bound to the specified service. They do not have separate "listening" and "accepting" sock<hy>
+ets. Connection-oriented services, such as TCP stream services can be designed to be either of type wait or nowait.
+A number of the basic properties are optional for a service. In their absence, their values are taken from the set of de<hy>
+<beginning of page>
+fault values present in the defaults property group in the inetd service. These properties, with their seed values, are
+listed below. Note that these values are configurable through inetadm(1M).
+ bind_fail_interval -1
+ bind_fail_max -1
+ con_rate_offline -1
+ connection_backlog 10
+ failrate_count 40
+ failrate_time 60
+ inherit_env true
+ max_con_rate -1
+ max_copies -1
+ tcp_trace false
+ tcp_wrappers false
+Each method specified for a service will have its configuration stored in the SMF repository, within a property group
+of the same name as the method. The set of properties allowable for these methods includes those specified for the
+services managed by svc.startd(1M). (See svc.startd(1M) for further details.) Additionally, for the inetd_start
+method, you can set the arg0 property.
+The arg0 property allows external wrapper programs to be used with inetd services. Specifically, it allows the first
+argument, argv[0], of the service's start method to be something other than the path of the server program.
+In the case where you want to use an external wrapper program and pass arguments to the service's daemon, the ar<hy>
+guments should be incorporated as arguments to the wrapper program in the exec property. For example:
+ exec='/path/to/wrapper/prog service_daemon_args'
+ arg0='/path/to/service/daemon'
+In addition to the special method tokens mentioned in smf_method(5), inetd also supports the :kill_process token
+for wait-type services. This results in behavior identical to that if the :kill token were supplied, except that the kill
+signal is sent only to the parent process of the wait-type service's start method, not to all members of its encom<hy>
+passing process contract (see process(4)).
+When configuring inetd for a sockets-based service, you have the choice, depending on what is supported by the ser<hy>
+vice, of the alternatives described under the proto property, above. The following are guidelines for which proto
+values to use: <bu> For a service that supports only IPv4: tcp and udp <bu> For a service that supports only IPv6: tcp6only
+and udp6only <bu> For a service that supports both IPv4 and IPv6: <bu> Obsolete and not recommended: tcp6 and udp6 <bu>
+Recommended: use two separate entries that differ only in the proto field. One entry has tcp and the other has
+tcp6only, or udp plus udp6only.
+See EXAMPLES for an example of a configuration of a service that supports both IPv4 and IPv6.
+inetd provides the methods listed below for consumption by the master restarter, svc.startd(1M).
+start
+Causes inetd to start providing service. This results in inetd beginning to handle smf requests for its managed ser<hy>
+vices and network requests for those services that are in either the online or degraded state.
+In addition, inetd also checks if the inetd.conf(4)-format configuration file it is monitoring has changed since the
+last inetconv(1M) conversion was carried out. If it has, then a message telling the administrator to re-run inetconv to
+effect the changes made is logged in syslog.
+stop
+Causes inetd to stop providing service. At this point, inetd transitions each of its services that are not in either the
+maintenance or disabled states to the offline state, running any appropriate methods in the process.
+refresh
+Results in a refresh being performed for each of its managed services and the inetd.conf(4) format configuration file
+being checked for change, as in the start method. When a service is refreshed, its behavior depends on its current
+state: <bu> if it is in the maintenance or disabled states, no action is performed because the configuration will be read
+<beginning of page>
+and consumed when the service leaves the state; <bu> if it is in the offline state, the configuration will be read and any
+changes consumed immediately; <bu> if it is in the online or degraded state and the configuration has changed such that
+a re-binding is necessary to conform to it, then the service will be transitioned to the offline state and back again, us<hy>
+ing the new configuration for the bind; <bu> if it is in the online state and a re-binding is not necessary, then the in<hy>
+etd_refresh method of the service, if provided, will be run to allow online wait-type services to consume any other
+changes.
+No options are supported.
+configuration-file
+Specifies an alternate location for the legacy service file (inetd.conf(4)).
+start|stop|refresh
+Specifies which of inetd's methods should be run.
+Example 1 Configuring a Service that Supports Both IPv4 and IPv6
+The following commands illustrate the existence of services that support both IPv4 and IPv6 and assign proto prop<hy>
+erties to those services.
+ example# svcs -a | grep mysvc
+ online 15:48:29 svc:/network/mysvc:dgram4
+ online 15:48:29 svc:/network/mysvc:dgram6
+ online 15:51:47 svc:/network/mysvc:stream4
+ online 15:52:10 svc:/network/mysvc:stream6
+ # inetadm -M network/rpc/mysvc:dgram4 proto=udp
+ # inetadm -M network/rpc/mysvc:dgram6 proto=udp6only
+ # inetadm -M network/rpc/mysvc:stream4 proto=tcp
+ # inetadm -M network/rpc/mysvc:stream6 proto=tcp6only
+See svcs(1) and inetadm(1M) for descriptions of those commands.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu _ Interface StabilityEvolving
+fmd(1M), inetadm(1M), inetconv(1M), svcadm(1M), svccfg(1M), svcs(1), svc.startd(1M), syslog(3C), getnet<hy>
+configent(3NSL), getrpcbyname(3NSL), getservbyname(3SOCKET), inetd.conf(4), process(4), syslog.conf(4),
+attributes(5), smf(5), smf_method(5)
+The inetd daemon performs the same function as, but is implemented significantly differently from, the daemon of
+the same name in Solaris 9 and prior Solaris operating system releases. In the current Solaris release, inetd is part of
+the Solaris Management Facility (see smf(5)) and will run only within that facility.
+The /etc/default/inetd file has been deprecated. The functionality represented by the properties ENABLE_CON<hy>
+NECTION_LOGGING and ENABLE_TCP_WRAPPERS are now available as the tcp_trace and tcp_wrappers
+properties, respectively. These properties are described above, under "Service Properties".

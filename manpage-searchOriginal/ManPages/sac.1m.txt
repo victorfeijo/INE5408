@@ -1,0 +1,66 @@
+<beginning of page>
+sac <-> service access controller
+sac -t sanity_interval
+/usr/lib/saf/sac
+The Service Access Controller (SAC) is the overseer of the server machine. It is started when the server machine en<hy>
+ters multiuser mode. The SAC performs several important functions as explained below.
+When sac is invoked, it first looks for the per-system configuration script /etc/saf/_sysconfig. sac interprets _syscon<hy>
+fig to customize its own environment. The modifications made to the SAC environment by _sysconfig are inherited
+by all the children of the SAC. This inherited environment may be modified by the children.
+After it has interpreted the _sysconfig file, the sac reads its administrative file /etc/saf/_sactab. _sactab specifies
+which port monitors are to be started. For each port monitor to be started, sac forks a child (see fork(2)) and creates
+a utmpx entry with the type field set to LOGIN_PROCESS. Each child then interprets its per-port monitor config<hy>
+uration script /etc/saf/pmtag/_config , if the file exists. These modifications to the environment affect the port moni<hy>
+tor and will be inherited by all its children. Finally, the child process execs the port monitor, using the command
+found in the _sactab entry. (See sacadm; this is the command given with the -c option when the port monitor is
+added to the system.)
+The -t option sets the frequency with which sac polls the port monitors on the system. This time may also be thought
+of as half of the maximum latency required to detect that a port monitor has failed and that recovery action is neces<hy>
+sary.
+The Service Access Controller represents the administrative point of control for port monitors. Its administrative
+tasks are explained below.
+When queried (sacadm with either -l or -L), the Service Access Controller returns the status of the port monitors
+specified, which sacadm prints on the standard output. A port monitor may be in one of six states:
+ENABLED The port monitor is currently running and is accepting connections. See sacadm(1M) with the -e op<hy>
+tion.
+DISABLED The port monitor is currently running and is not accepting connections. See sacadm with the -d option,
+and see NOTRUNNING, below.
+STARTING The port monitor is in the process of starting up. STARTING is an intermediate state on the way to
+ENABLED or DISABLED.
+FAILED The port monitor was unable to start and remain running.
+STOPPING The port monitor has been manually terminated but has not completed its shutdown procedure. STOP<hy>
+PING is an intermediate state on the way to NOTRUNNING.
+NOTRUNNING The port monitor is not currently running. (See sacadm with -k.) This is the normal "not running"
+state. When a port monitor is killed, all ports it was monitoring are inaccessible. It is not possible for an external us<hy>
+er to tell whether a port is not being monitored or the system is down. If the port monitor is not killed but is in the
+DISABLED state, it may be possible (depending on the port monitor being used) to write a message on the inacces<hy>
+sible port telling the user who is trying to access the port that it is disabled. This is the advantage of having a DIS<hy>
+ABLED state as well as the NOTRUNNING state.
+When a port monitor terminates, the SAC removes the utmpx entry for that port monitor.
+The SAC receives all requests to enable, disable, start, or stop port monitors and takes the appropriate action.
+The SAC is responsible for restarting port monitors that terminate. Whether or not the SAC will restart a given port
+monitor depends on two things: <bu> The restart count specified for the port monitor when the port monitor was added
+by sacadm; this information is included in /etc/saf/pmtag/_sactab. <bu> The number of times the port monitor has al<hy>
+ready been restarted.
+<beginning of page>
+sac uses pam(3PAM) for session management. The PAM configuration policy, listed through /etc/pam.conf, speci<hy>
+fies the session management module to be used for sac. Here is a partial pam.conf file with entries for sac using the
+UNIX session management module.
+ sac session required pam_unix_session.so.1
+If there are no entries for the sac service, then the entries for the "other" service will be used.
+-t sanity_interval Sets the frequency (sanity_interval) with which sac polls the port monitors on the system.
+<bu> /etc/saf/_sactab <bu> /etc/saf/_sysconfig <bu> /var/adm/utmpx <bu> /var/saf/_log
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu
+pmadm(1M), sacadm(1M), fork(2) pam(3PAM), pam.conf(4), attributes(5), pam_authtok_check(5), pam_au<hy>
+thtok_get(5), pam_authtok_store(5), pam_dhkeys(5), pam_passwd_auth(5), pam_unix_account(5),
+pam_unix_auth(5), pam_unix_session(5)
+The pam_unix(5) module is no longer supported. Similar functionality is provided by pam_authtok_check(5),
+pam_authtok_get(5), pam_authtok_store(5), pam_dhkeys(5), pam_passwd_auth(5), pam_unix_account(5),
+pam_unix_auth(5), and pam_unix_session(5).
+The service access controller service is managed by the service management facility, smf(5), under the service iden<hy>
+tifier:
+ svc:/system/sac:default
+Administrative actions on this service, such as enabling, disabling, or requesting restart, can be performed using sv<hy>
+cadm(1M). The service's status can be queried using the svcs(1) command.

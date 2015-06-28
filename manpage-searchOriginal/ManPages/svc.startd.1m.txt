@@ -1,0 +1,180 @@
+<beginning of page>
+svc.startd <-> Service Management Facility master restarter
+/lib/svc/bin/svc.startd
+svc:/system/svc/restarter:default
+svc.startd is the master restarter daemon for Service Management Facility (SMF) and the default restarter for all
+services. svc.startd starts, stops, and restarts services based on administrative requests, system failures, or applica<hy>
+tion failures.
+svc.startd maintains service state, as well as being responsible for managing faults in accordance with the depen<hy>
+dencies of each service.
+svc.startd is invoked automatically during system startup. It is restarted if any failures occur. svc.startd should nev<hy>
+er be invoked directly.
+See smf_restarter(5) for information on configuration and behavior common to all restarters.
+svcs(1) reports status for all services managed by the Service Configuration Facility. svcadm(1M) allows manipula<hy>
+tion of service instances with respect to the service's restarter.
+Environment variables with the "SMF_" prefix are reserved and may be overwritten.
+svc.startd supplies the "SMF_" environment variables specified in smf_method(5) to the method. PATH is set to
+"/usr/sbin:/usr/bin" by default. By default, all other environment variables supplied to svc.startd are those inherited
+from init(1M).
+Duplicate entries are reduced to a single entry. The value used is undefined. Environment entries that are not prefixed
+with "<name>=" are ignored.
+svc.startd is not configured by command line options. Instead, configuration is read from the service configuration
+repository. You can use svccfg(1M) to set all options and properties.
+The following configuration variables in the options property group are available to developers and administrators:
+boot_messages
+An astring (as defined in scf_value_is_type; see scf_value_is_type(3SCF)) that describes the default level of mes<hy>
+sages to print to the console during boot. The supported message options include quiet and verbose. The quiet op<hy>
+tion prints minimal messages to console during boot. The verbose option prints a single message per service started
+to indicate success or failure. You can use the boot -m option to override the boot_messages setting at boot time.
+See kernel(1M).
+logging
+Control the level of global service logging for svc.startd. An astring (as defined in scf_value_is_type; see scf_val<hy>
+ue_is_type(3SCF)) that describes the default level of messages to log to syslog (see syslog(3C) and svc.startd's
+global logfile, /var/svc/log/svc.startd.log. The supported message options include quiet, verbose, and debug. The
+quiet option sends error messages requiring administrative intervention to the console, syslog and svc.startd's glob<hy>
+al logfile. The verbose option sends error messages requiring administrative intervention to the console, syslog and
+svc.startd's global logfile, and information about errors which do not require administrative intervention to
+svc.startd's global logfile. A single message per service started is also sent to the console. The debug option sends
+svc.startd debug messages to svc.startd's global logfile, error messages requiring administrative intervention
+to the console, syslog and svc.startd's global logfile, and a single message per service started to the console.
+milestone
+An FMRI which determines the milestone used as the default boot level. Acceptable options include only the major
+milestones:
+ svc:/milestone/single-user:default
+ svc:/milestone/multi-user:default
+ svc:/milestone/multi-user-server:default
+or the special values all or none. all represents an idealized milestone that depends on every service. none is a spe<hy>
+<beginning of page>
+cial milestone where no services are running apart from the master svc:/system/svc/restarter:default. By default,
+svc.startd uses all, a synthetic milestone that depends on every service. If this property is specified, it overrides any
+initdefault setting in inittab(4).
+system/reconfigure
+Indicates that a reconfiguration reboot has been requested. Services with actions that must key off of a reconfigura<hy>
+tion reboot may check that this property exists and is set to 1 to confirm a reconfiguration boot has been requested.
+This property is managed by svc.startd and should not be modified by the administrator.
+Configuration errors, such as disabling svc.startd are logged by syslog, but ignored.
+Services managed by svc.startd can appear in any of the states described in smf(5). The state definitions are unmod<hy>
+ified by this restarter.
+In addition to any logging done by the managed service, svc.startd provides a common set of service reporting and
+logging mechanisms.
+Reporting properties svc.startd updates a common set of properties on all services it manages. These properties are
+a common interface that can be used to take action based on service instance health. The svcs(1) command can be
+used to easily display these properties.
+restarter/state
+restarter/next_state
+The current and next (if currently in transition) state for an instance.
+restarter/auxiliary_state
+A caption detailing additional information about the current instance state. The auxiliary state available for services
+managed by svc.startd is:
+maintenance
+ fault_threshold_reached
+ stop_method_failed
+ administrative_request
+restarter/state_timestamp
+The time when the current state was reached.
+restarter/contract
+The primary process contract ID, if any, that under which the service instance is executing.
+Logs
+By default, svc.startd provides logging of significant restarter actions for the service as well as method standard out<hy>
+put and standard error file descriptors to /var/svc/log/service:instance.log. The level of logging to system global lo<hy>
+cations like /var/svc/log/svc.startd.log and syslog is controlled by the options/logging property.
+When developing or configuring a service managed by svc.startd, a common set of properties are used to affect the
+interaction between the service instance and the restarter.
+Methods
+The general form of methods for the fork/exec model provided by svc.startd are presented in smf_method(5). The
+<beginning of page>
+following methods are supported as required or optional by services managed by svc.startd.
+refresh Reload any appropriate configuration parameters from the repository or config file, without interrupting ser<hy>
+vice. This is often implemented using SIGHUP for system daemons. If the service is unable to recognize configura<hy>
+tion changes without a restart, no refresh method is provided.
+This method is optional.
+start Start the service. Return success only after the application is available to consumers. Fail if a conflicting in<hy>
+stance is already running, or if the service is unable to start.
+This method is required.
+stop Stop the service. In some cases, the stop method can be invoked when some or all of the service has already
+been stopped. Only return an error if the service is not entirely stopped on method return.
+This method is required.
+If the service does not need to take any action in a required method, it must specify the :true token for that method.
+svc.startd honors any method context specified for the service or any specific method. The method expansion tokens
+described in smf_method(5) are available for use in all methods invoked by svc.startd.
+Properties
+An overview of the general properties is available in smf(5). The specific way in which these general properties in<hy>
+teracts with svc.startd follows:
+general/enabled
+If enabled is set to true, the restarter attempts to start the service once all its dependencies are satisfied. If set to false,
+the service remains in the disabled state, not running.
+general/restarter
+If this FMRI property is empty or set to svc:/system/svc/restarter:default, the service is managed by svc.startd.
+Otherwise, the restarter specified is responsible (once it is available) for managing the service.
+general/single_instance
+If single_instance is set to true, svc.startd only allows one instance of this service to transition to online or degrad<hy>
+ed at any time.
+Additionally, svc.startd managed services can define the optional properties listed below in the startd property
+group.
+startd/duration
+The duration property defines the service's model. It can be set to transient, child also known as "wait" model ser<hy>
+vices, or contract (the default).
+startd/ignore_error
+The ignore_error property, if set, specifies a comma-separated list of ignored events. Legitimate string values in that
+list are core and signal. The default is to restart on all errors.
+startd/need_session
+The need_session property, if set to true, indicates that the instance should be launched in its own session. The de<hy>
+fault is not to do so.
+<beginning of page>
+startd/utmpx_prefix
+The utmpx_prefix string property defines that the instance requires a valid utmpx entry prior to start method execu<hy>
+tion. The default is not to create a utmpx entry.
+svc.startd assumes that a method has failed if it returns a non-zero exit code or if fails to complete before the time<hy>
+out specified expires. If $SMF_EXIT_ERR_CONFIG or $SMF_EXIT_ERR_FATAL is returned, svc.startd im<hy>
+mediately places the service in the maintenance state. For all other failures, svc.startd places the service in the off<hy>
+line state. If a service is offline and its dependencies are satisfied, svc.startd tries again to start the service (see
+smf(5)).
+If a contract or transient service does not return from its start method before its defined timeout elapses, svc.startd
+sends a SIGKILL to the method, and returns the service to the offline state.
+If three failures happen in a row, or if the service is restarting more than once a second, svc.startd places the service
+in the maintenance state.
+The conditions of service failure are defined by a combination of the service model (defined by the startd/duration
+property) and the value of the startd/ignore_error property.
+A contract model service fails if any of the following conditions occur: <bu> all processes in the service exit <bu> any pro<hy>
+cesses in the service produce a core dump <bu> a process outside the service sends a service process a fatal signal (for
+example, an administrator terminates a service process with the pkill command)
+The last two conditions may be ignored by the service by specifying core and/or signal in startd/ignore_error.
+Defining a service as transient means that svc.startd does not track processes for that service. Thus, the potential
+faults described for contract model services are not considered failures for transient services. A transient service on<hy>
+ly enters the maintenance state if one of the method failure conditions occurs.
+"Wait" model services are restarted whenever the child process associated with the service exits. A child process
+that exits is not considered an error for "wait" model services, and repeated failures do not lead to a transition to
+maintenance state.
+svc.startd continues to provide support for services invoked during the startup run level transitions. Each /etc/rc?.d
+directory is processed after all managed services which constitute the equivalent run level milestone have transi<hy>
+tioned to the online state. Standard init scripts placed in the /etc/rc?.d directories are run in the order of their se<hy>
+quence numbers.
+The milestone to run-level mapping is:
+milestone/single-user
+Single-user (S)
+milestone/multi-user
+Multi-user (2)
+milestone/multi-user-server
+Multi-user with network services (3)
+Additionally, svc.startd gives these legacy services visibility in SMF by inserting an instance per script into the
+repository. These legacy instances are visible using standard SMF interfaces such as svcs(1), always appear in the
+LEGACY-RUN state, cannot be modified, and can not be specified as dependencies of other services. The initial
+start time of the legacy service is captured as a convenience for the administrator.
+/var/svc/log Directory where svc.startd stores log files.
+<beginning of page>
+/etc/svc/volatile Directory where svc.startd stores log files in early stages of boot, before /var is mounted read-
+write.
+Example 1 Turning on Verbose Logging
+To turn on verbose logging, type the following:
+ # /usr/sbin/svccfg -s system/svc/restarter:default
+ svc:/system/svc/restarter:default> addpg options application
+ svc:/system/svc/restarter:default> setprop options/logging = \
+ astring: verbose
+ svc:/system/svc/restarter:default> exit
+This request will take effect on the next restart of svc.startd.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu
+svcs(1), svcprop(1), kernel(1M), init(1M), svcadm(1M), svccfg(1M), svc.configd(1M), setsid(2), syslog(3C), lib<hy>
+scf(3LIB), scf_value_is_type(3SCF), contract(4), init.d(4), process(4), inittab(4), attributes(5), smf(5),
+smf_method(5)

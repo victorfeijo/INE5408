@@ -1,0 +1,63 @@
+<beginning of page>
+csx_CS_DDI_Info <-> obtain DDI information
+#include <sys/pccard.h>
+int32_t csx_CS_DDI_Info(cs_ddi_info_t *cdi);
+Solaris DDI Specific (Solaris DDI)
+cdi Pointer to a cs_ddi_info_t structure.
+This function is a Solaris-specific extension that is used by clients that need to provide the xx_getinfo driver entry
+point (see getinfo(9E)). It provides a method for clients to obtain DDI information based on their socket number and
+client driver name.
+The structure members of cs_ddi_info_t are:
+ uint32_t Socket; /* socket number */
+ char* driver_name; /* unique driver name */
+ dev_info_t *dip; /* dip */
+ int32_t instance; /* instance */
+The fields are defined as follows:
+Socket This field must be set to the physical socket number that the client is interested in getting information about.
+driver_name This field must be set to a string containing the name of the client driver to get information about.
+If csx_CS_DDI_Info() is used in a client's xx_getinfo function, then the client will typically extract the Socket value
+from the *arg argument and it must set the driver_name field to the same string used with csx_RegisterClient(9F).
+If the driver_name is found on the Socket, the csx_CS_DDI_Info() function returns both the dev_info pointer and
+the instance fields for the requested driver instance.
+CS_SUCCESS Successful operation.
+CS_BAD_SOCKET Client not found on Socket.
+CS_UNSUPPORTED_FUNCTION No PCMCIA hardware installed.
+This function may be called from user or kernel context. Example 1 : Using csx_CS_DDI_Info
+The following example shows how a client might call the csx_CS_DDI_Info() in the client's xx_getinfo function to
+return the dip or the instance number:
+ static int
+ pcepp_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg,
+   void **result)
+ {
+   int error = DDI_SUCCESS;
+   pcepp_state_t *pps;
+   cs_ddi_info_t cs_ddi_info;
+  switch (cmd) {
+   case DDI_INFO_DEVT2DEVINFO:
+  cs_ddi_info.Socket = getminor((dev_t)arg) & 0x3f;
+<beginning of page>
+  cs_ddi_info.driver_name = pcepp_name;
+  if (csx_CS_DDI_Info(&cs_ddi_info) != CS_SUCCESS)
+  return (DDI_FAILURE);
+  if (!(pps = ddi_get_soft_state(pcepp_soft_state_p,
+  cs_ddi_info.instance))) {
+  *result = NULL;
+  } else {
+  *result = pps->dip;
+  }
+  break;
+   case DDI_INFO_DEVT2INSTANCE:
+  cs_ddi_info.Socket = getminor((dev_t)arg) & 0x3f;
+  cs_ddi_info.driver_name = pcepp_name;
+  if (csx_CS_DDI_Info(&cs_ddi_info) != CS_SUCCESS)
+   return (DDI_FAILURE);
+  *result = (void *)cs_ddi_info.instance;
+  break;
+   default:
+  error = DDI_FAILURE;
+  break;
+  }
+   return (error);
+ }
+getinfo(9E), csx_RegisterClient(9F), ddi_get_instance(9F)
+PC Card 95 Standard, PCMCIA/JEIDA

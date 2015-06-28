@@ -1,0 +1,113 @@
+<beginning of page>
+libtnfctl <-> library for TNF probe control in a process or the kernel
+cc [ flag ... ] file ... -ltnfctl [ library ... ]
+#include <tnf/tnfctl.h>
+The libtnfctl library provides an API to control TNF ("Trace Normal Form") probes within a process or the kernel.
+See tracing(3TNF) for an overview of the Solaris tracing architecture. The client of libtnfctl controls probes in one
+of four modes:
+internal mode The target is the controlling process itself; that is, the client controls its own probes.
+direct mode The target is a separate process; a client can either exec(2) a program or attach to a running process for
+probe control. The libtnfctl library uses proc(4) on the target process for probe and process control in this mode,
+and additionally provides basic process control features.
+indirect mode The target is a separate process, but the controlling process is already using proc(4) to control the tar<hy>
+get, and hence libtnfctl cannot use those interfaces directly. Use this mode to control probes from within a debug<hy>
+ger. In this mode, the client must provide a set of functions that libtnfctl can use to query and update the target
+process.
+kernel mode The target is the Solaris kernel.
+A process is controlled "externally" if it is being controlled in either direct mode or indirect mode. Alternatively, a
+process is controlled "internally" when it uses internal mode to control its own probes.
+There can be only one client at a time doing probe control on a given process. Therefore, it is not possible for a
+process to be controlled internally while it is being controlled externally. It is also not possible to have a process con<hy>
+trolled by multiple external processes. Similarly, there can be only one process at a time doing kernel probe control.
+Note, however, that while a given target may only be controlled by one libtnfctl client, a single client may control an
+arbitrary number of targets. That is, it is possible for a process to simultaneously control its own probes, probes in
+other processes, and probes in the kernel.
+The following tables denotes the modes applicable to all libtnfctl interfaces (INT = internal mode; D = direct mode;
+IND = indirect mode; K = kernel mode).
+These interfaces create handles in the specified modes:
+tab(); lw(2.49i) lw(.76i) lw(.74i) lw(.78i) lw(.74i) lw(2.49i) lw(.76i) lw(.74i) lw(.78i) lw(.74i) tnfctl_inter<hy>
+nal_open()INT tnfctl_exec_open()D tnfctl_pid_open()D tnfctl_indirect_open()IND tnfctl_kernel_open()K
+These interfaces are used with the specified modes:
+tab(); lw(2.46i) lw(.76i) lw(.79i) lw(.78i) lw(.71i) lw(2.46i) lw(.76i) lw(.79i) lw(.78i) lw(.71i) tnfctl_continue()D
+tnfctl_probe_connect()INTDIND tnfctl_probe_disconnect_all ()INTDIND tnfctl_trace_attrs_get()INTDINDK
+tnfctl_buffer_alloc()INTDINDK tnfctl_register_funcs()INTDINDK tnfctl_probe_apply()INTDINDK tn<hy>
+fctl_probe_apply_ids()INTDINDK tnfctl_probe_state_get ()INTDINDK tnfctl_probe_enable()INTDINDK tn<hy>
+fctl_probe_disable()INTDINDK tnfctl_probe_trace()INTDINDK tnfctl_probe_untrace()INTDINDK tn<hy>
+fctl_check_libs()INTDINDK tnfctl_close()INTDINDK tnfctl_strerror()INTDINDK tnfctl_buffer_dealloc()K tn<hy>
+fctl_trace_state_set()K tnfctl_filter_state_set()K tnfctl_filter_list_get()K tnfctl_filter_list_add()K tnfctl_fil<hy>
+ter_list_delete()K
+When using libtnfctl, the first task is to create a handle for controlling probes. The tnfctl_internal_open() function
+creates an internal mode handle for controlling probes in the same process, as described above. The tn<hy>
+fctl_pid_open() and tnfctl_exec_open() functions create handles in direct mode. The tnfctl_indirect_open() func<hy>
+tion creates an indirect mode handle, and the tnfctl_kernel_open() function creates a kernel mode handle. A handle
+is required for use in nearly all other libtnfctl functions. The tnfctl_close() function releases the resources associat<hy>
+<beginning of page>
+ed with a handle.
+The tnfctl_continue() function is used in direct mode to resume execution of the target process.
+The tnfctl_buffer_alloc() function allocates a trace file or, in kernel mode, a trace buffer.
+The tnfctl_probe_apply() and tnfctl_probe_apply_ids() functions call a specified function for each probe or for a
+designated set of probes.
+The tnfctl_register_funcs() function registers functions to be called whenever new probes are seen or probes have
+disappeared, providing an opportunity to do one-time processing for each probe.
+The tnfctl_check_libs() function is used primarily in indirect mode to check whether any new probes have ap<hy>
+peared, that is, they have been made available by dlopen(3C), or have disappeared, that is, they have disassociated
+from the process by dlclose(3C).
+The tnfctl_probe_enable() and tnfctl_probe_disable() functions control whether the probe, when hit, will be ig<hy>
+nored.
+The tnfctl_probe_trace() and tnfctl_probe_untrace() functions control whether an enabled probe, when hit, will
+cause an entry to be made in the trace file.
+The tnfctl_probe_connect() and tnfctl_probe_disconnect_all() functions control which functions, if any, are called
+when an enabled probe is hit.
+The tnfctl_probe_state_get() function returns information about the status of a probe, such as whether it is current<hy>
+ly enabled.
+The tnfctl_trace_attrs_get() function returns information about the tracing session, such as the size of the trace
+buffer or trace file.
+The tnfctl_strerror() function maps a tnfctl error code to a string, for reporting purposes.
+The remaining functions apply only to kernel mode.
+The tnfctl_trace_state_set() function controls the master switch for kernel tracing. See prex(1) for more details.
+The tnfctl_filter_state_set(), tnfctl_filter_list_get(), tnfctl_filter_list_add(), and tnfctl_filter_list_delete() func<hy>
+tions allow a set of processes to be specified for which probes will not be ignored when hit. This prevents kernel ac<hy>
+tivity caused by uninteresting processes from cluttering up the kernel's trace buffer.
+The tnfctl_buffer_dealloc() function deallocates the kernel's internal trace buffer.
+Upon successful completion, these functions returnTNFCTL_ERR_NONE.
+The error codes for libtnfctl are:
+TNFCTL_ERR_ACCES Permission denied.
+TNFCTL_ERR_NOTARGET The target process completed.
+TNFCTL_ERR_ALLOCFAIL A memory allocation failure occurred.
+TNFCTL_ERR_INTERNAL An internal error occurred.
+TNFCTL_ERR_SIZETOOSMALL The requested trace size is too small.
+TNFCTL_ERR_SIZETOOBIG The requested trace size is too big.
+<beginning of page>
+TNFCTL_ERR_BADARG Bad input argument.
+TNFCTL_ERR_NOTDYNAMIC The target is not a dynamic executable.
+TNFCTL_ERR_NOLIBTNFPROBE libtnfprobe.so not linked in target.
+TNFCTL_ERR_BUFBROKEN Tracing is broken in the target.
+TNFCTL_ERR_BUFEXISTS A buffer already exists.
+TNFCTL_ERR_NOBUF No buffer exists.
+TNFCTL_ERR_BADDEALLOC Cannot deallocate buffer.
+TNFCTL_ERR_NOPROCESS No such target process exists.
+TNFCTL_ERR_FILENOTFOUND File not found.
+TNFCTL_ERR_BUSY Cannot attach to process or kernel because it is already tracing.
+TNFCTL_ERR_INVALIDPROBE Probe no longer valid.
+TNFCTL_ERR_USR1 Error code reserved for user.
+TNFCTL_ERR_USR2 Error code reserved for user.
+TNFCTL_ERR_USR3 Error code reserved for user.
+TNFCTL_ERR_USR4 Error code reserved for user.
+TNFCTL_ERR_USR5 Error code reserved for user.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Availability<hy>
+SUNWtnfc _ MT LevelMT-Safe with exceptions
+prex(1), exec(2), dlclose(3C), dlopen(3C), TNF_PROBE(3TNF), tnfctl_buffer_alloc(3TNF), tnfctl_buffer_deal<hy>
+loc(3TNF), tnfctl_check_libs(3TNF), tnfctl_close(3TNF), tnfctl_continue(3TNF), tnfctl_internal_open(3TNF),
+tnfctl_exec_open(3TNF), tnfctl_filter_list_add(3TNF), tnfctl_filter_list_delete(3TNF), tnfctl_fil<hy>
+ter_list_get(3TNF), tnfctl_filter_state_set(3TNF), tnfctl_kernel_open(3TNF), tnfctl_pid_open(3TNF), tn<hy>
+fctl_probe_apply(3TNF), tnfctl_probe_apply_ids(3TNF), tnfctl_probe_connect(3TNF), tnfctl_probe_dis<hy>
+able(3TNF), tnfctl_probe_enable(3TNF), tnfctl_probe_state_get(3TNF), tnfctl_probe_trace(3TNF), tn<hy>
+fctl_probe_untrace(3TNF), tnfctl_indirect_open(3TNF), tnfctl_register_funcs(3TNF), tnfctl_strerror(3TNF),
+tnfctl_trace_attrs_get(3TNF), tnfctl_trace_state_set(3TNF), libtnfctl(3LIB), proc(4), attributes(5)
+Linker and Libraries Guide
+<beginning of page>
+This API is MT-Safe. Multiple threads may concurrently operate on independent tnfctl handles, which is the typi<hy>
+cal behavior expected. The libtnfctl library does not support multiple threads operating on the same tnfctl handle.
+If this is desired, it is the client's responsibility to implement locking to ensure that two threads that use the same
+tnfctl handle are not simultaneously in a libtnfctl interface.

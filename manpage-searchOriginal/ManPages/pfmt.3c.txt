@@ -1,0 +1,82 @@
+<beginning of page>
+pfmt <-> display error message in standard format
+#include <pfmt.h>
+int pfmt(FILE *stream, long flags, char *format, ... /* arg */);
+The pfmt() retrieves a format string from a locale-specific message database (unless MM_NOGET is specified) and
+uses it for printf(3C) style formatting of args. The output is displayed on stream.
+The pfmt() function encapsulates the output in the standard error message format (unless MM_NOSTD is specified,
+in which case the output is similar to printf()).
+If the printf() format string is to be retrieved from a message database, the format argument must have the follow<hy>
+ing structure:
+<catalog>:<msgnum>:<defmsg>.
+If MM_NOGET is specified, only the defmsg field must be specified.
+The catalog field is used to indicate the message database that contains the localized version of the format string.
+This field must be limited to 14 characters selected from the set of all characters values, excluding \0 (null) and the
+ASCII codes for / (slash) and : (colon).
+The msgnum field is a positive number that indicates the index of the string into the message database.
+If the catalog does not exist in the locale (specified by the last call to setlocale(3C) using the LC_ALL or
+LC_MESSAGES categories), or if the message number is out of bound, pfmt() will attempt to retrieve the message
+from the C locale. If this second retrieval fails, pfmt() uses the defmsg field of the format argument.
+If catalog is omitted, pfmt() will attempt to retrieve the string from the default catalog specified by the last call to
+setcat(3C). In this case, the format argument has the following structure:
+:<msgnum>:<defmsg>.
+The pfmt() will output Message not found!!\n as format string if catalog is not a valid catalog name, if no catalog
+is specified (either explicitely or with setcat()), if msgnum is not a valid number, or if no message could be retrieved
+from the message databases and defmsg was omitted.
+The flags argument determine the type of output (such as whether the format should be interpreted as is or encapsu<hy>
+lated in the standard message format), and the access to message catalogs to retrieve a localized version of format.
+The flags argument is composed of several groups, and can take the following values (one from each group):
+Output format control
+MM_NOSTD Do not use the standard message format, interpret format as printf() format. Only catalog access
+control flags should be specified if MM_NOSTD is used; all other flags will be ignored.
+MM_STD Output using the standard message format (default value 0).
+Catalog access control
+MM_NOGET Do not retrieve a localized version of format. In this case, only the defmsg field of the format is
+specified.
+MM_GET Retrieve a localized version of format from the catalog, using msgid as the index and defmsg as the de<hy>
+fault message (default value 0).
+Severity (standard message format only)
+MM_HALT Generate a localized version of HALT, but do not halt the machine.
+<beginning of page>
+MM_ERROR Generate a localized version of ERROR (default value 0).
+MM_WARNING Generate a localized version of WARNING.
+MM_INFO Generate a localized version of INFO.
+Additional severities can be defined. Add-on severities can be defined with number-string pairs with numeric values
+from the range [5-255], using addsev(3C). The specified severity will be generated from the bitwise OR operation
+of the numeric value and other flags If the severity is not defined, pfmt() uses the string SEV=N, where N is replaced
+by the integer severity value passed in flags.
+Multiple severities passed in flags will not be detected as an error. Any combination of severities will be summed
+and the numeric value will cause the display of either a severity string (if defined) or the string SEV=N (if unde<hy>
+fined).
+Action
+MM_ACTION Specify an action message. Any severity value is superseded and replaced by a localized version of
+TO FIX.
+The pfmt() function displays error messages in the following format:
+ label: severity: text
+If no label was defined by a call to setlabel(3C), the message is displayed in the format:
+ severity: text
+If pfmt() is called twice to display an error message and a helpful action or recovery message, the output can look
+like:
+ label: severity: textlabel: TO FIX: text
+Upon success, pfmt() returns the number of bytes transmitted. Upon failure, it returns a negative value:
+<mi>1 Write error to stream.
+Example 1 Example of pfmt() function.
+Example 1:
+ setlabel("UX:test");
+ pfmt(stderr, MM_ERROR, "test:2:Cannot open file: %s\n",
+  strerror(errno));
+ displays the message:
+ UX:test: ERROR: Cannot open file: No such file or directory
+Example 2:
+ setlabel("UX:test");
+ setcat("test");
+<beginning of page>
+ pfmt(stderr, MM_ERROR, ":10:Syntax error\n");
+ pfmt(stderr, MM_ACTION, "55:Usage ...\n");
+displays the message
+ UX:test: ERROR: Syntax error
+ UX:test: TO FIX: Usage ...
+Since it uses gettxt(3C), pfmt() should not be used.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelMT-safe
+addsev(3C), gettxt(3C), lfmt(3C), printf(3C), setcat(3C), setlabel(3C), setlocale(3C), attributes(5), environ(5)

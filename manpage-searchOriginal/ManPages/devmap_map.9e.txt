@@ -1,0 +1,57 @@
+<beginning of page>
+devmap_map <-> device mapping create entry point
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+int prefixdevmap_map(devmap_cookie_t dhp, dev_t dev,
+ uint_t flags, offset_t off, size_t len, void **pvtp);
+Solaris DDI specific (Solaris DDI).
+dhp An opaque mapping handle that the system uses to describe the mapping currently being created.
+dev The device whose memory is to be mapped.
+flags Flags indicating type of mapping. Possible values are:
+MAP_PRIVATE Changes are private.
+MAP_SHARED Changes should be shared.
+off User offset within the logical device memory at which the mapping begins.
+len Length (in bytes) of the memory to be mapped.
+pvtp A pointer to be filled in by device drivers with the driver private mapping data.
+The devmap_map() entry point is an optional routine that allows drivers to perform additional processing or to allo<hy>
+cate private resources during the mapping setup time. For example, in order for device drivers to support context
+switching, the drivers allocate private mapping data and associate the private data with the mapping parameters in
+the devmap_map() entry point.
+The system calls devmap_map() after the user mapping to device physical memory has been established. (For ex<hy>
+ample, after the devmap(9E) entry point is called.)
+devmap_map() receives a pointer to the driver private data for this mapping in pvtp. The system expects the driver
+to allocate its private data and set *pvtp to the allocated data. The driver must store off and len, which define the
+range of the mapping, in its private data. Later, when the system calls devmap_unmap(9E), the driver will use the
+off and len stored in pvtp to check if the entire mapping, or just a part of it, is being unmapped. If only a part of the
+mapping is being unmapped, the driver must allocate a new private data for the remaining mapping before freeing
+the old private data. The driver will receive *pvtp in subsequent event notification callbacks.
+If the driver support context switching, it should store the mapping handle dhp in its private data *pvtp for later use
+in devmap_unload(9F).
+For a driver that supports context switching, flags indicates whether or not the driver should allocate a private con<hy>
+text for the mapping. For example, a driver may allocate a memory region to store the device context if flags is set
+to MAP_PRIVATE.
+devmap_map() returns the following values:
+0 Successful completion.
+Non-zero An error occurred.
+Example 1 devmap_map()implementation
+<beginning of page>
+The following shows an example implementation for devmap_map().
+ static int
+ xxdevmap_map(devmap_cookie_t dhp, dev_t dev, uint_t flags, \
+  offset_t off,size_t len, void **pvtp)
+ {
+  struct xx_resources *pvt;
+  struct xx_context *this_context;
+  struct xx_softc *softc;
+  softc = ddi_get_soft_state(statep, getminor(dev));
+  this_context = get_context(softc, off, len);
+  /* allocate resources for the mapping - Device dependent */
+  pvt = kmem_zalloc(sizeof (struct xx_resources), KM_SLEEP);
+  pvt->off = off;
+  pvt->len = len;
+  pvt->dhp = dhp;
+  pvt->ctx = this_context;
+  *pvtp = pvt;
+ }
+devmap_unmap(9E), devmap_unload(9F), devmap_callback_ctl(9S)
+Writing Device Drivers

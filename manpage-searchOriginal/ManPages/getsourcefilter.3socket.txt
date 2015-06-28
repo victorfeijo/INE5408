@@ -1,0 +1,67 @@
+<beginning of page>
+getsourcefilter, setsourcefilter, getipv4sourcefilter, setipv4sourcefilter <-> retrieve and set a socket's multicast filter
+cc [ flag... ] file... -lsocket [ library... ]
+#include <netinet/in.h>
+int getsourcefilter(int s, uint32_t interface,
+ struct sockaddr *group, socklen_t grouplen, uint32_t *fmode,
+ uint_t *numsrc, struct sockaddr_storage *slist);
+int setsourcefilter(int s, uint32_t interface,
+ struct sockaddr *group, socklen_t grouplen, uint32_t fmode,
+ uint_t numsrc, struct sockaddr_storage *slist);
+int getipv4sourcefilter(int s, struct in_addr interface,
+ struct in_addr group, uint32_t *fmode, uint32_t *numsrc,
+ struct in_addr *slist);
+int setipv4sourcefilter(int s, struct in_addr interface,
+ struct in_addr group,uint32_t fmode, uint32_t numsrc,
+ struct in_addr *slist);
+These functions allow applications to retrieve and modify the multicast filtering state for a tuple consisting of socket,
+interface, and multicast group values.
+A multicast filter is described by a filter mode, which is MODE_INCLUDE or MODE_EXCLUDE, and a list of
+source addresses which are filtered. If a group is simply joined with no source address restrictions, the filter mode is
+MODE_EXCLUDE and the source list is empty.
+The getsourcefilter() and setsourcefilter() functions are protocol-independent. They can be used on either PF_IN<hy>
+ET or PF_INET6 sockets. The getipv4sourcefilter() and setipv4sourcefilter() functions are IPv4-specific. They
+must be used only on PF_INET sockets.
+For the protocol-independent functions, the first four arguments identify the socket, interface, multicast group tuple
+values. The argument s is an open socket of type SOCK_DGRAM or SOCK_RAW. The interface argument is the
+interface index. The interface name can be mapped to the index using if_nametoindex(3SOCKET). The group
+points to either a sockaddr_in containing an IPv4 multicast address if the socket is PF_INET or a sockaddr_in6
+containing an IPv6 multicast address if the socket is PF_INET6. The grouplen is the size of the structure pointed to
+by group.
+For the IPv4-specific functions, the first three arguments identify the same socket, interface, multicast group tuple
+values. The argument s is an open socket of type SOCK_DGRAM or SOCK_RAW and protocol family PF_INET.
+The interface argument is the IPv4 address assigned to the local interface. The group argument is the IPv4 multicast
+address.
+The getsourcefilter() and getipv4sourcefilter() functions retrieve the current filter for the given tuple consisting of
+socket, interface, and multicast group values. On successful return, fmode contains either MODE_INCLUDE or
+MODE_EXCLUDE, indicating the filter mode. On input, the numsrc argument holds the number of addresses that
+can fit in the slist array. On return, slist contains as many addresses as fit, while numsrc contains the total number of
+source addresses in the filter. It is possible that numsrc can contain a number larger than the number of addresses in
+the slist array. An application might determine the required buffer size by calling getsourcefilter() with numsrc con<hy>
+taining 0 and slist a NULL pointer. On return, numsrc contains the number of elements that the slist buffer must be
+able to hold. Alternatively, the maximum number of source addresses allowed by this implementation is defined in
+<netinet/in.h>:
+ #define MAX_SRC_FILTER_SIZE64
+The setsourcefilter() and setipv4sourcefilter functions replace the current filter with the filter specified in the argu<hy>
+ments fmode, numsrc, and slist. The fmode argument must be set to either MODE_INCLUDE or MODE_EX<hy>
+CLUDE. The numsrc argument is the number of addresses in the slist array. The slist argument points to the array of
+source addresses to be included or excluded, depending on the fmode value.
+If successful, all four functions return 0. Otherwise, they return <mi>1 and set errno to indicate the error.
+These functions will fail if:
+<beginning of page>
+EBADF The s argument is not a valid descriptor.
+EAFNOSUPPORT The address family of the passed-in sockaddr is not AF_INET or AF_INET6.
+ENOPROTOOPT The socket s is not of type SOCK_DGRAM or SOCK_RAW.
+ENOPROTOOPT The address family of the group parameter does not match the protocol family of the socket.
+ENOSR Insufficient STREAMS resources available for the operation to complete.
+ENXIO The interface argument, either an index or an IPv4 address, does not identify a valid interface.
+The getsourcefilter() and getipv4sourcefilter() functions will fail if:
+EADDRNOTAVAIL The tuple consisting of socket, interface, and multicast group values does not exist; group is
+not being listened to on interface by socket.
+The functions setsourcefilter()and setipv4sourcefilter() can fail in the following additional case:
+ENOBUFS The source filter list is larger than that allowed by the implementation.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed _ MT-LevelSafe
+if_nametoindex(3SOCKET), socket(3SOCKET), attributes(5)
+RFC 3678

@@ -1,0 +1,40 @@
+<beginning of page>
+read <-> read data from a device
+#include <sys/types.h>
+#include <sys/errno.h>
+#include <sys/open.h>
+#include <sys/uio.h>
+#include <sys/cred.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+int prefixread(dev_t dev, struct uio *uio_p, cred_t *cred_p);
+Architecture independent level 1 (DDI/DKI). This entry point is optional.
+dev Device number.
+uio_p Pointer to the uio(9S) structure that describes where the data is to be stored in user space.
+cred_p Pointer to the user credential structure for the I/O transaction.
+The driver read() routine is called indirectly through cb_ops(9S) by the read(2) system call. The read() routine
+should check the validity of the minor number component of dev and the user credential structure pointed to by
+cred_p (if pertinent). The read() routine should supervise the data transfer into the user space described by the
+uio(9S) structure.
+The read() routine should return 0 for success, or the appropriate error number. Example 1 read() routine using
+physio()
+The following is an example of a read() routine using physio(9F) to perform reads from a non-seekable device:
+  static int
+  xxread(dev_t dev, struct uio *uiop, cred_t *credp)
+  {
+  int rval;
+  offset_t off;
+  int instance;
+  xx_t xx;
+  instance = getminor(dev);
+  xx = ddi_get_soft_state(xxstate, instance);
+  if (xx == NULL)
+  return (ENXIO);
+  off = uiop->uio_loffset;
+  rval = physio(xxstrategy, NULL, dev, B_READ,
+  xxmin, uiop);
+  uiop->uio_loffset = off;
+  return (rval);
+  }       
+read(2), write(9E), physio(9F), cb_ops(9S), uio(9S)
+Writing Device Drivers

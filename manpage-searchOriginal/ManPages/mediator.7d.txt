@@ -1,0 +1,74 @@
+<beginning of page>
+mediator <-> support for HA configurations consisting of two strings of drives
+Beginning with a prior version, Solaris Volume Manager provided support for high-availability (HA) configurations
+consisting of two hosts that share at least three strings of drives and that run software enabling exclusive access to
+the data on those drives from one host. (Note: Volume Manager, by itself, does not actually provide a high-availabil<hy>
+ity environment. The diskset feature is an enabler for HA configurations.)
+Volume Manager provides support for a low-end HA solution consisting of two hosts that share only two strings of
+drives. The hosts in this type of configuration, referred to as mediators, run a special daemon, rpc.metamedd(1M).
+The mediator hosts take on additional responsibilities to ensure that data is available in the case of host or drive fail<hy>
+ures.
+In a mediator configuration, two hosts are physically connected to two strings of drives. This configuration can sur<hy>
+vive the failure of a single host or a single string of drives, without administrative intervention. If both a host and a
+string of drives fail (multiple failures), the integrity of the data cannot be guaranteed. At this point, administrative in<hy>
+tervention is required to make the data accessible.
+The following definitions pertain to a mediator configuration:
+diskset
+A set of drives containing metadevices and hot spares that can be shared exclusively (but not concurrently) by two
+hosts.
+Volume Manager state database
+A replicated database that stores metadevice configuration and state information.
+mediator host
+A host that runs the rpc.metamedd(1M) daemon and that has been added to a diskset. The mediator host partici<hy>
+pates in checking the state database and the mediator quorum.
+mediator quorum
+The condition achieved when the number of accessible mediator hosts is equal to half+1 the total number of config<hy>
+ured mediator hosts. Because it is expected that there will be two mediator hosts, this number will normally be 2
+([(2/2) + 1] = 2.)
+replica
+A single copy of the Volume Manager metadevice state database.
+replica quorum
+The condition achieved when the number of accessible replicas is equal to half+1 the total number of configured
+replicas. For example, if a system is configured with ten replicas, the quorum is met when six are accessible ([(10/2)
++ 1 = 6]).
+A mediator host running the rpc.metamedd(1M) daemon keeps track of replica updates. As long as the following
+conditions are met, access to data occurs without any administrative intervention: <bu> The replica quorum is not met. <bu>
+Half of the replicas are still accessible. <bu> The mediator quorum is met.
+The following conditions describe the operation of mediator hosts: 1. If the is met, access to the diskset is granted.
+At this point no mediator host is involved. 2. If the replica quorum is not met, half of the replicas are accessible, the
+mediator quorum is met, and the replica and mediator data match, access to the diskset is granted. The mediator host
+contributes the deciding vote. 3. If the replica quorum is not met, half of the replicas are accessible, the mediator
+quorum is not met, half of the mediator hosts is accessible, and the replica and mediator data match, the system
+prompts you to grant or deny access to the diskset. 4. If the replica quorum is not met, half of the replicas are ac<hy>
+cessible, the mediator quorum is met, and the replica and mediator data do not match, access to the diskset is read-
+only. You can delete replicas, release the diskset, and retake the diskset to gain read-write access to the data in the
+diskset. 5. In all other cases, the diskset access is read-only. You can delete replicas, release the diskset, and retake
+the diskset to gain read-write access to the data in the diskset.
+<beginning of page>
+The metaset(1M) command administers disksets and mediator hosts. The following options to the metaset com<hy>
+mand pertain only to administering mediator hosts.
+-a -m mediator_host_list Adds mediator hosts to the named set. A mediator_host_list is the nodename of the medi<hy>
+ator host to be added and up to 2 other aliases for the mediator host. The nodename and aliases for each mediator
+host are separated by commas. Up to 3 mediator hosts can be specified for the named diskset.
+-d -m mediator_host_list Deletes mediator hosts from the named diskset. Mediator hosts are deleted from the
+diskset by specifying the nodename of mediator host to delete.
+-q Displays an enumerated list of tags pertaining to ``tagged data'' that may be encountered during a take of the
+ownership of a diskset.
+-t [-f] -y Takes ownership of a diskset safely, unless -f is used, in which case the take is unconditional. If metaset
+finds that another host owns the set, this host will not be allowed to take ownership of the set. If the set is not owned
+by any other host, all the disks within the set will be owned by the host on which metaset was executed. The
+metadevice state database is read in and the shared metadevices contained in the set become accessible. The -t op<hy>
+tion will take a diskset that has stale databases. When the databases are stale, metaset will exit with code 66, and a
+message will be printed. At that point, the only operations permitted are the addition and deletion of replicas. Once
+the addition or deletion of the replicas has been completed, the diskset should be released and retaken to gain full ac<hy>
+cess to the data. If mediator hosts have been configured, some additional exit codes are possible. If half of the repli<hy>
+cas and half of the mediator hosts are operating properly, the take will exit with code 3. At this point, you can add or
+delete replicas, or use the -y option on a subsequent take. If the take operation encounters ``tagged data,'' the take
+operation will exit with code 2. You can then run the metaset command with the -q option to see an enumerated list
+of tags.
+-t [-f] -u tagnumber Once a tag has been selected, a subsequent take with -u tagnumber can be executed to select
+the data associated with the given tagnumber.
+metaset(1M), md(7D), rpc.metamedd(1M), rpc.metad(1M)
+Sun Cluster documentation, Solaris Volume Manager Administration Guide
+Diskset administration, including the addition and deletion of hosts and drives, requires all hosts in the set to be ac<hy>
+cessible from the network.

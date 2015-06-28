@@ -1,0 +1,1389 @@
+<beginning of page>
+dladm <-> administer data links
+dladm show-link [-P] [-s [-i interval]] [[-p] -o field[,...]] [link]
+dladm rename-link [-R root-dir] link new-link
+dladm delete-phys phys-link
+dladm show-phys [-P] [-m] [[-p] -o field[,...]] [-H] [phys-link]
+dladm create-aggr [-t] [-R root-dir] [-P policy] [-L mode]
+ [-T time] [-u address] -l ether-link1 [-l ether-link2...] aggr-link
+dladm modify-aggr [-t] [-R root-dir] [-P policy] [-L mode]
+ [-T time] [-u address] aggr-link
+dladm delete-aggr [-t] [-R root-dir] aggr-link
+dladm add-aggr [-t] [-R root-dir] -l ether-link1 [-l ether-link2...]
+ aggr-link
+dladm remove-aggr [-t] [-R root-dir] -l ether-link1 [-l ether-link2...]
+ aggr-link
+dladm show-aggr [-PLx] [-s [-i interval]] [[-p] -o field[,...]]
+ [aggr-link]
+dladm create-bridge [-P protect] [-R root-dir] [-p priority]
+ [-m max-age] [-h hello-time] [-d forward-delay] [-f force-protocol]
+ [-l link...] bridge-name
+dladm modify-bridge [-P protect] [-R root-dir] [-p priority]
+ [-m max-age] [-h hello-time] [-d forward-delay] [-f force-protocol]
+ bridge-name
+dladm delete-bridge [-R root-dir] bridge-name
+dladm add-bridge [-R root-dir] -l link [-l link...]bridge-name
+dladm remove-bridge [-R root-dir] -l link [-l link...] bridge-name
+dladm show-bridge [-flt] [-s [-i interval]] [[-p] -o field,...]
+ [bridge-name]
+dladm create-vlan [-ft] [-R root-dir] -l ether-link -v vid [vlan-link]
+dladm delete-vlan [-t] [-R root-dir] vlan-link
+dladm show-vlan [-P] [[-p] -o field[,...]] [vlan-link]
+dladm scan-wifi [[-p] -o field[,...]] [wifi-link]
+dladm connect-wifi [-e essid] [-i bssid] [-k key,...]
+ [-s none | wep | wpa ] [-a open | shared] [-b bss | ibss] [-c]
+ [-m a | b | g] [-T time] [wifi-link]
+dladm disconnect-wifi [-a] [wifi-link]
+dladm show-wifi [[-p] -o field[,...]] [wifi-link]
+dladm show-ether [-x] [[-p] -o field[,...]] [ether-link]
+dladm set-linkprop [-t] [-R root-dir] -p prop=value[,...] link
+dladm reset-linkprop [-t] [-R root-dir] [-p prop[,...]] link
+dladm show-linkprop [-P] [[-c] -o field[,...]] [-p prop[,...]] [link]
+dladm create-secobj [-t] [-R root-dir] [-f file] -c class secobj
+dladm delete-secobj [-t] [-R root-dir] secobj[,...]
+dladm show-secobj [-P] [[-p] -o field[,...]] [secobj,...]
+dladm create-vnic [-t] -l link [-R root-dir] [-m value | auto |
+ {factory -n slot-identifier]} | {random [-r prefix]}]
+ [-v vlan-id] [-p prop=value[,...]] vnic-link
+dladm delete-vnic [-t] [-R root-dir] vnic-link
+dladm show-vnic [-pP] [-s [-i interval]] [-o field[,...]]
+ [-l link] [vnic-link]
+dladm create-etherstub [-t] [-R root-dir] etherstub
+dladm delete-etherstub [-t] [-R root-dir] etherstub
+<beginning of page>
+dladm show-etherstub [etherstub]
+dladm create-iptun [-t] [-R root-dir] -T type [-s tsrc] [-d tdst]
+ iptun-link
+dladm modify-iptun [-t] [-R root-dir] [-s tsrc] [-d tdst] iptun-link
+dladm delete-iptun [-t] [-R root-dir] iptun-link
+dladm show-iptun [-P] [[-p] -o field[,...]] [iptun-link]
+dladm show-usage [-a] -f filename [-p plotfile -F format] [-s time]
+ [-e time] [link]
+The dladm command is used to administer data-links. A data-link is represented in the system as a STREAMS
+DLPI (v2) interface which can be plumbed under protocol stacks such as TCP/IP. Each data-link relies on either a
+single network device or an aggregation of devices to send packets to or receive packets from a network.
+Each dladm subcommand operates on one of the following objects:
+link
+A datalink, identified by a name. In general, the name can use any alphanumeric characters (or the underscore, _),
+but must start with an alphabetic character and end with a number. A datalink name can be at most 31 characters,
+and the ending number must be between 0 and 4294967294 (inclusive). The ending number must not begin with a
+zero. Datalink names between 3 and 8 characters are recommended.
+Some subcommands operate only on certain types or classes of datalinks. For those cases, the following object
+names are used:
+phys-link
+A physical datalink.
+vlan-link
+A VLAN datalink.
+aggr-link
+An aggregation datalink (or a key; see NOTES).
+ether-link
+A physical Ethernet datalink.
+wifi-link
+A WiFi datalink.
+vnic-link
+A virtual network interface created on a link or an etherstub. It is a pseudo device that can be treated as if it were an
+network interface card on a machine.
+iptun-link
+An IP tunnel link.
+dev
+A network device, identified by concatenation of a driver name and an instance number.
+<beginning of page>
+etherstub
+An Ethernet stub can be used instead of a physical NIC to create VNICs. VNICs created on an etherstub will appear
+to be connected through a virtual switch, allowing complete virtual networks to be built without physical hardware.
+bridge
+A bridge instance, identified by an administratively-chosen name. The name may use any alphanumeric characters or
+the underscore, _, but must start and end with an alphabetic character. A bridge name can be at most 31 characters.
+The name default is reserved, as are all names starting with SUNW.
+Note that appending a zero (0) to a bridge name produces a valid link name, used for observability.
+secobj
+A secure object, identified by an administratively-chosen name. The name can use any alphanumeric characters, as
+well as underscore (_), period (.), and hyphen (-). A secure object name can be at most 32 characters.
+Each dladm subcommand has its own set of options. However, many of the subcommands have the following as a
+common option:
+-R root-dir, --root-dir=root-dir
+Specifies an alternate root directory where the operation-such as creation, deletion, or renaming-should apply.
+The following subcommands are supported:
+dladm show-link [-P] [-s [-i interval]] [[-p] -o field[,...]][link]
+Show link configuration information (the default) or statistics, either for all datalinks or for the specified link link.
+By default, the system is configured with one datalink for each known network device.
+-o field[,...], --output=field[,...]
+A case-insensitive, comma-separated list of output fields to display. When not modified by the -s option (described
+below), the field name must be one of the fields listed below, or the special value all to display all fields. By default
+(without -o), show-link displays all fields.
+LINK
+The name of the datalink.
+CLASS
+The class of the datalink. dladm distinguishes between the following classes:
+phys
+A physical datalink. The show-phys subcommand displays more detail for this class of datalink.
+aggr
+An IEEE 802.3ad link aggregation. The show-aggr subcommand displays more detail for this class of datalink.
+vlan
+A VLAN datalink. The show-vlan subcommand displays more detail for this class of datalink.
+vnic
+A virtual network interface. The show-vnic subcommand displays more detail for this class of datalink.
+<beginning of page>
+MTU
+The maximum transmission unit size for the datalink being displayed.
+STATE
+The link state of the datalink. The state can be up, down, or unknown.
+BRIDGE
+The name of the bridge to which this link is assigned, if any.
+OVER
+The physical datalink(s) over which the datalink is operating. This applies to aggr, bridge, and vlan classes of
+datalinks. A VLAN is created over a single physical datalink, a bridge has multiple attached links, and an aggre<hy>
+gation is comprised of one or more physical datalinks.
+When the -o option is used in conjunction with the -s option, used to display link statistics, the field name must be
+one of the fields listed below, or the special value all to display all fields
+LINK
+The name of the datalink.
+IPACKETS
+Number of packets received on this link.
+RBYTES
+Number of bytes received on this link.
+IERRORS
+Number of input errors.
+OPACKETS
+Number of packets sent on this link.
+OBYTES
+Number of bytes received on this link.
+OERRORS
+Number of output errors.
+-p, --parseable
+Display using a stable machine-parseable format. The -o option is required with -p. See "Parseable Output Format",
+below.
+-P, --persistent
+Display the persistent link configuration.
+<beginning of page>
+-s, --statistics
+Display link statistics.
+-i interval, --interval=interval
+Used with the -s option to specify an interval, in seconds, at which statistics should be displayed. If this option is not
+specified, statistics will be displayed only once.
+dladm rename-link [-R root-dir] link new-link
+Rename link to new-link. This is used to give a link a meaningful name, or to associate existing link configuration
+such as link properties of a removed device with a new device. See the EXAMPLES section for specific examples
+of how this subcommand is used.
+-R root-dir, --root-dir=root-dir
+See "Options," above.
+dladm delete-phys phys-link
+This command is used to delete the persistent configuration of a link associated with physical hardware which has
+been removed from the system. See the EXAMPLES section.
+dladm show-phys [-P] [[-p] -o field[,...]] [-H] [phys-link]
+Show the physical device and attributes of all physical links, or of the named physical link. Without -P, only physi<hy>
+cal links that are available on the running system are displayed.
+-H
+Show hardware resource usage, as returned by the NIC driver. Output from -H displays the following elements:
+LINK
+A physical device corresponding to a NIC driver.
+GROUP
+A collection of rings.
+GROUPTYPE
+RX or TX. All rings in a group are of the same group type.
+RINGS
+A hardware resource used by a data link, subject to assignment by a driver to different groups.
+CLIENTS
+MAC clients that are using the rings within a group.
+-o field, --output=field
+A case-insensitive, comma-separated list of output fields to display. The field name must be one of the fields listed
+below, or the special value all, to display all fields. For each link, the following fields can be displayed:
+<beginning of page>
+LINK
+The name of the datalink.
+MEDIA
+The media type provided by the physical datalink.
+STATE
+The state of the link. This can be up, down, or unknown.
+SPEED
+The current speed of the link, in megabits per second.
+DUPLEX
+For Ethernet links, the full/half duplex status of the link is displayed if the link state is up. The duplex is displayed
+as unknown in all other cases.
+DEVICE
+The name of the physical device under this link.
+-p, --parseable
+Display using a stable machine-parseable format. The -o option is required with -p. See "Parseable Output Format",
+below.
+-P, --persistent
+This option displays persistent configuration for all links, including those that have been removed from the system.
+The output provides a FLAGS column in which the r flag indicates that the physical device associated with a physi<hy>
+cal link has been removed. For such links, delete-phys can be used to purge the link's configuration from the sys<hy>
+tem.
+dladm create-aggr [-t] [-R root-dir] [-P policy] [-L mode] [-T time] [-u address] -l ether-link1 [-l ether-link2...]
+aggr-link
+Combine a set of links into a single IEEE 802.3ad link aggregation named aggr-link. The use of an integer key to
+generate a link name for the aggregation is also supported for backward compatibility. Many of the *-aggr subcom<hy>
+mands below also support the use of a key to refer to a given aggregation, but use of the aggregation link name is
+preferred. See the NOTES section for more information on keys.
+dladm supports a number of port selection policies for an aggregation of ports. (See the description of the -P option,
+below.) If you do not specify a policy, create-aggr uses the default, the L4 policy, described under the -P option.
+-l ether-link, --link=ether-link
+Each Ethernet link (or port) in the aggregation is specified using an -l option followed by the name of the link to be
+included in the aggregation. Multiple links are included in the aggregation by specifying multiple -l options. For
+backward compatibility with previous versions of Solaris, the dladm command also supports the using the -d option
+(or --dev) with a device name to specify links by their underlying device name. The other *-aggr subcommands that
+take -loptions also accept -d.
+-t, --temporary
+Specifies that the aggregation is temporary. Temporary aggregations last until the next reboot.
+<beginning of page>
+-R root-dir, --root-dir=root-dir
+See "Options," above.
+-P policy, --policy=policy
+
+Specifies the port selection policy to use for load spreading of outbound traffic. The policy specifies which dev ob<hy>
+ject is used to send packets. A policy is a list of one or more layers specifiers separated by commas. A layer specifier
+is one of the following:
+L2
+Select outbound device according to source and destination MAC addresses of the packet.
+L3
+Select outbound device according to source and destination IP addresses of the packet.
+L4
+Select outbound device according to the upper layer protocol information contained in the packet. For TCP and
+UDP, this includes source and destination ports. For IPsec, this includes the SPI (Security Parameters Index).
+For example, to use upper layer protocol information, the following policy can be used:
+ -P L4
+Note that policy L4 is the default.
+To use the source and destination MAC addresses as well as the source and destination IP addresses, the following
+policy can be used:
+ -P L2,L3
+-L mode, --lacp-mode=mode
+Specifies whether LACP should be used and, if used, the mode in which it should operate. Supported values are off,
+active or passive.
+-T time, --lacp-timer=time
+
+Specifies the LACP timer value. The supported values are short or longjjj.
+-u address, --unicast=address
+Specifies a fixed unicast hardware address to be used for the aggregation. If this option is not specified, then an ad<hy>
+dress is automatically chosen from the set of addresses of the component devices.
+dladm modify-aggr [-t] [-R root-dir] [-P policy] [-L mode] [-T time] [-u address] aggr-link
+Modify the parameters of the specified aggregation.
+-t, --temporary
+Specifies that the modification is temporary. Temporary aggregations last until the next reboot.
+<beginning of page>
+-R root-dir, --root-dir=root-dir
+See "Options," above.
+-P policy, --policy=policy
+Specifies the port selection policy to use for load spreading of outbound traffic. See dladm create-aggr for a de<hy>
+scription of valid policy values.
+-L mode, --lacp-mode=mode
+Specifies whether LACP should be used and, if used, the mode in which it should operate. Supported values are off,
+active, or passive.
+-T time, --lacp-timer=time
+
+Specifies the LACP timer value. The supported values are short or long.
+-u address, --unicast=address
+Specifies a fixed unicast hardware address to be used for the aggregation. If this option is not specified, then an ad<hy>
+dress is automatically chosen from the set of addresses of the component devices.
+dladm delete-aggr [-t] [-R root-dir] aggr-link
+Deletes the specified aggregation.
+-t, --temporary
+Specifies that the deletion is temporary. Temporary deletions last until the next reboot.
+-R root-dir, --root-dir=root-dir
+See "Options," above.
+dladm add-aggr [-t] [-R root-dir] -l ether-link1 [--link=ether-link2...] aggr-link
+Adds links to the specified aggregation.
+-l ether-link, --link=ether-link
+Specifies an Ethernet link to add to the aggregation. Multiple links can be added by supplying multiple -l options.
+-t, --temporary
+Specifies that the additions are temporary. Temporary additions last until the next reboot.
+-R root-dir, --root-dir=root-dir
+See "Options," above.
+dladm remove-aggr [-t] [-R root-dir] -l ether-link1 [--l=ether-link2...] aggr-link
+Removes links from the specified aggregation.
+<beginning of page>
+-l ether-link, --link=ether-link
+Specifies an Ethernet link to remove from the aggregation. Multiple links can be added by supplying multiple -l op<hy>
+tions.
+-t, --temporary
+Specifies that the removals are temporary. Temporary removal last until the next reboot.
+-R root-dir, --root-dir=root-dir
+See "Options," above.
+dladm show-aggr [-PLx] [-s [-i interval]] [[-p] -o field[,...]] [aggr-link]
+Show aggregation configuration (the default), LACP information, or statistics, either for all aggregations or for the
+specified aggregation.
+By default (with no options), the following fields can be displayed:
+LINK
+The name of the aggregation link.
+POLICY
+The LACP policy of the aggregation. See the create-aggr -P option for a description of the possible values.
+ADDRPOLICY
+Either auto, if the aggregation is configured to automatically configure its unicast MAC address (the default if the -u
+option was not used to create or modify the aggregation), or fixed, if -u was used to set a fixed MAC address.
+LACPACTIVITY
+The LACP mode of the aggregation. Possible values are off, active, or passive, as set by the -l option to create-aggr
+or modify-aggr.
+LACPTIMER
+The LACP timer value of the aggregation as set by the -T option of create-aggr or modify-aggr.
+FLAGS
+A set of state flags associated with the aggregation. The only possible flag is f, which is displayed if the administra<hy>
+tor forced the creation the aggregation using the -f option to create-aggr. Other flags might be defined in the future.
+The show-aggr command accepts the following options:
+-L, --lacp
+Displays detailed LACP information for the aggregation link and each underlying port. Most of the state informa<hy>
+tion displayed by this option is defined by IEEE 802.3. With this option, the following fields can be displayed:
+LINK
+The name of the aggregation link.
+PORT
+The name of one of the underlying aggregation ports.
+<beginning of page>
+AGGREGATABLE
+Whether the port can be added to the aggregation.
+SYNC
+If yes, the system considers the port to be synchronized and part of the aggregation.
+COLL
+If yes, collection of incoming frames is enabled on the associated port.
+DIST
+If yes, distribution of outgoing frames is enabled on the associated port.
+DEFAULTED
+If yes, the port is using defaulted partner information (that is, has not received LACP data from the LACP partner).
+EXPIRED
+If yes, the receive state of the port is in the EXPIRED state.
+-x, --extended
+Display additional aggregation information including detailed information on each underlying port. With -x, the fol<hy>
+lowing fields can be displayed:
+LINK
+The name of the aggregation link.
+PORT
+The name of one of the underlying aggregation ports.
+SPEED
+The speed of the link or port in megabits per second.
+DUPLEX
+The full/half duplex status of the link or port is displayed if the link state is up. The duplex status is displayed as un<hy>
+known in all other cases.
+STATE
+The link state. This can be up, down, or unknown.
+ADDRESS
+The MAC address of the link or port.
+PORTSTATE
+This indicates whether the individual aggregation port is in the standby or attached state.
+<beginning of page>
+-o field[,...], --output=field[,...]
+A case-insensitive, comma-separated list of output fields to display. The field name must be one of the fields listed
+above, or the special value all, to display all fields. The fields applicable to the -o option are limited to those listed
+under each output mode. For example, if using -L, only the fields listed under -L, above, can be used with -o.
+-p, --parseable
+Display using a stable machine-parseable format. The -o option is required with -p. See "Parseable Output Format",
+below.
+-P, --persistent
+Display the persistent aggregation configuration rather than the state of the running system.
+-s, --statistics
+Displays aggregation statistics.
+-i interval, --interval=interval
+Used with the -s option to specify an interval, in seconds, at which statistics should be displayed. If this option is not
+specified, statistics will be displayed only once.
+dladm create-bridge [ -P protect] [-R root-dir] [ -p priority] [ -m max-age] [ -h hello-time] [ -d forward-delay] [ -f
+force-protocol] [-l link...] bridge-name
+Create an 802.1D bridge instance and optionally assign one or more network links to the new bridge. By default, no
+bridge instances are present on the system.
+In order to bridge between links, you must create at least one bridge instance. Each bridge instance is separate, and
+there is no forwarding connection between bridges.
+-P protect, --protect=protect
+Specifies a protection method. The defined protection methods are stp for the Spanning Tree Protocol and trill for
+TRILL, which is used on RBridges. The default value is stp.
+-R root-dir, --root-dir=root-dir
+See "Options," above.
+-p priority, --priority=priority
+Specifies the Bridge Priority. This sets the IEEE STP priority value for determining the root bridge node in the net<hy>
+work. The default value is 32768. Valid values are 0 (highest priority) to 61440 (lowest priority), in increments of
+4096.
+If a value not evenly divisible by 4096 is used, the system silently rounds downward to the next lower value that is
+divisible by 4096.
+-m max-age, --max-age=max-age
+Specifies the maximum age for configuration information in seconds. This sets the STP Bridge Max Age parameter.
+This value is used for all nodes in the network if this node is the root bridge. Bridge link information older than this
+time is discarded. It defaults to 20 seconds. Valid values are from 6 to 40 seconds. See the -d forward-delay parame<hy>
+ter for additional constraints.
+<beginning of page>
+-h hello-time, --hello-time=hello-time
+Specifies the STP Bridge Hello Time parameter. When this node is the root node, it sends Configuration BPDUs at
+this interval throughout the network. The default value is 2 seconds. Valid values are from 1 to 10 seconds. See the
+-d forward-delay parameter for additional constraints.
+-d forward-delay, --forward-delay=forward-delay
+Specifies the STP Bridge Forward Delay parameter. When this node is the root node, then all bridges in the network
+use this timer to sequence the link states when a port is enabled. The default value is 15 seconds. Valid values are
+from 4 to 30 seconds.
+Bridges must obey the following two constraints:
+ 2 * (forward-delay - 1.0) >= max-age
+ max-age >= 2 * (hello-time + 1.0)
+Any parameter setting that would violate those constraints is treated as an error and causes the command to fail with
+a diagnostic message. The message provides valid alternatives to the supplied values.
+-f force-protocol, --force-protocol=force-protocol
+Specifies the MSTP forced maximum supported protocol. The default value is 3. Valid values are non-negative inte<hy>
+gers. The current implementation does not support RSTP or MSTP, so this currently has no effect. However, to pre<hy>
+vent MSTP from being used in the future, the parameter may be set to 0 for STP only or 2 for STP and RSTP.
+-l link, --link=link
+Specifies one or more links to add to the newly-created bridge. This is similar to creating the bridge and then adding
+one or more links, as with the add-bridge subcommand. However, if any of the links cannot be added, the entire
+command fails, and the new bridge itself is not created. To add multiple links on the same command line, repeat this
+option for each link. You are permitted to create bridges without links. For more information about link assignments,
+see the add-bridge subcommand.
+Bridge creation and link assignment require the PRIV_SYS_DL_CONFIG privilege. Bridge creation might fail if
+the optional bridging feature is not installed on the system.
+dladm modify-bridge [ -P protect] [-R root-dir] [ -p priority] [ -m max-age] [ -h hello-time] [ -d forward-delay] [ -f
+force-protocol] [-l link...] bridge-name
+Modify the operational parameters of an existing bridge. The options are the same as for the create-bridge subcom<hy>
+mand, except that the -l option is not permitted. To add links to an existing bridge, use the add-bridge subcommand.
+Bridge parameter modification requires the PRIV_SYS_DL_CONFIG privilege.
+dladm delete-bridge [-R root-dir] bridge-name
+Delete a bridge instance. The bridge being deleted must not have any attached links. Use the remove-bridge sub<hy>
+command to deactivate links before deleting a bridge.
+Bridge deletion requires the PRIV_SYS_DL_CONFIG privilege.
+The -R (--root-dir) option is the same as for the create-bridge subcommand.
+dladm add-bridge [-R root-dir] -l link [-l link...] bridge-name
+Add one or more links to an existing bridge. If multiple links are specified, and adding any one of them results in an
+error, the command fails and no changes are made to the system.
+Link addition to a bridge requires the PRIV_SYS_DL_CONFIG privilege.
+<beginning of page>
+A link may be a member of at most one bridge. An error occurs when you attempt to add a link that already belongs
+to another bridge. To move a link from one bridge instance to another, remove it from the current bridge before
+adding it to a new one.
+The links assigned to a bridge must not also be VLANs, VNICs, or tunnels. Only physical Ethernet datalinks, aggre<hy>
+gation datalinks, wireless links, and Ethernet stubs are permitted to be assigned to a bridge.
+Links assigned to a bridge must all have the same MTU. This is checked when the link is assigned. The link is added
+to the bridge in a deactivated form if it is not the first link on the bridge and it has a differing MTU.
+Note that systems using bridging should not set the eeprom(1M) local-mac-address? variable to false.
+The options are the same as for the create-bridge subcommand.
+dladm remove-bridge [-R root-dir] -l link [-l link...] bridge-name
+Remove one or more links from a bridge instance. If multiple links are specified, and removing any one of them
+would result in an error, the command fails and none are removed.
+Link removal from a bridge requires the PRIV_SYS_DL_CONFIG privilege.
+The options are the same as for the create-bridge subcommand.
+dladm show-bridge [-flt] [-s [-i interval]] [[-p] -o field,...] [bridge-name]
+Show the running status and configuration of bridges, their attached links, learned forwarding entries, and TRILL
+nickname databases. When showing overall bridge status and configuration, the bridge name can be omitted to show
+all bridges. The other forms require a specified bridge.
+The show-bridge subcommand accepts the following options:
+-i interval, --interval=interval
+Used with the -s option to specify an interval, in seconds, at which statistics should be displayed. If this option is not
+specified, statistics will be displayed only once.
+-s, --statistics
+Display statistics for the specified bridges or for a given bridge's attached links. This option cannot be used with the
+-f and -t options.
+-p, --parseable
+Display using a stable machine-parsable format. See "Parsable Output Format," below.
+-o field[,...], --output=field[,...]
+A case-insensitive, comma-separated list of output fields to display. The field names are described below. The spe<hy>
+cial value all displays all fields. Each set of fields has its own default set to display when -o is not specified.
+By default, the show-bridge subcommand shows bridge configuration. The following fields can be shown:
+BRIDGE
+The name of the bridge.
+ADDRESS
+The Bridge Unique Identifier value (MAC address).
+PRIORITY
+Configured priority value; set by -p with create-bridge and modify-bridge.
+<beginning of page>
+BMAXAGE
+Configured bridge maximum age; set by -m with create-bridge and modify-bridge.
+BHELLOTIME
+Configured bridge hello time; set by -h with create-bridge and modify-bridge.
+BFWDDELAY
+Configured forwarding delay; set by -d with create-bridge and modify-bridge.
+FORCEPROTO
+Configured forced maximum protocol; set by -f with create-bridge and modify-bridge.
+TCTIME
+Time, in seconds, since last topology change.
+TCCOUNT
+Count of the number of topology changes.
+TCHANGE
+This indicates that a topology change was detected.
+DESROOT
+Bridge Identifier of the root node.
+ROOTCOST
+Cost of the path to the root node.
+ROOTPORT
+Port number used to reach the root node.
+MAXAGE
+Maximum age value from the root node.
+HELLOTIME
+Hello time value from the root node.
+FWDDELAY
+Forward delay value from the root node.
+HOLDTIME
+Minimum BPDU interval.
+By default, when the -o option is not specified, only the BRIDGE, ADDRESS, PRIORITY, and DESROOT fields
+<beginning of page>
+are shown.
+When the -s option is specified, the show-bridge subcommand shows bridge statistics. The following fields can be
+shown:
+BRIDGE
+Bridge name.
+DROPS
+Number of packets dropped due to resource problems.
+FORWARDS
+Number of packets forwarded from one link to another.
+MBCAST
+Number of multicast and broadcast packets handled by the bridge.
+RECV
+Number of packets received on all attached links.
+SENT
+Number of packets sent on all attached links.
+UNKNOWN
+Number of packets handled that have an unknown destination. Such packets are sent to all links.
+By default, when the -o option is not specified, only the BRIDGE, DROPS, and FORWARDS fields are shown.
+The show-bridge subcommand also accepts the following options:
+-l, --link
+Displays link-related status and statistics information for all links attached to a single bridge instance. By using this
+option and without the -s option, the following fields can be displayed for each link:
+LINK
+The link name.
+INDEX
+Port (link) index number on the bridge.
+STATE
+State of the link. The state can be disabled, discarding, learning, forwarding, non-stp, or bad-mtu.
+UPTIME
+Number of seconds since the last reset or initialization.
+OPERCOST
+Actual cost in use (1-65535).
+<beginning of page>
+OPERP2P
+This indicates whether point-to-point (P2P) mode been detected.
+OPEREDGE
+This indicates whether edge mode has been detected.
+DESROOT
+The Root Bridge Identifier that has been seen on this port.
+DESCOST
+Path cost to the network root node through the designated port.
+DESBRIDGE
+Bridge Identifier for this port.
+DESPORT
+The ID and priority of the port used to transmit configuration messages for this port.
+TCACK
+This indicates whether Topology Change Acknowledge has been seen.
+When the -l option is specified without the -o option, only the LINK, STATE, UPTIME, and DESROOT fields are
+shown.
+When the -l option is specified, the -s option can be used to display the following fields for each link:
+LINK
+Link name.
+CFGBPDU
+Number of configuration BPDUs received.
+TCNBPDU
+Number of topology change BPDUs received.
+RSTPBPDU
+Number of Rapid Spanning Tree BPDUs received.
+TXBPDU
+Number of BPDUs transmitted.
+DROPS
+Number of packets dropped due to resource problems.
+<beginning of page>
+RECV
+Number of packets received by the bridge.
+XMIT
+Number of packets sent by the bridge.
+When the -o option is not specified, only the LINK, DROPS, RECV, and XMIT fields are shown.
+-f, --forwarding
+Displays forwarding entries for a single bridge instance. With this option, the following fields can be shown for each
+forwarding entry:
+DEST
+Destination MAC address.
+AGE
+Age of entry in seconds and milliseconds. Omitted for local entries.
+FLAGS
+The L (local) flag is shown if the MAC address belongs to an attached link or to a VNIC on one of the attached
+links.
+OUTPUT
+For local entries, this is the name of the attached link that has the MAC address. Otherwise, for bridges that use
+Spanning Tree Protocol, this is the output interface name. For RBridges, this is the output TRILL nickname.
+When the -o option is not specified, the DEST, AGE, FLAGS, and OUTPUT fields are shown.
+-t, --trill
+Displays TRILL nickname entries for a single bridge instance. With this option, the following fields can be shown
+for each TRILL nickname entry:
+NICK
+TRILL nickname for this RBridge, which is a number from 1 to 65535.
+FLAGS
+The L flag is shown if the nickname identifies the local system.
+LINK
+Link name for output when sending messages to this RBridge.
+NEXTHOP
+MAC address of the next hop RBridge that is used to reach the RBridge with this nickname.
+When the -o option is not specified, the NICK, FLAGS, LINK, and NEXTHOP fields are shown.
+<beginning of page>
+dladm create-vlan [-ft] [-R root-dir] -l ether-link -v vid [vlan-link]
+Create a tagged VLAN link with an ID of vid over Ethernet link ether-link. The name of the VLAN link can be spec<hy>
+ified as vlan-link. If the name is not specified, a name will be automatically generated (assuming that ether-link is
+namePPA) as:
+ <name><1000 * vlan-tag + PPA>
+For example, if ether-link is bge1 and vid is 2, the name generated is bge2001.
+-f, --force
+Force the creation of the VLAN link. Some devices do not allow frame sizes large enough to include a VLAN head<hy>
+er. When creating a VLAN link over such a device, the -f option is needed, and the MTU of the IP interfaces on the
+resulting VLAN must be set to 1496 instead of 1500.
+-l ether-link
+Specifies Ethernet link over which VLAN is created.
+-t, --temporary
+Specifies that the VLAN link is temporary. Temporary VLAN links last until the next reboot.
+-R root-dir, --root-dir=root-dir
+See "Options," above.
+dladm delete-vlan [-t] [-R root-dir] vlan-link
+Delete the VLAN link specified.
+The delete-vlansubcommand accepts the following options:
+-t, --temporary
+Specifies that the deletion is temporary. Temporary deletions last until the next reboot.
+-R root-dir, --root-dir=root-dir
+See "Options," above.
+dladm show-vlan [-P] [[-p] -o field[,...]] [vlan-link]
+Display VLAN configuration for all VLAN links or for the specified VLAN link.
+The show-vlansubcommand accepts the following options:
+-o field[,...], --output=field[,...]
+A case-insensitive, comma-separated list of output fields to display. The field name must be one of the fields listed
+below, or the special value all, to display all fields. For each VLAN link, the following fields can be displayed:
+LINK
+The name of the VLAN link.
+VID
+The ID associated with the VLAN.
+<beginning of page>
+OVER
+The name of the physical link over which this VLAN is configured.
+FLAGS
+A set of flags associated with the VLAN link. Possible flags are:
+f
+The VLAN was created using the -f option to create-vlan.
+i
+The VLAN was implicitly created when the DLPI link was opened. These VLAN links are automatically deleted on
+last close of the DLPI link (for example, when the IP interface associated with the VLAN link is unplumbed).
+Additional flags might be defined in the future.
+-p, --parseable
+Display using a stable machine-parseable format. The -o option is required with -p. See "Parseable Output Format",
+below.
+-P, --persistent
+Display the persistent VLAN configuration rather than the state of the running system.
+dladm scan-wifi [[-p] -o field[,...]] [wifi-link]
+Scans for WiFi networks, either on all WiFi links, or just on the specified wifi-link.
+By default, currently all fields but BSSTYPE are displayed.
+-o field[,...], --output=field[,...]
+A case-insensitive, comma-separated list of output fields to display. The field name must be one of the fields listed
+below, or the special value all to display all fields. For each WiFi network found, the following fields can be dis<hy>
+played:
+LINK
+The name of the link the WiFi network is on.
+ESSID
+The ESSID (name) of the WiFi network.
+BSSID
+Either the hardware address of the WiFi network's Access Point (for BSS networks), or the WiFi network's random<hy>
+ly generated unique token (for IBSS networks).
+SEC
+Either none for a WiFi network that uses no security, wep for a WiFi network that requires WEP (Wired Equivalent
+Privacy), or wpa for a WiFi network that requires WPA (Wi-Fi Protected Access).
+<beginning of page>
+MODE
+The supported connection modes: one or more of a, b, or g.
+STRENGTH
+The strength of the signal: one of excellent, very good, good, weak, or very weak.
+SPEED
+The maximum speed of the WiFi network, in megabits per second.
+BSSTYPE
+Either bss for BSS (infrastructure) networks, or ibss for IBSS (ad-hoc) networks.
+-p, --parseable
+Display using a stable machine-parseable format. The -o option is required with -p. See "Parseable Output Format",
+below.
+dladm connect-wifi [-e essid] [-i bssid] [-k key,...] [-s none | wep | wpa] [-a open|shared] [-b bss|ibss] [-c] [-m
+a|b|g] [-T time] [wifi-link]
+Connects to a WiFi network. This consists of four steps: discovery, filtration, prioritization, and association. How<hy>
+ever, to enable connections to non-broadcast WiFi networks and to improve performance, if a BSSID or ESSID is
+specified using the -e or -i options, then the first three steps are skipped and connect-wifi immediately attempts to
+associate with a BSSID or ESSID that matches the rest of the provided parameters. If this association fails, but there
+is a possibility that other networks matching the specified criteria exist, then the traditional discovery process begins
+as specified below.
+The discovery step finds all available WiFi networks on the specified WiFi link, which must not yet be connected.
+For administrative convenience, if there is only one WiFi link on the system, wifi-link can be omitted.
+Once discovery is complete, the list of networks is filtered according to the value of the following options:
+-e essid, --essid=essid
+Networks that do not have the same essid are filtered out.
+-b bss|ibss, --bsstype=bss|ibss
+Networks that do not have the same bsstype are filtered out.
+-m a|b|g, --mode=a|b|g
+Networks not appropriate for the specified 802.11 mode are filtered out.
+-k key,..., --key=key, ...
+Use the specified secobj named by the key to connect to the network. Networks not appropriate for the specified
+keys are filtered out.
+-s none|wep|wpa, --sec=none|wep|wpa
+Networks not appropriate for the specified security mode are filtered out.
+Next, the remaining networks are prioritized, first by signal strength, and then by maximum speed. Finally, an at<hy>
+tempt is made to associate with each network in the list, in order, until one succeeds or no networks remain.
+<beginning of page>
+In addition to the options described above, the following options also control the behavior of connect-wifi:
+-a open|shared, --auth=open|shared
+Connect using the specified authentication mode. By default, open and shared are tried in order.
+-c, --create-ibss
+Used with -b ibss to create a new ad-hoc network if one matching the specified ESSID cannot be found. If no ES<hy>
+SID is specified, then -c -b ibss always triggers the creation of a new ad-hoc network.
+-T time, --timeout=time
+Specifies the number of seconds to wait for association to succeed. If time is forever, then the associate will wait in<hy>
+definitely. The current default is ten seconds, but this might change in the future. Timeouts shorter than the default
+might not succeed reliably.
+-k key,..., --key=key,...
+In addition to the filtering previously described, the specified keys will be used to secure the association. The securi<hy>
+ty mode to use will be based on the key class; if a security mode was explicitly specified, it must be compatible with
+the key class. All keys must be of the same class.
+For security modes that support multiple key slots, the slot to place the key will be specified by a colon followed by
+an index. Therefore, -k mykey:3 places mykey in slot 3. By default, slot 1 is assumed. For security modes that sup<hy>
+port multiple keys, a comma-separated list can be specified, with the first key being the active key.
+dladm disconnect-wifi [-a] [wifi-link]
+Disconnect from one or more WiFi networks. If wifi-link specifies a connected WiFi link, then it is disconnected.
+For administrative convenience, if only one WiFi link is connected, wifi-link can be omitted.
+-a, --all-links
+Disconnects from all connected links. This is primarily intended for use by scripts.
+dladm show-wifi [[-p] -o field,...] [wifi-link]
+Shows WiFi configuration information either for all WiFi links or for the specified link wifi-link.
+-o field,..., --output=field
+A case-insensitive, comma-separated list of output fields to display. The field name must be one of the fields listed
+below, or the special value all, to display all fields. For each WiFi link, the following fields can be displayed:
+LINK
+The name of the link being displayed.
+STATUS
+Either connected if the link is connected, or disconnected if it is not connected. If the link is disconnected, all re<hy>
+maining fields have the value --.
+ESSID
+The ESSID (name) of the connected WiFi network.
+BSSID
+Either the hardware address of the WiFi network's Access Point (for BSS networks), or the WiFi network's random<hy>
+<beginning of page>
+ly generated unique token (for IBSS networks).
+SEC
+Either none for a WiFi network that uses no security, wep for a WiFi network that requires WEP, or wpa for a WiFi
+network that requires WPA.
+MODE
+The supported connection modes: one or more of a, b, or g.
+STRENGTH
+The connection strength: one of excellent, very good, good, weak, or very weak.
+SPEED
+The connection speed, in megabits per second.
+AUTH
+Either open or shared (see connect-wifi).
+BSSTYPE
+Either bss for BSS (infrastructure) networks, or ibss for IBSS (ad-hoc) networks.
+By default, currently all fields but AUTH, BSSID, BSSTYPE are displayed.
+-p, --parseable
+Displays using a stable machine-parseable format. The -o option is required with -p. See "Parseable Output Format",
+below.
+dladm show-ether [-x] [[-p] -o field,...] [ether-link]
+Shows state information either for all physical Ethernet links or for a specified physical Ethernet link.
+The show-ether subcommand accepts the following options:
+-o field,..., --output=field
+A case-insensitive, comma-separated list of output fields to display. The field name must be one of the fields listed
+below, or the special value all to display all fields. For each link, the following fields can be displayed:
+LINK
+The name of the link being displayed.
+PTYPE
+Parameter type, where current indicates the negotiated state of the link, capable indicates capabilities supported by
+the device, adv indicates the advertised capabilities, and peeradv indicates the capabilities advertised by the link-
+partner.
+STATE
+The state of the link.
+<beginning of page>
+AUTO
+A yes/no value indicating whether auto-negotiation is advertised.
+SPEED-DUPLEX
+Combinations of speed and duplex values available. The units of speed are encoded with a trailing suffix of G (Giga<hy>
+bits/s) or M (Mb/s). Duplex values are encoded as f (full-duplex) or h (half-duplex).
+PAUSE
+Flow control information. Can be no, indicating no flow control is available; tx, indicating that the end-point can
+transmit pause frames, but ignores any received pause frames; rx, indicating that the end-point receives and acts up<hy>
+on received pause frames; or bi, indicating bi-directional flow-control.
+REM_FAULT
+Fault detection information. Valid values are none or fault.
+By default, all fields except REM_FAULT are displayed for the "current" PTYPE.
+-p, --parseable
+Displays using a stable machine-parseable format. The -o option is required with -p. See "Parseable Output Format",
+below.
+-x, --extended
+Extended output is displayed for PTYPE values of current, capable, adv and peeradv.
+dladm set-linkprop [-t] [-R root-dir] -p prop=value[,...] link
+Sets the values of one or more properties on the link specified. The list of properties and their possible values depend
+on the link type, the network device driver, and networking hardware. These properties can be retrieved using show-
+linkprop.
+-t, --temporary
+Specifies that the changes are temporary. Temporary changes last until the next reboot.
+-R root-dir, --root-dir=root-dir
+See "Options," above.
+-p prop=value[,...], --prop prop=value[,...]
+
+A comma-separated list of properties to set to the specified values.
+Note that when the persistent value is set, the temporary value changes to the same value.
+dladm reset-linkprop [-t] [-R root-dir] [-p prop,...] link
+Resets one or more properties to their values on the link specified. Properties are reset to the values they had at start<hy>
+up. If no properties are specified, all properties are reset. See show-linkprop for a description of properties.
+-t, --temporary
+Specifies that the resets are temporary. Values are reset to default values. Temporary resets last until the next reboot.
+<beginning of page>
+-R root-dir, --root-dir=root-dir
+See "Options," above.
+-p prop, ..., --prop=prop, ...
+A comma-separated list of properties to reset.
+Note that when the persistent value is reset, the temporary value changes to the same value.
+dladm show-linkprop [-P] [[-c] -o field[,...]][-p prop[,...]] [link]
+Show the current or persistent values of one or more properties, either for all datalinks or for the specified link. By
+default, current values are shown. If no properties are specified, all available link properties are displayed. For each
+property, the following fields are displayed:
+-o field[,...], --output=field
+A case-insensitive, comma-separated list of output fields to display. The field name must be one of the fields listed
+below, or the special value all to display all fields. For each link, the following fields can be displayed:
+LINK
+The name of the datalink.
+PROPERTY
+The name of the property.
+PERM
+The read/write permissions of the property. The value shown is one of ro or rw.
+VALUE
+The current (or persistent) property value. If the value is not set, it is shown as --. If it is unknown, the value is
+shown as ?. Persistent values that are not set or have been reset will be shown as -- and will use the system DE<hy>
+FAULT value (if any).
+DEFAULT
+The default value of the property. If the property has no default value, -- is shown.
+POSSIBLE
+A comma-separated list of the values the property can have. If the values span a numeric range, min - max might be
+shown as shorthand. If the possible values are unknown or unbounded, -- is shown.
+The list of properties depends on the link type and network device driver, and the available values for a given proper<hy>
+ty further depends on the underlying network hardware and its state. General link properties are documented in the
+LINK PROPERTIES section. However, link properties that begin with "_" (underbar) are specific to a given link or
+its underlying network device and subject to change or removal. See the appropriate network device driver man page
+for details.
+-c, --parseable
+Display using a stable machine-parseable format. The -o option is required with this option. See "Parseable Output
+Format", below.
+-P, --persistent
+Display persistent link property information
+<beginning of page>
+-p prop, ..., --prop=prop, ...
+A comma-separated list of properties to show. See the sections on link properties following subcommand descrip<hy>
+tions.
+dladm create-secobj [-t] [-R root-dir] [-f file] -c class secobj
+Create a secure object named secobj in the specified class to be later used as a WEP or WPA key in connecting to an
+encrypted network. The value of the secure object can either be provided interactively or read from a file. The se<hy>
+quence of interactive prompts and the file format depends on the class of the secure object.
+Currently, the classes wep and wpa are supported. The WEP (Wired Equivalent Privacy) key can be either 5 or 13
+bytes long. It can be provided either as an ASCII or hexadecimal string -- thus, 12345 and 0x3132333435 are equiv<hy>
+alent 5-byte keys (the 0x prefix can be omitted). A file containing a WEP key must consist of a single line using ei<hy>
+ther WEP key format. The WPA (Wi-Fi Protected Access) key must be provided as an ASCII string with a length
+between 8 and 63 bytes.
+This subcommand is only usable by users or roles that belong to the "Network Link Security" RBAC profile.
+-c class, --class=class
+class can be wep or wpa. See preceding discussion.
+-t, --temporary
+Specifies that the creation is temporary. Temporary creation last until the next reboot.
+-R root-dir, --root-dir=root-dir
+See "Options," above.
+-f file, --file=file
+Specifies a file that should be used to obtain the secure object's value. The format of this file depends on the secure
+object class. See the EXAMPLES section for an example of using this option to set a WEP key.
+dladm delete-secobj [-t] [-R root-dir] secobj[,...]
+Delete one or more specified secure objects. This subcommand is only usable by users or roles that belong to the
+"Network Link Security" RBAC profile.
+-t, --temporary
+Specifies that the deletions are temporary. Temporary deletions last until the next reboot.
+-R root-dir, --root-dir=root-dir
+See "Options," above.
+dladm show-secobj [-P] [[-p] -o field[,...]] [secobj,...]
+Show current or persistent secure object information. If one or more secure objects are specified, then information
+for each is displayed. Otherwise, all current or persistent secure objects are displayed.
+By default, current secure objects are displayed, which are all secure objects that have either been persistently creat<hy>
+ed and not temporarily deleted, or temporarily created.
+For security reasons, it is not possible to show the value of a secure object.
+<beginning of page>
+-o field[,...] , --output=field[,...]
+A case-insensitive, comma-separated list of output fields to display. The field name must be one of the fields listed
+below. For displayed secure object, the following fields can be shown:
+OBJECT
+The name of the secure object.
+CLASS
+The class of the secure object.
+-p, --parseable
+Display using a stable machine-parseable format. The -o option is required with -p. See "Parseable Output Format",
+below.
+-P, --persistent
+Display persistent secure object information
+dladm create-vnic [-t] -l link [-R root-dir] [-m value | auto | {factory [-n slot-identifier]} | {random [-r prefix]}] [-v
+vlan-id] [-p prop=value[,...]] vnic-link
+Create a VNIC with name vnic-link over the specified link.
+-t, --temporary
+Specifies that the VNIC is temporary. Temporary VNICs last until the next reboot.
+-R root-dir, --root-dir=root-dir
+See "Options," above.
+-l link, --link=link
+link can be a physical link or an etherstub.
+-m value | keyword, --mac-address=value | keyword
+Sets the VNIC's MAC address based on the specified value or keyword. If value is not a keyword, it is interpreted as
+a unicast MAC address, which must be valid for the underlying NIC. The following special keywords can be used:
+factory [-n slot-identifier],
+factory [--slot=slot-identifier]
+Assign a factory MAC address to the VNIC. When a factory MAC address is requested, -m can be combined with
+the -n option to specify a MAC address slot to be used. If -n is not specified, the system will choose the next avail<hy>
+able factory MAC address. The -m option of the show-phys subcommand can be used to display the list of factory
+MAC addresses, their slot identifiers, and their availability.
+
+random [-r prefix],
+random [--mac-prefix=prefix]
+Assign a random MAC address to the VNIC. A default prefix consisting of a valid IEEE OUI with the local bit set
+will be used. That prefix can be overridden with the -r option.
+<beginning of page>
+auto
+Try and use a factory MAC address first. If none is available, assign a random MAC address. auto is the default ac<hy>
+tion if the -m option is not specified.
+-v vlan-id
+Enable VLAN tagging for this VNIC. The VLAN tag will have id vlan-id.
+-p prop=value,..., --prop prop=value,...
+A comma-separated list of properties to set to the specified values.
+dladm delete-vnic [-t] [-R root-dir] vnic-link
+Deletes the specified VNIC.
+-t, --temporary
+Specifies that the deletion is temporary. Temporary deletions last until the next reboot.
+-R root-dir, --root-dir=root-dir
+See "Options," above.
+dladm show-vnic [-pP] [-s [-i interval]] [-o field[,...]] [-l link] [vnic-link]
+Show VNIC configuration information (the default) or statistics, for all VNICs, all VNICs on a link, or only the
+specified vnic-link.
+-o field[,...] , --output=field[,...]
+A case-insensitive, comma-separated list of output fields to display. The field name must be one of the fields listed
+below. The field name must be one of the fields listed below, or the special value all to display all fields. By default
+(without -o), show-vnic displays all fields.
+LINK
+The name of the VNIC.
+OVER
+The name of the physical link over which this VNIC is configured.
+SPEED
+The maximum speed of the VNIC, in megabits per second.
+MACADDRESS
+MAC address of the VNIC.
+MACADDRTYPE
+MAC address type of the VNIC. dladm distinguishes among the following MAC address types:
+random
+A random address assigned to the VNIC.
+<beginning of page>
+factory
+A factory MAC address used by the VNIC.
+-p, --parseable
+Display using a stable machine-parseable format. The -o option is required with -p. See "Parseable Output Format",
+below.
+-P, --persistent
+Display the persistent VNIC configuration.
+-s, --statistics
+Displays VNIC statistics.
+-i interval, --interval=interval
+Used with the -s option to specify an interval, in seconds, at which statistics should be displayed. If this option is not
+specified, statistics will be displayed only once.
+-l link, --link=link
+Display information for all VNICs on the named link.
+
+dladm create-etherstub [-t] [-R root-dir] etherstub
+Create an etherstub with the specified name.
+-t, --temporary
+Specifies that the etherstub is temporary. Temporary etherstubs do not persist across reboots.
+-R root-dir, --root-dir=root-dir
+See "Options," above.
+VNICs can be created on top of etherstubs instead of physical NICs. As with physical NICs, such a creation causes
+the stack to implicitly create a virtual switch between the VNICs created on top of the same etherstub.
+
+dladm delete-etherstub [-t] [-R root-dir] etherstub
+Delete the specified etherstub.
+-t, --temporary
+Specifies that the deletion is temporary. Temporary deletions last until the next reboot.
+-R root-dir, --root-dir=root-dir
+See "Options," above.
+<beginning of page>
+dladm show-etherstub [etherstub]
+Show all configured etherstubs by default, or the specified etherstub if etherstub is specified.
+dladm create-iptun [-t] [-R root-dir] -T type [-s tsrc] [-d tdst] iptun-link
+Create an IP tunnel link named iptun-link. Such links can additionally be protected with IPsec using ipsecconf(1M).
+An IP tunnel is conceptually comprised of two parts: a virtual link between two or more IP nodes, and an IP inter<hy>
+face above this link that allows the system to transmit and receive IP packets encapsulated by the underlying link.
+This subcommand creates a virtual link. The ifconfig(1M) command is used to configure IP interfaces above the
+link.
+-t, --temporary
+Specifies that the IP tunnel link is temporary. Temporary tunnels last until the next reboot.
+-R root-dir, --root-dir=root-dir
+See "Options," above.
+-T type, --tunnel-type=type
+Specifies the type of tunnel to be created. The type must be one of the following:
+ipv4
+A point-to-point, IP-over-IP tunnel between two IPv4 nodes. This type of tunnel requires IPv4 source and destina<hy>
+tion addresses to function. IPv4 and IPv6 interfaces can be plumbed above such a tunnel to create IPv4-over-IPv4
+and IPv6-over-IPv4 tunneling configurations.
+ipv6
+A point-to-point, IP-over-IP tunnel between two IPv6 nodes as defined in IETF RFC 2473. This type of tunnel re<hy>
+quires IPv6 source and destination addresses to function. IPv4 and IPv6 interfaces can be plumbed above such a tun<hy>
+nel to create IPv4-over-IPv6 and IPv6-over-IPv6 tunneling configurations.
+6to4
+A 6to4, point-to-multipoint tunnel as defined in IETF RFC 3056. This type of tunnel requires an IPv4 source address
+to function. An IPv6 interface is plumbed on such a tunnel link to configure a 6to4 router.
+-s tsrc, --tunnel-src=tsrc
+Literal IP address or hostname corresponding to the tunnel source. If a hostname is specified, it will be resolved to
+IP addresses, and one of those IP addresses will be used as the tunnel source. Because IP tunnels are created before
+naming services have been brought online during the boot process, it is important that any hostname used be includ<hy>
+ed in /etc/hosts.
+-d tdst, --tunnel-dst=tdst
+Literal IP address or hostname corresponding to the tunnel destination.
+dladm modify-iptun [-t] [-R root-dir] [-s tsrc] [-d tdst] iptun-link
+Modify the parameters of the specified IP tunnel.
+-t, --temporary
+Specifies that the modification is temporary. Temporary modifications last until the next reboot.
+<beginning of page>
+-R root-dir, --root-dir=root-dir
+See "Options," above.
+-s tsrc, --tunnel-src=tsrc
+Specifies a new tunnel source address. See create-iptun for a description.
+-d tdst, --tunnel-dst=tdst
+Specifies a new tunnel destination address. See create-iptun for a description.
+dladm delete-iptun [-t] [-R root-dir] iptun-link
+Delete the specified IP tunnel link.
+-t, --temporary
+Specifies that the deletion is temporary. Temporary deletions last until the next reboot.
+-R root-dir, --root-dir=root-dir
+See "Options," above.
+dladm show-iptun [-P] [[-p] -o field[,...]] [iptun-link]
+Show IP tunnel link configuration for a single IP tunnel or all IP tunnels.
+-P, --persistent
+Display the persistent IP tunnel configuration.
+-p, --parseable
+Display using a stable machine-parseable format. The -o option is required with -p. See "Parseable Output Format",
+below.
+-o field[,...], --output=field[,...]
+A case-insensitive, comma-separated list of output fields to display. The field name must be one of the fields listed
+below, or the special value all, to display all fields. By default (without -o), show-iptun displays all fields.
+LINK
+The name of the IP tunnel link.
+TYPE
+Type of tunnel as specified by the -T option of create-iptun.
+FLAGS
+A set of flags associated with the IP tunnel link. Possible flags are:
+s
+The IP tunnel link is protected by IPsec policy. To display the IPsec policy associated with the tunnel link, enter:
+ # ipsecconf -ln -i tunnel-link
+<beginning of page>
+See ipsecconf(1M) for more details on how to configure IPsec policy.
+i
+The IP tunnel link was implicitly created with ifconfig(1M), and will be automatically deleted when it is no longer
+referenced (that is, when the last IP interface over the tunnel is unplumbed). See ifconfig(1M) for details on implicit
+tunnel creation.
+SOURCE
+The tunnel source address.
+DESTINATION
+The tunnel destination address.
+dladm show-usage [-a] -f filename [-p plotfile -F format] [-s time] [-e time] [link]
+Show the historical network usage from a stored extended accounting file. Configuration and enabling of network
+accounting through acctadm(1M) is required. The default output will be the summary of network usage for the en<hy>
+tire period of time in which extended accounting was enabled.
+-a
+Display all historical network usage for the specified period of time during which extended accounting is enabled.
+This includes the usage information for the links that have already been deleted.
+-f filename, --file=filename
+Read extended accounting records of network usage from filename.
+-F format, --format=format
+Specifies the format of plotfile that is specified by the -p option. As of this release, gnuplot is the only supported for<hy>
+mat.
+-p plotfile, --plot=plotfile
+Write network usage data to a file of the format specified by the -F option, which is required.
+-s time, --start=time
+-e time, --stop=time
+Start and stop times for data display. Time is in the format MM/DD/YYYY,hh:mm:ss.
+link
+If specified, display the network usage only for the named link. Otherwise, display network usage for all links.
+Many dladm subcommands have an option that displays output in a machine-parseable format. The output format is
+one or more lines of colon (:) delimited fields. The fields displayed are specific to the subcommand used and are list<hy>
+ed under the entry for the -o option for a given subcommand. Output includes only those fields requested by means
+of the -o option, in the order requested.
+When you request multiple fields, any literal colon characters are escaped by a backslash (\) before being output.
+<beginning of page>
+Similarly, literal backslash characters will also be escaped (\\). This escape format is parseable by using shell
+read(1) functions with the environment variable IFS=: (see EXAMPLES, below). Note that escaping is not done
+when you request only a single field.
+The following general link properties are supported:
+autopush
+Specifies the set of STREAMS modules to push on the stream associated with a link when its DLPI device is
+opened. It is a space-delimited list of modules.
+The optional special character sequence [anchor] indicates that a STREAMS anchor should be placed on the stream
+at the module previously specified in the list. It is an error to specify more than one anchor or to have an anchor first
+in the list.
+The autopush property is preferred over the more general autopush(1M) command.
+cpus
+Bind the processing of packets for a given data link to a processor or a set of processors. The value can be a comma-
+separated list of one or more processor ids. If the list consists of more than one processor, the processing will spread
+out to all the processors. Connection to processor affinity and packet ordering for any individual connection will be
+maintained.
+The processor or set of processors are not exclusively reserved for the link. Only the kernel threads and interrupts as<hy>
+sociated with processing of the link are bound to the processor or the set of processors specified. In case it is desired
+that processors be dedicated to the link, psrset(1M) can be used to create a processor set and then specifying the
+processors from the processor set to bind the link to.
+If the link was already bound to processor or set of processors due to a previous operation, the binding will be re<hy>
+moved and the new set of processors will be used instead.
+The default is no CPU binding, which is to say that the processing of packets is not bound to any specific processor
+or processor set.
+learn_limit
+Limits the number of new or changed MAC sources to be learned over a bridge link. When the number exceeds this
+value, learning on that link is temporarily disabled. Only non-VLAN, non-VNIC type links have this property.
+The default value is 1000. Valid values are greater or equal to 0.
+learn_decay
+Specifies the decay rate for source changes limited by learn_limit. This number is subtracted from the counter for a
+bridge link every 5 seconds. Only non-VLAN, non-VNIC type links have this property.
+The default value is 200. Valid values are greater or equal to 0.
+maxbw
+Sets the full duplex bandwidth for the link. The bandwidth is specified as an integer with one of the scale suffixes
+(K, M, or G for Kbps, Mbps, and Gbps). If no units are specified, the input value will be read as Mbps. The default
+is no bandwidth limit.
+priority
+Sets the relative priority for the link. The value can be given as one of the tokens high, medium, or low. The default
+is high.
+stp
+Enables or disables Spanning Tree Protocol on a bridge link. Setting this value to 0 disables Spanning Tree, and puts
+<beginning of page>
+the link into forwarding mode with BPDU guarding enabled. This mode is appropriate for point-to-point links con<hy>
+nected only to end nodes. Only non-VLAN, non-VNIC type links have this property. The default value is 1, to en<hy>
+able STP.
+forward
+Enables or disables forwarding for a VLAN. Setting this value to 0 disables bridge forwarding for a VLAN link.
+Disabling bridge forwarding removes that VLAN from the "allowed set" for the bridge. The default value is 1, to en<hy>
+able bridge forwarding for configured VLANs.
+default_tag
+Sets the default VLAN ID that is assumed for untagged packets sent to and received from this link. Only non-
+VLAN, non-VNIC type links have this property. Setting this value to 0 disables the bridge forwarding of untagged
+packets to and from the port. The default value is VLAN ID 1. Valid values values are from 0 to 4094.
+stp_priority
+Sets the STP and RSTP Port Priority value, which is used to determine the preferred root port on a bridge. Lower
+numerical values are higher priority. The default value is 128. Valid values range from 0 to 255.
+stp_cost
+Sets the STP and RSTP cost for using the link. The default value is auto, which sets the cost based on link speed, us<hy>
+ing 100 for 10Mbps, 19 for 100Mbps, 4 for 1Gbps, and 2 for 10Gbps. Valid values range from 1 to 65535.
+stp_edge
+Enables or disables bridge edge port detection. If set to 0 (false), the system assumes that the port is connected to
+other bridges even if no bridge PDUs of any type are seen. The default value is 1, which detects edge ports automati<hy>
+cally.
+stp_p2p
+Sets bridge point-to-point operation mode. Possible values are true, false, and auto. When set to auto, point-to-
+point connections are automatically discovered. When set to true, the port mode is forced to use point-to-point.
+When set to false, the port mode is forced to use normal multipoint mode. The default value is auto.
+stp_mcheck
+Triggers the system to run the RSTP Force BPDU Migration Check procedure on this link. The procedure is trig<hy>
+gered by setting the property value to 1. The property is automatically reset back to 0. This value cannot be set un<hy>
+less the following are true: <bu> The link is bridged <bu> The bridge is protected by Spanning Tree <bu> The bridge force-pro<hy>
+tocol value is at least 2 (RSTP) The default value is 0.
+zone
+Specifies the zone to which the link belongs. This property can be modified only temporarily through dladm, and
+thus the -t option must be specified. To modify the zone assignment such that it persists across reboots, please use
+zonecfg(1M). Possible values consist of any exclusive-IP zone currently running on the system. By default, the zone
+binding is as per zonecfg(1M).
+The following WiFi link properties are supported. Note that the ability to set a given property to a given value de<hy>
+pends on the driver and hardware.
+channel
+Specifies the channel to use. This property can be modified only by certain WiFi links when in IBSS mode. The de<hy>
+fault value and allowed range of values varies by regulatory domain.
+<beginning of page>
+powermode
+Specifies the power management mode of the WiFi link. Possible values are off (disable power management), max
+(maximum power savings), and fast (performance-sensitive power management). Default is off.
+radio
+Specifies the radio mode of the WiFi link. Possible values are on or off. Default is on.
+speed
+Specifies a fixed speed for the WiFi link, in megabits per second. The set of possible values depends on the driver
+and hardware (but is shown by show-linkprop); common speeds include 1, 2, 11, and 54. By default, there is no
+fixed speed.
+The following MII Properties, as documented in ieee802.3(5), are supported in read-only mode: <bu> duplex <bu> state <bu>
+adv_autoneg_cap <bu> adv_10gfdx_cap <bu> adv_1000fdx_cap <bu> adv_1000hdx_cap <bu> adv_100fdx_cap <bu>
+adv_100hdx_cap <bu> adv_10fdx_cap <bu> adv_10hdx_cap
+Each adv_ property (for example, adv_10fdx_cap) also has a read/write counterpart en_ property (for example,
+en_10fdx_cap) controlling parameters used at auto-negotiation. In the absence of Power Management, the adv*
+speed/duplex parameters provide the values that are both negotiated and currently effective in hardware. However,
+with Power Management enabled, the speed/duplex capabilities currently exposed in hardware might be a subset of
+the set of bits that were used in initial link parameter negotiation. Thus the MII adv_* parameters are marked read-
+only, with an additional set of en_* parameters for configuring speed and duplex properties at initial negotiation.
+Note that the adv_autoneg_cap does not have an en_autoneg_cap counterpart: the adv_autoneg_cap is a 0/1
+switch that turns off/on autonegotiation itself, and therefore cannot be impacted by Power Management.
+In addition, the following Ethernet properties are reported:
+speed
+(read-only) The operating speed of the device, in Mbps.
+mtu
+The maximum client SDU (Send Data Unit) supported by the device. Valid range is 68-65536.
+flowctrl
+Establishes flow-control modes that will be advertised by the device. Valid input is one of:
+no
+No flow control enabled.
+rx
+Receive, and act upon incoming pause frames.
+tx
+Transmit pause frames to the peer when congestion occurs, but ignore received pause frames.
+bi
+Bidirectional flow control.
+Note that the actual settings for this value are constrained by the capabilities allowed by the device and the link part<hy>
+ner.
+<beginning of page>
+tagmode
+This link property controls the conditions in which 802.1Q VLAN tags will be inserted in packets being transmitted
+on the link. Two mode values can be assigned to this property:
+normal Insert a VLAN tag in outgoing packets under the following conditions: <bu> The packet belongs to a VLAN. <bu>
+The user requested priority tagging.
+vlanonly Insert a VLAN tag only when the outgoing packet belongs to a VLAN. If a tag is being inserted in this
+mode and the user has also requested a non-zero priority, the priority is honored and included in the VLAN tag.
+The default value is vlanonly.
+The following IP tunnel link properties are supported.
+hoplimit
+Specifies the IPv4 TTL or IPv6 hop limit for the encapsulating outer IP header of a tunnel link. This property exists
+for all tunnel types. The default value is 64.
+encaplimit
+Specifies the IPv6 encapsulation limit for an IPv6 tunnel as defined in RFC 2473. This value is the tunnel nesting
+limit for a given tunneled packet. The default value is 4. A value of 0 disables the encapsulation limit.
+Example 1 Configuring an Aggregation
+To configure a data-link over an aggregation of devices bge0 and bge1 with key 1, enter the following command:
+ # dladm create-aggr -d bge0 -d bge1 1
+Example 2 Connecting to a WiFi Link
+To connect to the most optimal available unsecured network on a system with a single WiFi link (as per the prioriti<hy>
+zation rules specified for connect-wifi), enter the following command:
+ # dladm connect-wifi
+Example 3 Creating a WiFi Key
+To interactively create the WEP key mykey, enter the following command:
+ # dladm create-secobj -c wep mykey
+Alternatively, to non-interactively create the WEP key mykey using the contents of a file:
+ # umask 077
+  # cat >/tmp/mykey.$$ <<EOF
+  12345
+  EOF
+  # dladm create-secobj -c wep -f /tmp/mykey.$$ mykey
+  # rm /tmp/mykey.$$
+Example 4 Connecting to a Specified Encrypted WiFi Link
+<beginning of page>
+To use key mykey to connect to ESSID wlan on link ath0, enter the following command:
+ # dladm connect-wifi -k mykey -e wlan ath0
+Example 5 Changing a Link Property
+To set powermode to the value fast on link pcwl0, enter the following command:
+ # dladm set-linkprop -p powermode=fast pcwl0
+Example 6 Connecting to a WPA-Protected WiFi Link
+Create a WPA key psk and enter the following command:
+ # dladm create-secobj -c wpa psk
+To then use key psk to connect to ESSID wlan on link ath0, enter the following command:
+ # dladm connect-wifi -k psk -e wlan ath0
+Example 7 Renaming a Link
+To rename the bge0 link to mgmt0, enter the following command:
+ # dladm rename-link bge0 mgmt0
+Example 8 Replacing a Network Card
+Consider that the bge0 device, whose link was named mgmt0 as shown in the previous example, needs to be re<hy>
+placed with a ce0 device because of a hardware failure. The bge0 NIC is physically removed, and replaced with a
+new ce0 NIC. To associate the newly added ce0 device with the mgmt0 configuration previously associated with
+bge0, enter the following command:
+ # dladm rename-link ce0 mgmt0
+Example 9 Removing a Network Card
+Suppose that in the previous example, the intent is not to replace the bge0 NIC with another NIC, but rather to re<hy>
+move and not replace the hardware. In that case, the mgmt0 datalink configuration is not slated to be associated with
+a different physical device as shown in the previous example, but needs to be deleted. Enter the following command
+to delete the datalink configuration associated with the mgmt0 datalink, whose physical hardware (bge0 in this case)
+has been removed:
+ # dladm delete-phys mgmt0
+Example 10 Using Parseable Output to Capture a Single Field
+The following assignment saves the MTU of link net0 to a variable named mtu.
+ # mtu=`dladm show-link -p -o mtu net0`
+<beginning of page>
+Example 11 Using Parseable Output to Iterate over Links
+The following script displays the state of each link on the system.
+ # dladm show-link -p -o link,state | while IFS=: read link state; do
+  print "Link $link is in state $state"
+  done
+Example 12 Configuring VNICs
+Create two VNICs with names hello0 and test1 over a single physical link bge0:
+ # dladm create-vnic -l bge0 hello0
+ # dladm create-vnic -l bge0 test1
+Example 13 Configuring VNICs and Allocating Bandwidth and Priority
+Create two VNICs with names hello0 and test1 over a single physical link bge0 and make hello0 a high priority
+VNIC with a factory-assigned MAC address with a maximum bandwidth of 50 Mbps. Make test1 a low priority
+VNIC with a random MAC address and a maximum bandwidth of 100Mbps.
+ # dladm create-vnic -l bge0 -m factory -p maxbw=50,priority=high hello0
+ # dladm create-vnic -l bge0 -m random -p maxbw=100M,priority=low test1
+Example 14 Configuring a VNIC with a Factory MAC Address
+First, list the available factory MAC addresses and choose one of them:
+ # dladm show-phys -m bge0
+ LINK SLOT ADDRESS INUSE CLIENT
+ bge0 primary 0:e0:81:27:d4:47 yes bge0
+ bge0 1 8:0:20:fe:4e:a5 no
+ bge0 2 8:0:20:fe:4e:a6 no
+ bge0 3 8:0:20:fe:4e:a7 no
+Create a VNIC named hello0 and use slot 1's address:
+ # dladm create-vnic -l bge0 -m factory -n 1 hello0
+ # dladm show-phys -m bge0
+ LINK SLOT ADDRESS INUSE CLIENT
+ bge0 primary 0:e0:81:27:d4:47 yes bge0
+ bge0 1 8:0:20:fe:4e:a5 yes hello0
+ bge0 2 8:0:20:fe:4e:a6 no
+ bge0 3 8:0:20:fe:4e:a7 no
+Example 15 Creating a VNIC with User-Specified MAC Address, Binding it to Set of Processors
+Create a VNIC with name hello0, with a user specified MAC address, and a processor binding 0, 1, 2, 3.
+ # dladm create-vnic -l bge0 -m 8:0:20:fe:4e:b8 -p cpus=0,1,2,3 hello0
+<beginning of page>
+Example 16 Creating a Virtual Network Without a Physical NIC
+First, create an etherstub with name stub1:
+ # dladm create-etherstub stub1
+Create two VNICs with names hello0 and test1 on the etherstub. This operation implicitly creates a virtual switch
+connecting hello0 and test1.
+ # dladm create-vnic -l stub1 hello0
+ # dladm create-vnic -l stub1 test1
+Example 17 Showing Network Usage
+Network usage statistics can be stored using the extended accounting facility, acctadm(1M).
+ # acctadm -e basic -f /var/log/net.log net
+ # acctadm net
+  Network accounting: active
+  Network accounting file: /var/log/net.log
+  Tracked Network resources: basic
+  Untracked Network resources: src_ip,dst_ip,src_port,dst_port,protocol,
+  dsfield
+The saved historical data can be retrieved in summary form using the show-usage subcommand:
+ # dladm show-usage -f /var/log/net.log
+ LINK DURATION IPACKETS RBYTES OPACKETS OBYTES BANDWIDTH
+ e1000g0 80 1031 546908 0 0 2.44 Kbps
+Example 18 Displaying Bridge Information
+The following commands use the show-bridge subcommand with no and various options.
+ # dladm show-bridge
+ BRIDGE PROTECT ADDRESS PRIORITY DESROOT
+ foo stp 32768/8:0:20:bf:f 32768 8192/0:d0:0:76:14:38
+ bar stp 32768/8:0:20:e5:8 32768 8192/0:d0:0:76:14:38
+ # dladm show-bridge -l foo
+ LINK STATE UPTIME DESROOT
+ hme0 forwarding 117 8192/0:d0:0:76:14:38
+ qfe1 forwarding 117 8192/0:d0:0:76:14:38
+ # dladm show-bridge -s foo
+ BRIDGE DROPS FORWARDS
+ foo 0 302
+ # dladm show-bridge -ls foo
+ LINK DROPS RECV XMIT
+ hme0 0 360832 31797
+ qfe1 0 322311 356852
+ # dladm show-bridge -f foo
+ DEST AGE FLAGS OUTPUT
+<beginning of page>
+ 8:0:20:bc:a7:dc 10.860 -- hme0
+ 8:0:20:bf:f9:69 -- L hme0
+ 8:0:20:c0:20:26 17.420 -- hme0
+ 8:0:20:e5:86:11 -- L qfe1
+Example 19 Creating an IPv4 Tunnel
+The following sequence of commands creates and then displays a persistent IPv4 tunnel link named mytunnel0 be<hy>
+tween 66.1.2.3 and 192.4.5.6:
+ # dladm create-iptun -T ipv4 -s 66.1.2.3 -d 192.4.5.6 mytunnel0
+ # dladm show-iptun mytunnel0
+ LINK TYPE FLAGS SOURCE DESTINATION
+ mytunnel0 ipv4 -- 66.1.2.3 192.4.5.6
+A point-to-point IP interface can then be created over this tunnel link:
+ # ifconfig mytunnel0 plumb 10.1.0.1 10.1.0.2 up
+As with any other IP interface, configuration persistence for this IP interface is achieved by placing the desired if<hy>
+config commands (in this case, the command for "10.1.0.1 10.1.0.2") into /etc/hostname.mytunnel0.
+Example 20 Creating a 6to4 Tunnel
+The following command creates a 6to4 tunnel link. The IPv4 address of the 6to4 router is 75.10.11.12.
+ # dladm create-iptun -T 6to4 -s 75.10.11.12 sitetunnel0
+ # dladm show-iptun sitetunnel0
+ LINK TYPE FLAGS SOURCE DESTINATION
+ sitetunnel0 6to4 -- 75.10.11.12 --
+The following command plumbs an IPv6 interface on this tunnel:
+ # ifconfig sitetunnel0 inet6 plumb up
+ # ifconfig sitetunnel0 inet6
+ sitetunnel0: flags=2200041 <UP,RUNNING,NONUD,IPv6> mtu 65515 index 3
+  inet tunnel src 75.10.11.12
+  tunnel hop limit 64
+  inet6 2002:4b0a:b0c::1/16
+Note that the system automatically configures the IPv6 address on the 6to4 IP interface. See ifconfig(1M) for a de<hy>
+scription of how IPv6 addresses are configured on 6to4 tunnel links.
+See attributes(5) for descriptions of the following attributes:
+/usr/sbin
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu _ Interface StabilityCommitted
+<beginning of page>
+/sbin
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsr _ Interface StabilityCommitted
+acctadm(1M), autopush(1M), ifconfig(1M), ipsecconf(1M), ndd(1M), psrset(1M), wpad(1M), zonecfg(1M), at<hy>
+tributes(5), ieee802.3(5), dlpi(7P)
+The preferred method of referring to an aggregation in the aggregation subcommands is by its link name. Referring
+to an aggregation by its integer key is supported for backward compatibility, but is not necessary. When creating an
+aggregation, if a key is specified instead of a link name, the aggregation's link name will be automatically generated
+by dladm as aggrkey.

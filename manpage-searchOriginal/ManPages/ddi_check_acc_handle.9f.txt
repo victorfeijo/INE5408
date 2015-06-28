@@ -1,0 +1,59 @@
+<beginning of page>
+ddi_check_acc_handle, ddi_check_dma_handle <-> Check data access and DMA handles
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+int ddi_check_acc_handle(ddi_acc_handle_t acc_handle );
+int ddi_check_dma_handle(ddi_dma_handle_t dma_handle );
+Solaris DDI specific (Solaris DDI)
+acc_handle Data access handle obtained from a previous call to ddi_regs_map_setup(9F), ddi_dma_mem_al<hy>
+loc(9F), or similar function.
+dma_handle DMA handle obtained from a previous call to ddi_dma_setup(9F) or one of its derivatives.
+The ddi_check_acc_handle() and ddi_check_dma_handle() functions check for faults that can interfere with com<hy>
+munication between a driver and the device it controls. Each function checks a single handle of a specific type and
+returns a status value indicating whether faults affecting the resource mapped by the supplied handle have been de<hy>
+tected.
+If a fault is indicated when checking a data access handle, this implies that the driver is no longer able to access the
+mapped registers or memory using programmed I/O through that handle. Typically, this might occur after the device
+has failed to respond to an I/O access (for example, has incurred a bus error or timed out). The effect of programmed
+I/O accesses made after this happens is undefined; for example, read accesses (for example, ddi_get8(9F)) may re<hy>
+turn random values, and write accesses (for example, ddi_put8(9F)) may or may not have any effect. This type of
+fault is normally fatal to the operation of the device, and the driver should report it via ddi_dev_report_fault(9F)
+specifying DDI_SERVICE_LOST for the impact, and DDI_DATAPATH_FAULT for the location.
+If a fault is indicated when checking a DMA handle, it implies that a fault has been detected that has (or will) affect
+DMA transactions between the device and the memory currently bound to the handle (or most recently bound, if the
+handle is currently unbound). Possible causes include the failure of a component in the DMA data path, or an at<hy>
+tempt by the device to make an invalid DMA access. The driver may be able to continue by falling back to a non-
+DMA mode of operation, but in general, DMA faults are non-recoverable. The contents of the memory currently (or
+previously) bound to the handle should be regarded as indeterminate. The fault indication associated with the current
+transaction is lost once the handle is (re-)bound, but because the fault may persist, future DMA operations may not
+succeed.
+Note that some implementations cannot detect all types of failure. If a fault is not indicated, this does not constitute a
+guarantee that communication is possible. However, if a check fails, this is a positive indication that a problem does
+exist with respect to communication using that handle.
+The ddi_check_acc_handle() and ddi_check_dma_handle() functions return DDI_SUCCESS if no faults affect<hy>
+ing the supplied handle are detected and DDI_FAILURE if any fault affecting the supplied handle is detected.
+ static int
+ xxattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
+ {
+  ...
+  /* This driver uses only a single register-access handle */
+  status = ddi_regs_map_setup(dip, REGSET_ZERO, &regaddr,
+  0, 0, , &acc_attrs, &acc_hdl);
+  if (status != DDI_SUCCESS)
+  return (DDI_FAILURE);
+  ...
+ }
+ static int
+ xxread(dev_t dev, struct uio *uio_p, cred_t *cred_p)
+ {
+  ...
+  if (ddi_check_acc_handle(acc_hdl) != DDI_SUCCESS) {
+<beginning of page>
+  ddi_dev_report_fault(dip, DDI_SERVICE_LOST,
+  DDI_DATAPATH_FAULT, "register access fault during read");
+  return (EIO);
+  }
+  ...
+The ddi_check_acc_handle() and ddi_check_dma_handle() functions may be called from user, kernel, or interrupt
+context.
+ddi_regs_map_setup(9F), ddi_dma_setup(9F), ddi_dev_report_fault(9F), ddi_get8(9F), ddi_put8(9F)

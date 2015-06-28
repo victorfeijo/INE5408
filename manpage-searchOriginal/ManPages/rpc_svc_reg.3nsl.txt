@@ -1,0 +1,49 @@
+<beginning of page>
+rpc_svc_reg, rpc_reg, svc_reg, svc_unreg, svc_auth_reg, xprt_register, xprt_unregister <-> library routines for register<hy>
+ing servers
+These routines are a part of the RPC library which allows the RPC servers to register themselves with rpcbind()
+(see rpcbind(1M)), and associate the given program and version number with the dispatch function. When the RPC
+server receives a RPC request, the library invokes the dispatch routine with the appropriate arguments.
+See rpc(3NSL) for the definition of the SVCXPRT data structure.
+ #include <rpc/rpc.h>
+bool_t rpc_reg(const rpcprog_t prognum, const rpcvers_t versnum, const rpcproc_t procnum, char * (*proc<hy>
+name)(), const xdrproc_t inproc, const xdrproc_t outproc, const char *nettype);
+Register program prognum, procedure procname, and version versnum with the RPC service package. If a request
+arrives for program prognum, version versnum, and procedure procnum, procname is called with a pointer to its pa<hy>
+rameter(s); procname should return a pointer to its static result(s). The arg parameter to procname is a pointer to the
+(decoded) procedure argument. inproc is the XDR function used to decode the parameters while outproc is the XDR
+function used to encode the results. Procedures are registered on all available transports of the class nettype. See
+rpc(3NSL). This routine returns 0 if the registration succeeded, <mi>1 otherwise.
+int svc_reg(const SVCXPRT *xprt, const rpcprog_t prognum, const rpcvers_t versnum, const void (*dispatch)(),
+const struct netconfig *netconf);
+Associates prognum and versnum with the service dispatch procedure, dispatch. If netconf is NULL, the service is
+not registered with the rpcbind service. For example, if a service has already been registered using some other
+means, such as inetd (see inetd(1M)), it will not need to be registered again. If netconf is non-zero, then a mapping
+of the triple [prognum, versnum, netconf->] to xprt-> xp_ltaddr is established with the local rpcbind service.
+The svc_reg() routine returns 1 if it succeeds, and 0 otherwise.
+void svc_unreg(const rpcprog_t prognum, const rpcvers_t versnum);
+Remove from the rpcbind service, all mappings of the triple [prognum, versnum, all-transports] to network address
+and all mappings within the RPC service package of the double [prognum, versnum] to dispatch routines.
+int svc_auth_reg(const int cred_flavor, const enum auth_stat (*handler)());
+Registers the service authentication routine handler with the dispatch mechanism so that it can be invoked to authen<hy>
+ticate RPC requests received with authentication type cred_flavor. This interface allows developers to add new au<hy>
+thentication types to their RPC applications without needing to modify the libraries. Service implementors usually
+do not need this routine.
+Typical service application would call svc_auth_reg() after registering the service and prior to calling svc_run().
+When needed to process an RPC credential of type cred_flavor, the handler procedure will be called with two pa<hy>
+rameters (struct svc_req *rqst, struct rpc_msg *msg) and is expected to return a valid enum auth_stat value.
+There is no provision to change or delete an authentication handler once registered.
+The svc_auth_reg() routine returns 0 if the registration is successful, 1 if cred_flavor already has an authentication
+handler registered for it, and <mi>1 otherwise.
+void xprt_register(const SVCXPRT *xprt);
+After RPC service transport handle xprt is created, it is registered with the RPC service package. This routine modi<hy>
+fies the global variable svc_fdset (see rpc_svc_calls(3NSL)). Service implementors usually do not need this routine.
+void xprt_unregister(const SVCXPRT *xprt);
+Before an RPC service transport handle xprt is destroyed, it unregisters itself with the RPC service package. This
+routine modifies the global variable svc_fdset (see rpc_svc_calls(3NSL)). Service implementors usually do not need
+this routine.
+<beginning of page>
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelMT-Safe
+inetd(1M), rpcbind(1M), rpc(3NSL), rpc_svc_calls(3NSL), rpc_svc_create(3NSL), rpc_svc_err(3NSL),
+rpcbind(3NSL), select(3C), attributes(5)

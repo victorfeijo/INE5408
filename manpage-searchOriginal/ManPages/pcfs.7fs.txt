@@ -1,0 +1,157 @@
+<beginning of page>
+pcfs <-> FAT formatted file system
+#include <sys/param.h>
+#include <sys/mount.h>
+#include <sys/fs/pc_fs.h>
+int mount(const char *spec,
+ const char * dir, int mflag,
+ "pcfs", NULL, 0, char *optptr,
+ int optlen);
+pcfs is a file system type that enables direct access to files on FAT formatted disks from within the SunOS operating
+system.
+Once mounted, pcfs provides standard SunOS file operations and semantics. Using pcfs, you can create, delete,
+read, and write files on a FAT formatted disk. You can also create and delete directories and list files in a directory.
+pcfs supports FAT12 (floppies) and FAT16 and FAT32 file systems.
+pcfs file systems can be force umounted using the -f argument to umount(1M).
+The pcfs file system contained on the block special file identified by spec is mounted on the directory identified by
+dir. spec and dir are pointers to pathnames. mflag specifies the mount options. The MS_DATA bit in mflag must be
+set. Mount options can be passed to pcfs using the optptr and optlen arguments. See mount_pcfs(1M) for a list of
+mount options supported by pcfs.
+Because FAT formatted media can record file timestamps between January 1st 1980 and December 31st 2127, it's
+not possible to fully represent UNIX time_t in pcfs for 32 bit or 64 bit programs. In particular, if post-2038 time<hy>
+stamps are present on a FAT formatted medium and pcfs returns these, 32bit applications may unexpectedly fail with
+EOVERFLOW errors. To prevent this, the default behaviour of pcfs has been modified to clamp post-2038 time<hy>
+stamps to the latest possible value for a 32bit time_t, which is January 19th 2038, 03:14:06 UTC when setting and
+retrieving file timestamps. You can override this behavior using the noclamptime mount option, as described in
+mount_pcfs(1M).
+Timestamps on FAT formatted media are recorded in local time. If the recording and receiving systems use different
+timezones, the representation of timestamps shown on the two systems for the same medium might vary. To correct
+this, pcfs provides a timezone mount option to force interpretation of timestamps as read from a FAT formatted
+medium in a given timezone (that of the recorder). By default, the local timezone of the receiver is used. See
+mount_pcfs(1M) for details.
+The root directory of a FAT formatted medium has no timestamps and pcfs returns the time when the mount was
+done as timestamp for the root of the filesystem.
+The FAT filesystem doesn't support multiple links. As a result, the link count for all files and directories in pcfs is
+hard-coded as "1."
+Use the following command to mount pcfs from diskette:
+ mount -F pcfs device-special directory-name
+You can use:
+ mount directory-name
+if the following line is in your /etc/vfstab file:
+ device-special - directory-namepcfs <mi> no rw
+Use the following command to mount pcfs from non-diskette media:
+ mount -F pcfs device-special:logical-drive directory-name
+<beginning of page>
+You can use:
+ mount directory-name
+if the following line is in your /etc/vfstab file:
+ device-special:logical_drive <mi> directory-name pcfs <mi> no rw
+device-special specifies the special block device file for the diskette (/dev/disketteN) or the entire hard disk
+(/dev/dsk/cNtNdNp0 for a SCSI disk, and /dev/dsk/cNdNp0 for IDE disks) or the PCMCIA pseudo-floppy memory
+card (/dev/dsk/cNtNdNsN).
+logical-drive specifies either the DOS logical drive letter (c through z) or a drive number (1 through 24). Drive letter
+c is equivalent to drive number 1 and represents the Primary DOS partition on the disk; drive letters d through z are
+equivalent to drive numbers 2 through 24, and represent DOS drives within the Extended FAT partition. Note that
+device-special and logical-drive must be separated by a colon.
+directory-name specifies the location where the file system is mounted.
+For example, to mount the Primary DOS partition from a SCSI hard disk, use:
+ mount -F pcfs /dev/dsk/cNtNdNp0:c /pcfs/c
+To mount the first logical drive in the Extended DOS partition from an IDE hard disk, use:
+ mount -F pcfs /dev/dsk/cNdNp0:d /pcfs/d
+To mount a DOS diskette in the first floppy drive when volume management is not running use:
+ mount -F pcfs /dev/diskette /pcfs/a
+If Volume Management is running, run volcheck(1) to automatically mount the floppy and some removable disks.
+To mount a PCMCIA pseudo-floppy memory card, with Volume Management not running (or not managing the
+PCMCIA media), use:
+ mount -F pcfs /dev/dsk/cNtNdNsN /pcfs
+Files and directories created through pcfs must comply with either the FAT short file name convention or the long
+file name convention introduced with Windows 95. The FAT short file name convention is of the form filename[.ext],
+where filename generally consists of from one to eight upper-case characters, while the optional ext consists of from
+one to three upper-case characters.
+The long file name convention is much closer to Solaris file names. A long file name can consist of any characters
+valid in a short file name, lowercase letters, non-leading spaces, the characters +,;=[], any number of periods, and
+can be up to 255 characters long. Long file names have an associated short file name for systems that do not support
+long file names (including earlier releases of Solaris). The short file name is not visible if the system recognizes long
+file names. pcfs generates a unique short name automatically when creating a long file name.
+Given a long file name such as This is a really long filename.TXT, the short file name will generally be of the form
+THISIS~N.TXT, where N is a number. The long file name will probably get the short name THISIS~1.TXT, or
+THISIS~2.TXT if THISIS~1.TXT already exits (or THISIS~3.TXT if both exist, and so forth). If you use pcfs file
+<beginning of page>
+systems on systems that do not support long file names, you may want to continue following the short file name con<hy>
+ventions. See EXAMPLES.
+When creating a file name, pcfs creates a short file name if it fits the FAT short file name format, otherwise it creates
+a long file name. This is because long file names take more directory space. Because the root directory of a pcfs file
+system is fixed size, long file names in the root directory should be avoided if possible.
+When displaying file names, pcfs shows them exactly as they are on the media. This means that short names are dis<hy>
+played as uppercase and long file names retain their case. Earlier versions of pcfs folded all names to lowercase,
+which can be forced with the PCFS_MNT_FOLDCASE mount option. All file name searches within pcfs, howev<hy>
+er, are treated as if they were uppercase, so readme.txt and ReAdMe.TxT refer to the same file.
+To format a diskette or a PCMCIA pseudo-floppy memory card in FAT format in the SunOS system, use either the
+fdformat -d or the DOS FORMAT command.
+On x86 systems, hard drives may contain an fdisk partition reserved for the Solaris boot utilities. These partitions
+are special instances of pcfs. You can mount an x86 boot partition with the command:
+ mount -F pcfs device-special:boot directory-name
+or you can use:
+ mount directory-name
+if the following line is in your /etc/vfstab file:
+ device-special:boot <mi> directory-name pcfs <mi> no rw
+device-special specifies the special block device file for the entire hard disk (/dev/dsk/cNtNdNp0)
+directory-name specifies the location where the file system is mounted.
+All files on a boot partition are owned by super-user. Only the super-user may create, delete, or modify files on a
+boot partition. Example 1 Sample Displays of File Names
+If you copy a file financial.data from a UNIX file system to pcfs, it displays as financial.data in pcfs, but may
+show up as FINANC~1.DAT in systems that do not support long file names.
+The following are legal long file names. They are also illegal short file names:
+ test.sh.orig
+ data+
+ .login
+Other systems that do not support long file names may see:
+ TESTSH~1.ORI
+ DATA~1
+ LOGIN~1
+The short file name is generated from the initial characters of the long file name, so differentiate names in the first
+few characters. For example, these names:
+ WorkReport.January.Data
+ WorkReport.February.Data
+ WorkReport.March.Data
+result in these short names, which are not distinguishable:
+<beginning of page>
+ WORKRE~1.DAT
+ WORKRE~2.DAT
+ WORKRE~13.DAT
+These names, however:
+ January.WorkReport.Data
+ February.WorkReport.Data
+ March.WorkReport.Data
+result in the more descriptive short names:
+ JANUAR~1.DAT
+ FEBRUA~1.DAT
+ MARCHW~1.DAT
+/usr/lib/fs/pcfs/mount pcfs mount command
+/usr/kernel/fs/pcfs 32-bit kernel module
+See environ(5) for descriptions of the following environment variables for the current locale setting: LANG,
+LC_ALL, LC_CTYPE, and LC_COLLATE.
+chgrp(1), chown(1), dos2unix(1), eject(1), fdformat(1), unix2dos(1), volcheck(1), mount(1M), mount_pcfs(1M),
+umount(1M), ctime(3C), vfstab(4), environ(5), pcmem(7D)
+Do not physically eject a FAT floppy while the device is mounted as pcfs. If Volume Management is managing a de<hy>
+vice, use the eject(1) command before physically removing media.
+When mounting pcfs on a hard disk, make sure the first block on that device contains a valid fdisk partition table.
+Because pcfs has no provision for handling owner-IDs or group-IDs on files, chown(1) or chgrp(1) may generate
+various errors. This is a limitation of pcfs, but it should not cause problems other than error messages.
+Only the following characters are allowed in pcfs short file names and extensions:
+ 0-9
+ A-Z
+ $#&@!%()-{}<>`_^~|'
+SunOS and FAT use different character sets and have different requirements for the text file format. Use the
+dos2unix(1) and unix2dos(1) commands to convert files between them.
+pcfs offers a convenient transportation vehicle for files between Sun workstations and PCs. Because the FAT disk
+format was designed for use under DOS, it does not operate efficiently under the SunOS system and should not be
+used as the format for a regular local storage. Instead, use ufs for local storage within the SunOS system.
+Although long file names can contain spaces (just as in UNIX file names), some utilities may be confused by them.
+This implementation of pcfs conforms to the behavior exhibited by Windows 95 version 4.00.950.
+When pcfs encounters long file names with non-ASCII characters, it converts such long file names in Unicode scalar
+values into UTF-8 encoded filenames so that they are legible and usable with any of Solaris UTF-8 locales. In the
+same context, when new file names with non-ASCII characters are created, pcfs expects that such file names are in
+UTF-8. This feature increases the interoperability of pcfs on Solaris with other operating systems.
+pcfs should handle the disk change condition in the same way that DOS does, so you do not need to unmount the file
+system to change floppies.

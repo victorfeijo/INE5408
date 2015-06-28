@@ -1,0 +1,200 @@
+<beginning of page>
+cpc_bind_event, cpc_take_sample, cpc_rele <-> use CPU performance counters on lwps
+cc [ flag... ] file... <mi>lcpc [ library... ]
+#include <libcpc.h>
+int cpc_bind_event(cpc_event_t *event, int flags);
+int cpc_take_sample(cpc_event_t *event);
+int cpc_rele(void);
+Once the events to be sampled have been selected using, for example, cpc_strtoevent(3CPC), the event selections
+can be bound to the calling LWP using cpc_bind_event(). If cpc_bind_event() returns successfully, the system has
+associated performance counter context with the calling LWP. The context allows the system to virtualize the hard<hy>
+ware counters to that specific LWP, and the counters are enabled.
+Two flags are defined that can be passed into the routine to allow the behavior of the interface to be modified, as de<hy>
+scribed below.
+Counter values can be sampled at any time by calling cpc_take_sample(), and dereferencing the fields of the
+ce_pic[] array returned. The ce_hrt field contains the timestamp at which the kernel last sampled the counters.
+To immediately remove the performance counter context on an LWP, the cpc_rele() interface should be used. Other<hy>
+wise, the context will be destroyed after the LWP or process exits.
+The caller should take steps to ensure that the counters are sampled often enough to avoid the 32-bit counters wrap<hy>
+ping. The events most prone to wrap are those that count processor clock cycles. If such an event is of interest, sam<hy>
+pling should occur frequently so that less than 4 billion clock cycles can occur between samples. Practically speak<hy>
+ing, this is only likely to be a problem for otherwise idle systems, or when processes are bound to processors, since
+normal context switching behavior will otherwise hide this problem.
+Upon successful completion, cpc_bind_event() and cpc_take_sample() return 0. Otherwise, these functions return
+<mi>1, and set errno to indicate the error.
+The cpc_bind_event() and cpc_take_sample() functions will fail if:
+EACCES For cpc_bind_event(), access to the requested hypervisor event was denied.
+EAGAIN Another process may be sampling system-wide CPU statistics. For cpc_bind_event(), this implies that no
+new contexts can be created. For cpc_take_sample(), this implies that the performance counter context has been in<hy>
+validated and must be released with cpc_rele(). Robust programs should be coded to expect this behavior and recov<hy>
+er from it by releasing the now invalid context by calling cpc_rele() sleeping for a while, then attempting to bind and
+sample the event once more.
+EINVAL The cpc_take_sample() function has been invoked before the context is bound.
+ENOTSUP The caller has attempted an operation that is illegal or not supported on the current platform, such as at<hy>
+tempting to specify signal delivery on counter overflow on a CPU that doesn't generate an interrupt on counter over<hy>
+flow.
+Prior to calling cpc_bind_event(), applications should call cpc_access(3CPC) to determine if the counters are ac<hy>
+cessible on the system. Example 1 Use hardware performance counters to measure events in a process.
+The example below shows how a standalone program can be instrumented with the libcpc routines to use hardware
+performance counters to measure events in a process. The program performs 20 iterations of a computation, measur<hy>
+ing the counter values for each iteration. By default, the example makes the counters measure external cache refer<hy>
+ences and external cache hits; these options are only appropriate for UltraSPARC processors. By setting the PER<hy>
+FEVENTS environment variable to other strings (a list of which can be gleaned from the -h flag of the cpustat or
+cputrack utilities), other events can be counted. The error() routine below is assumed to be a user-provided routine
+analogous to the familiar printf(3C) routine from the C library but which also performs an exit(2) after printing the
+message.
+<beginning of page>
+ #include <inttypes.h>
+ #include <stdlib.h>
+ #include <stdio.h>
+ #include <unistd.h>
+ #include <libcpc.h>
+ int
+ main(int argc, char *argv[])
+ {
+ int cpuver, iter;
+ char *setting = NULL;
+ cpc_event_t event;
+ if (cpc_version(CPC_VER_CURRENT) != CPC_VER_CURRENT)
+  error("application:library cpc version mismatch!");
+ if ((cpuver = cpc_getcpuver()) == -1)
+  error("no performance counter hardware!");
+ if ((setting = getenv("PERFEVENTS")) == NULL)
+  setting = "pic0=EC_ref,pic1=EC_hit";
+ if (cpc_strtoevent(cpuver, setting, &event) != 0)
+  error("can't measure '%s' on this processor", setting);
+ setting = cpc_eventtostr(&event);
+ if (cpc_access() == -1)
+  error("can't access perf counters: %s", strerror(errno));
+ if (cpc_bind_event(&event, 0) == -1)
+  error("can't bind lwp%d: %s", _lwp_self(), strerror(errno));
+ for (iter = 1; iter <= 20; iter++) {
+  cpc_event_t before, after;
+  if (cpc_take_sample(&before) == -1)
+  break;
+  /* ==> Computation to be measured goes here <== */
+  if (cpc_take_sample(&after) == -1)
+  break;
+  (void) printf("%3d: %" PRId64 " %" PRId64 "0, iter,
+  after.ce_pic[0] - before.ce_pic[0],
+  after.ce_pic[1] - before.ce_pic[1]);
+ }
+ if (iter != 20)
+  error("can't sample '%s': %s", setting, strerror(errno));
+ free(setting);
+ return (0);
+ }
+Example 2 Write a signal handler to catch overflow signals.
+This example builds on Example 1, but demonstrates how to write the signal handler to catch overflow signals. The
+counters are preset so that counter zero is 1000 counts short of overflowing, while counter one is set to zero. After
+1000 counts on counter zero, the signal handler will be invoked.
+First the signal handler:
+ #define PRESET0 (UINT64_MAX - UINT64_C(999))
+ #define PRESET1 0
+<beginning of page>
+ void
+ emt_handler(int sig, siginfo_t *sip, void *arg)
+ {
+ ucontext_t *uap = arg;
+ cpc_event_t sample;
+ if (sig != SIGEMT || sip->si_code != EMT_CPCOVF) {
+  psignal(sig, "example");
+  psiginfo(sip, "example");
+  return;
+ }
+ (void) printf("lwp%d - si_addr %p ucontext: %%pc %p %%sp %p0,
+  _lwp_self(), (void *)sip->si_addr,
+  (void *)uap->uc_mcontext.gregs[PC],
+  (void *)uap->uc_mcontext.gregs[USP]);
+ if (cpc_take_sample(&sample) == -1)
+  error("can't sample: %s", strerror(errno));
+ (void) printf("0x%" PRIx64 " 0x%" PRIx64 "0,
+  sample.ce_pic[0], sample.ce_pic[1]);
+ (void) fflush(stdout);
+ sample.ce_pic[0] = PRESET0;
+ sample.ce_pic[1] = PRESET1;
+ if (cpc_bind_event(&sample, CPC_BIND_EMT_OVF) == -1)
+  error("cannot bind lwp%d: %s", _lwp_self(), strerror(errno));
+ }
+and second the setup code (this can be placed after the code that selects the event to be measured):
+ struct sigaction act;
+ cpc_event_t event;
+ ...
+ act.sa_sigaction = emt_handler;
+ bzero(&act.sa_mask, sizeof (act.sa_mask));
+ act.sa_flags = SA_RESTART|SA_SIGINFO;
+ if (sigaction(SIGEMT, &act, NULL) == -1)
+  error("sigaction: %s", strerror(errno));
+ event.ce_pic[0] = PRESET0;
+ event.ce_pic[1] = PRESET1;
+ if (cpc_bind_event(&event, CPC_BIND_EMT_OVF) == -1)
+  error("cannot bind lwp%d: %s", _lwp_self(), strerror(errno));
+ for (iter = 1; iter <= 20; iter++) {
+  /* ==> Computation to be measured goes here <== */
+ }
+ cpc_bind_event(NULL, 0); /* done */
+Note that a more general version of the signal handler would use write(2) directly instead of depending on the sig<hy>
+nal-unsafe semantics of stderr and stdout. Most real signal handlers will probably do more with the samples than
+just print them out.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelMT-Safe
+_ Interface StabilityObsolete
+<beginning of page>
+cpustat(1M), cputrack(1), write(2). cpc(3CPC), cpc_access(3CPC), cpc_bind_curlwp(3CPC), cpc_set_sam<hy>
+ple(3CPC), cpc_strtoevent(3CPC), cpc_unbind(3CPC), libcpc(3LIB), attributes(5)
+The cpc_bind_event(), cpc_take_sample(), and cpc_rele() functions exist for binary compatibility only. Source
+containing these functions will not compile. These functions are obsolete and might be removed in a future release.
+Applications should use cpc_bind_curlwp(3CPC), cpc_set_sample(3CPC), and cpc_unbind(3CPC) instead.
+Sometimes, even the overhead of performing a system call will be too disruptive to the events being measured. Once
+a call to cpc_bind_event() has been issued, it is possible to directly access the performance hardware registers from
+within the application. If the performance counter context is active, then the counters will count on behalf of the cur<hy>
+rent LWP.
+ rd %pic, %rN ! All UltraSPARC
+ wr %rN, %pic ! (ditto, but see text)
+ rdpmc ! Pentium II only
+If the counter context is not active or has been invalidated, the %pic register (SPARC), and the rdpmc instruction
+(Pentium) will become unavailable.
+Note that the two 32-bit UltraSPARC performance counters are kept in the single 64-bit %pic register so a couple of
+additional instructions are required to separate the values. Also note that when the %pcr register bit has been set
+that configures the %pic register as readable by an application, it is also writable. Any values written will be pre<hy>
+served by the context switching mechanism.
+Pentium II processors support the non-privileged rdpmc instruction which requires [5] that the counter of interest be
+specified in %ecx, and returns a 40-bit value in the %edx:%eax register pair. There is no non-privileged access
+mechanism for Pentium I processors.
+As described above, when counting events, some processors allow their counter registers to silently overflow. More
+recent CPUs such as UltraSPARC III and Pentium II, however, are capable of generating an interrupt when the hard<hy>
+ware counter overflows. Some processors offer more control over when interrupts will actually be generated. For ex<hy>
+ample, they might allow the interrupt to be programmed to occur when only one of the counters overflows. See
+cpc_strtoevent(3CPC) for the syntax.
+The most obvious use for this facility is to ensure that the full 64-bit counter values are maintained without repeated
+sampling. However, current hardware does not record which counter overflowed. A more subtle use for this facility
+is to preset the counter to a value to a little less than the maximum value, then use the resulting interrupt to catch the
+counter overflow associated with that event. The overflow can then be used as an indication of the frequency of the
+occurrence of that event.
+Note that the interrupt generated by the processor may not be particularly precise. That is, the particular instruction
+that caused the counter overflow may be earlier in the instruction stream than is indicated by the program counter
+value in the ucontext.
+When cpc_bind_event() is called with the CPC_BIND_EMT_OVF flag set, then as before, the control registers
+and counters are preset from the 64-bit values contained in event. However, when the flag is set, the kernel arranges
+to send the calling process a SIGEMT signal when the overflow occurs, with the si_code field of the corresponding
+siginfo structure set to EMT_CPCOVF, and the si_addr field is the program counter value at the time the overflow
+interrupt was delivered. Counting is disabled until the next call to cpc_bind_event(). Even in a multithreaded
+process, during execution of the signal handler, the thread behaves as if it is temporarily bound to the running LWP.
+Different processors have different counter ranges available, though all processors supported by Solaris allow at least
+31 bits to be specified as a counter preset value; thus portable preset values lie in the range UINT64_MAX to
+UINT64_MAX<mi>INT32_MAX.
+The appropriate preset value will often need to be determined experimentally. Typically, it will depend on the event
+being measured, as well as the desire to minimize the impact of the act of measurement on the event being mea<hy>
+sured; less frequent interrupts and samples lead to less perturbation of the system.
+If the processor cannot detect counter overflow, this call will fail (ENOTSUP). Specifying a null event unbinds the
+context from the underlying LWP and disables signal delivery. Currently, only user events can be measured using
+<beginning of page>
+this technique. See Example 2, above.
+By default, the library binds the performance counter context to the current LWP only. If the
+CPC_BIND_LWP_INHERIT flag is set, then any subsequent LWPs created by that LWP will automatically inher<hy>
+it the same performance counter context. The counters will be initialized to 0 as if a cpc_bind_event() had just been
+issued. This automatic inheritance behavior can be useful when dealing with multithreaded programs to determine
+aggregate statistics for the program as a whole.
+If the CPC_BIND_EMT_OVF flag is also set, the process will immediately dispatch a SIGEMT signal to the
+freshly created LWP so that it can preset its counters appropriately on the new LWP. This initialization condition
+can be detected using cpc_take_sample() to check that both ce_pic[] values are set to UINT64_MAX.

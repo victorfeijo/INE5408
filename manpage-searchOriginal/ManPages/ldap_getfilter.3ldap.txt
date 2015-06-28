@@ -1,0 +1,55 @@
+<beginning of page>
+ldap_getfilter, ldap_init_getfilter, ldap_init_getfilter_buf, ldap_getfilter_free, ldap_getfirstfilter, ldap_getnextfilter,
+ldap_setfilteraffixes, ldap_build_filter <-> LDAP filter generating functions
+cc[ flag... ] file... -lldap[ library... ]
+#include <lber.h>
+#include <ldap.h>
+#define LDAP_FILT_MAXSIZ 1024
+LDAPFiltDesc *ldap_init_getfilter(char *file);
+LDAPFiltDesc *ldap_init_getfilter_buf(char *buf, long buflen);
+ldap_getfilter_free(LDAPFiltDesc *lfdp);
+LDAPFiltInfo *ldap_getfirstfilter(LDAPFiltDesc *lfdp, char *tagpat,
+ char *value);
+LDAPFiltInfo *ldap_getnextfilter(LDAPFiltDesc *lfdp);
+void ldap_setfilteraffixes(LDAPFiltDesc *lfdp, char *prefix,
+ char *suffix);
+void ldap_build_filter(char *buf, unsigned long buflen, char *pattern,
+ char *prefix, char *suffix, char *attr, char *value,
+ char **valwords);
+These functions are used to generate filters to be used in ldap_search(3LDAP) or ldap_search_s(3LDAP). Either
+ldap_init_getfilter or ldap_init_getfilter_buf must be called prior to calling any of the other functions except
+ldap_build_filter.
+ldap_init_getfilter() takes a file name as its only argument. The contents of the file must be a valid LDAP filter
+configuration file (see ldapfilter.conf(4)). If the file is successfully read, a pointer to an LDAPFiltDesc is returned.
+This is an opaque object that is passed in subsequent get filter calls.
+ldap_init_getfilter_buf() reads from buf, whose length is buflen, the LDAP filter configuration information. buf
+must point to the contents of a valid LDAP filter configuration file. See ldapfilter.conf(4). If the filter configuration
+information is successfully read, a pointer to an LDAPFiltDesc is returned. This is an opaque object that is passed
+in subsequent get filter calls.
+ldap_getfilter_free() deallocates the memory consumed by ldap_init_getfilter. Once it is called, the LDAPFilt<hy>
+Desc is no longer valid and cannot be used again.
+ldap_getfirstfilter() retrieves the first filter that is appropriate for value. Only filter sets that have tags that match the
+regular expession tagpat are considered. ldap_getfirstfilter returns a pointer to an LDAPFiltInfo structure, which
+contains a filter with value inserted as appropriate in lfi_filter, a text match description in lfi_desc, lfi_scope set to
+indicate the search scope, and lfi_isexact set to indicate the type of filter. NULL is returned if no matching filters
+are found. lfi_scope will be one of LDAP_SCOPE_BASE, LDAP_SCOPE_ONELEVEL, or
+LDAP_SCOPE_SUBTREE. lfi_isexact will be zero if the filter has any '~' or '*' characters in it and non-zero oth<hy>
+erwise.
+ldap_getnextfilter() retrieves the next appropriate filter in the filter set that was determined when ldap_getfirstfil<hy>
+ter was called. It returns NULL when the list has been exhausted.
+ldap_setfilteraffixes() sets a prefix to be prepended and a suffix to be appended to all filters returned in the future.
+ldap_build_filter() constructs an LDAP search filter in buf. buflen is the size, in bytes, of the largest filter buf can
+hold. A pattern for the desired filter is passed in pattern. Where the string %a appears in the pattern it is replaced
+with attr. prefix is pre-pended to the resulting filter, and suffix is appended. Either can be NULL , in which case they
+are not used. value and valwords are used when the string %v appears in pattern. See ldapfilter.conf(4) for a de<hy>
+scription of how %v is handled.
+NULL is returned by ldap_init_getfilter if there is an error reading file. NULL is returned by ldap_getfirstfilter
+and ldap_getnextfilter when there are no more appropriate filters to return.
+ETCDIR/ldapfilter.conf LDAP filtering routine configuration file.
+<beginning of page>
+See attributes(5) for a description of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE AvailabilitySUNWcsl
+(32-bit) SUNWcslx (64-bit) Interface StabilityEvolving
+ldap(3LDAP), ldapfilter.conf(4), attributes(5)
+The return values for all of these functions are declared in the <ldap.h> header file. Some functions may allocate
+memory which must be freed by the calling application.

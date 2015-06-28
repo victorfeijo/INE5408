@@ -1,0 +1,312 @@
+<beginning of page>
+rpc <-> library routines for remote procedure calls
+cc [ flag ... ] file ... -lnsl [ library ... ]
+#include <rpc/rpc.h>
+#include <netconfig.h>
+These routines allow C language programs to make procedure calls on other machines across a network. First, the
+client sends a request to the server. On receipt of the request, the server calls a dispatch routine to perform the re<hy>
+quested service, and then sends back a reply.
+All RPC routines require the header <rpc/rpc.h>. Routines that take a netconfig structure also require that <net<hy>
+config.h> be included. Applications using RPC and XDR routines should be linked with the libnsl library.
+In the case of multithreaded applications, the -mt option must be specified on the command line at compilation time
+to enable a thread-specific version of rpc_createerr(). See rpc_clnt_create(3NSL) and threads(5).
+When used in multithreaded applications, client-side routines are MT-Safe. CLIENT handles can be shared between
+threads; however, in this implementation, requests by different threads are serialized (that is, the first request will re<hy>
+ceive its results before the second request is sent). See rpc_clnt_create(3NSL).
+When used in multithreaded applications, server-side routines are usually Unsafe. In this implementation the service
+transport handle, SVCXPRT contains a single data area for decoding arguments and encoding results. See
+rpc_svc_create(3NSL). Therefore, this structure cannot be freely shared between threads that call functions that do
+this. Routines that are affected by this restriction are marked as unsafe for MT applications. See
+rpc_svc_calls(3NSL).
+Some of the high-level RPC interface routines take a nettype string as one of the parameters (for example, clnt_cre<hy>
+ate(), svc_create(), rpc_reg(), rpc_call()). This string defines a class of transports which can be used for a particular
+application.
+nettype can be one of the following:
+netpath Choose from the transports which have been indicated by their token names in the NETPATH environment
+variable. If NETPATH is unset or NULL, it defaults to visible. netpath is the default nettype.
+visible Choose the transports which have the visible flag (v) set in the /etc/netconfig file.
+circuit_v This is same as visible except that it chooses only the connection oriented transports (semantics tpi_cots
+or tpi_cots_ord) from the entries in the /etc/netconfig file.
+datagram_v This is same as visible except that it chooses only the connectionless datagram transports (semantics
+tpi_clts) from the entries in the /etc/netconfig file.
+circuit_n This is same as netpath except that it chooses only the connection oriented datagram transports (seman<hy>
+tics tpi_cots or tpi_cots_ord).
+datagram_n This is same as netpath except that it chooses only the connectionless datagram transports (semantics
+tpi_clts).
+udp This refers to Internet UDP.
+tcp This refers to Internet TCP.
+If nettype is NULL, it defaults to netpath. The transports are tried in left to right order in the NETPATH variable
+or in top to down order in the /etc/netconfig file.
+In a 64-bit environment, the derived types are defined as follows:
+<beginning of page>
+tab(); lw(1.83i) lw(1.83i) lw(1.83i) lw(1.83i) lw(1.83i) lw(1.83i) typedefuint32_trpcprog_t; typedefuint32_tr<hy>
+pcvers_t; typedefuint32_trpcproc_t; typedefuint32_trpcprot_t; typedefuint32_trpcport_t; typedefint32_tr<hy>
+pc_inline_t;
+In a 32-bit environment, the derived types are defined as follows:
+tab(); lw(1.83i) lw(1.83i) lw(1.83i) lw(1.83i) lw(1.83i) lw(1.83i) typedefunsigned longrpcprog_t; typedefun<hy>
+signed longrpcvers_t; typedefunsigned longrpcproc_t; typedefunsigned longrpcprot_t; typedefunsigned lon<hy>
+grpcport_t; typedeflongrpc_inline_t;
+Some of the data structures used by the RPC package are shown below.
+ union des_block {
+  struct {
+  u_int32 high;
+  u_int32 low;
+  } key;
+ char c[8];
+ };
+ typedef union des_block des_block;
+ extern bool_t xdr_des_block();
+ /*
+  * Authentication info. Opaque to client.
+ */
+ struct opaque_auth {
+  enum_t oa_flavor; /* flavor of auth */
+  caddr_t oa_base; /* address of more auth stuff */
+  uint_t oa_length; /* not to exceed MAX_AUTH_BYTES */
+ };
+ /*
+  * Auth handle, interface to client side authenticators.
+ */
+  typedef struct {
+  struct opaque_auth ah_cred;
+  struct opaque_auth ah_verf;
+  union des_block ah_key;
+  struct auth_ops {
+  void(*ah_nextverf)();
+  int(*ah_marshal)(); /* nextverf & serialize */
+  int(*ah_validate)(); /* validate verifier */
+  int(*ah_refresh)(); /* refresh credentials */
+  void(*ah_destroy)(); /* destroy this structure */
+  } *ah_ops;
+  caddr_t ah_private;
+ } AUTH;
+ /*
+  * Client rpc handle.
+  * Created by individual implementations.
+  * Client is responsible for initializing auth.
+  */
+  typedef struct {
+  AUTH *cl_auth; /* authenticator */
+  struct clnt_ops {
+  enum clnt_stat (*cl_call)(); /* call remote procedure */
+  void (*cl_abort)(); /* abort a call */
+  void (*cl_geterr)(); /* get specific error code */
+  bool_t (*cl_freeres)(); /* frees results */
+  void (*cl_destroy)(); /* destroy this structure */
+<beginning of page>
+  bool_t (*cl_control)(); /* the ioctl() of rpc */
+  int (*cl_settimers)(); /* set rpc level timers */
+  } *cl_ops;
+  caddr_t cl_private; /* private stuff */
+  char *cl_netid; /* network identifier */
+  char *cl_tp; /* device name */
+ } CLIENT;
+ enum xprt_stat {
+ XPRT_DIED,
+ XPRT_MOREREQS,
+ XPRT_IDLE
+ };
+ /*
+  * Server side transport handle
+  */
+ typedef struct {
+  int xp_fd; /* file descriptor for the
+  ushort_t xp_port; /* obsolete */
+  struct xp_ops {
+  bool_t (*xp_recv)(); /* receive incoming requests */
+  enum xprt_stat (*xp_stat)(); /* get transport status */
+  bool_t (*xp_getargs)(); /* get arguments */
+  bool_t (*xp_reply)(); /* send reply */
+  bool_t (*xp_freeargs)(); /* free mem allocated
+  for args */
+  void (*xp_destroy)(); /* destroy this struct */
+  } *xp_ops;
+  int xp_addrlen; /* length of remote addr.
+  Obsolete */
+  char *xp_tp; /* transport provider device
+  name */
+  char *xp_netid; /* network identifier */
+  struct netbuf xp_ltaddr; /* local transport address */
+  struct netbuf xp_rtaddr; /* remote transport address */
+  char xp_raddr[16]; /* remote address. Obsolete */
+  struct opaque_auth xp_verf; /* raw response verifier */
+  caddr_t xp_p1; /* private: for use
+  by svc ops */
+  caddr_t xp_p2; /* private: for use
+  by svc ops */
+  caddr_t xp_p3; /* private: for use
+  by svc lib */
+  int xp_type /* transport type */
+ } SVCXPRT;
+ struct svc_req {
+  rpcprog_t rq_prog; /* service program number */
+  rpcvers_t rq_vers; /* service protocol version */
+  rpcproc_t rq_proc; /* the desired procedure */
+  struct opaque_auth rq_cred; /* raw creds from the wire */
+  caddr_t rq_clntcred; /* read only cooked cred */
+  SVCXPRT *rq_xprt; /* associated transport */
+ };
+ /*
+  * XDR operations.
+  * XDR_ENCODE causes the type to be encoded into the stream.
+  * XDR_DECODE causes the type to be extracted from the stream.
+  * XDR_FREE can be used to release the space allocated by an XDR_DECODE
+  * request.
+  */
+<beginning of page>
+ enum xdr_op {
+  XDR_ENCODE=0,
+  XDR_DECODE=1,
+  XDR_FREE=2
+ };
+ /*
+  * This is the number of bytes per unit of external data.
+  */
+ #define BYTES_PER_XDR_UNIT (4)
+ #define RNDUP(x) ((((x) + BYTES_PER_XDR_UNIT - 1) /
+  BYTES_PER_XDR_UNIT) \ * BYTES_PER_XDR_UNIT)
+ /*
+  * A xdrproc_t exists for each data type which is to be encoded or
+  * decoded. The second argument to the xdrproc_t is a pointer to
+  * an opaque pointer. The opaque pointer generally points to a
+  * structure of the data type to be decoded. If this points to 0,
+  * then the type routines should allocate dynamic storage of the
+  * appropriate size and return it.
+  * bool_t (*xdrproc_t)(XDR *, caddr_t *);
+  */
+ typedef bool_t (*xdrproc_t)();
+ /*
+  * The XDR handle.
+  * Contains operation which is being applied to the stream,
+  * an operations vector for the particular implementation
+  */
+ typedef struct {
+ enum xdr_op x_op; /* operation; fast additional param */
+ struct xdr_ops {
+ bool_t (*x_getlong)(); /* get long from underlying stream */
+ bool_t (*x_putlong)(); /* put long to underlying stream */
+ bool_t (*x_getbytes)(); /* get bytes from underlying stream */
+ bool_t (*x_putbytes)(); /* put bytes to underlying stream */
+ uint_t (*x_getpostn)(); /* returns bytes off from beginning */
+ bool_t (*x_setpostn)(); /* reposition the stream */
+ rpc_inline_t *(*x_inline)(); /* buf quick ptr to buffered data */
+ void (*x_destroy)(); /* free privates of this xdr_stream */
+ bool_t (*x_control)(); /* changed/retrieve client object info*/
+ bool_t (*x_getint32)(); /* get int from underlying stream */
+ bool_t (*x_putint32)(); /* put int to underlying stream */
+ } *x_ops;
+ caddr_t x_public; /* users' data */
+ caddr_t x_priv /* pointer to private data */
+ caddr_t x_base; /* private used for position info */
+ int x_handy; /* extra private word */
+ XDR;
+The following table lists RPC routines and the manual reference pages on which they are described:
+RPC Routine Manual Reference Page
+auth_destroy rpc_clnt_auth(3NSL)
+authdes_create rpc_soc(3NSL)
+authdes_getucred secure_rpc(3NSL)
+<beginning of page>
+authdes_seccreate secure_rpc(3NSL)
+authnone_create rpc_clnt_auth(3NSL)
+authsys_create rpc_clnt_auth(3NSL)
+authsys_create_default rpc_clnt_auth(3NSL)
+authunix_create rpc_soc(3NSL)
+authunix_create_default rpc_soc(3NSL)
+callrpc rpc_soc(3NSL)
+clnt_broadcast rpc_soc(3NSL)
+clnt_call rpc_clnt_calls(3NSL)
+clnt_control rpc_clnt_create(3NSL)
+clnt_create rpc_clnt_create(3NSL)
+clnt_destroy rpc_clnt_create(3NSL)
+clnt_dg_create rpc_clnt_create(3NSL)
+clnt_freeres rpc_clnt_calls(3NSL)
+clnt_geterr rpc_clnt_calls(3NSL)
+clnt_pcreateerror rpc_clnt_create(3NSL)
+clnt_perrno rpc_clnt_calls(3NSL)
+clnt_perror rpc_clnt_calls(3NSL)
+clnt_raw_create rpc_clnt_create(3NSL)
+clnt_spcreateerror rpc_clnt_create(3NSL)
+clnt_sperrno rpc_clnt_calls(3NSL)
+clnt_sperror rpc_clnt_calls(3NSL)
+<beginning of page>
+clnt_tli_create rpc_clnt_create(3NSL)
+clnt_tp_create rpc_clnt_create(3NSL)
+clnt_udpcreate rpc_soc(3NSL)
+clnt_vc_create rpc_clnt_create(3NSL)
+clntraw_create rpc_soc(3NSL)
+clnttcp_create rpc_soc(3NSL)
+clntudp_bufcreate rpc_soc(3NSL)
+get_myaddress rpc_soc(3NSL)
+getnetname secure_rpc(3NSL)
+host2netname secure_rpc(3NSL)
+key_decryptsession secure_rpc(3NSL)
+key_encryptsession secure_rpc(3NSL)
+key_gendes secure_rpc(3NSL)
+key_setsecret secure_rpc(3NSL)
+netname2host secure_rpc(3NSL)
+netname2user secure_rpc(3NSL)
+pmap_getmaps rpc_soc(3NSL)
+pmap_getport rpc_soc(3NSL)
+pmap_rmtcall rpc_soc(3NSL)
+pmap_set rpc_soc(3NSL)
+pmap_unset rpc_soc(3NSL)
+registerrpc rpc_soc(3NSL)
+<beginning of page>
+rpc_broadcast rpc_clnt_calls(3NSL)
+rpc_broadcast_exp rpc_clnt_calls(3NSL)
+rpc_call rpc_clnt_calls(3NSL)
+rpc_reg rpc_svc_calls(3NSL)
+svc_create rpc_svc_create(3NSL)
+svc_destroy rpc_svc_create(3NSL)
+svc_dg_create rpc_svc_create(3NSL)
+svc_dg_enablecache rpc_svc_calls(3NSL)
+svc_fd_create rpc_svc_create(3NSL)
+svc_fds rpc_soc(3NSL)
+svc_freeargs rpc_svc_reg(3NSL)
+svc_getargs rpc_svc_reg(3NSL)
+svc_getcaller rpc_soc(3NSL)
+svc_getreq rpc_soc(3NSL)
+svc_getreqset rpc_svc_calls(3NSL)
+svc_getrpccaller rpc_svc_calls(3NSL)
+svc_raw_create rpc_svc_create(3NSL)
+svc_reg rpc_svc_calls(3NSL)
+svc_register rpc_soc(3NSL)
+svc_run rpc_svc_reg(3NSL)
+svc_sendreply rpc_svc_reg(3NSL)
+svc_tli_create rpc_svc_create(3NSL)
+<beginning of page>
+svc_tp_create rpc_svc_create(3NSL)
+svc_unreg rpc_svc_calls(3NSL)
+svc_unregister rpc_soc(3NSL)
+svc_vc_create rpc_svc_create(3NSL)
+svcerr_auth rpc_svc_err(3NSL)
+svcerr_decode rpc_svc_err(3NSL)
+svcerr_noproc rpc_svc_err(3NSL)
+svcerr_noprog rpc_svc_err(3NSL)
+svcerr_progvers rpc_svc_err(3NSL)
+svcerr_systemerr rpc_svc_err(3NSL)
+svcerr_weakauth rpc_svc_err(3NSL)
+svcfd_create rpc_soc(3NSL)
+svcraw_create rpc_soc(3NSL)
+svctcp_create rpc_soc(3NSL)
+svcudp_bufcreate rpc_soc(3NSL)
+svcudp_create rpc_soc(3NSL)
+user2netname secure_rpc(3NSL)
+xdr_accepted_reply rpc_xdr(3NSL)
+xdr_authsys_parms rpc_xdr(3NSL)
+xdr_authunix_parms rpc_soc(3NSL)
+xdr_callhdr rpc_xdr(3NSL)
+xdr_callmsg rpc_xdr(3NSL)
+<beginning of page>
+xdr_opaque_auth rpc_xdr(3NSL)
+xdr_rejected_reply rpc_xdr(3NSL)
+xdr_replymsg rpc_xdr(3NSL)
+xprt_register rpc_svc_calls(3NSL)
+xprt_unregister rpc_svc_calls(3NSL)
+/etc/netconfig
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelMT-Safe
+with exceptions
+getnetconfig(3NSL), getnetpath(3NSL), rpc_clnt_auth(3NSL), rpc_clnt_calls(3NSL), rpc_clnt_create(3NSL),
+rpc_svc_calls(3NSL), rpc_svc_create(3NSL), rpc_svc_err(3NSL), rpc_svc_reg(3NSL), rpc_xdr(3NSL),
+rpcbind(3NSL), secure_rpc(3NSL), threads(5), xdr(3NSL), netconfig(4), rpc(4), attributes(5), environ(5)

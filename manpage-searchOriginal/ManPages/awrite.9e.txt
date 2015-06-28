@@ -1,0 +1,41 @@
+<beginning of page>
+awrite <-> asynchronous write to a device
+#include <sys/uio.h>
+#include <sys/aio_req.h>
+#include <sys/cred.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+intprefixawrite(dev_t dev, struct aio_req *aio_reqp,
+ cred_t *cred_p);
+Solaris DDI specific (Solaris DDI). This entry point is optional. Drivers that do not support an awrite() entry point
+should use nodev(9F)
+dev Device number.
+aio_reqp Pointer to the aio_req(9S) structure that describes where the data is stored.
+cred_p Pointer to the credential structure.
+The driver's awrite() routine is called to perform an asynchronous write. getminor(9F) can be used to access the
+minor number component of the dev argument. awrite() may use the credential structure pointed to by cred_p to
+check for superuser access by calling drv_priv(9F). The awrite() routine may also examine the uio(9S) structure
+through the aio_req structure pointer, aio_reqp. awrite() must call aphysio(9F) with the aio_req pointer and a
+pointer to the driver's strategy(9E) routine.
+No fields of the uio(9S) structure pointed to by aio_req, other than uio_offset or uio_loffset, may be modified for
+non-seekable devices.
+The awrite() routine should return 0 for success, or the appropriate error number.
+This function is called from user context only. Example 1 Using the awrite() routine:
+The following is an example of an awrite() routine:
+ static int
+ xxawrite(dev_t dev, struct aio_req *aio, cred_t *cred_p)
+ {
+  int instance;
+  struct xxstate *xsp;
+  instance = getminor(dev);
+  xsp = ddi_get_soft_state(statep, instance);
+  /*Verify soft state structure has been allocated */
+  if (xsp == NULL)
+  return (ENXIO);
+  return (aphysio(xxstrategy, anocancel, dev, B_WRITE, \
+  xxminphys, aio));
+ }
+write(2), aiowrite(3C), aread(9E), read(9E), strategy(9E), write(9E), anocancel(9F), aphysio(9F),
+ddi_get_soft_state(9F), drv_priv(9F), getminor(9F), minphys(9F), nodev(9F), aio_req(9S), cb_ops(9S), uio(9S)
+Writing Device Drivers
+There is no way other than calling aphysio(9F) to accomplish an asynchronous write.

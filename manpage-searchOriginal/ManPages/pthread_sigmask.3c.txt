@@ -1,0 +1,149 @@
+<beginning of page>
+pthread_sigmask <-> change or examine calling thread's signal mask
+cc -mt [ flag... ] file... -lpthread [ library... ]
+#include <pthread.h>
+#include <signal.h>
+int pthread_sigmask(int how, const sigset_t *set, sigset_t *oset);
+The pthread_sigmask() function changes or examines a calling thread's signal mask. Each thread has its own signal
+mask. A new thread inherits the calling thread's signal mask and priority; however, pending signals are not inherited.
+Signals pending for a new thread will be empty.
+If the value of the argument set is not NULL, set points to a set of signals that can modify the currently blocked set.
+If the value of set is NULL, the value of how is insignificant and the thread's signal mask is unmodified; thus,
+pthread_sigmask() can be used to inquire about the currently blocked signals.
+The value of the argument how specifies the method in which the set is changed and takes one of the following val<hy>
+ues:
+SIG_BLOCK set corresponds to a set of signals to block. They are added to the current signal mask.
+SIG_UNBLOCK set corresponds to a set of signals to unblock. These signals are deleted from the current signal
+mask.
+SIG_SETMASK set corresponds to the new signal mask. The current signal mask is replaced by set.
+If the value of oset is not NULL, it points to the location where the previous signal mask is stored.
+Upon successful completion, the pthread_sigmask() function returns 0. Otherwise, it returns a non-zero value.
+The pthread_sigmask() function will fail if:
+EINVAL The value of how is not defined and oset is NULL.
+Example 1 Create a default thread that can serve as a signal catcher/handler with its own signal mask.
+The following example shows how to create a default thread that can serve as a signal catcher/handler with its own
+signal mask. new will have a different value from the creator's signal mask.
+As POSIX threads and Solaris threads are fully compatible even within the same process, this example uses
+pthread_create(3C) if you execute a.out 0, or thr_create(3C) if you execute a.out 1.
+In this example:
+<bu> The sigemptyset(3C) function initializes a null signal set, new. The sigaddset(3C) function packs the signal, SIG<hy>
+INT, into that new set. <bu> Either pthread_sigmask() or thr_sigsetmask() is used to mask the signal, SIGINT
+(CTRL-C), from the calling thread, which is main(). The signal is masked to guarantee that only the new thread will
+receive this signal. <bu> pthread_create() or thr_create() creates the signal-handling thread. <bu> Using
+pthread_join(3C) or thr_join(3C), main() then waits for the termination of that signal-handling thread, whose ID
+number is user_threadID; main() will then sleep(3C) for 2 seconds, after which the program terminates. <bu> The sig<hy>
+nal-handling thread, handler: <bu> Assigns the handler interrupt() to handle the signal SIGINT, by the call to sigac<hy>
+tion(2). <bu> Resets its own signal set to not block the signal, SIGINT. <bu> Sleeps for 8 seconds to allow time for the us<hy>
+er to deliver the signal, SIGINT, by pressing the CTRL-C.
+ /* cc thisfile.c -lthread -lpthread */
+ #define _REENTRANT /* basic first 3-lines for threads */
+ #include <pthread.h>
+ #include <thread.h>
+ thread_t user_threadID;
+ sigset_t new;
+ void *handler(), interrupt();
+<beginning of page>
+ int
+ main( int argc, char *argv[] ) {
+  test_argv(argv[1]);
+  sigemptyset(&new);
+  sigaddset(&new, SIGINT);
+  switch(*argv[1]) {
+   case '0': /* POSIX */
+    pthread_sigmask(SIG_BLOCK, &new, NULL);
+    pthread_create(&user_threadID, NULL, handler,
+  argv[1]);
+    pthread_join(user_threadID, NULL);
+    break;
+   case '1': /* Solaris */
+    thr_sigsetmask(SIG_BLOCK, &new, NULL);
+    thr_create(NULL, 0, handler, argv[1], 0,
+  &user_threadID);
+    thr_join(user_threadID, NULL, NULL);
+    break;
+   } /* switch */
+  printf("thread handler, # %d, has exited\n",user_threadID);
+  sleep(2);
+  printf("main thread, # %d is done\n", thr_self());
+  return (0)
+ } /* end main */
+ struct sigaction act;
+ void *
+ handler(char *argv1)
+ {
+  act.sa_handler = interrupt;
+  sigaction(SIGINT, &act, NULL);
+  switch(*argv1) {
+   case '0': /* POSIX */
+    pthread_sigmask(SIG_UNBLOCK, &new, NULL);
+    break;
+   case '1': /* Solaris */
+    thr_sigsetmask(SIG_UNBLOCK, &new, NULL);
+    break;
+  }
+  printf("\n Press CTRL-C to deliver SIGINT signal to the
+  process\n");
+  sleep(8); /* give user time to hit CTRL-C */
+  return (NULL)
+ }
+ void
+ interrupt(int sig)
+ {
+  printf("thread %d caught signal %d\n", thr_self(), sig);
+ }
+ void test_argv(char argv1[]) {
+  if(argv1 == NULL) {
+   printf("use 0 as arg1 to use thr_create();\n \
+   or use 1 as arg1 to use pthread_create()\n");
+   exit(NULL);
+  }
+ }
+<beginning of page>
+In the last example, the handler thread served as a signal-handler while also taking care of activity of its own (in
+this case, sleeping, although it could have been some other activity). A thread could be completely dedicated to sig<hy>
+nal-handling simply by waiting for the delivery of a selected signal by blocking with sigwait(2). The two subrou<hy>
+tines in the previous example, handler() and interrupt(), could have been replaced with the following routine:
+ void *
+ handler(void *unused)
+ {
+  int signal;
+  printf("thread %d is waiting for you to press the CTRL-C keys\n",
+  thr_self());
+  sigwait(&new, &signal);
+  printf("thread %d has received the signal %d \n", thr_self(),
+  signal);
+  return (NULL);
+ }
+ /* pthread_create() and thr_create() would use NULL instead
+  of argv[1] for the arg passed to handler() */
+In this routine, one thread is dedicated to catching and handling the signal specified by the set new, which allows
+main() and all of its other sub-threads, created after pthread_sigmask() or thr_sigsetmask() masked that signal, to
+continue uninterrupted. Any use of sigwait(2) should be such that all threads block the signals passed to sigwait(2)
+at all times. Only the thread that calls sigwait() will get the signals. The call to sigwait(2) takes two arguments.
+For this type of background dedicated signal-handling routine, a Solaris daemon thread can be used by passing the
+argument THR_DAEMON to thr_create(3C).
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Standard _ MT-LevelMT-Safe and Async-Signal-Safe
+sigaction(2), sigprocmask(2), sigwait(2), cond_wait(3C), pthread_cancel(3C), pthread_create(3C),
+pthread_join(3C), pthread_self(3C), sigaddset(3C), sigemptyset(3C), sigsetops(3C), sleep(3C), attributes(5),
+cancellation(5), standards(5)
+It is not possible to block signals that cannot be caught or ignored (see sigaction(2)). It is also not possible to block
+or unblock SIGCANCEL, as SIGCANCEL is reserved for the implementation of POSIX thread cancellation (see
+pthread_cancel(3C) and cancellation(5)). This restriction is quietly enforced by the standard C library.
+Using sigwait(2) in a dedicated thread allows asynchronously generated signals to be managed synchronously; how<hy>
+ever, sigwait(2) should never be used to manage synchronously generated signals.
+Synchronously generated signals are exceptions that are generated by a thread and are directed at the thread causing
+the exception. Since sigwait() blocks waiting for signals, the blocking thread cannot receive a synchronously gener<hy>
+ated signal.
+The sigprocmask(2) function behaves the same as if pthread_sigmask() has been called. POSIX leaves the seman<hy>
+tics of the call to sigprocmask(2) unspecified in a multi-threaded process, so programs that care about POSIX porta<hy>
+bility should not depend on this semantic.
+If a signal is delivered while a thread is waiting on a condition variable, the cond_wait(3C) function will be inter<hy>
+rupted and the handler will be executed. The state of the lock protecting the condition variable is undefined while the
+thread is executing the signal handler.
+Although pthread_sigmask() is Async-Signal-Safe with respect to the Solaris environment, this safeness is not
+guaranteed to be portable to other POSIX domains.
+Signals that are generated synchronously should not be masked. If such a signal is blocked and delivered, the receiv<hy>
+<beginning of page>
+ing process is killed.

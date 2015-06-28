@@ -1,0 +1,126 @@
+<beginning of page>
+metassist <-> automated volume creation utility to support Solaris Volume Manager
+metassist -V
+metassist -?
+metassist create [-v n] [-c] -F config_file
+metassist create [-v n] [-c | -d] -F request_file
+metassist create [-v n] [-c | -d] [-f] [-n name]
+ [-p datapaths] [-r redundancy]
+ [-a available [,available,...]]
+ [-u unavailable [,unavailable,...]] -s setname -S size
+metassist create -?
+The metassist command provides assistance, through automation, with common Solaris Volume Manager tasks.
+The following subcommands are supported:
+create The create subcommand creates one or more Solaris Volume Manager volumes. You can specify this request
+on the command line or in a file specified on the command line.
+If you create a volume using the command line, you can specify the characteristics of the volume in terms of the de<hy>
+sired quality of service it will provide - its size, the number of redundant copies of the data it contains, the number of
+data paths by which it is accessible, and whether faulty components are replaced automatically. The diskset in which
+the volume will reside and the volume's size must be specified on the command line in this form of the command.
+If you create a volume using a request in a file, you can specify the characteristics of the volume in terms of the
+quality of service they provide, as on the command line. Alternatively, the file can specify the types and component
+parts of the volume, (for example, mirrors, stripes, concatenations, and their component slices). The file may also
+specify volumes partly in terms of their types and partly in terms of their component parts, and may specify the char<hy>
+acteristics of more than one volume. All volumes specified in a file must reside in the same diskset, whose name
+must be specified in the file.
+If you specify the -c or -d option on the command line, the command runs without creating an actual volume or vol<hy>
+umes. Instead, it outputs either a a Bourne shell command script (-c option) or a volume configuration (-d option).
+The command script, when run, creates the specified volume or volumes. The volume configuration specifies the
+volume or volumes in complete detail, naming all their components.
+The input file given on the command line can take one of the following forms: <bu> a volume request, which specifies a
+request for a volume with explicit attributes and components, or matching a given quality of service <bu> a volume con<hy>
+figuration, produced by a previous execution of the command
+The following option is mandatory if you specify a volume request or volume configuration in a file:
+-F config_file | request_file
+Specify the volume request or volume configuration file to process. If config_file or request_file is -, it is read from
+standard input.
+The -d option cannot be specified when inputfile is a volume configuration file.
+The following options are mandatory if you specify a volume request on the command line:
+-s set Specify the disk set to use when creating volumes. All the volumes and hot spare pools are created in this disk
+set. If necessary, disks are moved into the diskset for use in the volumes and hot spare pools. If the diskset doesn't
+exist the command creates it. This option is required. metassist works entirely within a named disk set. Use of the
+local, or unnamed disk set, is not allowed.
+-S size Specify the size of the volume to be created. The size argument consists of a numeric value (a decimal can be
+specified) followed by KB, MB, GB, or TB, indicating kilobytes, megabytes, gigabytes, or terabytes, respectively.
+Case is ignored when interpreting this option. This option is required.
+<beginning of page>
+The following options are optional command line parameters:
+-a device1,device2,... Explicitly specify the devices that can be used in the creation of this volume. Named devices
+may be controllers or disks. Only used when specifying a volume on the command line.
+-c Output the command script that would implement the specified or generated volume configuration. The command
+script is not run, and processing stops at this stage.
+-d Output the volume configuration that satisfies the specified or generated volume request. No command script is
+generated or executed, and processing stops at this stage.
+-f Specify whether the volume should support automatic component replacement after a fault. If this option is speci<hy>
+fied, a mirror is created and its submirrors are associated with a hot spare.
+-n name Specify the name of the new volume. See metainit(1M) for naming guidelines.
+-p n Specify the number of required paths to the storage volume. The value of n cannot be greater than the number
+of different physical paths and logical paths to attached storage. Only used when specifying a volume on the com<hy>
+mand line.
+-r n Specify the redundancy level (0-4) of the data. The default is 0. Only used when specifying a volume on the
+command line. If redundancy is 0, a stripe is created. If redundancy is 1 or greater, a mirror with this number of sub<hy>
+mirrors is created. In this case, the volume can suffer a disk failure on n-1 copies without data loss. With the use of
+hot spares (see the -f option), a volume can suffer a disk failure on n+hsps-1 volumes without data loss, assuming
+non-concurrent failures.
+-u device1,device2,... Explicitly specify devices to exclude in the creation of this volume. Named devices can be
+controllers or disks. You can use this option alone, or to exclude some of the devices listed as available with the -a
+option, Only used when specifying a volume on the command line.
+-v value Specify the level of verbosity. Values from 0 to 2 are available, with higher numbers specifying more ver<hy>
+bose output when the command is run. -v 0 indicates silent output, except for errors or other critical messages. The
+default level is 1.
+-V Display program version information.
+-? Display help information. This option can follow a subcommand for subcommand-specific help.
+Example 1 Creating a Mirror
+The following example creates a two-way, 36Gb mirror on available devices from controller 1 and controller 2. It
+places the volume in diskset mirrorset.
+ # metassist create -r 2 -a c1,c2 -s mirrorset -S 36GB
+Example 2 Creating a Mirror with Additional Fault Tolerance
+The following example creates a two-way, 36Gb mirror on available devices from controller 1 and controller 2. It
+provides additional fault tolerance in the form of a hot spare. It places the volume in diskset mirrorset.
+ # metassist create -f -r 2 -a c1,c2 -s mirrorset -S 36GB
+<beginning of page>
+Example 3 Creating a Three-way Mirror and Excluding Devices
+The following example creates a three-way, 180Gb mirror from storage devices on controller 1 or controller 2. It ex<hy>
+cludes the disks c1t2d0 and c2t2d1 from the volume. It places the volume in diskset mirrorset.
+ metassist create -r 3 -a c1,c2 -u c1t2d0, c2t2d1 \
+  -s mirrorset -S 180GB
+Example 4 Determining and Implementing a Configuration
+The following example determines and implements a configuration satisfying the request specified in a request file:
+ # metassist create -F request.xml
+Example 5 Determining a Configuration and Saving It in a volume-config File
+The following example determines a configuration which satisfies the given request. It saves the configuration in a
+volume-config file without implementing it:
+ # metassist create -d -F request.xml > volume-config
+Example 6 Determining a Configuration and Saving It in a Shell Script
+The following example determines a configuration which satisfies the given request. It saves the configuration in a
+shell script without implementing it:
+ # metassist create -c -F request.xml > setupvols.sh
+Example 7 Implementing the Given volume-config
+The following example implements the given volume-config:
+ # metassist create -F config.xml
+Example 8 Converting the Given volume-config to a Shell Script
+The following example converts the given volume-config to a shell script that you can run later:
+ # metassist create -c -F config.xml > setupvols.sh
+The following exit values are returned:
+0 Successful completion.
+>0 An error occurred.
+/usr/share/lib/xml/dtd/volume-request.dtd
+<beginning of page>
+/usr/share/lib/xml/dtd/volume-defaults.dtd
+/usr/share/lib/xml/dtd/volume-config.dtd
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wmdr _ Inteface StabilityStable
+mdmonitord(1M), metaclear(1M), metadb(1M), metadetach(1M), metahs(1M), metainit(1M), metaoffline(1M),
+metaonline(1M), metaparam(1M), metarecover(1M), metarename(1M), metareplace(1M), metaroot(1M),
+metaset(1M), metastat(1M), metasync(1M), metattach(1M), md.tab(4), md.cf(4), mddb.cf(4), md.tab(4), vol<hy>
+ume-config(4), volume-request(4), attributes(5), md(7D)
+The quality of service arguments are mutually exclusive with the -F inputfile argument.
+When specifying a request file or quality of service arguments on the command line, the /etc/default/metassist.xml
+file is read for global and per-disk set defaults.
+Characteristics of this file are specified in the DTD, in /usr/share/lib/xml/dtd/volume-defaults.dtd.
+Characteristics of the XML request file are specified in the DTD, in /usr/share/lib/xml/dtd/volume-request.dtd.
+Characteristics of the XML configuration file are specified in the DTD, in /usr/share/lib/xml/dtd/volume-con<hy>
+fig.dtd.
+This command must be run as root.
+This command requires a functional Solaris Volume Manager configuration before it runs.

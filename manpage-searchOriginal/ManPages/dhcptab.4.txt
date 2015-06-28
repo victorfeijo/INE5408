@@ -1,0 +1,107 @@
+<beginning of page>
+dhcptab <-> DHCP configuration parameter table
+The dhcptab configuration table allows network administrators to organize groups of configuration parameters as
+macro definitions, which can then be referenced in the definition of other useful macros. These macros are then used
+by the DHCP server to return their values to DHCP and BOOTP clients.
+The preferred method of managing the dhcptab is through the use of the dhcpmgr(1M) or dhtadm(1M) utility.
+The description of dhcptab entries included in this manual page is intended for informational purposes only, and
+should not be used to manually edit entries.
+You can view the contents of the dhcptab using the DHCP manager's tabs for Macros and Options, or using the
+dhtadm -P command.
+The format of a dhcptab table depends on the data store used to maintain it. However, any dhcptab must contain
+the following fields in each record:
+Name This field identifies the macro or symbol record and is used as a search key into the dhcptab table. The name
+of a macro or symbol must consist of ASCII characters, with the length limited to 128 characters. Names can in<hy>
+clude spaces, except at the end of the name. The name is not case-sensitive.
+Type This field specifies the type of record and is used as a search key into the dhcptab. Currently, there are only
+two legal values for Type:
+m This record is a DHCP macro definition.
+s This record is a DHCP symbol definition. It is used to define vendor and site-specific options.
+Value This field contains the value for the specified type of record. For the m type, the value will consist of a series
+of symbol=value pairs, separated by the colon (:) character. For the s type, the value will consist of a series of fields,
+separated by a comma (,), which define a symbol's characteristics. Once defined, a symbol can be used in macro def<hy>
+initions.
+The Value field of a symbols definition contain the following fields describing the characteristics of a symbol:
+Context This field defines the context in which the symbol definition is to be used. It can have one of the following
+values:
+Site This symbol defines a site-specific option, codes 128-254.
+Vendor=Client Class ... This symbol defines a vendor-specific option, codes 1-254. The Vendor context takes
+ASCII string arguments which identify the client class that this vendor option is associated with. Multiple client
+class names can be specified, separated by white space. Only those clients whose client class matches one of these
+values will see this option. For Sun machines, the Vendor client class matches the value returned by the command
+uname -i on the client, with periods replacing commas.
+Code This field specifies the option code number associated with this symbol. Valid values are 128-254 for site-spe<hy>
+cific options, and 1-254 for vendor-specific options.
+Type This field defines the type of data expected as a value for this symbol, and is not case-sensitive. Legal values
+are:
+ASCII NVT ASCII text. Value is enclosed in double-quotes ("). Granularity setting has no effect on symbols of this
+type, since ASCII strings have a natural granularity of one (1).
+BOOLEAN No value is associated with this data type. Presence of symbols of this type denote boolean TRUE,
+whereas absence denotes FALSE. Granularity and Miximum values have no meaning for symbols of this type.
+<beginning of page>
+IP Dotted decimal form of an Internet address. Multi-IP address granularity is supported.
+NUMBER An unsigned number with a supported granularity of 1, 2, 4, and 8 octets.
+Valid NUMBER types are: UNUMBER8, SNUMBER8, UNUMBER16, SNUMBER16, UNUMBER32, SNUM<hy>
+BER32, UNUMBER64, and SNUMBER64. See dhcp_inittab(4) for details.
+OCTET Uninterpreted ASCII representation of binary data. The client identifier is one example of an OCTET
+string. Valid characters are 0-9, a-f, A-F. One ASCII character represents one nibble (4 bits), thus two ASCII char<hy>
+acters are needed to represent an 8 bit quantity. The granularity setting has no effect on symbols of this type, since
+OCTET strings have a natural granularity of one (1).
+For example, to encode a sequence of bytes with decimal values 77, 82, 5, 240, 14, the option value would be encod<hy>
+ed as 4d5205f00e. A macro which supplies a value for option code 78, SLP_DA, with a 0 Mandatory byte and Di<hy>
+rectory Agents at 192.168.1.5 and 192.168.0.133 would appear in the dhcptab as:
+ slpparams
+ Macro
+ :SLP_DA=00c0a80105c0a80085:
+Granularity This value specifies how many objects of Type define a single instance of the symbol value. For exam<hy>
+ple, the static route option is defined to be a variable list of routes. Each route consists of two IP addresses, so the
+Type is defined to be IP, and the data's granularity is defined to be 2 IP addresses. The granularity field affects the
+IP and NUMBER data types.
+Maximum This value specifies the maximum items of Granularity which are permissible in a definition using this
+symbol. For example, there can only be one IP address specified for a subnet mask, so the Maximum number of
+items in this case is one (1). A Maximum value of zero (0) means that a variable number of items is permitted.
+The following example defines a site-specific option (symbol) called MystatRt, of code 130, type IP, and granulari<hy>
+ty 2, and a Maximum of 0. This definition corresponds to the internal definition of the static route option (StaticRt).
+ MystatRt s Site,130,IP,2,0
+The following example demonstrates how a SLP Service Scope symbol (SLP_SS) with a scope value of happy and
+mandatory byte set to 0 is encoded. The first octet of the option is the Mandatory octet, which is set either to 0 or 1.
+In this example, it is set to 0 (00). The balance of the value is the hexidecimal ASCII code numbers representing the
+name happy, that is, 6861707079.
+ SLP_SS=006861707079
+The following example illustrates a macro defined using the MystatRt site option symbol just defined:
+ 10netnis m :MystatRt=3.0.0.0 10.0.0.30:
+Macros can be specified in the Macro field in DHCP network tables (see dhcp_network(4)), which will bind par<hy>
+ticular macro definitions to specific IP addresses.
+Up to four macro definitions are consulted by the DHCP server to determine the options that are returned to the re<hy>
+questing client.
+These macros are processed in the following order:
+<beginning of page>
+Client Class A macro named using the ASCII representation of the client class (e.g. SUNW.Ultra-30) is searched
+for in the dhcptab. If found, its symbol/value pairs will be selected for delivery to the client. This mechanism per<hy>
+mits the network administrator to select configuration parameters to be returned to all clients of the same class.
+Network A macro named by the dotted Internet form of the network address of the client's network (for example,
+10.0.0.0) is searched for in the dhcptab. If found, its symbol/value pairs will be combined with those of the Client
+Class macro. If a symbol exists in both macros, then the Network macro value overrides the value defined in the
+Client Class macro. This mechanism permits the network administrator to select configuration parameters to be re<hy>
+turned to all clients on the same network.
+IP Address This macro may be named anything, but must be specified in the DHCP network table for the IP ad<hy>
+dress record assigned to the requesting client. If this macro is found in the dhcptab, then its symbol/value pairs will
+be combined with those of the Client Class macro and the Network macro. This mechanism permits the network
+administrator to select configuration parameters to be returned to clients using a particular IP address. It can also be
+used to deliver a macro defined to include "server-specific" information by including this macro definition in all
+DHCP network table entries owned by a specific server.
+Client Identifier A macro named by the ASCII representation of the client's unique identifier as shown in the
+DHCP network table (see dhcp_network(4)). If found, its symbol/value pairs are combined to the sum of the
+Client Class, Network, and IP Address macros. Any symbol collisions are replaced with those specified in the
+client identifier macro. The client mechanism permits the network administrator to select configuration parameters to
+be returned to a particular client, regardless of what network that client is connected to.
+Refer to System Administration Guide: IP Services for more information about macro processing.
+Refer to the dhcp_inittab(4) man page for more information about symbols used in Solaris DHCP.
+dhcpmgr(1M), dhtadm(1M), in.dhcpd(1M), dhcp_inittab(4), dhcp_network(4), dhcp(5)
+System Administration Guide: IP Services
+Alexander, S., and R. Droms, DHCP Options and BOOTP Vendor Extensions, RFC 2132, Silicon Graphics, Inc.,
+Bucknell University, March 1997.
+Droms, R., Interoperation Between DHCP and BOOTP, RFC 1534, Bucknell University, October 1993.
+Droms, R., Dynamic Host Configuration Protocol, RFC 2131, Bucknell University, March 1997.
+Wimer, W., Clarifications and Extensions for the Bootstrap Protocol, RFC 1542, Carnegie Mellon University, Octo<hy>
+ber 1993.

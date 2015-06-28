@@ -1,0 +1,85 @@
+<beginning of page>
+_lwp_cond_wait, _lwp_cond_timedwait, _lwp_cond_reltimedwait <-> wait on a condition variable
+#include <sys/lwp.h>
+int _lwp_cond_wait(lwp_cond_t *cvp, lwp_mutex_t *mp);
+int _lwp_cond_timedwait(lwp_cond_t *cvp, lwp_mutex_t *mp,
+ timestruc_t *abstime);
+int _lwp_cond_reltimedwait(lwp_cond_t *cvp, lwp_mutex_t *mp,
+ timestruc_t *reltime);
+These functions are used to wait for the occurrence of a condition represented by an LWP condition variable. LWP
+condition variables must be initialized to 0 before use.
+The _lwp_cond_wait() function atomically releases the LWP mutex pointed to by mp and causes the calling LWP to
+block on the LWP condition variable pointed to by cvp. The blocked LWP may be awakened by _lwp_cond_sig<hy>
+nal(2), _lwp_cond_broadcast(2), or when interrupted by delivery of a signal. Any change in value of a condition
+associated with the condition variable cannot be inferred by the return of _lwp_cond_wait() and any such condition
+must be re-evaluated.
+The _lwp_cond_timedwait() function is similar to _lwp_cond_wait(), except that the calling LWP will not block
+past the time of day specified by abstime. If the time of day becomes greater than abstime, _lwp_cond_timedwait()
+returns with the error code ETIME.
+The _lwp_cond_reltimedwait() function is similar to _lwp_cond_wait(), except that the calling LWP will not block
+past the relative time specified by reltime. If the time of day becomes greater than the starting time of day plus rel<hy>
+time, _lwp_cond_reltimedwait() returns with the error code ETIME.
+The _lwp_cond_wait(), _lwp_cond_timedwait(), and _lwp_cond_reltimedwait() functions always return with the
+mutex locked and owned by the calling lightweight process.
+Upon successful completion, 0 is returned. A non-zero value indicates an error.
+If any of the following conditions are detected, _lwp_cond_wait(), _lwp_cond_timedwait(), and _lwp_cond_rel<hy>
+timedwait() fail and return the corresponding value:
+EINVAL The cvp argument points to an invalid LWP condition variable or the mp argument points to an invalid
+LWP mutex.
+EFAULT The mp, cvp, or abstime argument points to an illegal address.
+If any of the following conditions occur, _lwp_cond_wait(), _lwp_cond_timedwait(), and _lwp_cond_reltimed<hy>
+wait() fail and return the corresponding value:
+EINTR The call was interrupted by a signal or fork(2).
+If any of the following conditions occur, _lwp_cond_timedwait() and _lwp_cond_reltimedwait() fail and return
+the corresponding value:
+ETIME The time specified inabstime or reltime has passed.
+Example 1 Use the _lwp_cond_wait() function in a loop testing some condition.
+The _lwp_cond_wait() function is normally used in a loop testing some condition, as follows:
+ lwp_mutex_t m;
+ lwp_cond_t cv;
+ int cond;
+ (void) _lwp_mutex_lock(&m);
+ while (cond == FALSE) {
+  (void) _lwp_cond_wait(&cv, &m);
+<beginning of page>
+ }
+ (void) _lwp_mutex_unlock(&m);
+Example 2 Use the _lwp_cond_timedwait() function in a loop testing some condition.
+The _lwp_cond_timedwait() function is also normally used in a loop testing some condition. It uses an absolute
+timeout value as follows:
+ timestruc_t to;
+ lwp_mutex_t m;
+ lwp_cond_t cv;
+ int cond, err;
+ (void) _lwp_mutex_lock(&m);
+ to.tv_sec = time(NULL) + TIMEOUT;
+ to.tv_nsec = 0;
+ while (cond == FALSE) {
+  err = _lwp_cond_timedwait(&cv, &m, &to);
+  if (err == ETIME) {
+  /* timeout, do something */
+  break;
+  SENDwhom}
+ }
+ (void) _lwp_mutex_unlock(&m);
+This example sets a bound on the total wait time even though the _lwp_cond_timedwait() may return several times
+due to the condition being signalled or the wait being interrupted.
+Example 3 Use the _lwp_cond_reltimedwait() function in a loop testing some condition.
+The _lwp_cond_reltimedwait() function is also normally used in a loop testing some condition. It uses a relative
+timeout value as follows:
+ timestruc_t to;
+ lwp_mutex_t m;
+ lwp_cond_t cv;
+ int cond, err;
+ (void) _lwp_mutex_lock(&m);
+ while (cond == FALSE) {
+  to.tv_sec = TIMEOUT;
+  to.tv_nsec = 0;
+  err = _lwp_cond_reltimedwait(&cv, &m, &to);
+  if (err == ETIME) {
+  /* timeout, do something */
+  break;
+  }
+ }
+ (void) _lwp_mutex_unlock(&m);
+_lwp_cond_broadcast(2), _lwp_cond_signal(2), _lwp_kill(2), _lwp_mutex_lock(2), fork(2), kill(2)

@@ -1,0 +1,114 @@
+<beginning of page>
+cfgadm_sysctrl <-> EXX00 system board administration
+/usr/sbin/cfgadm -c function [-f]
+ [-o disable-at-boot | enable-at-boot] [-n | -y] sysctrl0:slot# ...
+/usr/sbin/cfgadm -x quiesce-test sysctrl0:slot#
+/usr/sbin/cfgadm -x insert-test | remove-test sysctrl0:slot# ...
+/usr/sbin/cfgadm -x set-condition-test=# sysctrl0:slot# ...
+/usr/sbin/cfgadm [-l]
+ -o disable-at-boot | enable-at-boot sysctrl0:slot# ...
+The sysctrl hardware specific library /usr/platform/sun4u/lib/cfgadm/sysctrl.so.1 provides dynamic reconfigura<hy>
+tion functionality for configuring and disconnecting system boards on E6X00, E5X00, E4X00, and E3X00 systems.
+You can insert both I/O and CPU boards into a slot on a running system that is configured for Solaris without re<hy>
+booting. You can also disconnect and remove both types of boards from a running system without rebooting.
+System slots appear as attachment points in the device tree, one attachment point for each actual slot in the system
+chassis. If a board is not in a slot, the receptacle state is empty. If a board is powered-off and ready to remove, the
+receptacle state is disconnected. If a board is powered-on and is connected to the system bus, the receptacle state is
+connected.
+ The occupant state is unconfigured when the receptacle state is empty or disconnected. The occupant state is ei<hy>
+ther unconfigured or configured when the receptacle state is connected.
+In the configured state the devices on a board are available for use by Solaris. In the unconfigured state, the devices
+on the board are not.
+Inserting a board changes the receptacle state from empty to disconnected. Removing a board changes the recepta<hy>
+cle state from disconnected to empty. Removing a board that is in the connected state crashes the operating system
+and can result in permanent damage to the system.
+Refer to cfgadm(1M) for a more complete description options.
+The following options are supported:
+-c function
+Perform the state change function. Specify function as connect, disconnect, configure or unconfigure.
+configure Change the occupant state to configure.
+If the receptacle state is disconnected, the configure function first attempts to connect the receptacle. The configure
+function walks the OBP device tree created as part of the connect function and creates the Solaris device tree nodes,
+attaching devices as required. For CPU/Memory boards, configure adds CPUs to the CPU list in the powered-off
+state. These are visible to the psrinfo(1M) and psradm(1M) commands. Two memory attachment points are pub<hy>
+lished for CPU/memory boards. Use mount(1M) andifconfig(1M) to use I/O devices on the new board. To use
+CPUs, use psradm -n to on-line the new processors. Use cfgadm_ac(1M) to test and configure the memory banks.
+connect Change the receptacle state to connected.
+Changing the receptacle state requires that the system bus be frozen while the bus signals are connected and the
+board tested. The bus is frozen by running a quiesce operation which stops all process activity and suspends all driv<hy>
+ers. Because the quiesce operation and the subsequent resume can be time consuming, and are not supported by all
+drivers, the -x quiesce-test is provided. While the system bus is frozen, the board being connected is tested by
+firmware. This operation takes a short time for I/O boards and a significant time for CPU/Memory boards due to
+CPU external cache testing. This does not provide memory testing. The user is prompted for confirmation before
+proceeding with the quiesce. Use the -y or -n option to override the prompt. The connect operation is refused if the
+board is marked as disabled-at-boot, unless either the force flag, -f, or the enable at boot flag, -o enable-at-boot, is
+given. See -l.
+<beginning of page>
+disconnect
+ Change the receptacle state to disconnected.
+If the occupant state is configure, the disconnect function first attempts to unconfigure the occupant. The discon<hy>
+nect operation does not require a quiesce operation and operates quickly. The board is powered-off ready for re<hy>
+moval.
+unconfigure Change the occupant state to unconfigureed.
+Devices on the board are made invisible to Solaris during this process. The I/O devices on an I/O board are removed
+from the Solaris device tree. Any device that is still in use stops the unconfigure process and be reported as in use.
+The unconfigure operation must be retried after the device is made non-busy. For CPU/Memory boards, the memory
+must have been changed to the unconfigured state prior to issuing the board unconfigure operation. The CPUs on the
+board are off-lined, powered off and removed from the Solaris CPU list. CPUs that have processes bound to them
+cannot be off-lined. See psradm(1M), psrinfo(1M), pbind(1M), andp_online(2) for more information on off-lining
+CPUs.
+-f
+ Force a block on connecting a board marked as disabled-at-boot in the non-volatile disabled-board-list variable.
+See Platform Notes:Sun Enterprise 6x00/5x00/4x00/3x00 Systems
+-l
+List options. Supported as described in cfgadm(1M)cfgadm(1M).
+The type field can be one of cpu/mem, mem, dual-sbus, sbus-upa, dual-pci, soc+sbus, soc+upa, disk or un<hy>
+known.
+The hardware-specific info field is set as follows: [disabled at boot] [non-detachable] [100 MHz capable]
+For sbus-upa and soc+upa type boards, the following additional information appears first: [single buffered ffb|dou<hy>
+ble buffered ffb|no ffb installed] For disk type boards, the following additional information appears first: {target: #
+| no disk} {target: # | no disk}
+-o disable-at-boot | enable-at-boot
+Modify the state of the non<em>volatile disabled-board-list variable. Use this the -o option in conjunction with the -c
+function or -l option.
+Use -o enable-at-boot with the -c connect to override a block on connecting a disabled-at-boot board.
+-x insert-test | remove-test
+Perform a test.
+ Specify remove-test to change the driver state for the specified slot from disconnected to empty without the need
+for physically removing the board during automated test sequences.
+Specify insert-test to change the driver state of a slot made to appear empty using the remove-test command to the
+disconnected state as if it had been inserted.
+-x quiesce-test sysctrl0:slot1
+Perform a test.
+Allows the quiesce operation required for board connect operations to be exercised. The execution of this test con<hy>
+firms that, with the current software and hardware configuration, it is possible to quiesce the system. If a device or
+process cannot be quiesced, its name is printed in an error message. Any valid board attachment point can be used
+with this command, but since all systems have a slot1 the given form is recommended.
+<beginning of page>
+-x set-condition-test=#
+Perform a test.
+Allows the condition of a system board attachment point to be set for testing the policy logic for state change com<hy>
+mands. The new setting is given as a number indicating one of the following condition values:
+ 0 unknown
+ 1 ok
+ 2 failing
+ 3 failed
+ 4 unusable
+The following operand is supported:
+sysctrl0:slot# The attachment points for boards on EXX00 systems are published by instance 0 of the sysctrl driver
+(sysctrl0). The names of the attachment points are numbered from slot0 through slot15. Specify # as a number be<hy>
+tween 0 and 15, indicating the slot number. This form conforms to the logical ap_id specification given in cf<hy>
+gadm(1M). The corresponding physical ap_ids are listed in the FILES section.
+/usr/platform/sun4u/lib/cfgadm/sysctrl.so.1
+Hardware specific library
+/devices/central@1f,0/fhc@0,f8800000/clock-board@0,900000:slot*
+Attachment Points
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wkvm.u
+cfgadm(1M), cfgadm_ac(1M), ifconfig(1M), mount(1M), pbind(1M), psradm(1M), , psrinfo(1M), config_ad<hy>
+min(3CFGADM), attributes(5)
+Sun Enterprise 6x00, 5x00, 4x00 and 3x00 Systems Dynamic Reconfiguration User's Guide
+Platform Notes:Sun Enterprise 6x00/5x00/4x00/3x00 Systems
+Refer to the Sun Enterprise 6x00, 5x00, 4x00 and 3x00 Systems Dynamic Reconfiguration User's Guide for addition<hy>
+al details regarding dynamic reconfiguration of EXX00 system CPU/Memory boards.

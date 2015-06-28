@@ -1,0 +1,56 @@
+<beginning of page>
+detach <-> detach or suspend a device
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+int prefix detach(dev_info_t dip, ddi_detach_cmd_t cmd);
+Solaris DDI specific (Solaris DDI)
+dip A pointer to the device's dev_info structure.
+cmd Type of detach; the driver should return DDI_FAILURE if any value other than DDI_DETACH or DDI_SUS<hy>
+PEND is passed to it.
+The detach() function complements the attach(9E) routine.
+If cmd is set to DDI_DETACH, detach() is used to remove the state associated with a given instance of a device
+node prior to the removal of that instance from the system.
+The detach() function will be called once for each instance of the device for which there has been a successful at<hy>
+tach(), once there are no longer any opens on the device. An attached instance of a driver can be successfully de<hy>
+tached only once. The detach() function should clean up any per instance data initialized in attach(9E) and call
+kmem_free(9F) to free any heap allocations. For information on how to unregister interrupt handlers, see
+ddi_add_intr(9F). This should also include putting the underlying device into a quiescent state so that it will not
+generate interrupts.
+Drivers that set up timeout(9F) routines should ensure that they are cancelled before returning DDI_SUCCESS
+from detach().
+If detach() determines a particular instance of the device cannot be removed when requested because of some ex<hy>
+ceptional condition, detach() must return DDI_FAILURE, which prevents the particular device instance from being
+detached. This also prevents the driver from being unloaded. A driver instance failing the detach must ensure that no
+per instance data or state is modified or freed that would compromise the system or subsequent driver operation.
+The system guarantees that the function will only be called for a particular dev_info node after (and not concurrently
+with) a successful attach(9E) of that device. The system also guarantees that detach() will only be called when
+there are no outstanding open(9E) calls on the device.
+The DDI_SUSPEND cmd is issued when the entire system is being suspended and power removed from it or when
+the system must be made quiescent. It will be issued only to devices which have a reg property or which export a
+pm-hardware-state property with the value needs-suspend-resume.
+If cmd is set to DDI_SUSPEND, detach() is used to suspend all activity of a device before power is (possibly) re<hy>
+moved from the device. The steps associated with suspension must include putting the underlying device into a qui<hy>
+escent state so that it will not generate interrupts or modify or access memory. Once quiescence has been obtained,
+detach() can be called with outstanding open(9E) requests. It must save the hardware state of the device to memory
+and block incoming or existing requests until attach() is called with DDI_RESUME.
+If the device is used to store file systems, then after DDI_SUSPEND is issued, the device should still honor
+dump(9E) requests as this entry point may be used by suspend-resume operation (see cpr(7)) to save state file. It
+must do this, however, without disturbing the saved hardware state of the device.
+If the device driver uses automatic device Power Management interfaces (driver exports pm-components(9P) prop<hy>
+erty), it might need to call pm_raise_power(9F) if the current power level is lower than required to complete the
+dump(9E) request.
+Before returning successfully from a call to detach() with a command of DDI_SUSPEND, the driver must cancel
+any outstanding timeouts and make any driver threads quiescent.
+If DDI_FAILURE is returned for the DDI_SUSPEND cmd, either the operation to suspend the system or to make it
+quiescent will be aborted.
+<beginning of page>
+DDI_SUCCESS For DDI_DETACH, the state associated with the given device was successfully removed. For
+DDI_SUSPEND, the driver was successfully suspended.
+DDI_FAILURE The operation failed or the request was not understood. The associated state is unchanged.
+This function is called from user context only.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed
+cpr(7), pm(7D), pm(9P), pm-components(9P), attach(9E), dump(9E), open(9E), power(9E), ddi_add_intr(9F),
+ddi_dev_is_needed(9F), ddi_map_regs(9F), kmem_free(9F), pm_raise_power(9F), timeout(9F)
+Writing Device Drivers

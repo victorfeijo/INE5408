@@ -1,0 +1,285 @@
+<beginning of page>
+dhcpagent <-> Dynamic Host Configuration Protocol (DHCP) client daemon
+dhcpagent [-a] [ -d n] [-f] [-v]
+dhcpagent implements the client half of the Dynamic Host Configuration Protocol (DHCP) for machines running
+Solaris software.
+The dhcpagent daemon obtains configuration parameters for the client (local) machine's network interfaces from a
+DHCP server. These parameters may include a lease on an IP address, which gives the client machine use of the ad<hy>
+dress for the period of the lease, which may be infinite. If the client wishes to use the IP address for a period longer
+than the lease, it must negotiate an extension using DHCP. For this reason, dhcpagent must run as a daemon, termi<hy>
+nating only when the client machine powers down.
+For IPv4, the dhcpagent daemon is controlled through ifconfig(1M) in much the same way that the init(1M) dae<hy>
+mon is controlled by telinit(1M). dhcpagent can be invoked as a user process, albeit one requiring root privileges,
+but this is not necessary, as ifconfig(1M) will start it automatically.
+For IPv6, the dhcpagent daemon is invoked automatically by in.ndpd(1M). It can also be controlled through ifcon<hy>
+fig(1M), if necessary.
+When invoked, dhcpagent enters a passive state while it awaits instructions from ifconfig(1M) or in.ndpd(1M).
+When it receives a command to configure an interface, it brings up the interface (if necessary) and starts DHCP.
+Once DHCP is complete, dhcpagent can be queried for the values of the various network parameters. In addition, if
+DHCP was used to obtain a lease on an address for an interface, it configures the address for use. When a lease is
+obtained, it is automatically renewed as necessary. If the lease cannot be renewed, dhcpagent will unconfigure the
+address, but the interface will be left up and dhcpagent will attempt to acquire a new address lease. dhcpagent
+monitors system suspend/resume events and will validate any non-permanent leases with the DHCP server upon re<hy>
+sume. Similarly, dhcpagent monitors link up/down events and will validate any non-permanent leases with the
+DHCP server when the downed link is brought back up. The lease validation mechanism will restart DHCP if the
+server indicates that the existing lease is no longer valid. If the server cannot be contacted, then the existing lease
+will continue. This behavior can be modified with the VERIFIED_LEASE_ONLY parameter in the /etc/de<hy>
+fault/dhcpagent file. See the description of this parameter below.
+For IPv4, if the configured interface is found to be unplumbed, or to have a different IP address, subnet mask, or
+broadcast address from those obtained from DHCP, the interface is abandoned from DHCP control.
+For IPv6, dhcpagent automatically plumbs and unplumbs logical interfaces as necessary for the IPv6 addresses sup<hy>
+plied by the server. The IPv6 prefix length (netmask) is not set by the DHCPv6 protocol, but is instead set by in.nd<hy>
+pd(1M) using prefix information obtained by Router Advertisements. If any of the logical interfaces created by dhc<hy>
+pagent is unplumbed, or configured with a different IP address, it will be abandoned from DHCP control. If the
+link-local interface is unplumbed, then all addresses configured by DHCP on that physical interface will be removed.
+In addition to DHCP, dhcpagent also supports BOOTP (IPv4 only). See RFC 951, Bootstrap Protocol. Configura<hy>
+tion parameters obtained from a BOOTP server are treated identically to those received from a DHCP server, except
+that the IP address received from a BOOTP server always has an infinite lease.
+DHCP also acts as a mechanism to configure other information needed by the client, for example, the domain name
+and addresses of routers. Aside from the IP address, and for IPv4 alone, the netmask, broadcast address, and default
+router, the agent does not directly configure the workstation, but instead acts as a database which may be interrogat<hy>
+ed by other programs, and in particular by dhcpinfo(1).
+On clients with a single interface, this is quite straightforward. Clients with multiple interfaces may present difficul<hy>
+ties, as it is possible that some information arriving on different interfaces may need to be merged, or may be incon<hy>
+sistent. Furthermore, the configuration of the interfaces is asynchronous, so requests may arrive while some or all of
+the interfaces are still unconfigured. To handle these cases, one interface may be designated as primary, which makes
+it the authoritative source for the values of DHCP parameters in the case where no specific interface is requested.
+See dhcpinfo(1) and ifconfig(1M) for details.
+For IPv4, the dhcpagent daemon can be configured to request a particular host name. See the REQUEST_HOST<hy>
+NAME description in the FILES section. When first configuring a client to request a host name, you must perform
+the following steps as root to ensure that the full DHCP negotiation takes place:
+ # pkill dhcpagent
+ # rm /etc/dhcp/interface.dhc
+ # reboot
+<beginning of page>
+All DHCP packets sent by dhcpagent include a vendor class identifier (RFC 2132, option code 60; RFC 3315, op<hy>
+tion code 16). This identifier is the same as the platform name returned by the uname -i command, except: <bu> Any
+commas in the platform name are changed to periods. <bu> If the name does not start with a stock symbol and a com<hy>
+ma, it is automatically prefixed with SUNW.
+The dhcpagent daemon writes information and error messages in five categories:
+critical
+Critical messages indicate severe conditions that prevent proper operation.
+errors
+Error messages are important, sometimes unrecoverable events due to resource exhaustion and other unexpected fail<hy>
+ure of system calls; ignoring errors may lead to degraded functionality.
+warnings
+Warnings indicate less severe problems, and in most cases, describe unusual or incorrect datagrams received from
+servers, or requests for service that cannot be provided.
+informational
+Informational messages provide key pieces of information that can be useful to debugging a DHCP configuration at
+a site. Informational messages are generally controlled by the -v option. However, certain critical pieces of informa<hy>
+tion, such as the IP address obtained, are always provided.
+debug
+Debugging messages, which may be generated at two different levels of verbosity, are chiefly of benefit to persons
+having access to source code, but may be useful as well in debugging difficult DHCP configuration problems. De<hy>
+bugging messages are only generated when using the -d option.
+When dhcpagent is run without the -f option, all messages are sent to the system logger syslog(3C) at the appropri<hy>
+ate matching priority and with a facility identifier LOG_DAEMON. When dhcpagent is run with the -f option, all
+messages are directed to standard error.
+If an executable (binary or script) is placed at /etc/dhcp/eventhook, the dhcpagent deamon will automatically run
+that program when any of the following events occur:
+BOUND and BOUND6
+These events occur during interface configuration. The event program is invoked when dhcpagent receives the
+DHCPv4 ACK or DHCPv6 Reply message from the DHCP server for the lease request of an address, indicating suc<hy>
+cessful initial configuration of the interface. (See also the INFORM and INFORM6 events, which occur when con<hy>
+figuration parameters are obtained without address leases.)
+EXTEND and EXTEND6
+These events occur during lease extension. The event program is invoked just after dhcpagent receives the DHCPv4
+ACK or DHCPv6 Reply from the DHCP server for the DHCPv4 REQUEST (renew) message or the DHCPv6 Re<hy>
+new or Rebind message.
+Note that with DHCPv6, the server might choose to remove some addresses, add new address leases, and ignore (al<hy>
+low to expire) still other addresses in a given Reply message. The EXTEND6 event occurs when a Reply is received
+that leaves one or more address leases still valid, even if the Reply message does not extend the lease for any ad<hy>
+dress. The event program is invoked just before any addresses are removed, but just after any new addresses are
+added. Those to be removed will be marked with the IFF_DEPRECATED flag.
+<beginning of page>
+EXPIRE and EXPIRE6
+These events occur during lease expiration. For DHCPv4, the event program is invoked just before the leased ad<hy>
+dress is removed from an interface. For DHCPv6, the event program is invoked just before the last remaining leased
+addresses are removed from the interface.
+DROP and DROP6
+These events occur during the period when an interface is dropped. The event program is invoked just before the in<hy>
+terface is removed from DHCP control. If the interface has been abandoned due the user unplumbing the interface,
+then this event will occur after the user's action has taken place. The interface might not be present.
+INFORM and INFORM6
+These events occur when an interface acquires new or updated configuration information from a DHCP server by
+means of the DHCPv4 INFORM or the DHCPv6 Information-Request message. These messages are sent using an
+ifconfig(1M) dhcp inform command or when the DHCPv6 Router Advertisement O (letter 0) bit is set and the M
+bit is not set. Thus, these events occur when the DHCP client does not obtain an IP address lease from the server,
+and instead obtains only configuration parameters.
+LOSS6
+This event occurs during lease expiration when one or more valid leases still remain. The event program is invoked
+just before expired addresses are removed. Those being removed will be marked with the IFF_DEPRECATED flag.
+Note that this event is not associated with the receipt of the Reply message, which occurs only when one or more
+valid leases remain, and occurs only with DHCPv6. If all leases have expired, then the EXPIRE6 event occurs in<hy>
+stead.
+RELEASE and RELEASE6
+This event occurs during the period when a leased address is released. The event program is invoked just before dhc<hy>
+pagent relinquishes the address on an interface and sends the DHCPv4 RELEASE or DHCPv6 Release packet to
+the DHCP server.
+The system does not provide a default event program. The file /etc/dhcp/eventhook is expected to be owned by root
+and have a mode of 755.
+The event program will be passed two arguments, the interface name and the event name, respectively. For DHCPv6,
+the interface name is the name of the physical interface.
+The event program can use the dhcpinfo(1) utility to fetch additional information about the interface. While the
+event program is invoked on every event defined above, it can ignore those events in which it is not interested. The
+event program runs with the same privileges and environment as dhcpagent itself, except that stdin, stdout, and
+stderr are redirected to /dev/null. Note that this means that the event program runs with root privileges.
+If an invocation of the event program does not exit after 55 seconds, it is sent a SIGTERM signal. If does not exit
+within the next three seconds, it is terminated by a SIGKILL signal.
+See EXAMPLES for an example event program.
+The following options are supported:
+-a
+Adopt a configured IPv4 interface. This option is for use with diskless DHCP clients. In the case of diskless DHCP,
+DHCP has already been performed on the network interface providing the operating system image prior to running
+dhcpagent. This option instructs the agent to take over control of the interface. It is intended primarily for use in
+boot scripts.
+The effect of this option depends on whether the interface is being adopted.
+If the interface is being adopted, the following conditions apply:
+<beginning of page>
+dhcpagent uses the client id specified in /chosen:<client_id>, as published by the PROM or as specified on a
+boot(1M) command line. If this value is not present, the client id is undefined. The DHCP server then determines
+what to use as a client id. It is an error condition if the interface is an Infiniband interface and the PROM value is not
+present.
+If the interface is not being adopted:
+dhcpagent uses the value stored in /etc/default/dhcpagent. If this value is not present, the client id is undefined. If
+the interface is Infiniband and there is no value in /etc/default/dhcpagent, a client id is generated as described by
+the draft document on DHCP over Infiniband, available at:
+ http://www.ietf.org
+-d n
+Set debug level to n. Two levels of debugging are currently available, 1 and 2; the latter is more verbose.
+-f
+Run in the foreground instead of as a daemon process. When this option is used, messages are sent to standard error
+instead of to syslog(3C).
+-v
+Provide verbose output useful for debugging site configuration problems.
+Example 1 Example Event Program
+The following script is stored in the file /etc/dhcp/eventhook, owned by root with a mode of 755. It is invoked upon
+the occurrence of the events listed in the file.
+ #!/bin/sh
+ (
+ echo "Interface name: " $1
+ echo "Event: " $2
+ case $2 in
+ "BOUND")
+  echo "Address acquired from server "\
+  `/sbin/dhcpinfo -i $1 ServerID`
+  ;;
+ "BOUND6")
+  echo "Addresses acquired from server " \
+  `/sbin/dhcpinfo -v6 -i $1 ServerID`
+  ;;
+ "EXTEND")
+  echo "Lease extended for " \
+  `sbin/dhcpinfo -i $1 LeaseTim`" seconds"
+  ;;
+ "EXTEND6")
+  echo "New lease information obtained on $i"
+  ;;
+ "EXPIRE" | "DROP" | "RELEASE")
+  ;;
+ esac
+ ) >/var/run/dhcp_eventhook_output 2>&1
+Note the redirection of stdout and stderr to a file.
+<beginning of page>
+/etc/dhcp/if.dhc
+/etc/dhcp/if.dh6
+Contains the configuration for interface. The mere existence of this file does not imply that the configuration is cor<hy>
+rect, since the lease might have expired. On start-up, dhcpagent confirms the validity of the address using RE<hy>
+QUEST (for DHCPv4) or Confirm (DHCPv6).
+/etc/dhcp/duid
+/etc/dhcp/iaid
+Contains persistent storage for DUID (DHCP Unique Identifier) and IAID (Identity Association Identifier) values.
+The format of these files is undocumented, and applications should not read from or write to them.
+/etc/default/dhcpagent
+Contains default values for tunable parameters. All values may be qualified with the interface they apply to by
+prepending the interface name and a period (".") to the interface parameter name. The parameters include: the inter<hy>
+face parameter name.
+To configure IPv6 parameters, place the string .v6 between the interface name (if any) and the parameter name. For
+example, to set the global IPv6 parameter request list, use .v6.PARAM_REQUEST_LIST. To set the CLIENT_ID
+(DUID) on hme0, use hme0.v6.CLIENT_ID.
+The parameters include:
+VERIFIED_LEASE_ONLY
+Indicates that a RELEASE rather than a DROP should be performed on managed interfaces when the agent termi<hy>
+nates. Release causes the client to discard the lease, and the server to make the address available again. Drop causes
+the client to record the lease in /etc/dhcp/interface.dhc or /etc/dhcp/interface.dh6 for later use. In addition, when the
+link status changes to up or when the system is resumed after a suspend, the client will verify the lease with the
+server. If the server is unreachable for verification, then the old lease will be discarded (even if it has time remaining)
+and a new one obtained.
+Enabling this option is often desirable on mobile systems, such as laptops, to allow the system to recover quickly
+from moves.
+OFFER_WAIT
+Indicates how long to wait between checking for valid OFFERs after sending a DISCOVER. For DHCPv6, sets the
+time to wait between checking for valid Advertisements after sending a Solicit.
+CLIENT_ID
+Indicates the value that should be used to uniquely identify the client to the server. This value can take one of three
+basic forms:
+ decimal,data...
+ 0xHHHHH...
+ "string...."
+The first form is an RFC 3315 DUID. This is legal for both IPv4 DHCP and DHCPv6. For IPv4, an RFC 4361
+Client ID is constructed from this value. In this first form, the format of data... depends on the decimal value. The
+following formats are defined for this first form:
+1,hwtype,time,lla
+Type 1, DUID-LLT. The hwtype value is an integer in the range 0-65535, and indicates the type of hardware. The
+time value is the number of seconds since midnight, January 1st, 2000 UTC, and can be omitted to use the current
+system time. The lla value is either a colon-separated MAC address or the name of a physical interface. If the name
+of an interface is used, the hwtype value can be omitted. For example: 1,,,hme0
+<beginning of page>
+2,enterprise,hex...
+Type 2, DUID-EN. The enterprise value is an integer in the range 0-4294967295 and represents the SMI Enterprise
+number for an organization. The hex string is an even-length sequence of hexadecimal digits.
+3,hwtype,lla
+Type 3, DUID-LL. This is the same as DUID-LLT (type 1), except that a time stamp is not used.
+*,hex
+Any other type value (0 or 4-65535) can be used with an even-length hexadecimal string.
+The second and third forms of CLIENT_ID are legal for IPv4 only. These both represent raw Client ID (without
+RFC 4361), in hex, or NVT ASCII string format. Thus, "Sun" and 0x53756E are equivalent.
+PARAM_REQUEST_LIST
+Specifies a list of comma-separated integer values of options for which the client would like values, or symbolic Site
+or Option option names. Symbolic option names for IPv4 are resolved through /etc/dhcp/inittab. Option names for
+IPv6 are resolved by means of /etc/dhcp/inittab6.
+PARAM_IGNORE_LIST
+Specifies a list of options (constructed in the same manner as PARAM_REQUEST_LIST) that the DHCP client
+will ignore. Ignored options are treated as though the server did not return the options specified. Ignored options are
+not visible using dhcpinfo(1) or acted on by the client. This parameter can be used, for example, to disable an un<hy>
+wanted client name or default router.
+REQUEST_HOSTNAME
+Indicates the client requests the DHCP server to map the client's leased IPv4 address to the host name associated
+with the network interface that performs DHCP on the client. The host name must be specified in the /etc/host<hy>
+name.interface file for the relevant interface on a line of the form
+ inet hostname
+where hostname is the host name requested.
+This option works with DHCPv4 only.
+/etc/dhcp/eventhook
+Location of a DHCP event program.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsr _ Interface StabilityCommitted
+dhcpinfo(1), ifconfig(1M), init(1M), in.mpathd(1M), in.ndpd(1M), syslog(3C), attributes(5), dhcp(5)
+
+Croft, B. and Gilmore, J.,Bootstrap Protocol (BOOTP)RFC 951, Network Working Group, September 1985.
+Droms, R., Dynamic Host Configuration Protocol, RFC 2131, Network Working Group, March 1997.
+<beginning of page>
+Lemon, T. and B. Sommerfeld. RFC 4361, Node-specific Client Identifiers for Dynamic Host Configuration Protocol
+Version Four (DHCPv4). Nominum and Sun Microsystems. February 2006.
+Droms, R. RFC 3315, Dynamic Host Configuration Protocol for IPv6 (DHCPv6). Cisco Systems. July 2003.
+The dhcpagent daemon can be used on IPv4 logical interfaces, just as with physical interfaces. When used on a log<hy>
+ical interface, the daemon automatically constructs a Client ID value based on the DUID and IAID values, according
+to RFC 4361. The /etc/default/dhcpagent CLIENT_ID value, if any, overrides this automatic identifier.
+As with physical IPv4 interfaces, the /etc/hostname.hme0:1 and /etc/dhcp.hme0:1 files must also be created in or<hy>
+der for hme0:1 to be automatically plumbed and configured at boot. In addition, unlike physical IPv4 interfaces,
+dhcpagent does not add or remove default routes associated with logical interfaces.
+DHCP can be performed on IPMP IP interfaces to acquire and maintain IPMP data addresses. Because an IPMP IP
+interface has no hardware address, the daemon automatically constructs a Client ID using the same approach de<hy>
+scribed above for IPv4 logical interfaces. In addition, the lack of a hardware address means the daemon must set the
+"broadcast" flag in all DISCOVER and REQUEST messages on IPMP IP interfaces. Some DHCP servers may
+refuse such requests.
+DHCP can be performed on IP interfaces that are part of an IPMP group (to acquire and maintain test addresses).
+The daemon will automatically set the NOFAILOVER and DEPRECATED flags on each test address. Additional<hy>
+ly, the daemon will not add or remove default routes in this case. Note that the actual DHCP packet exchange may
+be performed over any active IP interface in the IPMP group. It is strongly recommended that test addresses have in<hy>
+finite leases. Otherwise, an extended network outage detectable only by probes may cause test address leases to ex<hy>
+pire, causing in.mpathd(1M) to revert to link-based failure detection and trigger an erroneous repair.
+With DHCPv6, the link-local interface must be configured using /etc/hostname6.hme0 in order for DHCPv6 to run
+on hme0 at boot time. The logical interfaces for each address are plumbed by dhcpagent automatically.

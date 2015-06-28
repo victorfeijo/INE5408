@@ -1,0 +1,110 @@
+<beginning of page>
+nisclient <-> initialize NIS+ credentials for NIS+ principals
+/usr/lib/nis/nisclient -c [-x] [-o] [-v]
+ [-l <network_password>] [-d <NIS+_domain>] client_name...
+/usr/lib/nis/nisclient -i [-x] [-v] -h <NIS+_server_host>
+ [-a <NIS+_server_addr>]
+ [-k <key_domain>] [-d <NIS+_domain>] [-S 0 | 2]
+/usr/lib/nis/nisclient -u [-x] [-v]
+/usr/lib/nis/nisclient -r [-x]
+The nisclient shell script can be used to: <bu> create NIS+ credentials for hosts and users <bu> initialize NIS+ hosts and
+users <bu> restore the network service environment
+NIS+ credentials are used to provide authentication information of NIS+ clients to NIS+ service.
+Use the first synopsis (-c option) to create individual NIS+ credentials for hosts or users. You must be logged in as a
+NIS+ principal in the domain for which you are creating the new credentials. You must also have write permission to
+the local "cred" table. The client_name argument accepts any valid host or user name in the NIS+ domain (for exam<hy>
+ple, the client_name must exist in the hosts or passwd table). nisclient verifies each client_name against both the
+host and passwd tables, then adds the proper NIS+ credentials for hosts or users. Note that if you are creating NIS+
+credentials outside of your local domain, the host or user must exist in the host or passwd tables in both the local
+and remote domains.
+By default, nisclient will not overwrite existing entries in the credential table for the hosts and users specified. To
+overwrite, use the -o option. After the credentials have been created, nisclient will print the command that must be
+executed on the client machine to initialize the host or the user. The -c option requires a network password for the
+client which is used to encrypt the secret key for the client. You can either specify it on the command line with the -l
+option or the script will prompt you for it. You can change this network password later with passwd(1) or chkey(1).
+nisclient -c is not intended to be used to create NIS+ credentials for all users and hosts which are defined in the
+passwd and hosts tables. To define credentials for all users and hosts, use nispopulate(1M).
+Use the second synopsis (-i option) to initialize a NIS+ client machine. The -i option can be used to convert ma<hy>
+chines to use NIS+ or to change the machine's domainname. You must be logged in as super-user on the machine
+that is to become a NIS+ client. Your administrator must have already created the NIS+ credential for this host by
+using nisclient -c or nispopulate -C. You will need the network password your administrator created. nisclient will
+prompt you for the network password to decrypt your secret key and then for this machine's root login password to
+generate a new set of secret/public keys. If the NIS+ credential was created by your administrator using nisclient -c,
+then you can simply use the initialization command that was printed by the nisclient script to initialize this host in<hy>
+stead of typing it manually.
+To initialize an unauthenticated NIS+ client machine, use the -i option with -S 0. With these options, the nisclient -i
+option will not ask for any passwords.
+During the client initialization process, files that are being modified are backed up as files.no_nisplus. The files that
+are usually modified during a client initialization are: /etc/defaultdomain, /etc/nsswitch.conf, /etc/inet/hosts, and,
+if it exists, /var/nis/NIS_COLD_START. Notice that a file will not be saved if a backup file already exists.
+The -i option does not set up a NIS+ client to resolve hostnames using DNS. Please refer to the DNS documentation
+for information on setting up DNS. (See resolv.conf(4)).
+It is not necessary to initialize either NIS+ root master servers or machines that were installed as NIS+ clients using
+suninstall(1M).
+Use the third synopsis (-u option) to initialize a NIS+ user. You must be logged in as the user on a NIS+ client ma<hy>
+chine in the domain where your NIS+ credentials have been created. Your administrator should have already created
+the NIS+ credential for your username using nisclient -c or nispopulate(1M). You will need the network password
+your administrator used to create the NIS+ credential for your username. nisclient will prompt you for this network
+password to decrypt your secret key and then for your login password to generate a new set of secret/public keys.
+Use the fourth synopsis (-r option) to restore the network service environment to whatever you were using before
+nisclient -i was executed. You must be logged in as super-user on the machine that is to be restored. The restore will
+only work if the machine was initialized with nisclient -i because it uses the backup files created by the -i option.
+<beginning of page>
+Reboot the machine after initializing a machine or restoring the network service.
+The following options are supported:
+-a <NIS+_server_addr> Specifies the IP address for the NIS+ server. This option is used only with the -i option.
+-c Adds DES credentials for NIS+ principals.
+-d <NIS+_domain> Specifies the NIS+ domain where the credential should be created when used in conjunction
+with the -c option. It specifies the name for the new NIS+ domain when used in conjunction with the -i option. The
+default is your current domainname.
+-h <NIS+_server_host> Specifies the NIS+ server's hostname. This option is used only with the -i option.
+-i Initializes a NIS+ client machine.
+-l <network_password> Specifies the network password for the clients. This option is used only with the -c option. If
+this option is not specified, the script will prompt you for the network password.
+-k <key_domain> This option specifies the domain where root's credentials are stored. If a domain is not specified,
+then the system default domain is assumed.
+-o Overwrites existing credential entries. The default is not to overwrite. This is used only with the -c option.
+-r Restores the network service environment.
+-S 0|2 Specifies the authentication level for the NIS+ client. Level 0 is for unauthenticated clients and level 2 is for
+authenticated (DES) clients. The default is to set up with level 2 authentication. This is used only with the -i option.
+nisclient always uses level 2 authentication (DES) for both -c and -u options. There is no need to run nisclient with
+-u and -c for level 0 authentication. To configure authentication mechanisms other than DES at security level 2, use
+nisauthconf(1M) before running nisclient.
+-u Initializes a NIS+ user.
+-v Runs the script in verbose mode.
+-x Turns the "echo" mode on. The script just prints the commands that it would have executed. Notice that the com<hy>
+mands are not actually executed. The default is off.
+Example 1 Adding the DES Credential in the Local Domain
+To add the DES credential for host sunws and user fred in the local domain:
+ example% /usr/lib/nis/nisclient -c sunws fred
+Example 2 Adding the DES Credential in a Specified Domain
+To add the DES credential for host sunws and user fred in domain xyz.example.com.:
+ example% /usr/lib/nis/nisclient -c -d xyz.example.com. sunws fred
+<beginning of page>
+Example 3 Initializing the Host in a Specific Domain
+To initialize host sunws as a NIS+ client in domain xyz.example.com. where nisplus_server is a server for the do<hy>
+main xyz.example.com.:
+ example# /usr/lib/nis/nisclient -i -h nisplus_server -d xyz.example.com
+The script will prompt you for the IP address of nisplus_server if the server is not found in the /etc/hosts file. The
+-d option is needed only if your current domain name is different from the new domain name.
+Example 4 Initializing the Host as an Unauthenticated Client in a Specific Domain
+To initialize host sunws as an unauthenticated NIS+ client in domain xyz.example.com. where nisplus_server is a
+server for the domain xyz.example.com:
+ example# /usr/lib/nis/nisclient -i -S 0 \
+  -h nisplus_server -d xyz.example.com. -a 172.16.44.1
+Example 5 Initializing the User as a NIS+ principal
+To initialize user fred as a NIS+ principal, log in as user fred on a NIS+ client machine.
+ example% /usr/lib/nis/nisclient -u
+/var/nis/NIS_COLD_START This file contains a list of servers, their transport addresses, and their Secure RPC
+public keys that serve the machines default domain.
+/etc/defaultdomain The system default domainname.
+/etc/nsswitch.conf Configuration file for the name-service switch.
+/etc/inet/hosts Local host name database.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wnisu
+chkey(1), keylogin(1), NIS+(1), passwd(1), keyserv(1M), nisaddcred(1M), nisauthconf(1M), nisinit(1M), nis<hy>
+populate(1M), suninstall(1M), nsswitch.conf(4), resolv.conf(4), attributes(5)
+NIS+ might not be supported in future releases of the Solaris operating system. Tools to aid the migration from
+NIS+ to LDAP are available in the current Solaris release. For more information, visit http://www.sun.com/directo<hy>
+ry/nisplus/transition.html.

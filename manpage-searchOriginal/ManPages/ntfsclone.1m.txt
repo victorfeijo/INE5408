@@ -1,0 +1,128 @@
+<beginning of page>
+ntfsclone <-> clone, image, restore, or rescue an NTFS
+ntfsclone [options] source
+ntfsclone --save-image [options] source
+ntfsclone --resotore-image [options] source
+ntfsclone --metadata [options] source
+The ntfsclone utility efficiently clones (which includes copy, save, backup, and restore operations) or rescues an
+NTFS filesystem to a sparse file, an image, a device (partition), or to standard output. It works at disk sector level
+and copies only the written data (that is, not empty space). Unused disk space becomes zero (cloning to sparse file),
+encoded with control codes (saving in special image format), left unchanged (cloning to a disk/partition) or filled
+with zeros (cloning to standard output).
+ntfsclone can be useful in making backups<em>taking an exact snapshot of an NTFS filesystem<em>and restoring it later
+on. It also can be used to test NTFS read/write functionality and allows you to troubleshoot users' issues using the
+clone, without the risk of destroying the original file system.
+If not using the special image format (see section of the same name below), the clone is an exact copy of the original
+NTFS file system, from sector to sector. Thus, it can also be mounted just like the original NTFS filesystem. For ex<hy>
+ample, if you clone to a file and the kernel has a loopback device and NTFS support, then the file can be mounted
+using:
+ # mount -t ntfs -o loop ntfsclone.img
+You must exercise great care to copy, move or restore a system or boot partition to another computer, or to a differ<hy>
+ent disk or partition (for example, /dev/dsk/c0d0p1 to /dev/dsk/c0d0p2, /dev/dsk/c0d0p1 to /dev/dsk/c0d1p1 or to
+a different disk sector offset).
+Under most circumstances, to enable Windows to boot you must copy, move, or restore NTFS to the same partition
+that has the following characteristics as the original partition and disk: <bu> starts at the same sector <bu> on the same type
+of disk <bu> having the same BIOS legacy cylinder setting
+The ntfsclone utility guarantees an exact copy of NTFS but does not deal with booting issues. This is by design: ntf<hy>
+sclone is a file system, not a system, utility. Its goal is only NTFS cloning, not Windows cloning. Because of this,
+ntfsclone can be used as a very fast and reliable building block for Windows cloning, but is not a complete answer.
+You can find useful tips on NTFS cloning at the NTFS web site, http://wiki.linux-ntfs.org.
+A file containing unallocated blocks (holes) is referred to as a "sparse file". The reported size of such files is always
+higher than the disk space consumed by them. The du(1) command reports the real disk space used by a sparse file.
+The holes are always read as zeros. All major Linux file systems, such as, ext2, ext3, reiserfs, Reiser4, JFS, and
+XFS support sparse files. However, the ISO 9600 CD-ROM file system, as one example, does not.
+It is recommended that you save an NTFS filesystem to a special image format. Instead of representing unallocated
+blocks as holes, they are encoded using control codes. Thus, the image saves space without requiring sparse file sup<hy>
+port. The image format is ideal for streaming file system images over the network. The disadvantage of the special
+image format is that you cannot mount the image directly; you must first restore it.
+To save an image using the special image format, use the -s or the --save-image option. To restore an image, use
+the -r or the --restore-image option. Note that you can restore images from standard input by using a hyphen (-) as
+the source file.
+Using the -m or --metadata option, ntfsclone can save only the NTFS metadata and the clone still will be mount<hy>
+able. In this usage, all non-metadata file content is lost; reading back the data results in all zeros.
+The metadata-only image can be compressed very well, usually to a size in the range of 1 to 8 MB. It is convenient
+to transfer such an image for investigation and troubleshooting.
+In metadata-only mode, ntfsclone saves none of the user's data, which includes the resident user's data embedded
+into metadata. All is filled with zeros. Moreover, all the file timestamps, and deleted and unused spaces inside the
+metadata are filled with zeros. Thus, this mode is inappropriate, for example, for forensic analyses.
+<beginning of page>
+Note that filenames are not removed. Because a filename might contain sensitive information, consider the possi<hy>
+bities for breaches of security or privacy before sending out a metadata-only image.
+Supported options are listed below. Most options have both single-letter and full-name forms. Multiple single-letter
+options that do not take an argument can be combined. For example, -fv is the equivalent of -f -v. A full-name option
+can be abbreviated to a unique prefix of its name.
+-f, --force
+Forces ntfsclone to proceed, even if the filesystem is marked "dirty" following a consistency check.
+-h, --help
+Show a list of options with a brief description of each one.
+-i, --ignore-fs-check
+Ignore the result of the file system consistency check. This option can be used only with the --meta-data option.
+Any clusters that cause an inconsistency are saved.
+-m, --metadata
+Clone only metadata. With this option, you must clone only to a file.
+-o, --output file
+Clone NTFS to the non-existent file. If file is a hyphen (-), clone to the standard output.
+-O, --overwrite file
+Clone NTFS to file, overwriting file if it already exists.
+--rescue
+Ignore disk read errors so that a disk having bad sectors, for example, a failing disk, can be rescued with minimal
+impact on the disk. ntfsclone works at the lowest, sector level in this mode, enabling more data to be rescued. The
+contents of the unreadable sectors are filled with the question mark (?) character; the beginning of such sectors are
+marked by the string: BadSector.
+-r, --restore-image source
+Restore from the special image format specified by source. If source is a hyphen (-), the image is read from the stan<hy>
+dard input.
+-s, --save-image
+Save to the special image format. In terms of space usage and speed, this is the most efficient option if imaging is
+done to the standard output. This option is useful for image compression, encryption, or streaming through a net<hy>
+work.
+Example 1 Cloning with Overwrite Option
+The following command clones with the --overwrite option.
+ # ntfsclone --overwrite /dev/dsk/c0d2p1 /dev/dsk/c0d0p1
+Example 2 Saving to Special Image Format
+The following command clones to the special image format to its original partition.
+<beginning of page>
+ # ntfsclone --save-image --output backup.img /dev/dsk/c0d0p1
+Example 3 Restoring from a Special Image File
+The following command restores an NTFS from a special image file.
+ # ntfsclone --restore-image --overwrite /dev/dsk/c0d0p1 backup.img
+Example 4 Saving to a Compressed Image
+The following command saves an NTFS to a compressed image file.
+ # ntfsclone --save-image -o - /dev/dsk/c0d0p1
+Example 5 Restoring from a Compressed Image
+The following command restores an NTFS volume from a compressed image file.
+ # gunzip -c backup.img.gz | \
+ ntfsclone --restore-image --overwrite /dev/dsk/c0d0p1 -
+Example 6 Backing up to a Remote Host Using ssh
+The following command backs up to a remote host, using ssh(1). Note that ssh will probably require a password.
+ # ntfsclone --save-image --output - /dev/dsk/c0d0p1 | \
+ gzip -c | ssh host `cat > backup.img.gz`
+Example 7 Restoring from a Remote Host Using ssh
+The following command backs up to a remote host, using ssh(1). Note that ssh will probably require a password.
+ # ssh host `cat backup.img.gz` | gunzip -c | \
+ ntfsclone --restore-image --overwrite /dev/dsk/c0d0p1 -
+Example 8 Streaming an Image File from a Web Server
+The following command streams an image file from a web server and restore it to a partition.
+ # wget -qO - http://server/backup.img | \
+ ntfsclone --restore-image --overwrite /dev/dsk/c0d0p1 -
+Example 9 Cloning to a New File
+The following command clones an NTFS volume to a non-existent file.
+ # ntfsclone --output ntfs-clone.img /dev/dsk/c0d0p1
+Example 10 Packing NTFS Metadata
+<beginning of page>
+The following command packs NTFS metadata into an image file. Note that bzip2 takes a much longer time than
+gzip, but produces an archive that is up to ten times smaller than the latter produces.
+ # ntfsclone --metadata --output ntfsmeta.img /dev/dsk/c0d0p1
+ bzip2 ntfsmeta.img
+Example 11 Unpacking NTFS Metadata
+The following command unpacks NTFS metadata into a sparse file.
+ # bunzip2 -c ntfsmeta.img.bz2 | \
+ cp --sparse=always /proc/self/fd/0 ntfsmeta.img
+The return code is zero on success, non-zero otherwise.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wntfsprogs _ Interface StabilityUncommitted
+du(1), ssh(1), ntfsresize(1M), ntfsundelete(1M), parted(1M), attributes(5)
+http://wiki.linux-ntfs.org
+ntfsclone was written by Szabolcs Szakacsits with contributions from Per Olofsson (special image format support)
+and Anton Altaparmakov.

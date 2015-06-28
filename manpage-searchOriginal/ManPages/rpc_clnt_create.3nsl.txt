@@ -1,0 +1,255 @@
+<beginning of page>
+rpc_clnt_create, clnt_control, clnt_create, clnt_create_timed, clnt_create_vers, clnt_create_vers_timed, clnt_destroy,
+clnt_dg_create, clnt_pcreateerror, clnt_raw_create, clnt_spcreateerror, clnt_tli_create, clnt_tp_create, clnt_tp_cre<hy>
+ate_timed, clnt_vc_create, rpc_createerr, clnt_door_create <-> library routines for dealing with creation and manipula<hy>
+tion of CLIENT handles
+#include <rpc/rpc.h>
+bool_t clnt_control(CLIENT *clnt, const uint_t req, char *info);
+CLIENT *clnt_create(const char *host, const rpcprog_t prognum,
+ const rpcvers_t versnum, const char *nettype);
+CLIENT *clnt_create_timed(const char *host, const rpcprog_t prognum,
+ const rpcvers_t versnum, const nettype,
+ const struct timeval *timetout);
+CLIENT *clnt_create_vers (const char *host,
+ const rpcprog_t prognum, rpcvers_t *vers_outp,
+ const rpcvers_t vers_low, const rpcvers_t vers_high,
+ const char *nettype);
+CLIENT *clnt_create_vers_timed(const char *host,
+ const rpcprog_t prognum, rpcvers_t *vers_outp,
+ const rpcvers_t vers_low, const rpcvers_t vers_high,
+ char *nettype, const struct timeval *timeout);
+void clnt_destroy(CLIENT *clnt);
+CLIENT *clnt_dg_create(const int fildes,
+ const struct netbuf *svcaddr, const rpcprog_t prognum,
+ const rpcvers_t versnum, const uint_t sendsz,
+ const uint_t recsz);
+void clnt_pcreateerror(const char *s);
+CLIENT *clnt_raw_create(const rpcprog_t prognum,
+ const rpcvers_t versnum);
+char *clnt_spcreateerror(const char *s);
+CLIENT *clnt_tli_create(const int fildes,
+ const struct netconfig *netconf, const struct netbuf *svcaddr,
+ const rpcprog_t prognum, const rpcvers_t versnum,
+ const uint_t sendsz, const uint_t recsz);
+CLIENT *clnt_tp_create(const char *host,
+ const rpcprog_t prognum, const rpcvers_t versnum,
+ const struct netconfig *netconf);
+CLIENT *clnt_tp_create_timed(const char *host,
+ const rpcprog_t prognum, const rpcvers_t versnum,
+ const struct netconfig *netconf, const struct timeval *timeout);
+CLIENT *clnt_vc_create(const int fildes,
+ const struct netbuf *svcaddr, const rpcprog_t prognum,
+ const rpcvers_t versnum, const uint_t sendsz,
+ const uint_t recsz);
+struct rpc_createerr rpc_createerr
+CLIENT *clnt_door_create(const rpcprog_t prognum,
+ const rpcvers_t versnum, const uint_t sendsz);
+RPC library routines allow C language programs to make procedure calls on other machines across the network.
+First a CLIENT handle is created and then the client calls a procedure to send a request to the server. On receipt of
+the request, the server calls a dispatch routine to perform the requested service, and then sends a reply.
+<beginning of page>
+These routines are MT-Safe. In the case of multithreaded applications, the -mt option must be specified on the com<hy>
+mand line at compilation time. When the -mt option is specified, rpc_createerr() becomes a macro that enables
+each thread to have its own rpc_createerr(). See threads(5).
+See rpc(3NSL) for the definition of the CLIENT data structure.
+clnt_control()
+A function macro to change or retrieve various information about a client object. req indicates the type of operation,
+and info is a pointer to the information. For both connectionless and connection-oriented transports, the supported
+values of req and their argument types and what they do are:
+ CLSET_TIMEOUT struct timeval * set total timeout
+ CLGET_TIMEOUT struct timeval * get total timeout
+If the timeout is set using clnt_control(), the timeout argument passed by clnt_call() is ignored in all subsequent
+calls. If the timeout value is set to 0, clnt_control() immediately returns RPC_TIMEDOUT. Set the timeout pa<hy>
+rameter to 0 for batching calls.
+ CLGET_SERVER_ADDR struct netbuf * get server's address
+ CLGET_SVC_ADDR struct netbuf * get server's address
+ CLGET_FD int * get associated file descriptor
+ CLSET_FD_CLOSE void close the file descriptor when
+   destroying the client handle
+   (see clnt_destroy())
+ CLSET_FD_NCLOSE void do not close the file
+   descriptor when destroying the client handle
+ CLGET_VERS rpcvers_t get the RPC program's version
+   number associated with the
+   client handle
+ CLSET_VERS rpcvers_t set the RPC program's version
+   number associated with the
+   client handle. This assumes
+   that the RPC server for this
+   new version is still listening
+   at the address of the previous
+   version.
+ CLGET_XID uint32_t get the XID of the previous
+   remote procedure call
+ CLSET_XID uint32_t set the XID of the next
+   remote procedure call
+ CLGET_PROG rpcprog_t get program number
+ CLSET_PROG rpcprog_t set program number
+The following operations are valid for connection-oriented transports only:
+ CLSET_IO_MODE rpciomode_t* set the IO mode used
+    to send one-way requests. The argument for this operation
+   can be either:
+  - RPC_CL_BLOCKING  all sending operations block
+    until the underlying transport protocol has
+    accepted requests. If you specify this argument
+    you cannot use flush and getting and setting buffer
+    size is meaningless.
+  - RPC_CL_NONBLOCKING sending operations do not
+    block and return as soon as requests enter the buffer.
+    You can now use non-blocking I/O. The requests in the
+   buffer are pending. The requests are sent to
+   the server as soon as a two-way request is sent
+   or a flush is done. You are responsible for flushing
+   the buffer. When you choose RPC_CL_NONBLOCKING argument
+    you have a choice of flush modes as specified by
+   CLSET_FLUSH_MODE.
+ CLGET_IO_MODE rpciomode_t*  get the current IO mode
+ CLSET_FLUSH_MODE rpcflushmode_t*   set the flush mode.
+    The flush mode can only be used in non-blocking I/O mode.
+<beginning of page>
+   The argument can be either of the following:  
+  - RPC_CL_BESTEFFORT_FLUSH: All flushes send requests
+    in the buffer until the transport end-point blocks.
+    If the transport connection is congested, the call
+    returns directly.  
+  - RPC_CL_BLOCKING_FLUSH: Flush blocks until the
+    underlying transport protocol accepts all pending
+   requests into the queue.
+ CLGET_FLUSH_MODE rpcflushmode_t* get the current flush mode.
+ CLFLUSH rpcflushmode_t   flush the pending requests.
+   This command can only be used in non-blocking I/O mode.
+   The flush policy depends on which of the following
+   parameters is specified:
+  - RPC_CL_DEFAULT_FLUSH, or NULL: The flush is done
+   according to the current flush mode policy
+   (see CLSET_FLUSH_MODE option).
+  - RPC_CL_BESTEFFORT_FLUSH:  The flush tries
+   to send pending requests without blocking; the call
+   returns directly. If the transport connection is
+   congested, this call could return without the request
+   being sent.
+  - RPC_CL_BLOCKING_FLUSH:  The flush sends all pending
+   requests. This call will block until all the requests
+   have been accepted by the transport layer.
+ CLSET_CONNMAXREC_SIZE int* set the buffer size.
+    It is not possible to dynamically
+   resize the buffer if it contains data.
+   The default size of the buffer is 16 kilobytes.
+ CLGET_CONNMAXREC_SIZE int*   get the current size of the
+   buffer
+ CLGET_CURRENT_REC_SIZE int*   get the size of
+   the pending requests stored in the buffer. Use of this
+   command is only recommended when you are in non-blocking
+   I/O mode. The current size of the buffer is always zero
+   when the handle is in blocking mode as the buffer is not
+   used in this mode.
+The following operations are valid for connectionless transports only:
+ CLSET_RETRY_TIMEOUT struct timeval * set the retry timeout
+ CLGET_RETRY_TIMEOUT struct timeval * get the retry timeout
+The retry timeout is the time that RPC waits for the server to reply before retransmitting the request.
+clnt_control() returns TRUE on success and FALSE on failure.
+clnt_create()
+Generic client creation routine for program prognum and version versnum. host identifies the name of the remote
+host where the server is located. nettype indicates the class of transport protocol to use. The transports are tried in
+left to right order in NETPATH variable or in top to bottom order in the netconfig database.
+clnt_create() tries all the transports of the nettype class available from the NETPATH environment variable and the
+netconfig database, and chooses the first successful one. A default timeout is set and can be modified using
+clnt_control(). This routine returns NULL if it fails. The clnt_pcreateerror() routine can be used to print the reason
+for failure.
+Note that clnt_create() returns a valid client handle even if the particular version number supplied to clnt_create()
+is not registered with the rpcbind service. This mismatch will be discovered by a clnt_call later (see
+rpc_clnt_calls(3NSL)).
+clnt_create_timed()
+Generic client creation routine which is similar to clnt_create() but which also has the additional parameter timeout
+that specifies the maximum amount of time allowed for each transport class tried. In all other respects, the clnt_cre<hy>
+<beginning of page>
+ate_timed() call behaves exactly like the clnt_create() call.
+clnt_create_vers()
+Generic client creation routine which is similar to clnt_create() but which also checks for the version availability.
+host identifies the name of the remote host where the server is located. nettype indicates the class transport protocols
+to be used. If the routine is successful it returns a client handle created for the highest version between vers_low and
+vers_high that is supported by the server. vers_outp is set to this value. That is, after a successful return vers_low <=
+*vers_outp <= vers_high. If no version between vers_low and vers_high is supported by the server then the routine
+fails and returns NULL. A default timeout is set and can be modified using clnt_control(). This routine returns
+NULL if it fails. The clnt_pcreateerror() routine can be used to print the reason for failure.
+Note: clnt_create() returns a valid client handle even if the particular version number supplied to clnt_create() is
+not registered with the rpcbind service. This mismatch will be discovered by a clnt_call later (see
+rpc_clnt_calls(3NSL)). However, clnt_create_vers() does this for you and returns a valid handle only if a version
+within the range supplied is supported by the server.
+clnt_create_vers_timed()
+Generic client creation routine similar to clnt_create_vers() but with the additional parameter timeout, which speci<hy>
+fies the maximum amount of time allowed for each transport class tried. In all other respects, the clnt_cre<hy>
+ate_vers_timed() call behaves exactly like the clnt_create_vers() call.
+clnt_destroy()
+A function macro that destroys the client's RPC handle. Destruction usually involves deallocation of private data
+structures, including clnt itself. Use of clnt is undefined after calling clnt_destroy(). If the RPC library opened the
+associated file descriptor, or CLSET_FD_CLOSE was set using clnt_control(), the file descriptor will be closed.
+The caller should call auth_destroy(clnt->cl_auth) (before calling clnt_destroy()) to destroy the associated AUTH
+structure (see rpc_clnt_auth(3NSL)).
+clnt_dg_create()
+This routine creates an RPC client for the remote program prognum and version versnum; the client uses a connec<hy>
+tionless transport. The remote program is located at address svcaddr. The parameter fildes is an open and bound file
+descriptor. This routine will resend the call message in intervals of 15 seconds until a response is received or until
+the call times out. The total time for the call to time out is specified by clnt_call() (see clnt_call() in
+rpc_clnt_calls(3NSL)). The retry time out and the total time out periods can be changed using clnt_control(). The
+user may set the size of the send and receive buffers with the parameters sendsz and recvsz; values of 0 choose suit<hy>
+able defaults. This routine returns NULL if it fails.
+clnt_pcreateerror()
+Print a message to standard error indicating why a client RPC handle could not be created. The message is prepend<hy>
+ed with the string s and a colon, and appended with a newline.
+clnt_raw_create()
+This routine creates an RPC client handle for the remote program prognum and version versnum. The transport used
+to pass messages to the service is a buffer within the process's address space, so the corresponding RPC server
+should live in the same address space; (see svc_raw_create() in rpc_svc_create(3NSL)). This allows simulation of
+RPC and measurement of RPC overheads, such as round trip times, without any kernel or networking interference.
+This routine returns NULL if it fails. clnt_raw_create() should be called after svc_raw_create().
+clnt_spcreateerror()
+Like clnt_pcreateerror(), except that it returns a string instead of printing to the standard error. A newline is not ap<hy>
+pended to the message in this case.
+Warning: returns a pointer to a buffer that is overwritten on each call. In multithread applications, this buffer is im<hy>
+plemented as thread-specific data.
+<beginning of page>
+clnt_tli_create()
+This routine creates an RPC client handle for the remote program prognum and version versnum. The remote pro<hy>
+gram is located at address svcaddr. If svcaddr is NULL and it is connection-oriented, it is assumed that the file de<hy>
+scriptor is connected. For connectionless transports, if svcaddr is NULL, RPC_UNKNOWNADDR error is set.
+fildes is a file descriptor which may be open, bound and connected. If it is RPC_ANYFD, it opens a file descriptor
+on the transport specified by netconf. If fildes is RPC_ANYFD and netconf is NULL, a RPC_UNKNOWNPROTO
+error is set. If fildes is unbound, then it will attempt to bind the descriptor. The user may specify the size of the buf<hy>
+fers with the parameters sendsz and recvsz; values of 0 choose suitable defaults. Depending upon the type of the
+transport (connection-oriented or connectionless), clnt_tli_create() calls appropriate client creation routines. This
+routine returns NULL if it fails. The clnt_pcreateerror() routine can be used to print the reason for failure. The re<hy>
+mote rpcbind service (see rpcbind(1M)) is not consulted for the address of the remote service.
+clnt_tp_create()
+Like clnt_create() except clnt_tp_create() tries only one transport specified through netconf.
+clnt_tp_create() creates a client handle for the program prognum, the version versnum, and for the transport speci<hy>
+fied by netconf. Default options are set, which can be changed using clnt_control() calls. The remote rpcbind ser<hy>
+vice on the host host is consulted for the address of the remote service. This routine returns NULL if it fails. The
+clnt_pcreateerror() routine can be used to print the reason for failure.
+clnt_tp_create_timed()
+Like clnt_tp_create() except clnt_tp_create_timed() has the extra parameter timeout which specifies the maximum
+time allowed for the creation attempt to succeed. In all other respects, the clnt_tp_create_timed() call behaves ex<hy>
+actly like the clnt_tp_create() call.
+clnt_vc_create()
+This routine creates an RPC client for the remote program prognum and version versnum; the client uses a connec<hy>
+tion-oriented transport. The remote program is located at address svcaddr. The parameter fildes is an open and bound
+file descriptor. The user may specify the size of the send and receive buffers with the parameters sendsz and recvsz;
+values of 0 choose suitable defaults. This routine returns NULL if it fails.
+The address svcaddr should not be NULL and should point to the actual address of the remote program.
+clnt_vc_create() does not consult the remote rpcbind service for this information.
+rpc_createerr()
+A global variable whose value is set by any RPC client handle creation routine that fails. It is used by the routine
+clnt_pcreateerror() to print the reason for the failure.
+In multithreaded applications, rpc_createerr becomes a macro which enables each thread to have its own rpc_cre<hy>
+ateerr.
+clnt_door_create()
+This routine creates an RPC client handle over doors for the given program prognum and version versnum. Doors is
+a transport mechanism that facilitates fast data transfer between processes on the same machine. The user may set
+the size of the send buffer with the parameter sendsz. If sendsz is 0, the corresponding default buffer size is 16
+Kbyte. The clnt_door_create() routine returns NULL if it fails and sets a value for rpc_createerr.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ ArchitectureAll _
+AvailabilitySUNWcsl (32-bit) _ SUNWcslx (64-bit) _ Interface StabilityCommitted _ MT-LevelMT-Safe
+<beginning of page>
+rpcbind(1M), rpc(3NSL), rpc_clnt_auth(3NSL), rpc_clnt_calls(3NSL), rpc_svc_create(3NSL), svc_raw_cre<hy>
+ate(3NSL), threads(5), attributes(5)

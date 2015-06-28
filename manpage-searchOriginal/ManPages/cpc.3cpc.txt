@@ -1,0 +1,57 @@
+<beginning of page>
+cpc <-> hardware performance counters
+Modern microprocessors contain hardware performance counters that allow the measurement of many different
+hardware events related to CPU behavior, including instruction and data cache misses as well as various internal
+states of the processor. The counters can be configured to count user events, system events, or both. Data from the
+performance counters can be used to analyze and tune the behavior of software on a particular type of processor.
+Most processors are able to generate an interrupt on counter overflow, allowing the counters to be used for various
+forms of profiling.
+This manual page describes a set of APIs that allow Solaris applications to use these counters. Applications can
+measure their own behavior, the behavior of other applications, or the behavior of the whole system.
+There are two principal models for using these performance counters. Some users of these statistics want to observe
+system-wide behavior. Other users want to view the performance counters as part of the register set exported by each
+LWP. On a machine performing more than one activity, these two models are in conflict because the counters repre<hy>
+sent a critical hardware resource that cannot simultaneously be both shared and private.
+The following configuration interfaces are provided:
+cpc_open(3CPC) Check the version the application was compiled with against the version of the library.
+cpc_cciname(3CPC) Return a printable string to describe the performance counters of the processor.
+cpc_npic(3CPC) Return the number of performance counters on the processor.
+cpc_cpuref(3CPC) Return a reference to documentation that should be consulted to understand how to use and in<hy>
+terpret data from the performance counters.
+Performance counters can be present in hardware but not acccessible because either some of the necessary system
+software components are not available or not installed, or the counters might be in use by other processes. The
+cpc_open(3CPC) function determines the accessibility of the counters and must be invoked before any attempt to
+program the counters.
+Each different type of processor has its own set of events available for measurement. The
+cpc_walk_events_all(3CPC) and cpc_walk_events_pic(3CPC) functions allow an application to determine the
+names of events supported by the underlying processor. A collection of generic, platform independent event names
+are defined by generic_events(3CPC). Each generic event maps to an underlying hardware event specific to the un<hy>
+derlying processor and any optional attributes. The cpc_walk_generic_events_all(3CPC) and cpc_walk_gener<hy>
+ic_events_pic(3CPC) functions allow an application to determine the generic events supported on the underlying
+platform.
+Some processors have advanced performance counter capabilities that are configured with attributes. The
+cpc_walk_attrs(3CPC) function can be used to determine the names of attributes supported by the underlying pro<hy>
+cessor. The documentation referenced by cpc_cpuref(3CPC) should be consulted to understand the meaning of a
+processor's performance counter attributes.
+Each processor on the system possesses its own set of performance counter registers. For a single process, it is often
+desirable to maintain the illusion that the counters are an intrinsic part of that process (whichever processors it runs
+on), since this allows the events to be directly attributed to the process without having to make passive all other ac<hy>
+tivity on the system.
+To achieve this behavior, the library associates performance counter context with each LWP in the process. The con<hy>
+text consists of a small amount of kernel memory to hold the counter values when the LWP is not running, and some
+simple kernel functions to save and restore those counter values from and to the hardware registers when the LWP
+performs a normal context switch. A process can only observe and manipulate its own copy of the performance
+counter control and data registers.
+Though applications can be modified to instrument themselves as demonstrated above, it is frequently useful to be
+able to examine the behavior of an existing application without changing the source code. A separate library, libpc<hy>
+tx, provides a simple set of interfaces that use the facilities of proc(4) to control a target process, and together with
+functions in libcpc, allow truss-like tools to be constructed to measure the performance counters in other applica<hy>
+<beginning of page>
+tions. An example of one such application is cputrack(1).
+The functions in libpctx are independent of those in libcpc. These functions manage a process using an event-loop
+paradigm <em> that is, the execution of certain system calls by the controlled process cause the library to stop the con<hy>
+trolled process and execute callback functions in the context of the controlling process. These handlers can perform
+various operations on the target process using APIs in libpctx and libcpc that consume pctx_t handles.
+cputrack(1), cpustat(1M), cpc_bind_curlwp(3CPC), cpc_buf_create(3CPC), cpc_enable(3CPC),
+cpc_npic(3CPC), cpc_open(3CPC), cpc_set_create(3CPC), cpc_seterrhndlr(3CPC), generic_events(3CPC),
+libcpc(3LIB), pctx_capture(3CPC), pctx_set_events(3CPC), proc(4)

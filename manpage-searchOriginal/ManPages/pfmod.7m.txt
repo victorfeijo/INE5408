@@ -1,0 +1,136 @@
+<beginning of page>
+pfmod <-> STREAMS Packet Filter Module
+#include <sys/pfmod.h>
+ioctl(fd, IPUSH, "pfmod");
+pfmod is a STREAMS module that subjects messages arriving on its read queue to a packet filter and passes only
+those messages that the filter accepts on to its upstream neighbor. Such filtering can be very useful for user-level pro<hy>
+tocol implementations and for networking monitoring programs that wish to view only specific types of events.
+pfmod applies the current packet filter to all M_DATA and M_PROTO messages arriving on its read queue. The
+module prepares these messages for examination by first skipping over all leading M_PROTO message blocks to ar<hy>
+rive at the beginning of the message's data portion. If there is no data portion, pfmod accepts the message and pass<hy>
+es it along to its upstream neighbor. Otherwise, the module ensures that the part of the message's data that the packet
+filter might examine lies in contiguous memory, calling the pullupmsg(9F) utility routine if necessary to force conti<hy>
+guity. (Note: this action destroys any sharing relationships that the subject message might have had with other mes<hy>
+sages.) Finally, it applies the packet filter to the message's data, passing the entire message upstream to the next
+module if the filter accepts, and discarding the message otherwise. See PACKET FILTERS below for details on how
+the filter works.
+If there is no packet filter yet in effect, the module acts as if the filter exists but does nothing, implying that all in<hy>
+coming messages are accepted. The ioctls section below describes how to associate a packet filter with an instance of
+pfmod.
+pfmod passes all other messages through unaltered to its upper neighbor.
+pfmod intercepts M_IOCTL messages for the ioctl described below. The module passes all other messages through
+unaltered to its lower neighbor.
+pfmod responds to the following ioctl.
+PFIOCSETF This ioctl directs the module to replace its current packet filter, if any, with the filter specified by the
+struct packetfilt pointer named by its final argument. This structure is defined in <sys/pfmod.h> as:
+ struct packetfilt {
+  uchar_t Pf_Priority; /* priority of filter */
+  uchar_t Pf_FilterLen; /* length of filter cmd list */
+  ushort_tPf_Filter[ENMAXFILTERS]; /* filter command list */
+ };
+The Pf_Priority field is included only for compatibility with other packet filter implementations and is otherwise ig<hy>
+nored. The packet filter itself is specified in the Pf_Filter array as a sequence of two-byte commands, with the
+Pf_FilterLen field giving the number of commands in the sequence. This implementation restricts the maximum
+number of commands in a filter (ENMAXFILTERS) to 255. The next section describes the available commands
+and their semantics.
+A packet filter consists of the filter command list length (in units of ushort_ts), and the filter command list itself.
+(The priority field mentioned above is ignored in this implementation.) Each filter command list specifies a sequence
+of actions that operate on an internal stack of ushort_ts ("shortwords") or an offset register. The offset register is
+initially zero. Each shortword of the command list specifies an action and a binary operator. Using _n_ as short<hy>
+hand for the next shortword of the instruction stream and _%oreg_ for the offset register, the list of actions is:
+  COMMAND SHORTWORDS ACTION
+  ENF_PUSHLIT 2 Push _n_ on the stack.
+  ENF_PUSHZERO 1 Push zero on the stack.
+  ENF_PUSHONE 1 Push one on the stack.
+  ENF_PUSHFFFF 1 Push 0xFFFF on the stack.
+  ENF_PUSHFF00 1 Push 0xFF00 on the stack.
+  ENF_PUSH00FF 1 Push 0x00FF on the stack.
+  ENF_LOAD_OFFSET 2 Load _n_ into _%oreg_.
+  ENF_BRTR 2 Branch forward _n_ shortwords if
+  the top element of the stack is
+  non-zero.
+  ENF_BRFL 2 Branch forward _n_ shortwords if
+<beginning of page>
+  the top element of the stack is zero.
+  ENF_POP 1 Pop the top element from the stack.
+  ENF_PUSHWORD+m 1 Push the value of shortword (_m_ +
+  _%oreg_) of the packet onto the stack.
+The binary operators can be from the set {ENF_EQ, ENF_NEQ, ENF_LT, ENF_LE, ENF_GT,ENF_GE,
+ENF_AND, ENF_OR, ENF_XOR} which operate on the top two elements of the stack and replace them with its
+result.
+When both an action and operator are specified in the same shortword, the action is performed followed by the oper<hy>
+ation.
+The binary operator can also be from the set {ENF_COR, ENF_CAND, ENF_CNOR, ENF_CNAND}. These are
+"short-circuit" operators, in that they terminate the execution of the filter immediately if the condition they are
+checking for is found, and continue otherwise. All pop two elements from the stack and compare them for equality;
+ENF_CAND returns false if the result is false; ENF_COR returns true if the result is true; ENF_CNAND returns
+true if the result is false; ENF_CNOR returns false if the result is true. Unlike the other binary operators, these four
+do not leave a result on the stack, even if they continue.
+The short-circuit operators should be used when possible, to reduce the amount of time spent evaluating filters.
+When they are used, you should also arrange the order of the tests so that the filter will succeed or fail as soon as
+possible; for example, checking the IP destination field of a UDP packet is more likely to indicate failure than the
+packet type field.
+The special action ENF_NOPUSH and the special operator ENF_NOP can be used to only perform the binary op<hy>
+eration or to only push a value on the stack. Since both are (conveniently) defined to be zero, indicating only an ac<hy>
+tion actually specifies the action followed by ENF_NOP, and indicating only an operation actually specifies
+ENF_NOPUSH followed by the operation.
+After executing the filter command list, a non-zero value (true) left on top of the stack (or an empty stack) causes the
+incoming packet to be accepted and a zero value (false) causes the packet to be rejected. (If the filter exits as the re<hy>
+sult of a short-circuit operator, the top-of-stack value is ignored.) Specifying an undefined operation or action in the
+command list or performing an illegal operation or action (such as pushing a shortword offset past the end of the
+packet or executing a binary operator with fewer than two shortwords on the stack) causes a filter to reject the pack<hy>
+et.
+The packet filter module is not dependent on any particular device driver or module but is commonly used with
+datalink drivers such as the Ethernet driver. If the underlying datalink driver supports the Data Link Provider Inter<hy>
+face (DLPI) message set, the appropriate STREAMS DLPI messages must be issued to attach the stream to a par<hy>
+ticular hardware device and bind a datalink address to the stream before the underlying driver will route received
+packets upstream. Refer to the DLPI Version 2 specification for details on this interface.
+The reverse ARP daemon program may use code similar to the following fragment to construct a filter that rejects
+all but RARP packets. That is, it accepts only packets whose Ethernet type field has the value ETHERTYPE_RE<hy>
+VARP. The filter works whether a VLAN is configured or not.
+ struct ether_header eh;  /* used only for offset values */
+ struct packetfilt pf;
+ register ushort_t *fwp = pf.Pf_Filter;
+ ushort_t offset;
+ int fd;
+ /*
+  * Push packet filter streams module.
+  */
+ if (ioctl(fd, I_PUSH, "pfmod") < 0)
+  syserr("pfmod");
+ /*
+  * Set up filter. Offset is the displacement of the Ethernet
+  * type field from the beginning of the packet in units of
+  * ushort_ts.
+  */
+ offset = ((uint_t) &eh.ether_type - (uint_t) &eh.ether_dhost) /
+   sizeof (us_short);
+  *fwp++ = ENF_PUSHWORD + offset;
+<beginning of page>
+  *fwp++ = ENF_PUSHLIT;
+  *fwp++ = htons(ETHERTYPE_VLAN);
+  *fwp++ = ENF_EQ;
+  *fwp++ = ENF_BRFL;
+  *fwp++ = 3; /* If this isn't ethertype VLAN, don't change oreg */
+  *fwp++ = ENF_LOAD_OFFSET;
+  *fwp++ = 2; /* size of the VLAN tag in words */
+  *fwp++ = ENF_POP;
+  *fwp++ = ENF_PUSHWORD + offset;
+  *fwp++ = ENF_PUSHLIT;
+  *fwp++ = htons(ETHERTYPE_REVARP);
+  *fwp++ = ENF_EQ;
+  pf.Pf_FilterLen = fwp - &pf.PF_Filter[0];
+This filter can be abbreviated by taking advantage of the ability to combine actions and operations:
+  *fwp++ = ENF_PUSHWORD + offset;
+  *fwp++ = ENF_PUSHLIT | ENF_EQ;
+  *fwp++ = htons(ETHERTYPE_REVARP);
+  *fwp++ = htons(ETHERTYPE_VLAN);
+  *fwp++ = ENF_BRFL | ENF_NOP;
+  *fwp++ = 3;
+  *fwp++ = ENF_LOAD_OFFSET | ENF_NOP;
+  *fwp++ = 2;
+  *fwp++ = ENF_POP | ENF_NOP;
+  *fwp++ = ENF_PUSHWORD + offset;
+  *fwp++ = ENF_PUSHLIT | ENF_EQ;
+  *fwp++ = htons(ETHERTYPE_REVARP);
+bufmod(7M), dlpi(7P), pullupmsg(9F)

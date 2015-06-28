@@ -1,0 +1,149 @@
+<beginning of page>
+pca_lookup_file, del_PathCache, del_PcaPathConf, new_PathCache, new_PcaPathConf, pca_last_error,
+pca_path_completions, pca_scan_path, pca_set_check_fn, ppc_file_start, ppc_literal_escapes <-> lookup a file in a list
+of directories
+cc [ flag... ] file... -ltecla [ library... ]
+#include <libtecla.h>
+char *pca_lookup_file(PathCache *pc, const char *name,
+ int name_len, int literal);
+PathCache *del_PathCache(PathCache *pc);
+PcaPathConf *del_PcaPathConf(PcaPathConf *ppc);
+PathCache *new_PathCache(void);
+PcaPathConf *new_PcaPathConf(PathCache *pc);
+const char *pca_last_error(PathCache *pc);
+CPL_MATCH_FN(pca_path_completions);
+int pca_scan_path(PathCache *pc, const char *path);
+void pca_set_check_fn(PathCache *pc, CplCheckFn *check_fn,
+ void *data);
+void ppc_file_start(PcaPathConf *ppc, int start_index);
+void ppc_literal_escapes(PcaPathConf *ppc, int literal);
+The PathCache object is part of the libtecla(3LIB) library. PathCache objects allow an application to search for
+files in any colon separated list of directories, such as the UNIX execution PATH environment variable. Files in ab<hy>
+solute directories are cached in a PathCache object, whereas relative directories are scanned as needed. Using a
+PathCache object, you can look up the full pathname of a simple filename, or you can obtain a list of the possible
+completions of a given filename prefix. By default all files in the list of directories are targets for lookup and comple<hy>
+tion, but a versatile mechanism is provided for only selecting specific types of files. The obvious application of this
+facility is to provide Tab-completion and lookup of executable commands in the UNIX PATH, so an optional call<hy>
+back which rejects all but executable files, is provided.
+Under UNIX, the following example program looks up and displays the full pathnames of each of the command
+names on the command line.
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <libtecla.h>
+ int main(int argc, char *argv[])
+ {
+  int i;
+  /*
+  * Create a cache for executable files.
+  */
+  PathCache *pc = new_PathCache();
+  if(!pc)
+  exit(1);
+  /*
+  * Scan the user's PATH for executables.
+  */
+  if(pca_scan_path(pc, getenv("PATH"))) {
+  fprintf(stderr, "%s\n", pca_last_error(pc));
+  exit(1);
+  }
+  /*
+  * Arrange to only report executable files.
+  */
+<beginning of page>
+  pca_set_check_fn(pc, cpl_check_exe, NULL);
+  /*
+  * Lookup and display the full pathname of each of the
+  * commands listed on the command line.
+  */
+  for(i=1; i<argc; i++) {
+  char *cmd = pca_lookup_file(pc, argv[i], -1, 0);
+  printf("The full pathname of '%s' is %s\\n", argv[i],
+  cmd ? cmd : "unknown");
+  }
+  pc = del_PathCache(pc); /* Clean up */
+  return 0;
+ }
+The following is an example of what this does on a laptop under LINUX:
+ $ ./example less more blob
+ The full pathname of 'less' is /usr/bin/less
+ The full pathname of 'more' is /bin/more
+ The full pathname of 'blob' is unknown
+ $
+To use the facilities of this module, you must first allocate a PathCache object by calling the new_PathCache()
+constructor function. This function creates the resources needed to cache and lookup files in a list of directories. It
+returns NULL on error.
+Once you have created a cache, it needs to be populated with files. To do this, call the pca_scan_path() function.
+Whenever this function is called, it discards the current contents of the cache, then scans the list of directories speci<hy>
+fied in its path argument for files. The path argument must be a string containing a colon-separated list of directories,
+such as "/usr/bin:/home/mcs/bin:". This can include directories specified by absolute pathnames such as "/usr/bin",
+as well as sub-directories specified by relative pathnames such as "." or "bin". Files in the absolute directories are
+immediately cached in the specified PathCache object, whereas subdirectories, whose identities obviously change
+whenever the current working directory is changed, are marked to be scanned on the fly whenever a file is looked up.
+On success this function return 0. On error it returns 1, and a description of the error can be obtained by calling
+pca_last_error(pc).
+Once the cache has been populated with files, you can look up the full pathname of a file, simply by specifying its
+filename to pca_lookup_file().
+To make it possible to pass this function a filename which is actually part of a longer string, the name_len argument
+can be used to specify the length of the filename at the start of the name[] argument. If you pass -1 for this length,
+the length of the string will be determined with strlen. If the name[] string might contain backslashes that escape the
+special meanings of spaces and tabs within the filename, give the literal argument the value 0. Otherwise, if back<hy>
+slashes should be treated as normal characters, pass 1 for the value of the literal argument.
+Looking up the potential completions of a filename-prefix in the filename cache is achieved by passing the provided
+pca_path_completions() callback function to the cpl_complete_word(3TECLA) function.
+This callback requires that its data argument be a pointer to a PcaPathConf object. Configuration objects of this type
+are allocated by calling new_PcaPathConf().
+This function returns an object initialized with default configuration parameters, which determine how the
+cpl_path_completions() callback function behaves. The functions which allow you to individually change these pa<hy>
+rameters are discussed below.
+By default, the pca_path_completions() callback function searches backwards for the start of the filename being
+completed, looking for the first un-escaped space or the start of the input line. If you wish to specify a different loca<hy>
+tion, call ppc_file_start() with the index at which the filename starts in the input line. Passing start_index=-1 re-en<hy>
+ables the default behavior.
+By default, when pca_path_completions() looks at a filename in the input line, each lone backslash in the input line
+is interpreted as being a special character which removes any special significance of the character which follows it,
+such as a space which should be taken as part of the filename rather than delimiting the start of the filename. These
+<beginning of page>
+backslashes are thus ignored while looking for completions, and subsequently added before spaces, tabs and literal
+backslashes in the list of completions. To have unescaped backslashes treated as normal characters, call ppc_liter<hy>
+al_escapes() with a non-zero value in its literal argument.
+When you have finished with a PcaPathConf variable, you can pass it to the del_PcaPathConf() destructor func<hy>
+tion to reclaim its memory.
+If you are only interested in certain types or files, such as, for example, executable files, or files whose names end in
+a particular suffix, you can arrange for the file completion and lookup functions to be selective in the filenames that
+they return. This is done by registering a callback function with your PathCache object. Thereafter, whenever a file<hy>
+name is found which either matches a filename being looked up or matches a prefix which is being completed, your
+callback function will be called with the full pathname of the file, plus any application-specific data that you provide.
+If the callback returns 1 the filename will be reported as a match. If it returns 0, it will be ignored. Suitable callback
+functions and their prototypes should be declared with the following macro. The CplCheckFn typedef is also pro<hy>
+vided in case you wish to declare pointers to such functions
+ #define CPL_CHECK_FN(fn) int (fn)(void *data, const char *pathname)
+ typedef CPL_CHECK_FN(CplCheckFn);
+Registering one of these functions involves calling the pca_set_check_fn() function. In addition to the callback
+function passed with the check_fn argument, you can pass a pointer to anything with the data argument. This pointer
+will be passed on to your callback function by its own data argument whenever it is called, providing a way to pass
+application-specific data to your callback. Note that these callbacks are passed the full pathname of each matching
+file, so the decision about whether a file is of interest can be based on any property of the file, not just its filename.
+As an example, the provided cpl_check_exe() callback function looks at the executable permissions of the file and
+the permissions of its parent directories, and only returns 1 if the user has execute permission to the file. This call<hy>
+back function can thus be used to lookup or complete command names found in the directories listed in the user's
+PATH environment variable. The example program above provides a demonstration of this.
+Beware that if somebody tries to complete an empty string, your callback will get called once for every file in the
+cache, which could number in the thousands. If your callback does anything time consuming, this could result in an
+unacceptable delay for the user, so callbacks should be kept short.
+To improve performance, whenever one of these callbacks is called, the choice that it makes is cached, and the next
+time the corresponding file is looked up, instead of calling the callback again, the cached record of whether it was
+accepted or rejected is used. Thus if somebody tries to complete an empty string, and hits tab a second time when
+nothing appears to happen, there will only be one long delay, since the second pass will operate entirely from the
+cached dispositions of the files. These cached dipositions are discarded whenever pca_scan_path() is called, and
+whenever pca_set_check_fn() is called with changed callback function or data arguments.
+If pca_scan_path() reports that an error occurred by returning 1, you can obtain a terse description of the error by
+calling pca_last_error(pc). This returns an internal string containing an error message.
+Once you have finished using a PathCache object, you can reclaim its resources by passing it to the del_Path<hy>
+Cache() destructor function. This takes a pointer to one of these objects, and always returns NULL.
+It is safe to use the facilities of this module in multiple threads, provided that each thread uses a separately allocated
+PathCache object. In other words, if two threads want to do path searching, they should each call new_Path<hy>
+Cache() to allocate their own caches.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stabili<hy>
+tyEvolving _ MT-LevelMT-Safe
+cpl_complete_word(3TECLA), ef_expand_file(3TECLA), gl_get_line(3TECLA), libtecla(3LIB), attributes(5)

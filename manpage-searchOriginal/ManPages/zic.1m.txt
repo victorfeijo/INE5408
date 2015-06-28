@@ -1,0 +1,121 @@
+<beginning of page>
+zic <-> time zone compiler
+zic [--version] [-s] [-v] [-l localtime] [-p posixrules]
+ [-d directory] [-y yearistype] [filename]...
+zic reads text from the file(s) named on the command line and creates the time conversion information files specified
+in this input. If a filename is '<mi>', the standard input is read.
+Input lines are made up of fields. Fields are separated by any number of white space characters. Leading and trailing
+white space on input lines is ignored. A pound sign (#) indicates a comment that extends to the end of the line.
+White space characters and pound signs can be enclosed within double quotes (" ") if they are to be used as part of a
+field. Any line that is blank (after comment stripping) is ignored. Non-blank lines are expected to be of one of three
+types: rule lines, zone lines, or link lines.
+A rule line has the form:
+For example:
+ Rule NAME FROM TO TYPE IN ON AT SAVE LETTER/S
+The fields that make up a rule line are:
+ Rule USA 1969 1973 - Apr lastSun 2:00 1:00 D
+NAME Gives the (arbitrary) name of the set of rules this rule is part of.
+FROM Gives the first year in which the rule applies. The word minimum (or an abbreviation) means the minimum
+year with a representable time value. The word maximum (or an abbreviation) means the maximum year with a rep<hy>
+resentable time value.
+TO Gives the final year in which the rule applies. In addition to minimum and maximum (as above), the word only
+(or an abbreviation) can be used to repeat the value of the FROM field.
+TYPE Gives the type of year in which the rule applies. If TYPE is:
+'<mi>' The rule applies in all years between FROM and TO, inclusive.
+uspres The rule applies in U.S. Presidential election years.
+nonpres The rule applies in years other than U.S. Presidential election years.
+even The rule applies to even-numbered years.
+odd The rule applies to odd-numbered years.
+If TYPE is something else, then zic will attempt to execute the command
+ yearistype year type
+to check the type of a year: an exit status of 0 means that the year is of the given type; an exit status of 1 means that
+the year is not of the given type. The yearistype command is not currently provided in the Solaris environment.
+<beginning of page>
+IN Names the month in which the rule takes effect. Month names can be abbreviated.
+ON Gives the day on which the rule takes effect. Recognized forms include:
+5 the fifth day of the month
+lastSun The last Sunday in the month
+lastMon The last Monday in the month
+Sun>=8 First Sunday on or after the eighth
+Sun<=25 Last Sunday on or before the 25th
+Names of days of the week can be abbreviated or spelled out in full. Note: There cannot be spaces within the ON
+field.
+AT Gives the time of day at which the rule takes effect. Recognized forms include:
+2 Time in hours
+2:00 Time in hours and minutes
+15:00 24-hour format time (for times after noon)
+1:28:14 Time in hours, minutes, and seconds, where hour 0 is midnight at the start of the day and hour 24 is mid<hy>
+night at the end of the day.
+Any of these forms can be followed by the letter w if the given time is local "wall clock" time; s if the given time is
+local "standard" time; or u (or g or z) if the given time is universal time. In the absence of an indicator, wall clock
+time is assumed.
+SAVE Gives the amount of time to be added to local standard time when the rule is in effect. This field has the same
+format as the AT field (without the w and s suffixes).
+LETTER/S Gives the "variable part" (for example, the "S" or "D" in "EST" or "EDT" of time zone abbreviations to
+be used when this rule is in effect. If this field is '<mi>', the variable part is null.
+A zone line has the form:
+ Zone NAME GMTOFF RULES/SAVE FORMAT [UNTIL]
+For example:
+ Zone Australia/SouthWest 9:30 - CST 1992 Mar 15 12:00
+  8:30 Aus CST
+The fields that make up a zone line are:
+<beginning of page>
+NAME The name of the time zone. This is the name used in creating the time conversion information file for the
+zone.
+GMTOFF The amount of time to add to UTC to get standard time in this zone. This field has the same format as
+the AT and SAVE fields of rule lines; begin the field with a minus sign to subtract time from UTC.
+RULES/SAVE The name of the rule(s) that apply in the time zone or, alternately, an amount of time to add to local
+standard time. If this field is `<mi>', then standard time always applies in the time zone.
+FORMAT The format for time zone abbreviations in this time zone. The pair of characters %s is used to show
+where the "variable part" of the time zone abbreviation goes. Alternately, a slash (/) separates standard and daylight
+abbreviations.
+UNTIL The time at which the UTC offset or the rule(s) change for a location. It is specified as a year, a month, a
+day, and a time of day. The time of day has the same format as the AT field of rule lines. If this is specified, the time
+zone information is generated from the given UTC offset and rule change until the time specified.
+The month, day, and time of day have the same format as the IN, ON, and AT columns of a rule; trailing columns
+can be omitted, and default to the earliest possible value for the missing columns.
+The next line must be a "continuation" line. This line has the same form as a zone line except that the string "Zone"
+and the name are omitted. The continuation line places information starting at the time specified as the UNTIL field
+in the previous line in the file used by the previous line. Continuation lines can contain an UNTIL field, just as zone
+lines do, indicating that the next line is a further continuation.
+A link line has the form:
+ Link LINK-FROM LINK-TO
+For example:
+ Link Europe/Istanbul Asia/Istanbul
+The LINK-FROM field should appear as the NAME field in some zone line; the LINK-TO field is used as an alter<hy>
+nate name for that zone.
+Except for continuation lines, lines can appear in any order in the input.
+--version Outputs version information and exits.
+-d directory Creates time conversion information files in the directory directory rather than in the standard directory
+/usr/share/lib/zoneinfo.
+-l localtime Uses the given time zone as local time localtime. zic acts as if the file contained a link line of the form:
+ Link localtime localtime
+-p posixrules Uses the rules of the given time zone posixrules when handling POSIX-format time zone environment
+variables. zic acts as if the input contained a link line of the form:
+ Link posixrules posixrules
+<beginning of page>
+This option is not used by ctime(3C) and mktime(3C) in the Solaris environment.
+-s Limits time values stored in output files to values that are the same whether they are taken to be signed or un<hy>
+signed. You can use this option to generate SVVS-compatible files.
+This option is obsolete and may be removed in a future release.
+-v Complains if a year that appears in a data file is outside the range of years representable by system time values
+(0:00:00 a.m. UTC, January 1, 1970, to 3:14:07 a.m. UTC, January 19, 2038). This option also complains if a
+time of 24:00 (which cannot be handled by pre-1998 versions of zic) appears in the input.
+-y yearistype Uses the given command yearistype rather than yearistype when checking year types (see Rules under
+DESCRIPTION).
+filename A file containing input lines that specify the time conversion information files to be created. If a filename is
+'<mi>', the standard input is read.
+/usr/share/lib/zoneinfo
+Standard directory used for created files
+/usr/share/lib/zoneinfo/src
+Directory containing source files
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu _ Interface StabilityCommitted*
+* The -s option is obsolete.
+time(1), zdump(1M), ctime(3C), mktime(3C), attributes(5)
+For areas with more than two types of local time, you might need to use local standard time in the AT field of the
+earliest transition time's rule to ensure that the earliest transition time recorded in the compiled file is correct.
+If the current timezone file is edited and compiled using the "zic" command, the changes will only be reflected in any
+new processes that are running. The most accurate way to reflect the changes for the whole system would be a re<hy>
+boot.

@@ -1,0 +1,266 @@
+<beginning of page>
+cpc_bind_curlwp, cpc_bind_pctx, cpc_bind_cpu, cpc_unbind, cpc_request_preset, cpc_set_restart <-> bind request
+sets to hardware counters
+cc [ flag... ] file... -lcpc [ library... ]
+#include <libcpc.h>
+int cpc_bind_curlwp(cpc_t *cpc, cpc_set_t *set, uint_t flags);
+int cpc_bind_pctx(cpc_t *cpc, pctx_t *pctx, id_t id, cpc_set_t *set,
+ uint_t flags);
+int cpc_bind_cpu(cpc_t *cpc, processorid_t id, cpc_set_t *set,
+ uint_t flags);
+int cpc_unbind(cpc_t *cpc, cpc_set_t *set);
+int cpc_request_preset(cpc_t *cpc, int index, uint64_t preset);
+int cpc_set_restart(cpc_t *cpc, cpc_set_t *set);
+These functions program the processor's hardware counters according to the requests contained in the set argument.
+If these functions are successful, then upon return the physical counters will have been assigned to count events on
+behalf of each request in the set, and each counter will be enabled as configured.
+The cpc_bind_curlwp() function binds the set to the calling LWP. If successful, a performance counter context is
+associated with the LWP that allows the system to virtualize the hardware counters to that specific LWP.
+By default, the system binds the set to the current LWP only. If the CPC_BIND_LWP_INHERIT flag is present in
+the flags argument, however, any subsequent LWPs created by the current LWP will inherit a copy of the request
+set. The newly created LWP will have its virtualized 64-bit counters initialized to the preset values specified in set,
+and the counters will be enabled and begin counting events on behalf of the new LWP. This automatic inheritance
+behavior can be useful when dealing with multithreaded programs to determine aggregate statistics for the program
+as a whole.
+If the CPC_BIND_LWP_INHERIT flag is specified and any of the requests in the set have the CPC_OVF_NOTI<hy>
+FY_EMT flag set, the process will immediately dispatch a SIGEMT signal to the freshly created LWP so that it
+can preset its counters appropriately on the new LWP. This initialization condition can be detected using
+cpc_set_sample(3CPC) and looking at the counter value for any requests with CPC_OVF_NOTIFY_EMT set.
+The value of any such counters will be UINT64_MAX.
+The cpc_bind_pctx() function binds the set to the LWP specified by the pctx-id pair, where pctx refers to a handle
+returned from libpctx and id is the ID of the desired LWP in the target process. If successful, a performance counter
+context is associated with the specified LWP and the system virtualizes the hardware counters to that specific LWP.
+The flags argument is reserved for future use and must always be 0.
+The cpc_bind_cpu() function binds the set to the specified CPU and measures events occurring on that CPU regard<hy>
+less of which LWP is running. Only one such binding can be active on the specified CPU at a time. As long as any
+application has bound a set to a CPU, per-LWP counters are unavailable and any attempt to use either
+cpc_bind_curlwp() or cpc_bind_pctx() returns EAGAIN. The first invocation of cpc_bind_cpu() invalidates all
+currently bound per-LWP counter sets, and any attempt to sample an invalidated set returns EAGAIN. To bind to a
+CPU, the library binds the calling LWP to the measured CPU with processor_bind(2). The application must not
+change its processor binding until after it has unbound the set with cpc_unbind(). The flags argument is reserved for
+future use and must always be 0.
+The cpc_request_preset() function updates the preset and current value stored in the indexed request within the cur<hy>
+rently bound set, thereby changing the starting value for the specified request for the calling LWP only, which takes
+effect at the next call to cpc_set_restart().
+When a performance counter counting on behalf of a request with the CPC_OVF_NOTIFY_EMT flag set over<hy>
+flows, the performance counters are frozen and the LWP to which the set is bound receives a SIGEMT signal. The
+cpc_set_restart() function can be called from a SIGEMT signal handler function to quickly restart the hardware
+counters. Counting begins from each request's original preset (see cpc_set_add_request(3CPC)), or from the preset
+specified in a prior call to cpc_request_preset(). Applications performing performance counter overflow profiling
+should use the cpc_set_restart() function to quickly restart counting after receiving a SIGEMT overflow signal and
+recording any relevant program state.
+<beginning of page>
+The cpc_unbind() function unbinds the set from the resource to which it is bound. All hardware resources associat<hy>
+ed with the bound set are freed and if the set was bound to a CPU, the calling LWP is unbound from the correspond<hy>
+ing CPU. See processor_bind(2).
+Upon successful completion these functions return 0. Otherwise, -1 is returned and errno is set to indicate the error.
+Applications wanting to get detailed error values should register an error handler with cpc_seterrhndlr(3CPC). Oth<hy>
+erwise, the library will output a specific error description to stderr.
+These functions will fail if:
+EACCES For cpc_bind_curlwp(), the system has Pentium 4 processors with HyperThreading and at least one
+physical processor has more than one hardware thread online. See NOTES.
+For cpc_bind_cpu(), the process does not have the cpc_cpu privilege to access the CPU's counters.
+For cpc_bind_curlwp(), cpc_bind_cpc(), and cpc_bind_pctx(), access to the requested hypervisor event was de<hy>
+nied.
+EAGAIN For cpc_bind_curlwp() and cpc_bind_pctx(), the performance counters are not available for use by the
+application.
+For cpc_bind_cpu(), another process has already bound to this CPU. Only one process is allowed to bind to a CPU
+at a time and only one set can be bound to a CPU at a time.
+EINVAL The set does not contain any requests or cpc_set_add_request() was not called.
+The value given for an attribute of a request is out of range.
+The system could not assign a physical counter to each request in the system. See NOTES.
+One or more requests in the set conflict and might not be programmed simultaneously.
+The set was not created with the same cpc handle.
+For cpc_bind_cpu(), the specified processor does not exist.
+For cpc_unbind(), the set is not bound.
+For cpc_request_preset() and cpc_set_restart(), the calling LWP does not have a bound set.
+ENOSYS For cpc_bind_cpu(), the specified processor is not online.
+ENOTSUP The cpc_bind_curlwp() function was called with the CPC_OVF_NOTIFY_EMT flag, but the under<hy>
+lying processor is not capable of detecting counter overflow.
+ESRCH For cpc_bind_pctx(), the specified LWP in the target process does not exist.
+Example 1 Use hardware performance counters to measure events in a process.
+The following example demonstrates how a standalone application can be instrumented with the libcpc(3LIB) func<hy>
+tions to use hardware performance counters to measure events in a process. The application performs 20 iterations of
+a computation, measuring the counter values for each iteration. By default, the example makes use of two counters
+to measure external cache references and external cache hits. These options are only appropriate for UltraSPARC
+processors. By setting the EVENT0 and EVENT1 environment variables to other strings (a list of which can be ob<hy>
+tained from the -h option of the cpustat(1M) or cputrack(1) utilities), other events can be counted. The error() rou<hy>
+tine is assumed to be a user-provided routine analogous to the familiar printf(3C) function from the C library that
+also performs an exit(2) after printing the message.
+ #include <inttypes.h>
+<beginning of page>
+ #include <stdlib.h>
+ #include <stdio.h>
+ #include <unistd.h>
+ #include <libcpc.h>
+ #include <errno.h>
+ int
+ main(int argc, char *argv[])
+ {
+ int iter;
+ char *event0 = NULL, *event1 = NULL;
+ cpc_t *cpc;
+ cpc_set_t *set;
+ cpc_buf_t *diff, *after, *before;
+ int ind0, ind1;
+ uint64_t val0, val1;
+ if ((cpc = cpc_open(CPC_VER_CURRENT)) == NULL)
+  error("perf counters unavailable: %s", strerror(errno));
+ if ((event0 = getenv("EVENT0")) == NULL)
+  event0 = "EC_ref";
+ if ((event1 = getenv("EVENT1")) == NULL)
+  event1 = "EC_hit";
+ if ((set = cpc_set_create(cpc)) == NULL)
+  error("could not create set: %s", strerror(errno));
+ if ((ind0 = cpc_set_add_request(cpc, set, event0, 0, CPC_COUNT_USER, 0,
+  NULL)) == -1)
+  error("could not add first request: %s", strerror(errno));
+ if ((ind1 = cpc_set_add_request(cpc, set, event1, 0, CPC_COUNT_USER, 0,
+  NULL)) == -1)
+  error("could not add first request: %s", strerror(errno));
+ if ((diff = cpc_buf_create(cpc, set)) == NULL)
+  error("could not create buffer: %s", strerror(errno));
+ if ((after = cpc_buf_create(cpc, set)) == NULL)
+  error("could not create buffer: %s", strerror(errno));
+ if ((before = cpc_buf_create(cpc, set)) == NULL)
+  error("could not create buffer: %s", strerror(errno));
+ if (cpc_bind_curlwp(cpc, set, 0) == -1)
+  error("cannot bind lwp%d: %s", _lwp_self(), strerror(errno));
+ for (iter = 1; iter <= 20; iter++) {
+  if (cpc_set_sample(cpc, set, before) == -1)
+  break;
+  /* ==> Computation to be measured goes here <== */
+  if (cpc_set_sample(cpc, set, after) == -1)
+  break;
+  cpc_buf_sub(cpc, diff, after, before);
+  cpc_buf_get(cpc, diff, ind0, &val0);
+  cpc_buf_get(cpc, diff, ind1, &val1);
+  (void) printf("%3d: %" PRId64 " %" PRId64 "\n", iter,
+  val0, val1);
+ }
+  if (iter != 21)
+  error("cannot sample set: %s", strerror(errno));
+<beginning of page>
+ cpc_close(cpc);
+ return (0);
+ }
+Example 2 Write a signal handler to catch overflow signals.
+The following example builds on Example 1 and demonstrates how to write the signal handler to catch overflow sig<hy>
+nals. A counter is preset so that it is 1000 counts short of overflowing. After 1000 counts the signal handler is in<hy>
+voked.
+The signal handler:
+ cpc_t *cpc;
+ cpc_set_t *set;
+ cpc_buf_t *buf;
+ int index;
+ void
+ emt_handler(int sig, siginfo_t *sip, void *arg)
+ {
+  ucontext_t *uap = arg;
+  uint64_t val;
+  if (sig != SIGEMT || sip->si_code != EMT_CPCOVF) {
+  psignal(sig, "example");
+  psiginfo(sip, "example");
+  return;
+  }
+  (void) printf("lwp%d - si_addr %p ucontext: %%pc %p %%sp %p\n",
+  _lwp_self(), (void *)sip->si_addr,
+  (void *)uap->uc_mcontext.gregs[PC],
+  (void *)uap->uc_mcontext.gregs[SP]);
+  if (cpc_set_sample(cpc, set, buf) != 0)
+  error("cannot sample: %s", strerror(errno));
+  cpc_buf_get(cpc, buf, index, &val);
+  (void) printf("0x%" PRIx64"\n", val);
+  (void) fflush(stdout);
+  /*
+  * Update a request's preset and restart the counters. Counters which
+  * have not been preset with cpc_request_preset() will resume counting
+  * from their current value.
+  */
+  (cpc_request_preset(cpc, ind1, val1) != 0)
+  error("cannot set preset for request %d: %s", ind1,
+  strerror(errno));
+  if (cpc_set_restart(cpc, set) != 0)
+  error("cannot restart lwp%d: %s", _lwp_self(), strerror(errno));
+ }
+The setup code, which can be positioned after the code that opens the CPC library and creates a set:
+ #define PRESET (UINT64_MAX - 999ull)
+  struct sigaction act;
+  ...
+<beginning of page>
+  act.sa_sigaction = emt_handler;
+  bzero(&act.sa_mask, sizeof (act.sa_mask));
+  act.sa_flags = SA_RESTART|SA_SIGINFO;
+  if (sigaction(SIGEMT, &act, NULL) == -1)
+  error("sigaction: %s", strerror(errno));
+  if ((index = cpc_set_add_request(cpc, set, event, PRESET,
+  CPC_COUNT_USER | CPC_OVF_NOTIFY_EMT, 0, NULL)) != 0)
+  error("cannot add request to set: %s", strerror(errno));
+  if ((buf = cpc_buf_create(cpc, set)) == NULL)
+  error("cannot create buffer: %s", strerror(errno));
+  if (cpc_bind_curlwp(cpc, set, 0) == -1)
+  error("cannot bind lwp%d: %s", _lwp_self(), strerror(errno));
+  for (iter = 1; iter <= 20; iter++) {
+  /* ==> Computation to be measured goes here <== */
+  }
+  cpc_unbind(cpc, set); /* done */
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stabili<hy>
+tyEvolving _ MT-LevelSafe
+cpustat(1M), cputrack(1), psrinfo(1M), processor_bind(2), cpc_seterrhndlr(3CPC), cpc_set_sample(3CPC),
+libcpc(3LIB), attributes(5)
+When a set is bound, the system assigns a physical hardware counter to count on behalf of each request in the set. If
+such an assignment is not possible for all requests in the set, the bind function returns -1 and sets errno to EINVAL.
+The assignment of requests to counters depends on the capabilities of the available counters. Some processors (such
+as Pentium 4) have a complicated counter control mechanism that requires the reservation of limited hardware re<hy>
+sources beyond the actual counters. It could occur that two requests for different events might be impossible to count
+at the same time due to these limited hardware resources. See the processor manual as referenced by
+cpc_cpuref(3CPC) for details about the underlying processor's capabilities and limitations.
+Some processors can be configured to dispatch an interrupt when a physical counter overflows. The most obvious
+use for this facility is to ensure that the full 64-bit counter values are maintained without repeated sampling. Certain
+hardware, such as the UltraSPARC processor, does not record which counter overflowed. A more subtle use for this
+facility is to preset the counter to a value slightly less than the maximum value, then use the resulting interrupt to
+catch the counter overflow associated with that event. The overflow can then be used as an indication of the frequen<hy>
+cy of the occurrence of that event.
+The interrupt generated by the processor might not be particularly precise. That is, the particular instruction that
+caused the counter overflow might be earlier in the instruction stream than is indicated by the program counter value
+in the ucontext.
+When a request is added to a set with the CPC_OVF_NOTIFY_EMT flag set, then as before, the control registers
+and counter are preset from the 64-bit preset value given. When the flag is set, however, the kernel arranges to send
+the calling process a SIGEMT signal when the overflow occurs. The si_code member of the corresponding siginfo
+structure is set to EMT_CPCOVF and the si_addr member takes the program counter value at the time the over<hy>
+flow interrupt was delivered. Counting is disabled until the set is bound again.
+If the CPC_CAP_OVERFLOW_PRECISE bit is set in the value returned by cpc_caps(3CPC), the processor is
+able to determine precisely which counter has overflowed after receiving the overflow interrupt. On such processors,
+the SIGEMT signal is sent only if a counter overflows and the request that the counter is counting has the
+CPC_OVF_NOTIFY_EMT flag set. If the capability is not present on the processor, the system sends a SIGEMT
+signal to the process if any of its requests have the CPC_OVF_NOTIFY_EMT flag set and any counter in its set
+overflows.
+<beginning of page>
+Different processors have different counter ranges available, though all processors supported by Solaris allow at
+least 31 bits to be specified as a counter preset value. Portable preset values lie in the range UINT64_MAX to
+UINT64_MAX-INT32_MAX.
+The appropriate preset value will often need to be determined experimentally. Typically, this value will depend on
+the event being measured as well as the desire to minimize the impact of the act of measurement on the event being
+measured. Less frequent interrupts and samples lead to less perturbation of the system.
+If the processor cannot detect counter overflow, bind will fail and return ENOTSUP. Only user events can be mea<hy>
+sured using this technique. See Example 2.
+Most Pentium 4 events require the specification of an event mask for counting. The event mask is specified with the
+emask attribute.
+Pentium 4 processors with HyperThreading Technology have only one set of hardware counters per physical proces<hy>
+sor. To use cpc_bind_curlwp() or cpc_bind_pctx() to measure per-LWP events on a system with Pentium 4 HT
+processors, a system administrator must first take processors in the system offline until each physical processor has
+only one hardware thread online (See the -p option to psrinfo(1M)). If a second hardware thread is brought online,
+all per-LWP bound contexts will be invalidated and any attempt to sample or bind a CPC set will return EAGAIN.
+Only one CPC set at a time can be bound to a physical processor with cpc_bind_cpu(). Any call to cpc_bind_cpu()
+that attempts to bind a set to a processor that shares a physical processor with a processor that already has a CPU-
+bound set returns an error.
+To measure the shared state on a Pentium 4 processor with HyperThreading, the count_sibling_usr and count_sib<hy>
+ling_sys attributes are provided for use with cpc_bind_cpu(). These attributes behave exactly as the
+CPC_COUNT_USER and CPC_COUNT_SYSTEM request flags, except that they act on the sibling hardware
+thread sharing the physical processor with the CPU measured by cpc_bind_cpu(). Some CPC sets will fail to bind
+due to resource constraints. The most common type of resource constraint is an ESCR conflict among one or more
+requests in the set. For example, the branch_retired event cannot be measured on counters 12 and 13 simultaneously
+because both counters require the CRU_ESCR2 ESCR to measure this event. To measure branch_retired events si<hy>
+multaneously on more than one counter, use counters such that one counter uses CRU_ESCR2 and the other
+counter uses CRU_ESCR3. See the processor documentation for details.

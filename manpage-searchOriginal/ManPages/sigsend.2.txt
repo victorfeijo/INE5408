@@ -1,0 +1,57 @@
+<beginning of page>
+sigsend, sigsendset <-> send a signal to a process or a group of processes
+#include <signal.h>
+int sigsend(idtype_t idtype, id_t id, int sig);
+int sigsendset(procset_t *psp, int sig);
+The sigsend() function sends a signal to the process or group of processes specified by id and idtype. The signal to
+be sent is specified by sig and is either 0 or one of the values listed in signal.h(3HEAD). If sig is 0 (the null signal),
+error checking is performed but no signal is actually sent. This value can be used to check the validity of id and id<hy>
+type.
+The real or effective user ID of the sending process must match the real or saved user ID of the receiving process,
+unless the {PRIV_PROC_OWNER} privilege is asserted in the effective set of the sending process or sig is SIG<hy>
+CONT and the sending process has the same session ID as the receiving process.
+If idtype is P_PID, sig is sent to the process with process ID id.
+If idtype is P_PGID, sig is sent to all processes with process group ID id.
+If idtype is P_SID, sig is sent to all processes with session ID id.
+If idtype is P_TASKID, sig is sent to all processes with task ID id.
+If idtype is P_UID, sig is sent to any process with effective user ID id.
+If idtype is P_GID, sig is sent to any process with effective group ID id.
+If idtype is P_PROJID, sig is sent to any process with project ID id.
+If idtype is P_CID, sig is sent to any process with scheduler class ID id (see priocntl(2)).
+If idtype is P_CTID, sig is sent to any process with process contract ID id.
+If idtype is P_ALL, sig is sent to all processes and id is ignored.
+If id is P_MYID, the value of id is taken from the calling process.
+The process with a process ID of 0 is always excluded. The process with a process ID of 1 is excluded unless idtype
+is equal to P_PID.
+The sigsendset() function provides an alternate interface for sending signals to sets of processes. This function sends
+signals to the set of processes specified by psp. psp is a pointer to a structure of type procset_t, defined in
+<sys/procset.h>, which includes the following members:
+ idop_t p_op;
+ idtype_t p_lidtype;
+ id_t p_lid;
+ idtype_t p_ridtype;
+ id_t p_rid;
+The p_lidtype and p_lid members specify the ID type and ID of one ("left") set of processes; the p_ridtype and
+p_rid members specify the ID type and ID of a second ("right") set of processes. ID types and IDs are specified just
+as for the idtype and id arguments to sigsend(). The p_op member specifies the operation to be performed on the
+two sets of processes to get the set of processes the function is to apply to. The valid values for p_op and the pro<hy>
+cesses they specify are:
+POP_DIFF Set difference: processes in left set and not in right set.
+POP_AND Set intersection: processes in both left and right sets.
+<beginning of page>
+POP_OR Set union: processes in either left or right set or both.
+POP_XOR Set exclusive-or: processes in left or right set but not in both.
+Upon successful completion, 0 is return. Otherwise, <mi>1 is returned and errno is set to indicate the error.
+The sigsend() and sigsendset() functions will fail if:
+EINVAL The sig argument is not a valid signal number, or the idtype argument is not a valid idtype field.
+EINVAL The sig argument is SIGKILL, idtype is P_PID and id is 1 (proc1).
+EPERM The effective user of the calling process does not match the real or saved user ID of the receiving process,
+the calling process does not have the {PRIV_PROC_OWNER} privilege asserted in the effective set, and the call<hy>
+ing process is not sending SIGCONT to a process that shares the same session ID.
+The calling process does not have the {PRIV_PROC_SESSION} privilege asserted and is trying to send a signal to
+a process with a different session ID, even though the effective user ID matches the real or saved ID of the receiving
+process.
+ESRCH No process can be found corresponding to that specified by id and idtype.
+The sigsendset() function will fail if:
+EFAULT The psp argument points to an illegal address.
+kill(1), getpid(2), kill(2), priocntl(2), signal(3C), signal.h(3HEAD), process(4), privileges(5)

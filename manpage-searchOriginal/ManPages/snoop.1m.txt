@@ -1,0 +1,379 @@
+<beginning of page>
+snoop <-> capture and inspect network packets
+snoop [-aqrCDINPSvV] [-t [r | a | d]] [-c maxcount]
+ [-d device] [-i filename] [-n filename] [-o filename]
+ [-p first [, last]] [-s snaplen] [-x offset [, length]]
+ [expression]
+From a datalink or IP interface, snoop captures packets and displays their contents. If the datalink or IP interface is
+not specified, snoop will pick a datalink to use, giving priority to datalinks that have been plumbed for IP traffic.
+snoop uses the pfmod(7M) and bufmod(7M) STREAMS modules to provide efficient capture of packets from the
+network. Captured packets can be displayed as they are received or saved to a file (which is RFC 1761-compliant)
+for later inspection.
+snoop can display packets in a single-line summary form or in verbose multi-line forms. In summary form, with the
+exception of certain VLAN packets, only the data pertaining to the highest level protocol is displayed. If a packet
+has a VLAN header and its VLAN ID is non-zero, then snoop will show that the packet is VLAN tagged. For exam<hy>
+ple, an NFS packet will have only NFS information displayed. Except for VLAN information under the condition
+just described, the underlying RPC, UDP, IP, and Ethernet frame information is suppressed, but can be displayed if
+either of the verbose options are chosen.
+In the absence of a name service, such as LDAP or NIS, snoop displays host names as numeric IP addresses.
+snoop requires an interactive interface.
+-C
+List the code generated from the filter expression for either the kernel packet filter, or snoop's own filter.
+-D
+Display number of packets dropped during capture on the summary line.
+-N
+Create an IP address-to-name file from a capture file. This must be set together with the -i option that names a cap<hy>
+ture file. The address-to-name file has the same name as the capture file with .names appended. This file records the
+IP address to hostname mapping at the capture site and increases the portability of the capture file. Generate a
+.names file if the capture file is to be analyzed elsewhere. Packets are not displayed when this flag is used.
+-I interface
+Capture IP packets from the network using the IP interface specified by interface, for example, lo0. The ifcon<hy>
+fig(1M) command can be used to list available IP interfaces. The -I and -d options are mutually exclusive.
+-P
+Capture packets in non-promiscuous mode. Only broadcast, multicast, or packets addressed to the host machine will
+be seen.
+-S
+Display size of the entire link layer frame in bytes on the summary line.
+-V
+Verbose summary mode. This is halfway between summary mode and verbose mode in degree of verbosity. Instead
+of displaying just the summary line for the highest level protocol in a packet, it displays a summary line for each
+protocol layer in the packet. For instance, for an NFS packet it will display a line each for the ETHER, IP, UDP,
+RPC and NFS layers. Verbose summary mode output may be easily piped through grep to extract packets of inter<hy>
+est. For example, to view only RPC summary lines, enter the following: example# snoop -i rpc.cap -V | grep RPC
+<beginning of page>
+-a
+Listen to packets on /dev/audio (warning: can be noisy).
+-c maxcount
+Quit after capturing maxcount packets. Otherwise keep capturing until there is no disk space left or until interrupted
+with Control-C.
+-d datalink
+Capture link-layer packets from the network using the DLPI datalink specified by datalink, for example, bge0 or
+net0. The dladm(1M) show-link subcommand can be used to list available datalinks. The -d and -I options are mu<hy>
+tually exclusive.
+-i filename
+Display packets previously captured in filename. Without this option, snoop reads packets from the network inter<hy>
+face. If a filename.names file is present, it is automatically loaded into the snoop IP address-to-name mapping table
+(See -N flag).
+-n filename
+Use filename as an IP address-to-name mapping table. This file must have the same format as the /etc/hosts file (IP
+address followed by the hostname).
+-o filename
+Save captured packets in filename as they are captured. (This filename is referred to as the "capture file".) The format
+of the capture file is RFC 1761-compliant. During packet capture, a count of the number of packets saved in the file
+is displayed. If you wish just to count packets without saving to a file, name the file /dev/null.
+-p first [ , last ]
+Select one or more packets to be displayed from a capture file. The first packet in the file is packet number 1.
+-q
+When capturing network packets into a file, do not display the packet count. This can improve packet capturing per<hy>
+formance.
+-r
+Do not resolve the IP address to the symbolic name. This prevents snoop from generating network traffic while cap<hy>
+turing and displaying packets. However, if the -n option is used, and an address is found in the mapping file, its cor<hy>
+responding name will be used.
+-s snaplen
+Truncate each packet after snaplen bytes. Usually the whole packet is captured. This option is useful if only certain
+packet header information is required. The packet truncation is done within the kernel giving better utilization of the
+streams packet buffer. This means less chance of dropped packets due to buffer overflow during periods of high traf<hy>
+fic. It also saves disk space when capturing large traces to a capture file. To capture only IP headers (no options) use
+a snaplen of 34. For UDP use 42, and for TCP use 54. You can capture RPC headers with a snaplen of 80 bytes.
+NFS headers can be captured in 120 bytes.
+-t [ r | a | d ]
+Time-stamp presentation. Time-stamps are accurate to within 4 microseconds. The default is for times to be present<hy>
+ed in d (delta) format (the time since receiving the previous packet). Option a (absolute) gives wall-clock time. Op<hy>
+tion r (relative) gives time relative to the first packet displayed. This can be used with the -p option to display time
+<beginning of page>
+relative to any selected packet.
+-v
+Verbose mode. Print packet headers in lots of detail. This display consumes many lines per packet and should be
+used only on selected packets.
+-xoffset [ , length]
+Display packet data in hexadecimal and ASCII format. The offset and length values select a portion of the packet to
+be displayed. To display the whole packet, use an offset of 0. If a length value is not provided, the rest of the packet
+is displayed.
+expression
+Select packets either from the network or from a capture file. Only packets for which the expression is true will be
+selected. If no expression is provided it is assumed to be true.
+Given a filter expression, snoop generates code for either the kernel packet filter or for its own internal filter. If cap<hy>
+turing packets with the network interface, code for the kernel packet filter is generated. This filter is implemented as
+a streams module, upstream of the buffer module. The buffer module accumulates packets until it becomes full and
+passes the packets on to snoop. The kernel packet filter is very efficient, since it rejects unwanted packets in the ker<hy>
+nel before they reach the packet buffer or snoop. The kernel packet filter has some limitations in its implementation;
+it is possible to construct filter expressions that it cannot handle. In this event, snoop tries to split the filter and do as
+much filtering in the kernel as possible. The remaining filtering is done by the packet filter for snoop. The -C flag
+can be used to view generated code for either the packet filter for the kernel or the packet filter for snoop. If packets
+are read from a capture file using the -i option, only the packet filter for snoop is used.
+A filter expression consists of a series of one or more boolean primitives that may be combined with boolean opera<hy>
+tors (AND, OR, and NOT). Normal precedence rules for boolean operators apply. Order of evaluation of these oper<hy>
+ators may be controlled with parentheses. Since parentheses and other filter expression characters are known to the
+shell, it is often necessary to enclose the filter expression in quotes. Refer to for information about setting up more
+efficient filters.
+The primitives are:
+host hostname
+True if the source or destination address is that of hostname. The hostname argument may be a literal address. The
+keyword host may be omitted if the name does not conflict with the name of another expression primitive. For ex<hy>
+ample, pinky selects packets transmitted to or received from the host pinky, whereas pinky and dinky selects pack<hy>
+ets exchanged between hosts pinky AND dinky.
+The type of address used depends on the primitive which precedes the host primitive. The possible qualifiers are in<hy>
+et, inet6, ether, or none. These three primitives are discussed below. Having none of the primitives present is equiv<hy>
+alent to "inet host hostname or inet6 host hostname". In other words, snoop tries to filter on all IP addresses associat<hy>
+ed with hostname.
+inet or inet6
+A qualifier that modifies the host primitive that follows. If it is inet, then snoop tries to filter on all IPv4 addresses
+returned from a name lookup. If it is inet6, snoop tries to filter on all IPv6 addresses returned from a name lookup.
+ipaddr, atalkaddr, or etheraddr
+Literal addresses, IP dotted, AppleTalk dotted, and Ethernet colon are recognized. For example, <bu> "172.16.40.13"
+matches all packets with that IP <bu> "2::9255:a00:20ff:fe73:6e35" matches all packets with that IPv6 address as
+source or destination; <bu> "65281.13" matches all packets with that AppleTalk address; <bu> "8:0:20:f:b1:51" matches all
+packets with the Ethernet address as source or destination. An Ethernet address beginning with a letter is interpreted
+as a hostname. To avoid this, prepend a zero when specifying the address. For example, if the Ethernet address is
+aa:0:45:23:52:44, then specify it by add a leading zero to make it 0aa:0:45:23:52:44.
+<beginning of page>
+from or src
+A qualifier that modifies the following host, net, ipaddr, atalkaddr, etheraddr, port or rpc primitive to match just
+the source address, port, or RPC reply.
+to or dst
+A qualifier that modifies the following host, net, ipaddr, atalkaddr, etheraddr, port or rpc primitive to match just
+the destination address, port, or RPC call.
+ether
+A qualifier that modifies the following host primitive to resolve a name to an Ethernet address. Normally, IP address
+matching is performed. This option is not supported on media such as IPoIB (IP over InfiniBand).
+ethertype number
+True if the Ethernet type field has value number. If number is not 0x8100 (VLAN) and the packet is VLAN tagged,
+then the expression will match the encapsulated Ethernet type.
+ip, ip6, arp, rarp, pppoed, pppoes
+True if the packet is of the appropriate ethertype.
+vlan
+True if the packet has ethertype VLAN and the VLAN ID is not zero.
+vlan-id id
+True for packets of ethertype VLAN with the id id.
+pppoe
+True if the ethertype of the packet is either pppoed or pppoes.
+broadcast
+True if the packet is a broadcast packet. Equivalent to ether[2:4] = 0xffffffff for Ethernet. This option is not support<hy>
+ed on media such as IPoIB (IP over InfiniBand).
+multicast
+True if the packet is a multicast packet. Equivalent to "ether[0] & 1 = 1" on Ethernet. This option is not supported
+on media such as IPoIB (IP over InfiniBand).
+bootp, dhcp
+True if the packet is an unfragmented IPv4 UDP packet with either a source port of BOOTPS (67) and a destination
+port of BOOTPC (68), or a source port of BOOTPC (68) and a destination of BOOTPS (67).
+dhcp6
+True if the packet is an unfragmented IPv6 UDP packet with either a source port of DHCPV6-SERVER (547) and a
+destination port of DHCPV6-CLIENT (546), or a source port of DHCPV6-CLIENT (546) and a destination of
+DHCPV6-SERVER (547).
+<beginning of page>
+apple
+True if the packet is an Apple Ethertalk packet. Equivalent to "ethertype 0x809b or ethertype 0x80f3".
+decnet
+True if the packet is a DECNET packet.
+greater length
+True if the packet is longer than length.
+less length
+True if the packet is shorter than length.
+udp, tcp, icmp, icmp6, ah, esp
+True if the IP or IPv6 protocol is of the appropriate type.
+net net
+True if either the IP source or destination address has a network number of net. The from or to qualifier may be
+used to select packets for which the network number occurs only in the source or destination address.
+port port
+True if either the source or destination port is port. The port may be either a port number or name from /etc/ser<hy>
+vices. The tcp or udp primitives may be used to select TCP or UDP ports only. The from or to qualifier may be
+used to select packets for which the port occurs only as the source or destination.
+rpc prog [ , vers [ , proc ] ]
+True if the packet is an RPC call or reply packet for the protocol identified by prog. The prog may be either the
+name of an RPC protocol from /etc/rpc or a program number. The vers and proc may be used to further qualify the
+program version and procedure number, for example, rpc nfs,2,0 selects all calls and replies for the NFS null proce<hy>
+dure. The to or from qualifier may be used to select either call or reply packets only.
+zone zoneid
+True if zoneid matches either the source or destination zoneid of a packet received on an ipnet device.
+ldap
+True if the packet is an LDAP packet on port 389.
+gateway host
+True if the packet used host as a gateway, that is, the Ethernet source or destination address was for host but not the
+IP address. Equivalent to "ether host host and not host host".
+nofrag
+True if the packet is unfragmented or is the first in a series of IP fragments. Equivalent to ip[6:2] & 0x1fff = 0.
+expr relop expr
+True if the relation holds, where relop is one of >, <, >=, <=, =, !=, and expr is an arithmetic expression composed
+of numbers, packet field selectors, the length primitive, and arithmetic operators +, <mi>, *, &, |, ^, and %. The arith<hy>
+metic operators within expr are evaluated before the relational operator and normal precedence rules apply between
+<beginning of page>
+the arithmetic operators, such as multiplication before addition. Parentheses may be used to control the order of eval<hy>
+uation. To use the value of a field in the packet use the following syntax:
+ base[expr [: size ] ]
+where expr evaluates the value of an offset into the packet from a base offset which may be ether, ip, ip6, udp, tcp,
+or icmp. The size value specifies the size of the field. If not given, 1 is assumed. Other legal values are 2 and 4. For
+example,
+ ether[0] & 1 = 1
+is equivalent to multicast
+ ether[2:4] = 0xffffffff
+is equivalent to broadcast.
+ ip[ip[0] & 0xf * 4 : 2] = 2049
+is equivalent to udp[0:2] = 2049
+ ip[0] & 0xf > 5
+selects IP packets with options.
+ ip[6:2] & 0x1fff = 0
+eliminates IP fragments.
+ udp and ip[6:2]&0x1fff = 0 and udp[6:2] != 0
+finds all packets with UDP checksums.
+The length primitive may be used to obtain the length of the packet. For instance "length > 60" is equivalent to
+"greater 60", and "ether[length <mi> 1]" obtains the value of the last byte in a packet.
+and
+Perform a logical AND operation between two boolean values. The AND operation is implied by the juxtaposition
+of two boolean expressions, for example "dinky pinky" is the same as "dinky AND pinky".
+or or ,
+Perform a logical OR operation between two boolean values. A comma may be used instead, for example,
+"dinky,pinky" is the same as "dinky OR pinky".
+not or !
+Perform a logical NOT operation on the following boolean value. This operator is evaluated before AND or OR.
+slp
+True if the packet is an SLP packet.
+sctp
+True if the packet is an SCTP packet.
+ospf
+True if the packet is an OSPF packet.
+<beginning of page>
+Example 1 Using the snoop Command
+Capture all packets and display them as they are received:
+ example# snoop
+Capture packets with host funky as either the source or destination and display them as they are received:
+ example# snoop funky
+Capture packets between funky and pinky and save them to a file. Then inspect the packets using times (in seconds)
+relative to the first captured packet:
+ example# snoop -o cap funky pinky
+ example# snoop -i cap -t r | more
+To look at selected packets in another capture file:
+ example# snoop -i pkts -p 99,108
+  99 0.0027 boutique -> sunroof NFS C GETATTR FH=8E6
+ 100 0.0046 sunroof -> boutique NFS R GETATTR OK
+ 101 0.0080 boutique -> sunroof NFS C RENAME FH=8E6C MTra00192 to .nfs08
+ 102 0.0102 marmot -> viper NFS C LOOKUP FH=561E screen.r.13.i386
+ 103 0.0072 viper -> marmot NFS R LOOKUP No such file or directory
+ 104 0.0085 bugbomb -> sunroof RLOGIN C PORT=1023 h
+ 105 0.0005 kandinsky -> sparky RSTAT C Get Statistics
+ 106 0.0004 beeblebrox -> sunroof NFS C GETATTR FH=0307
+ 107 0.0021 sparky -> kandinsky RSTAT R
+ 108 0.0073 office -> jeremiah NFS C READ FH=2584 at 40960 for 8192
+To look at packet 101 in more detail:
+ example# snoop -i pkts -v -p101
+ ETHER: ----- Ether Header -----
+ ETHER:
+ ETHER: Packet 101 arrived at 16:09:53.59
+ ETHER: Packet size = 210 bytes
+ ETHER: Destination = 8:0:20:1:3d:94, Sun
+ ETHER: Source = 8:0:69:1:5f:e, Silicon Graphics
+ ETHER: Ethertype = 0800 (IP)
+ ETHER:
+ IP: ----- IP Header -----
+ IP:
+ IP: Version = 4, header length = 20 bytes
+ IP: Type of service = 00
+ IP: ..0. .... = routine
+ IP: ...0 .... = normal delay
+ IP: .... 0... = normal throughput
+ IP: .... .0.. = normal reliability
+ IP: Total length = 196 bytes
+ IP: Identification 19846
+ IP: Flags = 0X
+<beginning of page>
+ IP: .0.. .... = may fragment
+ IP: ..0. .... = more fragments
+ IP: Fragment offset = 0 bytes
+ IP: Time to live = 255 seconds/hops
+ IP: Protocol = 17 (UDP)
+ IP: Header checksum = 18DC
+ IP: Source address = 172.16.40.222, boutique
+ IP: Destination address = 172.16.40.200, sunroof
+ IP:
+ UDP: ----- UDP Header -----
+ UDP:
+ UDP: Source port = 1023
+ UDP: Destination port = 2049 (Sun RPC)
+ UDP: Length = 176
+ UDP: Checksum = 0
+ UDP:
+ RPC: ----- SUN RPC Header -----
+ RPC:
+ RPC: Transaction id = 665905
+ RPC: Type = 0 (Call)
+ RPC: RPC version = 2
+ RPC: Program = 100003 (NFS), version = 2, procedure = 1
+ RPC: Credentials: Flavor = 1 (Unix), len = 32 bytes
+ RPC: Time = 06-Mar-90 07:26:58
+ RPC: Hostname = boutique
+ RPC: Uid = 0, Gid = 1
+ RPC: Groups = 1
+ RPC: Verifier : Flavor = 0 (None), len = 0 bytes
+ RPC:
+ NFS: ----- SUN NFS -----
+ NFS:
+ NFS: Proc = 11 (Rename)
+ NFS: File handle = 000016430000000100080000305A1C47
+ NFS: 597A0000000800002046314AFC450000
+ NFS: File name = MTra00192
+ NFS: File handle = 000016430000000100080000305A1C47
+ NFS: 597A0000000800002046314AFC450000
+ NFS: File name = .nfs08
+ NFS:
+To view just the NFS packets between sunroof and boutique:
+ example# snoop -i pkts rpc nfs and sunroof and boutique
+ 1 0.0000 boutique -> sunroof NFS C GETATTR FH=8E6C
+ 2 0.0046 sunroof -> boutique NFS R GETATTR OK
+ 3 0.0080 boutique -> sunroof NFS C RENAME FH=8E6C MTra00192 to .nfs08
+To save these packets to a new capture file:
+ example# snoop -i pkts -o pkts.nfs rpc nfs sunroof boutique
+To view encapsulated packets, there will be an indicator of encapsulation:
+ example# snoop ip-in-ip
+ sunroof -> boutique ICMP Echo request (1 encap)
+<beginning of page>
+If -V is used on an encapsulated packet:
+ example# snoop -V ip-in-ip
+ sunroof -> boutique ETHER Type=0800 (IP), size = 118 bytes
+ sunroof -> boutique IP D=172.16.40.222 S=172.16.40.200 LEN=104, ID=27497
+ sunroof -> boutique IP D=10.1.1.2 S=10.1.1.1 LEN=84, ID=27497
+ sunroof -> boutique ICMP Echo request
+Example 2 Setting Up A More Efficient Filter
+To set up a more efficient filter, the following filters should be used toward the end of the expression, so that the first
+part of the expression can be set up in the kernel: greater, less, port, rpc, nofrag, and relop. The presence of OR
+makes it difficult to split the filtering when using these primitives that cannot be set in the kernel. Instead, use paren<hy>
+theses to enforce the primitives that should be OR'd.
+To capture packets between funky and pinky of type tcp or udp on port 80:
+ example# snoop funky and pinky and port 80 and tcp or udp
+Since the primitive port cannot be handled by the kernel filter, and there is also an OR in the expression, a more ef<hy>
+ficient way to filter is to move the OR to the end of the expression and to use parentheses to enforce the OR between
+tcp and udp:
+ example# snoop funky and pinky and (tcp or udp) and port 80
+0 Successful completion.
+1 An error occurred.
+/dev/audio Symbolic link to the system's primary audio device.
+/dev/null The null file.
+/etc/hosts Host name database.
+/etc/rpc RPC program number data base.
+/etc/services Internet services and aliases.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wrcmdc
+dladm(1M), ifconfig(1M), netstat(1M), hosts(4), rpc(4), services(4), attributes(5), audio(7I), ipnet(7D), buf<hy>
+mod(7M), dlpi(7P), pfmod(7M)
+<beginning of page>
+Callaghan, B. and Gilligan, R. RFC 1761, Snoop Version 2 Packet Capture File Format. Network Working Group.
+February 1995.
+The processing overhead is much higher for real-time packet interpretation. Consequently, the packet drop count
+may be higher. For more reliable capture, output raw packets to a file using the -o option and analyze the packets off<hy>
+line.
+Unfiltered packet capture imposes a heavy processing load on the host computer, particularly if the captured packets
+are interpreted real-time. This processing load further increases if verbose options are used. Since heavy use of
+snoop may deny computing resources to other processes, it should not be used on production servers. Heavy use of
+snoop should be restricted to a dedicated computer.
+snoop does not reassemble IP fragments. Interpretation of higher level protocol halts at the end of the first IP frag<hy>
+ment.
+snoop may generate extra packets as a side-effect of its use. For example it may use a network name service (NIS or
+NIS+) to convert IP addresses to host names for display. Capturing into a file for later display can be used to post<hy>
+pone the address-to-name mapping until after the capture session is complete. Capturing into an NFS-mounted file
+may also generate extra packets.
+Setting the snaplen (-s option) to small values may remove header information that is needed to interpret higher lev<hy>
+el protocols. The exact cutoff value depends on the network and protocols being used. For NFS Version 2 traffic us<hy>
+ing UDP on 10 Mb/s Ethernet, do not set snaplen less than 150 bytes. For NFS Version 3 traffic using TCP on 100
+Mb/s Ethernet, snaplen should be 250 bytes or more.
+snoop requires information from an RPC request to fully interpret an RPC reply. If an RPC reply in a capture file
+or packet range does not have a request preceding it, then only the RPC reply header will be displayed.

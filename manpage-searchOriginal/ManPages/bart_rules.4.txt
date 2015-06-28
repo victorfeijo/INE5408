@@ -1,0 +1,108 @@
+<beginning of page>
+bart_rules <-> bart rules file
+The bart_rules file is a text file that is used by the bart(1M) command. The rules file determines which files to vali<hy>
+date and which file attributes of those files to ignore.
+Some lines are ignored by the manifest comparison tool. Ignored lines include blank lines, lines that consist only of
+white space, and comments that begin with #.
+The rules file supports three directives: CHECK, IGNORE, and a subtree directive, which is an absolute path name
+and optional pattern matching modifiers. Each CHECK, IGNORE, and subtree directive must be on a separate line.
+Bart supports continuation of long lines using a backslash (\). The rules file uses the directives to create logical
+blocks.
+The syntax for the rules file is as follows:
+ [IGNORE attribute...]*
+ [CHECK] [attribute...]*
+ subtree1 [pattern...]*
+ [IGNORE attribute...]*
+ [CHECK] [attribute...]*
+ subtree2 [pattern...]*
+ subtree3 [pattern...]*
+ subtree4 [pattern...]*
+ [IGNORE attribute...]*
+ [CHECK] [attribute...]*
+ ...
+Rule blocks are composed of statements that are created by using directives and arguments.
+There are three types of blocks:
+Global Block The first block in the file. The block is considered ``global'' if it specifies CHECK and IGNORE
+statements, but no previous subtree statement. A global block pertains to all subsequent blocks.
+Local block A block that specifies CHECK and IGNORE statements as well as a subtree directive. The rules in
+this block pertain to files and directories found in the specified subtree.
+Heir block A block that contains a null CHECK statement, no arguments. This block inherits the global CHECK
+statements and IGNORE statements.
+The order in which CHECK and IGNORE statements appear in blocks is important. The bart command processes
+CHECK and IGNORE statements in the order in which they are read, with later statements overriding earlier state<hy>
+ments.
+Subtree specifications must appear one per line. Each specification must begin with an absolute path name. Option<hy>
+ally, each specification can be followed by pattern-matching arguments.
+When a file system being tracked belongs to more than one subtree directive, bart performs the following resolution
+steps: <bu> Applies the CHECK and IGNORE statements set in the global block. Note that all CHECK and IGNORE
+statements are processed in order. <bu> Finds the last subtree directive that matches the file. <bu> Processes the CHECK
+and IGNORE statements that belong to the last matching subtree directive. These statements are processed in the
+order in which they are read, overriding global settings.
+There are two types of pattern matching statements
+AND For a given subtree directive, all pattern matching statements are logically ANDed with the subtree. Patterns
+have the following syntax: <bu> Wildcards are permitted for both the subtree and pattern matching statements. <bu> The ex<hy>
+clamation point (!) character represents logical NOT. <bu> A pattern that terminates with a slash is a subtree. The ab<hy>
+sence of a slash indicates that the pattern is not a directory. The subtree itself does not require an end slash. For ex<hy>
+ample, the following subtree example includes the contents of /home/nickiso/src except for object files, core files,
+<beginning of page>
+and all of the SCCS subtrees. Note that directory names that terminate with .o and directories named core are not
+excluded because the patterns specified do not terminate with /.
+ /home/nickiso/src !*.o !core !SCCS/
+ CHECK all
+OR Group multiple subtree directives together. Such subtree directives are logically ORed together.
+ /home/nickiso/src !*.o !core
+ /home/nickiso/Mail
+ /home/nickiso/docs *.sdw
+ CHECK all
+ IGNORE mtime lnmtime dirmtime
+The files included in the previous example are as follows: <bu> Everything under /home/nickiso/src except for *.o and
+core files <bu> Everything under /home/nickiso/Mail <bu> All files under /home/nickiso/docs that end in *.sdw For these
+files, all attributes are checked except for modification times.
+The bart command uses CHECK and IGNORE statements to define which attributes to track or ignore. Each at<hy>
+tribute has an associated keyword.
+The attribute keywords are as follows:
+acl ACL attributes for the file. For a file with ACL attributes, this field contains the output from acltotext().
+all All attributes.
+contents Checksum value of the file. This attribute is only specified for regular files. If you turn off context checking
+or if checksums cannot be computed, the value of this field is -.
+dest Destination of a symbolic link.
+devnode Value of the device node. This attribute is for character device files and block device files only.
+dirmtime Modification time in seconds since 00:00:00 UTC, January 1, 1970 for directories.
+gid Numerical group ID of the owner of this entry.
+lnmtime Creation time for links.
+mode Octal number that represents the permissions of the file.
+mtime Modification time in seconds since 00:00:00 UTC, January 1, 1970 for files.
+size File size in bytes.
+type Type of file.
+uid Numerical user ID of the owner of this entry.
+Example 1 Sample Rules File
+<beginning of page>
+The following is a sample rules file:
+ # Global rules, track everything except dirmtime.
+ CHECK all
+ IGNORE dirmtime
+ # The files in /data* are expected to change, so don't bother
+ # tracking the attributes expected to change.
+ # Furthermore, by specifying ``IGNORE contents,'' you save
+ # time and resources.
+ /data*
+ IGNORE contents mtime size
+ /home/nickiso f* bar/
+ IGNORE acl
+ # For /usr, apply the global rules.
+ /usr
+ CHECK
+ # Note: Since /usr/tmp follows the /usr block, the /usr/tmp
+ # subtree is subjected to the ``IGNORE all.''
+ /usr/tmp
+ /home/nickiso *.o
+ /home/nickiso core
+ /home/nickiso/proto
+ IGNORE all
+The following files are cataloged based on the sample rules file:
+<bu> All attributes, except for dirmtime, mtime, size, and contents, are tracked for files under the /data* subtrees. <bu>
+Files under the /usr subtree, except for /usr/tmp, are cataloged by using the global rules. <bu> If the /home/nick<hy>
+iso/foo.c file exists, its attributes, except for acl and dirmtime, are cataloged. <bu> All .o and core files under
+/home/nickiso, as well as the /home/nickiso/proto and /usr/tmp subtrees, are ignored. <bu> If the /home/nick<hy>
+iso/bar/foo.o file exists, it is ignored because it is subject to the last block.
+bart(1M), bart_manifest(4), attributes(5)

@@ -1,0 +1,107 @@
+<beginning of page>
+ipsec <-> Internet Protocol Security Architecture
+The IP Security Architecture (IPsec) provides protection for IP datagrams. The protection can include confidentiali<hy>
+ty, strong integrity of the data, partial sequence integrity (replay protection), and data authentication. IPsec is per<hy>
+formed inside the IP processing, and it can be applied with or without the knowledge of an Internet application.
+IPsec applies to both IPv4 and IPv6. See ip(7P) and ip6(7P).
+IPsec provides two mechanisms for protecting data. The Authentication Header (AH) provides strong integrity, re<hy>
+play protection, and data authentication. AH protects as much of the IP datagram as it can. AH cannot protect fields
+that change nondeterministically between sender and receiver.
+The Encapsulating Security Payload (ESP) provides confidentiality over what it encapsulates, as well as the services
+that AH provides, but only over that which it encapsulates. ESP's authentication services are optional, which allow
+ESP and AH to be used together on the same datagram without redundancy.
+Authentication and encryption algorithms are used for IPsec. Authentication algorithms produce an integrity check<hy>
+sum value or "digest"based on the data and a key. Encryption algorithms operate on data in units of a "block size".
+IPsec's ESP can also encapsulate itself in UDP if IKE (see in.iked(1M)) discovers a Network Address Translator
+(NAT) between two communicating endpoints.
+A UDP socket can be specified as a NAT-Traversal endpoint. See udp(7P) for details.
+AH and ESP use Security Associations (SA). SA's are entities that specify security properties from one host to an<hy>
+other. Two communicating machines require two SAs (at a minimum) to communicate securely. However, commu<hy>
+nicating machines that use multicast can share the same multicast SA. SAs are managed through the pf_key(7P) in<hy>
+terface. For IPv4, automatic SA management is available through the Internet Key Exchange (IKE), as implemented
+by in.iked(1M). A command-line front-end is available by means of ipseckey(1M). An IPsec SA is identified by a
+tuple of <AH or ESP, destination IP address, and SPI>. The Security Parameters Index (SPI) is an arbitrary 32-bit
+value that is transmitted on the wire with an AH or ESP packet. See ipsecah(7P) or ipsecesp(7P) for an explanation
+about where the SPI falls in a protected packet.
+Mechanism and policy are separate. The policy for applying IPsec is enforced on a system-wide or per-socket level.
+Configuring system-wide policy and per-tunnel policy (see Transport Mode and Tunnel Mode sections) is done via
+the ipsecconf(1M) command. Configuring per-socket policy is discussed later in this section.
+System-wide IPsec policy is applied to incoming and outgoing datagrams. Some additional rules can be applied to
+outgoing datagrams because of the additional data known by the system. Inbound datagrams can be accepted or
+dropped. The decision to drop or accept an inbound datagram is based on several criteria which sometimes overlap
+or conflict. Conflict resolution is resolved by which rule is parsed first, with one exception: if a policy entry states
+that traffic should bypass all other policy, it is automatically be accepted. Outbound datagrams are sent with or with<hy>
+out protection. Protection may (or may not) indicate specific algorithms. If policy normally would protect a data<hy>
+gram, it can be bypassed either by an exception in system-wide policy or by requesting a bypass in per-socket policy.
+Intra-machine traffic policies are enforced, but actual security mechanisms are not applied. Instead, the outbound
+policy on an intra-machine packet translates into an inbound packet with those mechanisms applied.
+IPsec policy is enforced in the ip(7P) driver. Several ndd tunables for /dev/ip affect policy enforcement, including:
+icmp_accept_clear_messages If equal to 1 (the default), allow certain cleartext icmp messages to bypass policy. For
+ICMP echo requests ("ping"messages), protect the response like the request. If zero, treat icmp messages like other
+IP traffic.
+igmp_accept_clear_messages If 1, allow inbound cleartext IGMP messages to bypass IPsec policy.
+pim_accept_clear_messages If 1, allow inbound cleartext PIM messages to bypass IPsec policy.
+ipsec_policy_log_interval IPsec logs policy failures and errors to /var/adm/messages. To prevent syslog from be<hy>
+ing overloaded, the IPsec kernel modules limit the rate at which errors can be logged. You can query/set ipsec_poli<hy>
+cy_log_interval using ndd(1M). The value is in milliseconds. Only one message can be logged per interval.
+<beginning of page>
+If IPsec is used on a tunnel, Tunnel Mode IPsec can be used to protect distinct flows within a tunnel or to cause
+packets that do not match per-tunnel policy to drop. System-wide policy is always Transport Mode. A tunnel can
+use Transport Mode IPsec or Tunnel Mode IPsec.
+The IP_SEC_OPT or IPV6_SEC_OPT socket option is used to set per-socket IPsec policy. The structure used for
+an IP_SEC_OPT request is:
+ typedef struct ipsec_req {
+  uint_t ipsr_ah_req; /* AH request */
+  uint_t ipsr_esp_req; /* ESP request */
+  uint_t ipsr_self_encap_req; /* Self-Encap request */
+  uint8_t ipsr_auth_alg; /* Auth algs for AH */
+  uint8_t ipsr_esp_alg; /* Encr algs for ESP */
+  uint8_t ipsr_esp_auth_alg; /* Auth algs for ESP */
+ } ipsec_req_t;
+The IPsec request has fields for both AH and ESP. Algorithms may or may not be specified. The actual request for
+AH or ESP services can take one of the following values:
+IPSEC_PREF_NEVER Bypass all policy. Only the superuser may request this service.
+IPSEC_PREF_REQUIRED Regardless of other policy, require the use of the IPsec service.
+The following value can be logically ORed to an IPSEC_PREF_REQUIRED value:
+IPSEC_PREF_UNIQUE Regardless of other policy, enforce a unique SA for traffic originating from this socket.
+In the event IP options not normally encapsulated by ESP need to be, the ipsec_self_encap_req is used to add an
+additional IP header outside the original one. Algorithm values from <net/pfkeyv2.h> are as follows:
+SADB_AALG_MD5HMAC Uses the MD5-HMAC (RFC 2403) algorithm for authentication.
+SADB_AALG_SHA1HMAC Uses the SHA1-HMAC (RFC 2404) algorithm for authentication.
+SADB_EALG_DESCBC Uses the DES (RFC 2405) algorithm for encryption.
+SADB_EALG_3DESCBC Uses the Triple DES (RFC 2451) algorithm for encryption.
+SADB_EALG_BLOWFISH Uses the Blowfish (RFC 2451) algorithm for encryption.
+SADB_EALG_AES Uses the Advanced Encryption Standard algorithm for encryption.
+SADB_AALG_SHA256HMAC
+SADB_AALG_SHA384HMAC
+SADB_AALG_SHA512HMAC Uses the SHA2 hash algorithms with HMAC (RFC 4868)for authentication.
+An application should use either the getsockopt(3SOCKET) or the setsockopt(3SOCKET) call to manipulate IPsec
+requests. For example:
+ #include <sys/socket.h>
+ #include <netinet/in.h>
+ #include <net/pfkeyv2.h> /* For SADB_*ALG_* */
+ /* .... socket setup skipped */
+ rc = setsockopt(s, IPPROTO_IP, IP_SEC_OPT,
+  (const char *)&ipsec_req, sizeof (ipsec_req_t));
+<beginning of page>
+While IPsec is an effective tool in securing network traffic, it will not make security problems disappear. Security is<hy>
+sues beyond the mechanisms that IPsec offers may be discussed in similar "Security" or "Security Consideration"
+sections within individual reference manual pages.
+While a non-root user cannot bypass IPsec, a non-root user can set policy to be different from the system-wide poli<hy>
+cy. For ways to prevent this, consult the ndd(1M) variables in /dev/ip.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed
+in.iked(1M), ipsecconf(1M), ipseckey(1M), ndd(1M), getsockopt(3SOCKET), setsockopt(3SOCKET), at<hy>
+tributes(5), inet(7P), ip(7P), ip6(7P), ipsecah(7P), ipsecesp(7P), pf_key(7P), udp(7P)
+Kent, S., and Atkinson, R., RFC 2401, Security Architecture for the Internet Protocol, The Internet Society, 1998.
+Kent, S. and Atkinson, R., RFC 2406, IP Encapsulating Security Payload (ESP), The Internet Society, 1998.
+Madson, C., and Doraswamy, N., RFC 2405, The ESP DES-CBC Cipher Algorithm with Explicit IV, The Internet
+Society, 1998.
+Madsen, C. and Glenn, R., RFC 2403, The Use of HMAC-MD5-96 within ESP and AH, The Internet Society, 1998.
+Madsen, C. and Glenn, R., RFC 2404, The Use of HMAC-SHA-1-96 within ESP and AH, The Internet Society, 1998.
+Pereira, R. and Adams, R., RFC 2451, The ESP CBC-Mode Cipher Algorithms, The Internet Society, 1998.
+Kelly, S. and Frankel, S., RFC 4868, Using HMAC-SHA-256, HMAC-SHA-384, and HMAC-SHA-512 with IPsec,
+2007.
+Huttunen, A., Swander, B., Volpe, V., DiBurro, L., Stenberg, M., RFC 3948, UDP Encapsulation of IPsec ESP Pack<hy>
+ets, The Internet Society, 2005.

@@ -1,0 +1,49 @@
+<beginning of page>
+ipnet, lo0 <-> ipnet device driver
+/dev/ipnet/*, /dev/lo0
+The ipnet device driver creates, removes and manages nodes in the /dev/ipnet/ namespace.
+A node is created in /dev/ipnet for every IP interface on the system, including interfaces that exist only in software
+and for which there is no hardware device. The ipnet device also provides access to all IP traffic to and from the sys<hy>
+tem. To provide access to packets that are internally looped-back in IP, the ipnet driver creates a /dev/lo0 DLPI de<hy>
+vice.
+Device nodes created in /dev/ipnet are DLPI style-1 devices. All M_PROTO and M_PCPROTO-type messages
+are interpreted as DLPI primitives. Because the device is read-only and packets can only be observed by opening
+them, the following subset of DLPI primitives is supported:
+ DL_INFO_REQ
+ DL_BIND_REQ
+ DL_UNBIND_REQ
+ DL_PROMISCON_REQ
+ DL_PROMISCOFF_REQ
+ DLIOCRAW
+The values returned by the driver in the DL_INFO_ACK primitive in response to the DL_INFO_REQ are: <bu> Maxi<hy>
+mum SDU is INT_MAX <bu> Minimum SDU is 0. <bu> DLSAP address length is 2. <bu> MAC type is DL_IPNET. <bu> SAP
+length value is 2. <bu> Service mode is DL_CLDLS. <bu> No optional quality of service (QOS) support is provided. Ac<hy>
+cordingly, the QOS fields are 0. <bu> Provider style is DL_STYLE1. <bu> Version is DL_VERSION_2.
+The /dev/ipnet/* and /dev/lo0 devices only accept DL_BIND_REQ requests for SAPs 4 (IPv4 packets), 6 (IPv6
+packets), or 0 (all IP packets). DL_BIND_REQ requests for other SAP values result in a DL_ERROR_ACK of
+DL_BADSAP.
+For /dev/ipnet/* devices, the DL_PROMISCON_REQ and DL_PROMISCOFF_REQ primitives with the
+DL_PROMISC_PHYS flag set in the dl_level field enables/disables the reception of all packets. When disabled,
+only packets with addresses matching any of the configured addresses on the IP interface are received. When used
+with the DL_PROMISC_MULTI flag set, reception of all multicast group addresses can be enabled/disabled.
+DL_PROMISC_PHYS and DL_PROMISC_MULTI have no effect for /dev/lo0. When the DL_PROMISC_SAP
+flag is set, reception of all IPv4/IPv6 can be enabled/disabled.
+The DLIOCRAW ioctl is supported but has no effect on the data returned from the device.
+The DL_IOC_IPNET_INFO ioctl enables/disables the inclusion of a dl_ipnetinfo_t structure that is prepended to
+the IP header when receiving packet data. When enabled, a non-zero integer is returned reflecting the current
+DL_IOC_IPNET_INFO version. The dl_ipnetinfo_t data structure is defined in <sys/dlpi.h> and includes the fol<hy>
+lowing fields:
+ uint8_t dli_version; /* DL_IPNETINFO_* version */
+ uint8_t dli_ipver; /* packet IP header version */
+ uint16_t dli_len; /* length of dl_ipnetinfo_t */
+ uint64_t dli_srczone; /* packet source zone ID (if any) */
+ uint64_t dli_dstzone; /* packet dest zone ID (if any) */
+The current dli_version is 1. To robustly support future dl_ipnetinfo_t versions, consumers should check that
+dli_version is a value they recognize, and must use the dli_len field to advance past the dl_ipnetinfo_t header.
+/dev/ipnet/*, /dev/lo0 Special character devices.
+/kernel/drv/ipnet.conf Configuration file.
+See attributes(5) for descriptions of the following attributes:
+<beginning of page>
+tab() box; lw(2.75i) lw(2.75i) lw(2.75i) lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE AvailabilitySUNWckr
+ArchitectureSPARC, x86 Interface StabilityCommitted
+attributes(5), dlpi(7P)

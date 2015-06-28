@@ -1,0 +1,195 @@
+<beginning of page>
+poll <-> driver for fast poll on many file descriptors
+#include <sys/devpoll.h>
+int fd = open("/dev/poll", O_RDWR);
+ssize_t n = write(int fd, struct pollfd buf[], int bufsize);
+int n = ioctl(int fd, DP_POLL, struct dvpoll* arg);
+int n = ioctl(int fd, DP_ISPOLLED, struct pollfd* pfd);
+fd Open file descriptor that refers to the /dev/poll driver.
+path /dev/poll
+buf Array of pollfd structures.
+bufsize Size of buf in bytes.
+arg Pointer to pollcall structure.
+pfd Pointer to pollfd structure.
+Note -
+The /dev/poll device, associated driver and corresponding manpages may be removed in a future Solaris release. For
+similar functionality in the event ports framework, see port_create(3C).
+The /dev/poll driver is a special driver that enables you to monitor multiple sets of polled file descriptors. By using
+the /dev/poll driver, you can efficiently poll large numbers of file descriptors. Access to the /dev/poll driver is pro<hy>
+vided through open(2), write(2), and ioctl(2) system calls.
+Writing an array of pollfd struct to the /dev/poll driver has the effect of adding these file descriptors to the moni<hy>
+tored poll file descriptor set represented by the fd. To monitor multiple file descriptor sets, open the /dev/poll driver
+multiple times. Each fd corresponds to one set. For each pollfd struct entry (defined in sys/poll.h):
+  struct pollfd {
+  int fd;
+  short events;
+  short revents;
+  }
+The fd field specifies the file descriptor being polled. The events field indicates the interested poll events on the file
+descriptor. If a pollfd array contains multiple pollfd entries with the same fd field, the "events" field in each pollfd
+entry is OR'ed. A special POLLREMOVE event in the events field of the pollfd structure removes the fd from the
+monitored set. The revents field is not used. Write returns the number of bytes written successfully or -1 when write
+fails.
+The DP_POLL ioctl is used to retrieve returned poll events occured on the polled file descriptors in the monitored
+set represented by fd. arg is a pointer to the devpoll structures which are defined as follows:
+  struct dvpoll {
+  struct pollfd* dp_fds;
+  int dp_nfds;
+  int dp_timeout;
+  }
+The dp_fds points to a buffer that holds an array of returned pollfd structures. The dp_nfds field specifies the size
+of the buffer in terms of the number of pollfd entries it contains. The dp_nfds field also indicates the maximum
+number of file descriptors from which poll information can be obtained. If there is no interested events on any of
+the polled file descriptors, the DP_POLL ioctl call will wait dp_timeout milliseconds before returning. If dp_time<hy>
+out is 0, the ioctl call returns immediately. If dp_timeout is -1, the call blocks until an interested poll events is
+<beginning of page>
+available or the call is interrupted. Upon return, if the ioctl call has failed, -1 is returned. The memory content point<hy>
+ed by dp_fds is not modified. A return value 0 means the ioctl is timed out. In this case, the memory content pointed
+by dp_fds is not modified. If the call is successful, it returns the number of valid pollfd entries in the array pointed
+by dp_fds; the contents of the rest of the buffer is undefined. For each valid pollfd entry, the fd field indicates the
+file desciptor on which the polled events happened. The events field is the user specified poll events. The revents
+field contains the events occurred. -1 is returned if the call fails.
+DP_ISPOLLED ioctl allows you to query if a file descriptor is already in the monitored set represented by fd. The
+fd field of the pollfd structure indicates the file descriptor of interest. The DP_ISPOLLED ioctl returns 1 if the file
+descriptor is in the set. The events field contains 0. The revents field contains the currently polled events. The ioctl
+returns 0 if the file descriptor is not in the set. The pollfd structure pointed by pfd is not modified. The ioctl returns
+a -1 if the call fails.
+The following example shows how /dev/poll may be used.
+ {
+  ...
+  /*
+  * open the driver
+  */
+  if ((wfd = open("/dev/poll", O_RDWR)) < 0) {
+  exit(-1);
+  }
+  pollfd = (struct pollfd* )malloc(sizeof(struct pollfd) * MAXBUF);
+  if (pollfd == NULL) {
+  close(wfd);
+  exit(-1);
+  }
+  /*
+  * initialize buffer
+  */
+  for (i = 0; i < MAXBUF; i++) {
+  pollfd[i].fd = fds[i];
+  pollfd[i].events = POLLIN;
+  pollfd[i].revents = 0;
+  }
+  if (write(wfd, &pollfd[0], sizeof(struct pollfd) * MAXBUF) !=
+  sizeof(struct pollfd) * MAXBUF) {
+  perror("failed to write all pollfds");
+  close (wfd);
+  free(pollfd);
+  exit(-1);
+  }
+  /*
+  * read from the devpoll driver
+  */
+  dopoll.dp_timeout = -1;
+  dopoll.dp_nfds = MAXBUF;
+  dopoll.dp_fds = pollfd;
+  result = ioctl(wfd, DP_POLL, &dopoll);
+  if (result < 0) {
+  perror("/dev/poll ioctl DP_POLL failed");
+  close (wfd);
+  free(pollfd);
+  exit(-1);
+  }
+  for (i = 0; i < result; i++) {
+  read(dopoll.dp_fds[i].fd, rbuf, STRLEN);
+  }
+  ...
+ }
+The following example is part of a test program which shows how DP_ISPOLLED() ioctl may be used.
+ {
+<beginning of page>
+  ...
+  loopcnt = 0;
+  while (loopcnt < ITERATION) {
+  rn = random();
+  rn %= RANGE;
+  if (write(fds[rn], TESTSTRING, strlen(TESTSTRING)) !=
+  strlen(TESTSTRING)) {
+  perror("write to fifo failed.");
+  close (wfd);
+  free(pollfd);
+  error = 1;
+  goto out1;
+  }
+  dpfd.fd = fds[rn];
+  dpfd.events = 0;
+  dpfd.revents = 0;
+  result = ioctl(wfd, DP_ISPOLLED, &dpfd);
+  if (result < 0) {
+  perror("/dev/poll ioctl DP_ISPOLLED failed");
+  printf("errno = %d0, errno);
+  close (wfd);
+  free(pollfd);
+  error = 1;
+  goto out1;
+  }
+  if (result != 1) {
+  printf("DP_ISPOLLED returned incorrect result: %d.0,
+  result);
+  close (wfd);
+  free(pollfd);
+  error = 1;
+  goto out1;
+  }
+  if (dpfd.fd != fds[rn]) {
+  printf("DP_ISPOLLED returned wrong fd %d, expect %d0,
+  dpfd.fd, fds[rn]);
+  close (wfd);
+  free(pollfd);
+  error = 1;
+  goto out1;
+  }
+  if (dpfd.revents != POLLIN) {
+  printf("DP_ISPOLLED returned unexpected revents %d0,
+  dpfd.revents);
+  close (wfd);
+  free(pollfd);
+  error = 1;
+  goto out1;
+  }
+  if (read(dpfd.fd, rbuf, strlen(TESTSTRING)) !=
+  strlen(TESTSTRING)) {
+  perror("read from fifo failed");
+  close (wfd);
+  free(pollfd);
+  error = 1;
+  goto out1;
+  }
+  loopcnt++;
+  }
+EACCES A process does not have permission to access the content cached in /dev/poll.
+<beginning of page>
+EINTR A signal was caught during the execution of the ioctl(2) function.
+EFAULT The request argument requires a data transfer to or from a buffer pointed to by arg, but arg points to an il<hy>
+legal address.
+EINVAL The request or arg parameter is not valid for this device, or field of the dvpoll struct pointed by arg is not
+valid (for example, when using write/pwrite dp_nfds is greater than {OPEN_MAX}, or when using the DPPOLL
+ioctl dp_nfds is greater than or equal to {OPEN_MAX}}.
+ENXIO The O_NONBLOCK flag is set, the named file is a FIFO, the O_WRONLY flag is set, and no process has
+the file open for reading; or the named file is a character special or block special file and the device associated with
+this special file does not exist.
+See attributes(5) for a description of the following attributes:
+tab() box; lw(2.75i) lw(2.75i) lw(2.75i) lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE ArchitectureSPARC,
+x86 AvailabilitySUNWcar ( Solaris) SUNWcsr, SUNWcsu (Solaris on x86) SUNWhea (header files) Interface Sta<hy>
+bilityObsolete MT-LevelSafe
+open(2), poll(2), write(2), attributes(5)
+The /dev/poll API is particularly beneficial to applications that poll a large number of file descriptors repeatedly.
+Applications will exhibit the best performance gain if the polled file descriptor list rarely change.
+When using the /dev/poll driver, you should remove a closed file descriptor from a monitored poll set. Failure to do
+so may result in a POLLNVAL revents being returned for the closed file descriptor. When a file descriptor is closed
+but not removed from the monitored set, and is reused in subsequent open of a different device, you will be polling
+the device associated with the reused file descriptor. In a multithreaded application, careful coordination among
+threads doing close and DP_POLL ioctl is recommended for consistent results.
+The /dev/poll driver caches a list of polled file descriptors, which are specific to a process. Therefore, the /dev/poll
+file descriptor of a process will be inherited by its child process, just like any other file descriptors. But the child
+process will have very limited access through this inherited /dev/poll file descriptor. Any attempt to write or do ioctl
+by the child process will result in an EACCES error. The child process should close the inherited /dev/poll file de<hy>
+scriptor and open its own if desired.
+The /dev/poll driver does not yet support polling. Polling on a /dev/poll file descriptor will result in POLLERR be<hy>
+ing returned in the revents field of pollfd structure.

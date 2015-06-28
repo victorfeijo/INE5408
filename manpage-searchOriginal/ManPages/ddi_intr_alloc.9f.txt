@@ -1,0 +1,63 @@
+<beginning of page>
+ddi_intr_alloc, ddi_intr_free <-> allocate or free interrupts for a given interrupt type
+#include <sys/types.h>
+#include <sys/conf.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+int ddi_intr_alloc(dev_info_t *dip, ddi_intr_handle_t *h_array, int type,
+ int inum, int count, int *actualp, int behavior);
+int ddi_intr_free(ddi_intr_handle_t h);
+Solaris DDI specific (Solaris DDI).
+ddi_intr_alloc()
+dip Pointer to the dev_info structure
+h_array Pointer to an array of DDI interrupt handles
+type Interrupt type
+inum Interrupt number
+count Number of interrupts requested. The count should not exceed the total number of interrupts supported by the
+device, as returned by a call to ddi_intr_get_nintrs(9F).
+actualp Pointer to the number of interrupts actually allocated
+behavior Flag to determine the allocation algorithm
+ddi_intr_free()
+h DDI interrupt handle
+The ddi_intr_alloc() function allocates interrupts of the interrupt type given by the type argument beginning at the
+interrupt number inum. If ddi_intr_alloc() allocates any interrupts, it returns the actual number of interrupts allocat<hy>
+ed in the integer pointed to by the actualp argument and returns the number of interrupt handles in the interrupt han<hy>
+dle array pointed to by the h_array argument.
+Specific interrupts are always specified by the combination of interrupt type and inum. For legacy devices, inum
+refers to the nth interrupt, typically as defined by the devices interrupts property. For PCI fixed interrupts, inum
+refers to the interrupt number. The inum is the relative interrupt vector number, from 0 to 31 for MSI, from 0 to 2047
+for MSI-X. The first interrupt vector is 0. The last relative vector is 31 for MSI or 2047 for MSI-X.
+The h_array must be pre-allocated by the caller as a count sized array of ddi_intr_handle_t's.
+If MSI interrupts are being allocated, the count argument passed should be a number between 1 and 32, specified as
+a power of two. If count is not specified as a power of two, the error DDI_EINVAL is returned.
+The behavior flag controls the interrupt allocation algorithm. It takes one of two input values: DDI_INTR_AL<hy>
+LOC_NORMAL or DDI_INTR_ALLOC_STRICT. If the count value used is greater than NINTRs, then the call
+fails with DDI_EINVAL unconditionally. When set to DDI_INTR_ALLOC_STRICT, the call succeeds if and on<hy>
+ly if count interrupts are allocated. Otherwise, the call fails, and the number of available interrupts is returned in ac<hy>
+tualp. When set to DDI_INTR_ALLOC_NORMAL, the call succeeds if at least one interrupt is allocated, and the
+number of allocated interrupts is returned in actualp.
+The handle for each allocated interrupt, if any, is returned in the array of handles given by the h_array argument.
+<beginning of page>
+The ddi_intr_free() function releases the system resources and interrupt vectors associated with the ddi_intr_han<hy>
+dle_t h, including any resources associated with the handle h itself. Once freed, the handle h should not be used in
+any further calls.
+The ddi_intr_free() function should be called once for each handle in the handle array.
+The ddi_intr_alloc() and ddi_intr_free() functions return:
+DDI_SUCCESS On success.
+DDI_EAGAIN Not enough interrupt resources.
+DDI_EINVAL On encountering invalid input parameters.
+DDI_INTR_NOTFOUND On failure to find the interrupt.
+DDI_FAILURE On any implementation specific failure.
+The ddi_intr_alloc() and ddi_intr_free() functions can be called from kernel non-interrupt context.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed
+attributes(5), ddi_intr_add_handler(9F), ddi_intr_block_enable(9F), ddi_intr_disable(9F), ddi_intr_en<hy>
+able(9F), ddi_intr_get_cap(9F), ddi_intr_get_nintrs(9F), ddi_intr_get_pri(9F), ddi_intr_get_support<hy>
+ed_types(9F), ddi_intr_remove_handler(9F)
+Writing Device Drivers
+Consumers of these interfaces should verify that the return value is not equal to DDI_SUCCESS. Incomplete check<hy>
+ing for failure codes could result in inconsistent behavior among platforms.
+If a device driver that uses MSI and MSI-X interrupts resets the device, the device might reset its configuration
+space modifications. Such a reset could cause a device driver to lose any MSI and MSI-X interrupt usage settings
+that have been applied.

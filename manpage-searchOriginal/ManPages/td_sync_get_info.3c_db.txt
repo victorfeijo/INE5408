@@ -1,0 +1,78 @@
+<beginning of page>
+td_sync_get_info, td_ta_sync_tracking_enable, td_sync_get_stats, td_sync_setstate, td_sync_waiters <-> operations on
+a synchronization object in libc_db
+cc [ flag... ] file... -lc_db [ library... ]
+#include <proc_service.h>
+#include <thread_db.h>
+td_err_e td_sync_get_info(const td_synchandle_t *sh_p, td_syncinfo_t *si_p);
+td_err_e td_ta_sync_tracking_enable(const td_thragent_t *ta_p, int on_off);
+td_err_e td_sync_get_stats(const td_synchandle_t *sh_p, td_syncstats_t *ss_p);
+td_err_e td_sync_setstate(const td_synchandle_t *sh_p);
+typedef int td_thr_iter_f(const td_thrhandle_t *th_p, void *cb_data_p);
+td_err_e td_sync_waiters(const td_synchandle_t *sh_p, td_thr_iter_f *cb,
+ void *cb_data_p);
+Synchronization objects include mutexes, condition variables, semaphores, and reader-writer locks. In the same way
+that thread operations use a thread handle of type td_thrhandle_t, operations on synchronization objects use a syn<hy>
+chronization object handle of type td_synchandle_t.
+The controlling process obtains synchronization object handles either by calling the function td_ta_sync_iter() to
+obtain handles for all synchronization objects of the target process that are known to the libc_db library of inter<hy>
+faces, or by mapping the address of a synchronization object in the address space of the target process to a handle by
+calling td_ta_map_addr2sync(3C_DB).
+Not all synchronization objects that a process uses can be known to the libc_db library and returned by
+td_ta_sync_iter(3C_DB). A synchronization object is known to libc_db only if it has been the target of a synchro<hy>
+nization primitive in the process (such as mutex_lock(), described on the mutex_init(3C) manual page) after
+td_ta_new(3C_DB) has been called to attach to the process and td_ta_sync_tracking_enable() has been called to
+enable synchronization object tracking.
+The td_ta_sync_tracking_enable() function turns synchronization object tracking on or off for the process identi<hy>
+fied by ta_p, depending on whether on_off is 0 (off) or non-zero (on).
+The td_sync_get_info() function fills in the td_syncinfo_t structure *si_p with values for the synchronization object
+identified by sh_p. The td_syncinfo_t structure contains the following fields:
+td_thragent_t *si_ta_p The internal process handle identifying the target process through which this synchroniza<hy>
+tion object handle was obtained. Synchronization objects may be process-private or process-shared. In the latter
+case, the same synchronization object may have multiple handles, one for each target process's "view" of the syn<hy>
+chronization object.
+psaddr_t si_sv_addr The address of the synchronization object in this target process's address space.
+td_sync_type_e si_type The type of the synchronization variable: mutex, condition variable, semaphore, or readers-
+writer lock.
+int si_shared_type If si_shared_type is non-zero, this synchronization object is process-shared, otherwise it is
+process-private.
+td_sync_flags_t si_flags Flags dependent on the type of the synchronization object.
+int si_state.sema_count Semaphores only. The current value of the semaphore
+int si_state.nreaders Readers-writer locks only. The number of readers currently holding the lock, or -1, if a writer
+is currently holding the lock.
+<beginning of page>
+int si_state.mutex_locked For mutexes only. Non-zero if and only if the mutex is currently locked.
+int si_size The size of the synchronization object.
+uint8_t si_has_waiters Non-zero if and only if at least one thread is blocked on this synchronization object.
+uint8_t si_is_wlocked For reader-writer locks only. The value is non-zero if and only if this lock is held by a writer.
+uint8_t si_rcount PTHREAD_MUTEX_RECURSIVE mutexes only. If the mutex is held, the recursion count.
+uint8_t si_prioceiling PTHREAD_PRIO_PROTECT protocol mutexes only. The priority ceiling.
+td_thrhandle_t si_owner Mutexes and readers-writer locks only. This is the thread holding the mutex, or the write
+lock, if this is a reader-writer lock. The value is NULL if no one holds the mutex or write-lock.
+pid_t si_ownerpid Mutexes only. For a locked process-shared mutex, this is the process-ID of the process contain<hy>
+ing the owning thread.
+The td_sync_get_stats() function fills in the td_syncstats_t structure *ss_p with values for the synchronization ob<hy>
+ject identified by sh_p. The td_syncstats_t structure contains an embedded td_syncinfo_t structure that is filled in
+as described above for td_sync_get_info(). In addition, usage statistics gathered since td_ta_sync_tracking_en<hy>
+able() was called to enable synchronization object tracking are returned in the ss_un.mutex, ss_un.cond,
+ss_un.rwlock, or ss_un.sema members of the td_syncstats_t structure, depending on the type of the synchroniza<hy>
+tion object.
+The td_sync_setstate function modifies the state of synchronization object si_p, depending on the synchronization
+object type. For mutexes, td_sync_setstate is unlocked if the value is 0. Otherwise it is locked. For semaphores,
+the semaphore's count is set to the value. For reader-writer locks, the reader count set to the value if value is >0. The
+count is set to write-locked if value is -1. It is set to unlocked if the value is 0. Setting the state of a synchronization
+object from a libc_db interface may cause the synchronization object's semantics to be violated from the point of
+view of the threads in the target process. For example, if a thread holds a mutex, and td_sync_setstate is used to set
+the mutex to unlocked, then a different thread will also be able to subsequently acquire the same mutex.
+The td_sync_waiters function iterates over the set of thread handles of threads blocked on sh_p. The callback func<hy>
+tion cb is called once for each such thread handle, and is passed the thread handle and cb_data_p. If the callback
+function returns a non-zero value, iteration is terminated early. See td_ta_thr_iter(3C_DB).
+TD_OK The call returned successfully.
+TD_BADTH An invalid thread handle was passed in.
+TD_DBERR A call to one of the imported interface routines failed.
+TD_ERR A libc_db-internal error occurred.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelSafe
+<beginning of page>
+libc_db(3LIB), mutex_init(3C), td_ta_map_addr2sync(3C_DB), td_ta_sync_iter(3C_DB),
+td_ta_thr_iter(3C_DB), attributes(5)

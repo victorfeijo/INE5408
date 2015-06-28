@@ -1,0 +1,110 @@
+<beginning of page>
+system <-> system configuration information file
+The system file is used for customizing the operation of the operating system kernel. The recommended procedure is
+to preserve the original system file before modifying it.
+The system file contains commands which are read by the kernel during initialization and used to customize the op<hy>
+eration of your system. These commands are useful for modifying the system's treatment of its loadable kernel mod<hy>
+ules.
+The syntax of the system file consists of a list of keyword/value pairs which are recognized by the system as valid
+commands. Comment lines must begin with an asterisk (*) or a hash mark (#) and end with a newline character. All
+commands are case-insensitive except where noted.
+Commands that modify the system's operation with respect to loadable kernel modules require you to specify the
+module type by listing the module's namespace. The following namespaces are currently supported on all platforms:
+drv Modules in this namespace are device drivers.
+exec Modules in this namespace are execution format modules. The following exec modules are currently provided:
+Only on SPARC system:
+ aoutexec
+Only on x86 system:
+ coffexec
+On SPARC and IA systems:
+ elfexec
+ intpexec
+ javaexec
+fs These modules are filesystems.
+sched These modules implement a process scheduling algorithm.
+strmod These modules are STREAMS modules.
+sys These modules implement loadable system-call modules.
+misc These modules do not fit into any of the above categories, so are considered "miscellaneous" modules.
+SPARC only:
+dacf These modules provide rules and actions for device auto-configuration.
+<beginning of page>
+tod These modules provide support for the time of day hardware.
+cpu These modules provide CPU-specific kernel routines.
+A description of each of the supported commands follows:
+exclude: <namespace>/<modulename>
+Do not allow the listed loadable kernel module to be loaded. exclude commands are cumulative; the list of modules
+to exclude is created by combining every exclude entry in the system file.
+include: <namespace>/<modulename>
+Include the listed loadable kernel module. This is the system's default, so using include does not modify the sys<hy>
+tem's operation. include commands are cumulative.
+forceload: <namespace>/<modulename>
+Force this kernel module to be loaded during kernel initialization. The default action is to automatically load the ker<hy>
+nel module when its services are first accessed. forceload commands are cumulative.
+rootdev: <device name>
+Set the root device to the listed value instead of using the default root device as supplied by the boot program.
+rootfs: <root filesystem type>
+Set the root filesystem type to the listed value.
+moddir: <first module path>[[{:, }<second ...>]...]
+Set the search path for loadable kernel modules. This command operates very much like the PATH shell variable.
+Multiple directories to search can be listed together, delimited either by blank spaces or colons.
+set [<module>:]<symbol> {=, |, &} [~][-]<value>
+Set an integer or character pointer in the kernel or in the selected kernel module to a new value. This command is
+used to change kernel and module parameters and thus modify the operation of your system. Assignment operations
+are not cumulative, whereas bitwise AND and OR operations are cumulative.
+Operations that are supported for modifying integer variables are: simple assignment, inclusive bitwise OR, bitwise
+AND, one's complement, and negation. Variables in a specific loadable module can be targeted for modification by
+specifying the variable name prefixed with the kernel module name and a colon (:) separator. Values can be specified
+as hexadecimal (0x10), Octal (046), or Decimal (5).
+The only operation supported for modifying character pointers is simple assignment. Static string data such as char<hy>
+acter arrays cannot be modified using the set command. Use care and ensure that the variable you are modifying is
+in fact a character pointer. The set command is very powerful, and will likely cause problems if used carelessly. The
+following escape sequences are supported within the quoted string:
+ \n  (newline)
+ \t  (tab)
+ \b  (backspace)
+Example 1 A sample system file.
+The following is a sample system file.
+<beginning of page>
+ * Force the ELF exec kernel module to be loaded during kernel
+ * initialization. Execution type modules are in the exec namespace.
+ forceload: exec/elfexec
+ * Change the root device to /sbus@1,f8000000/esp@0,800000/sd@3,0:a.
+ * You can derive root device names from /devices.
+ * Root device names must be the fully expanded Open Boot Prom
+ * device name. This command is platform and configuration specific.
+ * This example uses the first partition (a) of the SCSI disk at
+ * SCSI target 3 on the esp host adapter in slot 0 (on board)
+ * of the SBus of the machine.
+ * Adapter unit-address 3,0 at sbus unit-address 0,800000.
+ rootdev: /sbus@1,f8000000/esp@0,800000/sd@3,0:a
+ * Set the filesystem type of the root to ufs. Note that
+ * the equal sign can be used instead of the colon.
+ rootfs:ufs
+ * Set the search path for kernel modules to look first in
+ * /usr/phil/mod_test for modules, then in /kernel/modules (the
+ * default) if not found. Useful for testing new modules.
+ * Note that you can delimit your module pathnames using
+ * colons instead of spaces: moddir:/newmodules:/kernel/modules
+ moddir:/usr/phil/mod_test /kernel/modules.
+ * Set the configuration option {_POSIX_CHOWN_RESTRICTED} :
+ * This configuration option is enabled by default.
+ set rstchown = 1
+ * Disable the configuration option {_POSIX_CHOWN_RESTRICTED} :
+ set rstchown = 0
+ * Turn on debugging messages in the modules mydriver. This is useful
+ * during driver development.
+ set mydriver:debug = 1
+ * Bitwise AND the kernel variable "moddebug" with the
+ * one's complement of the hex value 0x880, and set
+ * "moddebug" to this new value.
+ set moddebug & ~0x880
+ * Demonstrate the cumulative effect of the SET
+ * bitwise AND/OR operations by further modifying "moddebug"
+ * by ORing it with 0x40.
+ set moddebug | 0x40
+boot(1M), init(1M), kernel(1M)
+Use care when modifying the system file; it modifies the operation of the kernel. If you preserved the original sys<hy>
+tem file, you can boot using boot -a, which will ask you to specify the path to the saved file. This should allow the
+system to boot correctly. If you cannot locate a system file that will work, you may specify /dev/null. This acts as an
+empty system file, and the system will attempt to boot using its default settings.
+The /etc/system file is read only once, at boot time.

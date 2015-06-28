@@ -1,0 +1,109 @@
+<beginning of page>
+ypserv, ypxfrd <-> NIS server and binder processes
+/usr/lib/netsvc/yp/ypserv [-dv] [-i | -I] [-r | -R]
+/usr/lib/netsvc/yp/ypxfrd
+The Network Information Service (NIS) provides a simple network lookup service consisting of databases and pro<hy>
+cesses. The databases are ndbm files in a directory tree rooted at /var/yp. See ndbm(3C). These files are described
+in ypfiles(4). The processes are /usr/lib/netsvc/yp/ypserv, the NIS database lookup server, and
+/usr/lib/netsvc/yp/ypbind, the NIS binder. The programmatic interface to the NIS service is described in yp<hy>
+clnt(3NSL). Administrative tools are described in yppoll(1M), yppush(1M), ypset(1M), ypxfr(1M), and yp<hy>
+which(1). Tools to see the contents of NIS maps are described in ypcat(1), and ypmatch(1). Database generation
+and maintenance tools are described in ypinit(1M), ypmake(1M), and makedbm(1M).
+The ypserv utility is a daemon process typically activated at system startup from svc:/network/nis/server:default.
+Alternatively, you can, as the root user, start NIS services using ypstart(1M) from the command-line. ypserv runs
+only on NIS server machines with a complete NIS database. You can halt all NIS services using the ypstop(1M)
+command.
+The ypxfrd utility transfers entire NIS maps in an efficient manner. For systems that use this daemon, map transfers
+are 10 to 100 times faster, depending on the map. To use this daemon, be sure ypxfrd is running on the master serv<hy>
+er. See /usr/lib/netsvc/yp/ypstart. ypxfr attempts to use ypxfrd first. If that fails, it prints a warning, then uses the
+older transfer method.
+The ypserv daemon's primary function is to look up information in its local database of NIS maps.
+The operations performed by ypserv are defined for the implementor by the YP Protocol Specification, and for the
+programmer by the header file <rpcsvc/yp_prot.h>.
+Communication to and from ypserv is by means of RPC calls. Lookup functions are described in ypclnt(3NSL),
+and are supplied as C-callable functions in the libnsl(3LIB) library. There are four lookup functions, all of which are
+performed on a specified map within some NIS domain: yp_match(3NSL), yp_first(3NSL), yp_next(3NSL), and
+yp_all(3NSL). The yp_match operation takes a key, and returns the associated value. The yp_first operation returns
+the first key-value pair from the map, and yp_next can be used to enumerate the remainder. yp_all ships the entire
+map to the requester as the response to a single RPC request.
+A number of special keys in the DBM files can alter the way in which ypserv operates. The keys of interest are:
+YP_INTERDOMAIN The presence of this key causes ypserv to forward to a DNS server host lookups that cannot
+be satisfied by the DBM files.
+YP_SECURE This key causes ypserv to answer only questions coming from clients on reserved ports.
+YP_MULTI_hostname This is a special key in the form, YP_MULTI_hostname addr1,...,addrN. A client looking
+for hostname receives the closest address.
+Two other functions supply information about the map, rather than map entries: yp_order(3NSL), and yp_mas<hy>
+ter(3NSL). In fact, both order number and master name exist in the map as key-value pairs, but the server will not
+return either through the normal lookup functions. If you examine the map with makedbm(1M), however, they are
+visible. Other functions are used within the NIS service subsystem itself, and are not of general interest to NIS
+clients. These functions include do_you_serve_this_domain?, transfer_map, and reinitialize_internal_state.
+On start up, ypserv checks for the existence of the NIS to LDAP (N2L) configuration file /var/yp/NISLDAPmap<hy>
+ping. If it is present then a master server starts in N2L mode. If the file is not present it starts in "traditional" (non
+N2L) mode. Slave servers always start in traditional mode.
+In N2L mode, a new set of map files, with an LDAP_ prefix, are generated, based on the contents of the LDAP DIT.
+The old map files, NIS source files and ypmake(1M) are not used.
+It is possible that ypmake(1M) can be accidentally run in N2L mode. If the occurs, the old style map files are over<hy>
+written. That the map files are overwritten is harmless. However, any resulting yppush(1M) operation will push in<hy>
+formation based on the DIT rather than the source files. The user may not expect information based on the DIT.
+ypserv keeps track of the last modification date of the old style map files. If the map files have been updated, a
+<beginning of page>
+warning is logged that suggests that the user call yppush directly instead of ypmake.
+If a server attempts to run in N2L mode and a LDAP server cannot be contacted, it behaves as follows: 1. When
+ypserv is started, a warning will be logged. 2. When a NIS read access is made and the TTL entry has expired, a
+warning is logged.Information that is returned from the cache has not been updated. 3. When a NIS write access is
+made, a warning is logged. The cache will not be updated, and a NIS failure will be returned.
+If ypxfrd is running in N2L mode and is asked to transfer a map, ypxfrd first checks whether the map is out of date.
+If the map is out of date, ypxfrd initiates an update from the DIT. ypxfrd cannot wait for the update to complete. If
+ypxfrd waited, the client end ypxfr operation could time out. To prevent ypxfrd from timing out, the existing map is
+transferred from the cache. The most up to date map will be transferred on subsequent ypxfrd operations.
+-d The NIS service should go to the DNS for more host information. This requires the existence of a correct /etc/re<hy>
+solv.conf file pointing to a DNS server. This option turns on DNS forwarding regardless of whether or not the
+YP_INTERDOMAIN flag is set in the hosts maps. See makedbm(1M). In the absence of an /etc/resolv.conf file,
+ypserv complains, but ignores the -d option.
+-i If in N2L mode, initialize the NIS related parts of the DIT based on the current, non LDAP_ prefixed, map files.
+The LDAP_ prefixed maps are not created or updated. If you require that LDAP_ prefixed maps be updated or creat<hy>
+ed, then use the -ir option.
+The -i option does not attempt to create any NIS domain or container objects. If any NIS domain or container objects
+have not already been created, then errors will occur, as entries are written to nonexistent containers.
+-I Identical to -i, except that any missing domain and container objects are created.
+-r If in N2L mode, then refresh the LDAP_ prefixed map files based on the contents of the DIT.
+-ir If both -i and -r are specified in N2L mode, then the DIT will first be initialized from the current non LDAP_
+prefixed map files. A new set of LDAP_ prefixed maps will then be generated from the contents of the DIT. A new
+set of LDAP_ prefixed maps is required when moving from traditional NIS to N2L mode NIS.
+-Ir Identical to -ir, except that any missing domain and container objects are created.
+-v Operate in the verbose mode, printing diagnostic messages to stderr.
+When run with the -i, -r, -I, -ir or -Ir options, the ypserv command runs in the foreground and exits once map ini<hy>
+tialization has been completed. Once the ypserv command exits, the user knows the maps are ready and can restart
+ypserv and the other yp daemons by running ypstart(1M).
+If there is a requirement to initialize the DIT from the NIS source files, which may have been modified since the
+maps were last remade, run ypmake before running ypserv -i or ypserv -ir. ypmake regenerated old style NIS
+maps. Then ypserv -ir dumps them into the DIT. When the -ir option is used, the LDAP_ prefixe maps are also
+generated or updated. Since these maps will be more recent than the old style maps, ypmake will not be reported as
+erroneous when it is run.
+/var/yp/securenets
+Defines the hosts and networks that are granted access to information in the served domain. It is read at startup time
+by both ypserv and ypxfrd.
+/var/yp/ypserv.log
+If the /var/yp/ypserv.log file exists when ypserv starts up, log information is written to it when error conditions
+arise.
+<beginning of page>
+/var/yp/binding/domainname/ypservers
+Lists the NIS server hosts that ypbind can bind to.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wypu
+svcs(1), ypcat(1), ypmatch(1), ypwhich(1), domainname(1M), makedbm(1M), svcadm(1M), ypbind(1M), yp<hy>
+init(1M), ypmake(1M), yppoll(1M), yppush(1M), ypset(1M), ypstart(1M), ypstop(1M), ypxfr(1M), ndbm(3C),
+ypclnt(3NSL), libnsl(3LIB), NISLDAPmapping(4), securenets(4), ypfiles(4), ypserv(4), attributes(5), smf(5)
+
+ypserv supports multiple domains. The ypserv process determines the domains it serves by looking for directories
+of the same name in the directory /var/yp. It replies to all broadcasts requesting yp service for that domain.
+The Network Information Service (NIS) was formerly known as Sun Yellow Pages (YP). The functionality of the
+two remains the same; only the name has changed. The name Yellow Pages is a registered trademark in the United
+Kingdom of British Telecommunications PLC, and must not be used without permission.
+NIS uses ndbm() files to store maps. Therefore, it is subject to the 1024 byte limitations described in the USAGE
+and NOTES sections of the ndbm(3C) man page.
+The NIS server service is managed by the service management facility, smf(5), under the service identifier:
+ svc:/network/nis/server:default
+Administrative actions on this service, such as enabling, disabling, or requesting restart, can be performed using sv<hy>
+cadm(1M). The service's status can be queried using the svcs(1) command.

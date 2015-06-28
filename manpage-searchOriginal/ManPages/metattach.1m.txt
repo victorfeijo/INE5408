@@ -1,0 +1,131 @@
+<beginning of page>
+metattach, metadetach <-> attach or detach a metadevice
+/usr/sbin/metattach [-h]
+/usr/sbin/metattach [-s setname] mirror [metadevice]
+/usr/sbin/metattach [-s setname] [-i interlace] concat/stripe component...
+/usr/sbin/metattach [-s setname] RAID component...
+/usr/sbin/metattach [-s setname] [-A alignment] softpart size | all
+/usr/sbin/metadetach [-s setname] [-f] mirror submirror
+/usr/sbin/metadetach [-s setname] [-f] trans
+metattach adds submirrors to a mirror, grows metadevices, or grows soft partitions. Growing metadevices can be
+done without interrupting service. To grow the size of a mirror or trans, the slices must be added to the submirrors or
+to the master devices.
+Solaris Volume Manager supports storage devices and logical volumes greater than 1 terabyte (TB) when a system
+runs a 64-bit Solaris kernel. Support for large volumes is automatic. If a device greater than 1 TB is created, Solaris
+Volume Manager configures it appropriately and without user intervention.
+If a system with large volumes is rebooted under a 32-bit Solaris kernel, the large volumes are visible through meta<hy>
+stat output. Large volumes cannot be accessed, modified or deleted, and no new large volumes can be created. Any
+volumes or file systems on a large volume in this situation are also unavailable. If a system with large volumes is re<hy>
+booted under a version of Solaris prior to the Solaris 9 4/03 release, Solaris Volume Manager does not start. You
+must remove all large volumes before Solaris Volume Manager runs under an earlier version of the Solaris Operating
+System.
+Solaris Volume Manager supports one-to-four-way mirrors. You can only attach a metadevice to a mirror if there are
+three or fewer submirrors beneath the mirror. Once a new metadevice is attached to a mirror, metattach automatical<hy>
+ly starts a resync operation to the new submirror.
+metadetach detaches submirrors from mirrors and logging devices from trans metadevices.
+When a submirror is detached from a mirror, it is no longer part of the mirror, thus reads and writes to and from that
+metadevice by way of the mirror are no longer performed through the mirror. Detaching the only existing submirror
+is not allowed. Detaching a submirror that has slices reported as needing maintenance (by metastat) is not allowed
+unless the -f (force) flag is used.
+metadetach also detaches the logging device from a trans. This step is necessary before you can clear the trans vol<hy>
+ume. Trans metadevices have been replaced by UFS logging. Existing trans devices are not logging. They pass data
+directly through to the underlying device. See mount_ufs(1M) for more information about UFS logging.
+Detaching the logging device from a busy trans device is not allowed unless the -f (force) flag is used. Even so, the
+logging device is not actually detached until the trans is idle. The trans is in the Detaching state (metastat) until the
+logging device is detached.
+Root privileges are required for all of the following options except -h.
+The following options are supported:
+-A alignment Set the value of the soft partition extent alignment. Use this option when it is important specify a start<hy>
+ing offset for the soft partition. It preserves the data alignment between the metadevice address space and the address
+space of the underlying physical device.
+For example, a hardware device that does checksumming should not have its I/O requests divided by Solaris Volume
+Manager. In this case, use a value from the hardware configuration as the value for the alignment. When using this
+option in conjunction with a software I/O load, the alignment value corresponds to the I/O load of the application.
+This prevents I/O from being divided unnecessarily and affecting performance.
+-f Force the detaching of metadevices that have components that need maintenance or are busy. You can use this op<hy>
+tion only when a mirror is in a maintenance state that can be fixed with metareplace(1M). If the mirror is in a main<hy>
+<beginning of page>
+tenance state that can only be fixed with metasync(1M) (as shown by the output of metastat(1M)), metadetach -f
+has no effect, because the mirrors must be resynchronized before one of them can be detached.
+-h Display a usage message.
+-i interlace Specify the interlace value for stripes, where size is a specified value followed by either k for kilobytes,
+m for megabytes, or b for blocks. The units can be either uppercase or lowercase. If size is not specified, the size de<hy>
+faults to the interlace size of the last stripe of the metadevice. When an interlace size change is made on a stripe, it is
+carried forward on all stripes that follow.
+-s setname Specify the name of the diskset on which the metattach command or the metadetach command works..
+Using the -s option causes the command to perform its administrative function within the specified diskset. Without
+this option, the command performs its function on local metadevices.
+The following operands are supported:
+component The logical name for the physical slice (partition) on a disk drive, such as /dev/dsk/c0t0d0s2, being
+added to the concatenation, stripe, concatenation of stripes, or RAID5 metadevice.
+concat/stripe The metadevice name of the concatenation, stripe, or concatenation of stripes.
+log The metadevice name of the logging device to be attached to the trans metadevice.
+metadevice The metadevice name to be attached to the mirror as a submirror. This metadevice must have been previ<hy>
+ously created by the metainit command.
+mirror The name of the mirror.
+RAID The metadevice name of the RAID5 metadevice.
+size | all The amount of space to add to the soft partition in K or k for kilobytes, M or m for megabytes, G or g for
+gigabytes, T or t for terabytes, and B or b for blocks (sectors). All values represent powers of 2, and upper and lower
+case options are equivalent. Only integer values are permitted. The literal all specifies that the soft partition should
+grow to occupy all available space on the underlying volume.
+softpart The metadevice name of the existing soft partition.
+submirror The metadevice name of the submirror to be detached from the mirror.
+trans The metadevice name of the trans metadevice (not the master or logging device).
+Example 1 Concatenating a New Slice to a Metadevice
+This example concatenates a single new slice to an existing metadevice, Volume.1. Afterwards, you would use the
+growfs(1M) command to expand the file system.
+ # metattach Volume.1 /dev/dsk/c0t1d0s2
+Example 2 Detaching Logging Device from Trans Metadevice
+This example detaches the logging device from a trans metadevice d9. Notice that you do not have to specify the
+<beginning of page>
+logging device itself, as there can only be one.
+ # metadetach d9
+Example 3 Expanding a RAID5 Metadevice
+This example expands a RAID5 metadevice, d45, by attaching another slice.
+ # metattach d45 /dev/dsk/c3t0d0s2
+When you add additional slices to a RAID5 metadevice, the additional space is devoted to data. No new parity
+blocks are allocated. The data on the added slices is, however, included in the overall parity calculations, so it is pro<hy>
+tected against single-device failure.
+Example 4 Expanding a Soft Partition
+The following example expands a soft partition, d42, attaching all space available on the underlying device.
+ # metattach d42 all
+When you add additional space to a soft partition, the additional space is taken from any available space on the slice
+and might not be contiguous with the existing soft partition.
+Example 5 Adding Space to Two-Way Mirror
+This example adds space to a two-way mirror by adding a slice to each submirror. Afterwards, you would use the
+growfs(1M) command to expand the file system.
+ # metattach d9 /dev/dsk/c0t2d0s5
+ # metattach d10 /dev/dsk/c0t3d0s5
+This example tells the mirror to grow to the size of the underlying devices
+ # metattach d11
+This example increases the size of the UFS on the device so the space can be used.
+ # growfs -M /export /dev/md/rdsk/d11
+Example 6 Detaching a Submirror from a Mirror
+This example detaches a submirror, d2, from a mirror, d4.
+ # metadetach d4 d2
+Example 7 Adding Four Slices to Metadevice
+This example adds four slices to an existing metadevice, d9. Afterwards, you would use the growfs(1M) command
+<beginning of page>
+to expand the file system.
+ # metattach d9 /dev/dsk/c0t1d0s2 /dev/dsk/c0t2d0s2 /dev/dsk/c0t3d0s2 /dev/dsk/c0t4d0s2
+Example 8 Setting the Value of the Soft Partition Extent Alignment
+This example shows how to set the alignment of the soft partition to 1mb when the soft partition is expanded.
+ # metattach -s red -A 2m d13 1m
+The following exit values are returned:
+0 Successful completion.
+>0 An error occurred.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wmdu _ Interface StabilityStable
+mdmonitord(1M), metaclear(1M), metadb(1M), metahs(1M), metainit(1M), metaoffline(1M), metaonline(1M),
+metaparam(1M), metarecover(1M), metarename(1M), metareplace(1M), metaroot(1M), metaset(1M), metas<hy>
+sist(1M), metastat(1M), metasync(1M), md.tab(4), md.cf(4), mddb.cf(4), md.tab(4), attributes(5), md(7D)
+
+This section provides information regarding warnings for devices greater than 1 TB and for multi-way mirrors.
+Do not create large (>1 TB) volumes if you expect to run the Solaris Operating System with a 32-bit kernel or if you
+expect to use a version of the Solaris Operating System prior to Solaris 9 4/03.
+When a submirror is detached from its mirror, the data on the metadevice might not be the same as the data that ex<hy>
+isted on the mirror prior to running metadetach. In particular, if the -f option was needed, the metadevice and mirror
+probably do not contain the same data.
+Trans metadevices have been replaced by UFS logging. Existing trans devices are not logging. They pass data di<hy>
+rectly through to the underlying device. See mount_ufs(1M) for more information about UFS logging.

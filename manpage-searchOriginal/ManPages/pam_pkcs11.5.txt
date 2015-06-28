@@ -1,0 +1,102 @@
+<beginning of page>
+pam_pkcs11 <-> PAM Authentication Module for the PKCS#11 token libraries
+pam_pkcs11.so [debug] [config_file=filename]
+The pam_pkcs11 module implements pam_sm_authenticate(3PAM), which provides functionality to the PAM au<hy>
+thentication stack. This module allows a user to login a system, using a X.509 certificate and its dedicated private
+key stored in a PKCS#11 token. This module currently supports the RSA algorithm only.
+To verify the dedicated private key is truly associated with the X.509 certificate, the following verification procedure
+is performed in this module by default: <bu> Generate 128 random byte data <bu> Sign the random data with the private key
+and get a signature. This step is done in the PKCS#11 token. <bu> Verify the signature using the public key extracted
+from the certificate.
+For the verification of the users' certificates, locally stored CA certificates as well as either online or locally accessi<hy>
+ble CRLs are used.
+The pam_pkcs11.so service module can be used in the <auth> PAM chain. The program that needs a PAM service
+should be configured in the /etc/pam.conf file. For details on how to configure PAM services, see pam.conf(4).
+The following example uses only pam_pkcs11 for authentication:
+ login auth requisite pam_pkcs11.so.1
+ login autho required pam_unix_cred.so.1
+The following example uses pam_pkcs11 for authentication with fallback to standard UNIX authentication:
+ login auth sufficient pam_pkcs11.so.1
+ login auth requisite pam_authtok_get.so.1
+ login auth required pam_dhkeys.so.1
+ login auth required pam_unix_cred.so.1
+ login auth required pam_unix_auth.so.1
+To configure the pam_pkcs11 module, you must have the following information: <bu> Which PKCS #11 token you are
+going to use <bu> Which mapper(s) you need, and if needed, how to create and edit the related mapping files <bu> The root
+Certificate Authority files, and if required, the Certificate Revocation Lists files <bu> The list of authorized users to lo<hy>
+gin, and their corresponding certificates
+To configure the pam_pkcs11 module, you need to modify the pam_pkcs11.conf configuration file which is in the
+/etc/security/pam_pkcs11 directory by default. For detailed information on how to configure the pam_pkcs11
+module, see the PAM-PKCS11 User Manual, available at the http://www.opensc-project.org/ web site, under the
+PAM PKCS#11 link.
+The following example illustrates how to configure the pam_pkcs11 module for a user whose certificate and private
+key are stored in the Solaris pkcs11_softtoken keystore. This example uses the default certificate verification policy.
+<bu> Set up the PKCS#11 module.
+On Solaris, the PKCS#11 module should be set to /usr/lib/libpkcs11.so.1, the PKCS#11 Cryptographic Framework
+library. <bu> Set up the slot_description entry.
+Specifies the slot to be used. For example, slot_description = "Sun Crypto Softtoken". The default value for this
+entry is none which means to use the first slot with an available token.
+An administrator can use the cryptoadm list -vcommand to find all the available slots and their slot descriptions.
+For more information, see libpkcs11(3LIB) and cryptoadm(1M). <bu> Install or create user certificates and its dedicat<hy>
+ed private keys in the specific PKCS#11 token. <bu> Set up the certificate verification policy (cert_policy). If needed,
+set up CA certificate and CRL files.
+The certificate verification policy includes:
+none Perform no verification
+<beginning of page>
+ca Perform CA check
+signature Perform a signature check to ensure that private and public key matches
+crl_xxx Perform various certificate revocation checking
+As this example uses the default policy, cert_policy = ca,signature, an administer needs to set up the CA certifi<hy>
+cates. <bu> Copy the CA certificate to the /etc/security/pam_pkcs11/cacerts directory.
+A certificate that is self-signed is its own CA certificate. Therefore, in this example, the certificate is placed both in
+the Softtoken keystore and in the CA certificate directory. <bu> Make hash links for CA certificates
+ $ /etc/security/pam_pkcs11/make_hash_link.sh \
+  /etc/security/pam_pkcs11/cacerts
+<bu> Set up the mappers and mapfiles.
+When a X509 certificate is provided, there are no direct ways to map a certificate to a login. The pam_pkcs11 mod<hy>
+ule provides a configurable way with mappers to specify cert-to-user mapping.
+Many mappers are provided by the pam_pkcs11 module, for example, the common name (CN) mapper, the digest
+mapper, the Email mapper, or the LDAP mapper.
+A user can configure a mapper list in the pam_pkcs11.conf file. The mappers in the list are used sequentially until
+the certificate is successfully matched with the user.
+The default mapper list is as follows:
+ use_mappers = digest, cn, pwent, uid, mail, subject, null;
+Some mappers do not require the specification of a mapfile, for example, the common name mapper. Other mappers
+require mapfiles, for example, the digest mapper. Some sample mapping files can be found in the /etc/securi<hy>
+ty/pam_pkcs11 directory.
+The following options are supported:
+config_file=filename Specify the configuration file. The default value is /etc/securi<hy>
+ty/pam_pkcs11/pam_pkcs11.conf.
+debug Enable debugging output.
+/usr/lib/security/pam_pkcs11.so
+pam_pkcs11 module
+/usr/lib/pam_pkcs11/ldap_mapper.so
+Mapper module.
+/usr/lib/pam_pkcs11/opensc_mapper.so
+Mapper module.
+/usr/lib/pam_pkcs11/openssh_mapper.so
+Mapper module.
+<beginning of page>
+/etc/security/pam_pkcs11/pam_pkcs11.conf
+Configuration file.
+/etc/security/pam_pkcs11/cacerts
+Configuration directory. Stores the CA certificates.
+/etc/security/pam_pkcs11/crls
+Configuration directory. Stores the CRL files.
+/etc/security/pam_pkcs11/digest_mapping.example
+Sample mapfile.
+/etc/security/pam_pkcs11/subject_mapping.example
+Sample mapfile.
+/etc/security/pam_pkcs11/mail_mapping.example
+Sample mapfile.
+/etc/security/pam_pkcs11/make_hash_link.sh
+Sample script.
+PAM-pkcs11 was originally written by MarioStrasser , mast@gmx.net.
+Newer versions are from Juan Antonio Martinez, jonsito@teleline.es
+See attributes(5) for a description of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilityT{
+SUNWpampkcs11u, SUNWpampkcs11r, SUNWpampkcs11-docs T} _ Interface StabilityUncommitted
+pkcs11_inspect(1), pklogin_finder(1), cryptoadm(1M), libpkcs11(3LIB)libpkcs11(3LIB)pam_sm_authenti<hy>
+cate(3PAM), pam.conf(4), attributes(5), pkcs11_softtoken(5)
+PAM-PKCS11 User Manual, available at the http://www.opensc-project.org/ web site, under the PAM PKCS#11
+link.

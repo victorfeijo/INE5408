@@ -1,0 +1,273 @@
+<beginning of page>
+ddi_cb_register, ddi_cb_unregister <-> register and unregister a device driver callback handler
+#include <sys/sunddi.h>
+int ddi_cb_register(dev_info_t *dip, ddi_cb_flags_t flags,
+ ddi_cb_func_t cbfunc, void *arg1, void *arg2,
+ ddi_cb_handle_t * ret_hdlp);
+int ddi_cb_unregister(ddi_cb_handle_t hdl);
+Solaris DDI specific (Solaris DDI).
+ddi_cb_register()
+dip Pointer to the dev_info structure.
+flags Flags to determine which callback events can be handled.
+cbfunc Callback handler function.
+arg1 First argument to the callback handler.
+arg2 Second (optional) argument to the callback handler.
+ret_hdlp Pointer to return a handle to the registered callback.
+ddi_cb_unregister()
+hdl Handle to the registered callback handler that is to be unregistered.
+The ddi_cb_register() function installs a callback handler which processes various actions that require the driver's
+attention while it is attached. The driver specifies which callback actions it can handle through the flags parameter.
+With each relevant action, the specified callback function passes the arg1 and arg2 arguments along with the de<hy>
+scription of each callback event to the driver.
+The ddi_cb_unregister() function removes a previously installed callback handler and prevents future processing of
+actions.
+The flags parameter consists of the following:
+DDI_CB_FLAG_INTR The device driver participates in interrupt resource management. The device driver may re<hy>
+ceive additional interrupt resources from the system, but only because it can accept callback notices informing it
+when it has more or less resources available. Callback notices can occur at anytime after the driver is attached. Inter<hy>
+rupt availability varies based on the overall needs of the system.
+The cdfunc is a callback handler with the following prototype:
+ typedef int (*ddi_cb_func_t)(dev_info_t *dip,
+  ddi_cb_action_t action, void *cbarg,
+  void *arg1, void *arg2);
+The cbfunc routine with the arguments dip, action, cbarg, arg1 and arg2 is called upon receipt of any callbacks for
+which the driver is registered. The callback handler returns DDI_SUCCESS if the callback was handled successful<hy>
+ly, DDI_ENOTSUP if it received a callback action that it did not know how to process, or DDI_FAILURE if it has
+an internal failure while processing an action.
+<beginning of page>
+The action parameter can be one of the following:
+DDI_CB_INTR_ADD For interrupt resource management, the driver has more available interrupts. The driver can al<hy>
+locate more interrupt vectors and then set up more interrupt handling functions by using ddi_intr_alloc(9F).
+DDI_CB_INTR_REMOVE For interrupt resource management, the driver has fewer available interrupts. The driver
+must release any previously allocated interrupts in excess of what is now available by using ddi_intr_free(9F).
+The cbarg parameter points to an action-specific argument. Each class of registered actions specifies its own data
+structure that a callback handler should dereference when it receives those actions.
+The cbarg parameter is defined as an integer in the case of DDI_CB_INTR_ADD and DDI_CB_INTR_REMOVE
+actions. The callback handler should cast the cbarg parameter to an integer. The integer represents how many inter<hy>
+rupts have been added or removed from the total number available to the device driver.
+If a driver participates in interrupt resource management, it must register a callback with the DDI_CB_FLAG_IN<hy>
+TR flag. The driver then receives the actions DDI_CB_INTR_ADD and DDI_CB_INTR_REMOVE whenever its
+interrupt availability has changed. The callback handler should use the interrupt functions ddi_intr_alloc(9F) and
+ddi_intr_free(9F) functions to respond accordingly. A driver is not required to allocate all interrupts that are avail<hy>
+able to it, but it is required to manage its allocations so that it never uses more interrupts than are currently available.
+The ddi_cb_register() and ddi_cb_unregister() functions return:
+DDI_SUCCESS on success
+DDI_EINVAL An invalid parameter was given when registering a callback handler, or an invalid handle was given
+when unregistering.
+DDI_EALREADY An attempt was made to register a callback handler while a previous registration still exists.
+The cbfunc routine must return:
+DDI_SUCCESS on success
+DDI_ENOTSUP The device does not support the operation
+DDI_FAILURE Implementation specific failure
+These functions can be called from kernel, non-interrupt context. Example 1 ddi_cb_register
+ /*
+  * attach(9F) routine.
+  *
+  * Creates soft state, registers callback handler, initializes
+  * hardware, and sets up interrupt handling for the driver.
+  */
+  xx_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
+  {
+  xx_state_t *statep = NULL;
+  xx_intr_t *intrs = NULL;
+  ddi_intr_handle_t *hdls;
+  ddi_cb_handle_t cb_hdl;
+  int instance;
+  int type;
+  int types;
+  int nintrs;
+  int nactual;
+  int inum;
+<beginning of page>
+  /* Get device instance */
+  instance = ddi_get_instance(dip);
+  switch (cmd) {
+  case DDI_ATTACH:
+  /* Get soft state */
+  if (ddi_soft_state_zalloc(state_list, instance) != 0)
+  return (DDI_FAILURE);
+  statep = ddi_get_soft_state(state_list, instance);
+  ddi_set_driver_private(dip, (caddr_t)statep);
+  statep->dip = dip;
+  /* Initialize hardware */
+  xx_initialize(statep);
+  /* Register callback handler */
+  if (ddi_cb_register(dip, DDI_CB_FLAG_INTR, xx_cbfunc,
+  statep, NULL, &cb_hdl) != 0) {
+  ddi_soft_state_free(state_list, instance);
+  return (DDI_FAILURE);
+  }
+  statep->cb_hdl = cb_hdl;
+  /* Select interrupt type */
+  ddi_intr_get_supported_types(dip, &types);
+  if (types & DDI_INTR_TYPE_MSIX) {
+  type = DDI_INTR_TYPE_MSIX;
+  } else if (types & DDI_INTR_TYPE_MSI) {
+  type = DDI_INTR_TYPE_MSI;
+  } else {
+  type = DDI_INTR_TYPE_FIXED;
+  }
+  statep->type = type;
+  /* Get number of supported interrupts */
+  ddi_intr_get_nintrs(dip, type, &nintrs);
+  /* Allocate interrupt handle array */
+  statep->hdls_size = nintrs * sizeof (ddi_intr_handle_t);
+  hdls = kmem_zalloc(statep->hdls_size, KMEM_SLEEP);
+  /* Allocate interrupt setup array */
+  statep->intrs_size = nintrs * sizeof (xx_intr_t);
+  statep->intrs = kmem_zalloc(statep->intrs_size, KMEM_SLEEP);
+  /* Allocate interrupt vectors */
+  ddi_intr_alloc(dip, hdls, type, 0, nintrs, &nactual, 0);
+  statep->nactual = nactual;
+  /* Configure interrupt handling */
+  xx_setup_interrupts(statep, nactual, statep->intrs);
+  /* Install and enable interrupt handlers */
+  for (inum = 0; inum < nactual; inum++) {
+  ddi_intr_add_handler(&statep->hdls[inum],
+  statep->intrs[inum].inthandler,
+  statep->intrs[inum].arg1,
+  statep->intrs[inum].arg2);
+  ddi_intr_enable(statep->hdls[inum]);
+  }
+  break;
+<beginning of page>
+  case DDI_RESUME:
+  /* Get soft state */
+  statep = ddi_get_soft_state(state_list, instance);
+  if (statep == NULL)
+  return (DDI_FAILURE);
+  /* Resume hardware */
+  xx_resume(statep);
+  break;
+  }
+  return (DDI_SUCESS);
+  }
+  /*
+  * detach(9F) routine.
+  *
+  * Stops the hardware, disables interrupt handling, unregisters
+  * a callback handler, and destroys the soft state for the driver.
+  */
+  xx_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
+  {
+  xx_state_t *statep = NULL;
+  int instance;
+  int inum;
+  /* Get device instance */
+  instance = ddi_get_instance(dip);
+  switch (cmd) {
+  case DDI_DETACH:
+  /* Get soft state */
+  statep = ddi_get_soft_state(state_list, instance);
+  if (statep == NULL)
+  return (DDI_FAILURE);
+  /* Stop device */
+  xx_uninitialize(statep);
+  /* Disable and free interrupts */
+  for (inum = 0; inum < statep->nactual; inum++) {
+  ddi_intr_disable(statep->hdls[inum]);
+  ddi_intr_remove_handler(statep->hdls[inum]);
+  ddi_intr_free(statep->hdls[inum]);
+  }
+  /* Unregister callback handler */
+  ddi_cb_unregister(statep->cb_hdl);
+  /* Free interrupt handle array */
+  kmem_free(statep->hdls, statep->hdls_size);
+  /* Free interrupt setup array */
+  kmem_free(statep->intrs, statep->intrs_size);
+  /* Free soft state */
+  ddi_soft_state_free(state_list, instance);
+  break;
+  case DDI_SUSPEND:
+<beginning of page>
+  /* Get soft state */
+  statep = ddi_get_soft_state(state_list, instance);
+  if (statep == NULL)
+  return (DDI_FAILURE);
+  /* Suspend hardware */
+  xx_quiesce(statep);
+  break;
+  }
+  return (DDI_SUCCESS);
+  }
+  /*
+  * (*ddi_cbfunc)() routine.
+  *
+  * Adapt interrupt usage when availability changes.
+  */
+  int
+  xx_cbfunc(dev_info_t *dip, ddi_cb_action_t cbaction, void *cbarg,
+  void *arg1, void *arg2)
+  {
+  xx_state_t *statep = (xx_state_t *)arg1;
+  int count;
+  int inum;
+  int nactual;
+  switch (cbaction) {
+  case DDI_CB_INTR_ADD:
+  case DDI_CB_INTR_REMOVE:
+  /* Get change in availability */
+  count = (int)(uintptr_t)cbarg;
+  /* Suspend hardware */
+  xx_quiesce(statep);
+  /* Tear down previous interrupt handling */
+  for (inum = 0; inum < statep->nactual; inum++) {
+  ddi_intr_disable(statep->hdls[inum]);
+  ddi_intr_remove_handler(statep->hdls[inum]);
+  }
+  /* Adjust interrupt vector allocations */
+  if (cbaction == DDI_CB_INTR_ADD) {
+  /* Allocate additional interrupt vectors */
+  ddi_intr_alloc(dip, statep->hdls, statep->type,
+  statep->nactual, count, &nactual, 0);
+  /* Update actual count of available interrupts */
+  statep->nactual += nactual;
+  } else {
+  /* Free removed interrupt vectors */
+  for (inum = statep->nactual - count;
+  inum < statep->nactual; inum++) {
+  ddi_intr_free(statep->hdls[inum]);
+  }
+  /* Update actual count of available interrupts */
+  statep->nactual -= count;
+  }
+<beginning of page>
+  /* Configure interrupt handling */
+  xx_setup_interrupts(statep, statep->nactual, statep->intrs);
+  /* Install and enable interrupt handlers */
+  for (inum = 0; inum < statep->nactual; inum++) {
+  ddi_intr_add_handler(&statep->hdls[inum],
+  statep->intrs[inum].inthandler,
+  statep->intrs[inum].arg1,
+  statep->intrs[inum].arg2);
+  ddi_intr_enable(statep->hdls[inum]);
+  }
+  /* Resume hardware */
+  xx_resume(statep);
+  break;
+  default:
+  return (DDI_ENOTSUP);
+  }
+  return (DDI_SUCCESS);
+  }
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stabili<hy>
+tyPrivate _ MT-LevelUnsafe
+attributes(5), ddi_intr_alloc(9F), ddi_intr_free(9F), ddi_intr_set_nreq(9F)
+Users of these interfaces that register for DDI_CB_FLAG_INTR become participants in interrupt resource manage<hy>
+ment. With that participation comes a responsibility to properly adjust interrupt usage. In the case of a DDI_CB_IN<hy>
+TR_ADD action, the system guarantees that a driver can allocate a total number of interrupt resources up to its new
+number of available interrupts. The total number of interrupt resources is the sum of all resources allocated by the
+function ddi_intr_alloc(9F), minus all previously released by the function ddi_intr_free(9F). In the case of a
+DDI_CB_INTR_REMOVE action, the driver might have more interrupts allocated than are now currently avail<hy>
+able. It is necessary for the driver to release the excess interrupts, or it will have a negative impact on the interrupt
+availability for other drivers in the system.
+A failure to release interrupts in response to a DDI_CB_INTR_REMOVE callback generates the following warn<hy>
+ing on the system console:
+ WARNING: <driver><instance>: failed to release interrupts for
+  IRM (nintrs = ##, navail=##).
+Participation in interrupt resource management ends when a driver uses the ddi_cb_unregister() function to unreg<hy>
+ister its callback function. The callback function must still operate properly until after the call to the ddi_cb_unreg<hy>
+ister() function completes. If addinterrupts were given to the driver because of its participation, then a final use of
+the callback function occurs to release the additional interrupts. The call to the ddi_cb_unregister() function blocks
+until the final use of the registered callback function is finished.

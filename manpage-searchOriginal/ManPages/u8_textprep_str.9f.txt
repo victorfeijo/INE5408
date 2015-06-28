@@ -1,0 +1,126 @@
+<beginning of page>
+u8_textprep_str <-> string-based UTF-8 text preparation function
+#include <sys/types.h>
+#include <sys/errno.h>
+#include <sys/sunddi.h>
+size_t u8_textprep_str(char *inarray, size_t *inlen,
+ char *outarray, size_t *outlen, int flag,
+ size_t unicode_version, int *errno);
+Solaris DDI specific (Solaris DDI)
+inarray A pointer to a byte array containing a sequence of UTF-8 character bytes to be prepared.
+inlen As input argument, the number of bytes to be prepared in inarray. As output argument, the number of bytes in
+inarray still not consumed.
+outarray A pointer to a byte array where prepared UTF-8 character bytes can be saved.
+outlen As input argument, the number of available bytes at outarray where prepared character bytes can be saved.
+As output argument, after the conversion, the number of bytes still available at outarray.
+flag The possible preparation options constructed by a bitwise-inclusive-OR of the following values:
+U8_TEXTPREP_IGNORE_NULL
+Normally u8_textprep_str() stops the preparation if it encounters null byte even if the current inlen is pointing to a
+value bigger than zero.
+With this option, null byte does not stop the preparation and the preparation continues until inlen specified amount
+of inarray bytes are all consumed for preparation or an error happened.
+U8_TEXTPREP_IGNORE_INVALID
+Normally u8_textprep_str() stops the preparation if it encounters illegal or incomplete characters with correspond<hy>
+ing errno values.
+When this option is set, u8_textprep_str() does not stop the preparation and instead treats such characters as no
+need to do any preparation.
+U8_TEXTPREP_TOUPPER
+Map lowercase characters to uppercase characters if applicable.
+U8_TEXTPREP_TOLOWER
+Map uppercase characters to lowercase characters if applicable.
+U8_TEXTPREP_NFD
+Apply Unicode Normalization Form D.
+U8_TEXTPREP_NFC
+Apply Unicode Normalization Form C.
+U8_TEXTPREP_NFKD
+Apply Unicode Normalization Form KD.
+<beginning of page>
+U8_TEXTPREP_NFKC
+Apply Unicode Normalization Form KC.
+Only one case folding option is allowed. Only one Unicode Normalization option is allowed.
+When a case folding option and a Unicode Normalization option are specified together, UTF-8 text preparation is
+done by doing case folding first and then Unicode Normalization.
+If no option is specified, no processing occurs except the simple copying of bytes from input to output.
+unicode_version The version of Unicode data that should be used during UTF-8 text preparation. The following val<hy>
+ues are supported:
+U8_UNICODE_320
+Use Unicode 3.2.0 data during comparison.
+U8_UNICODE_500
+Use Unicode 5.0.0 data during comparison.
+U8_UNICODE_LATEST
+Use the latest Unicode version data available which is Unicode 5.0.0 currently.
+errno The error value when preparation is not completed or fails. The following values are supported:
+E2BIG Text preparation stopped due to lack of space in the output array.
+EBADF Specified option values are conflicting and cannot be supported.
+EILSEQ Text preparation stopped due to an input byte that does not belong to UTF-8.
+EINVAL Text preparation stopped due to an incomplete UTF-8 character at the end of the input array.
+ERANGE The specified Unicode version value is not a supported version.
+The u8_textprep_str() function prepares the sequence of UTF-8 characters in the array specified by inarray into a
+sequence of corresponding UTF-8 characters prepared in the array specified by outarray. The inarray argument
+points to a character byte array to the first character in the input array and inlen indicates the number of bytes to the
+end of the array to be converted. The outarray argument points to a character byte array to the first available byte in
+the output array and outlen indicates the number of the available bytes to the end of the array. Unless flag is
+U8_TEXTPREP_IGNORE_NULL, u8_textprep_str() normally stops when it encounters a null byte from the in<hy>
+put array regardless of the current inlen value.
+If flag is U8_TEXTPREP_IGNORE_INVALID and a sequence of input bytes does not form a valid UTF-8 char<hy>
+acter, preparation stops after the previous successfully prepared character. If flag is U8_TEXTPREP_IG<hy>
+NORE_INVALID and the input array ends with an incomplete UTF-8 character, preparation stops after the previous
+successfully prepared bytes. If the output array is not large enough to hold the entire prepared text, preparation stops
+just prior to the input bytes that would cause the output array to overflow. The value pointed to by inlen is decre<hy>
+mented to reflect the number of bytes still not prepared in the input array. The value pointed to by outlen is decre<hy>
+mented to reflect the number of bytes still available in the output array.
+The u8_textprep_str() function updates the values pointed to by inlen and outlen arguments to reflect the extent of
+<beginning of page>
+the preparation. When U8_TEXTPREP_IGNORE_INVALID is specified, u8_textprep_str() returns the number
+of illegal or incomplete characters found during the text preparation. When U8_TEXTPREP_IGNORE_INVALID
+is not specified and the text preparation is successful, the function returns 0. If the entire string in the input array is
+prepared, the value pointed to by inlen will be 0. If the text preparation is stopped due to any conditions mentioned
+above, the value pointed to by inlen will be non-zero and errno is set to indicate the error. If such and any other error
+occurs, u8_textprep_str() returns (size_t)-1 and sets errno to indicate the error.
+The u8_textprep_str() function can be called from user or interrupt context. Example 1 Simple UTF-8 text prepa<hy>
+ration
+ #include <sys/types.h>
+ #include <sys/errno.h>
+ #include <sys/sunddi.h>
+ .
+ .
+ .
+ size_t ret;
+ char ib[MAXPATHLEN];
+ char ob[MAXPATHLEN];
+ size_t il, ol;
+ int err;
+ .
+ .
+ .
+ /*
+  * We got a UTF-8 pathname from somewhere.
+  *
+  * Calculate the length of input string including the terminating
+  * NULL byte and prepare other arguments.
+  */
+ (void) strlcpy(ib, pathname, MAXPATHLEN);
+ il = strlen(ib) + 1;
+ ol = MAXPATHLEN;
+ /*
+  * Do toupper case folding, apply Unicode Normalization Form D,
+  * ignore NULL byte, and ignore any illegal/incomplete characters.
+  */
+ ret = u8_textprep_str(ib, &il, ob, &ol,
+  (U8_TEXTPREP_IGNORE_NULL|U8_TEXTPREP_IGNORE_INVALID|
+  U8_TEXTPREP_TOUPPER|U8_TEXTPREP_NFD), U8_UNICODE_LATEST, &err);
+ if (ret == (size_t)-1) {
+  if (err == E2BIG)
+  return (-1);
+  if (err == EBADF)
+  return (-2);
+  if (err == ERANGE)
+  return (-3);
+  return (-4);
+ }
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed
+u8_strcmp(3C), u8_textprep_str(3C), u8_validate(3C), attributes(5), u8_strcmp(9F), u8_validate(9F),
+uconv_u16tou32(9F)
+The Unicode Standard (http://www.unicode.org)

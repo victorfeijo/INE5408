@@ -1,0 +1,82 @@
+<beginning of page>
+bufcall <-> call a function when a buffer becomes available
+#include <sys/types.h>
+#include <sys/stream.h>
+bufcall_id_t bufcall(size_t size, uint_t pri, void *funcvoid *arg,
+ void *arg);
+Architecture independent level 1 (DDI/DKI).
+size Number of bytes required for the buffer.
+pri Priority of the allocb(9F) allocation request (not used).
+func Function or driver routine to be called when a buffer becomes available.
+arg Argument to the function to be called when a buffer becomes available.
+The bufcall() function serves as a timeout(9F) call of indeterminate length. When a buffer allocation request fails,
+bufcall() can be used to schedule the routine func, to be called with the argument arg when a buffer becomes avail<hy>
+able. func may call allocb() or it may do something else.
+If successful, bufcall() returns a bufcall ID that can be used in a call to unbufcall() to cancel the request. If the buf<hy>
+call() scheduling fails, func is never called and 0 is returned.
+The bufcall() function can be called from user, interrupt, or kernel context. Example 1 Calling a function when a
+buffer becomes available:
+The purpose of this srv(9E) service routine is to add a header to all M_DATA messages. Service routines must
+process all messages on their queues before returning, or arrange to be rescheduled
+While there are messages to be processed (line 13), check to see if it is a high priority message or a normal priority
+message that can be sent on (line 14). Normal priority message that cannot be sent are put back on the message
+queue (line 34). If the message was a high priority one, or if it was normal priority and canputnext(9F) succeeded,
+then send all but M_DATA messages to the next module with putnext(9F) (line 16).
+For M_DATA messages, try to allocate a buffer large enough to hold the header (line 18). If no such buffer is avail<hy>
+able, the service routine must be rescheduled for a time when a buffer is available. The original message is put back
+on the queue (line 20) and bufcall (line 21) is used to attempt the rescheduling. It will succeed if the rescheduling
+succeeds, indicating that qenable will be called subsequently with the argument q once a buffer of the specified size
+(sizeof (struct hdr)) becomes available. If it does, qenable(9F) will put q on the list of queues to have their service
+routines called. If bufcall() fails, timeout(9F) (line 22) is used to try again in about a half second.
+If the buffer allocation was successful, initialize the header (lines 25-28), make the message type M_PROTO (line
+29), link the M_DATA message to it (line 30), and pass it on (line 31).
+Note that this example ignores the bookkeeping needed to handle bufcall() and timeout(9F) cancellation for ones
+that are still outstanding at close time.
+  1 struct hdr {
+  2 unsigned int h_size;
+  3 int h_version;
+  4 };
+  5
+  6 void xxxsrv(q)
+<beginning of page>
+  7 queue_t *q;
+  8 {
+  9 mblk_t *bp;
+ 10 mblk_t *mp;
+ 11 struct hdr *hp;
+ 12
+ 13 while ((mp = getq(q)) != NULL) { /* get next message */
+ 14 if (mp->b_datap->db_type >= QPCTL || /* if high priority */
+  canputnext(q)) { /* normal & can be passed */
+ 15 if (mp->b_datap->db_type != M_DATA)
+ 16 putnext(q, mp); /* send all but M_DATA */
+ 17 else {
+ 18 bp = allocb(sizeof(struct hdr), BPRI_LO);
+ 19 if (bp == NULL) { /* if unsuccessful */
+ 20 putbq(q, mp); /* put it back */
+ 21 if (!bufcall(sizeof(struct hdr), BPRI_LO,
+  qenable, q)) /* try to reschedule */
+ 22 timeout(qenable, q, drv_usectohz(500000));
+ 23 return (0);
+ 24 }
+ 25 hp = (struct hdr *)bp->b_wptr;
+ 26 hp->h_size = msgdsize(mp); /* initialize header */
+ 27 hp->h_version = 1;
+ 28 bp->b_wptr += sizeof(struct hdr);
+ 29 bp->b_datap->db_type = M_PROTO;/* make M_PROTO */
+ 30 bp->b_cont = mp; /* link it */
+ 31 putnext(q, bp); /* pass it on */
+ 32 }
+ 33 } else { /* normal priority, canputnext failed */
+ 34 putbq(q, mp); /* put back on the message queue */
+ 35 return (0);
+ 36 }
+ 37 }
+  return (0);
+ 38 }
+srv(9E), allocb(9F), canputnext(9F), esballoc(9F), esbbcall(9F), putnext(9F), qenable(9F), testb(9F), time<hy>
+out(9F), unbufcall(9F)
+Writing Device Drivers
+STREAMS Programming Guide
+Even when func is called by bufcall(), allocb(9F) can fail if another module or driver had allocated the memory be<hy>
+fore func was able to call allocb(9F).

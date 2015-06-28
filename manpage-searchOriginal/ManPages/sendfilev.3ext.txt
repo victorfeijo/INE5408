@@ -1,0 +1,86 @@
+<beginning of page>
+sendfilev <-> send a file
+cc [ flag... ] file... -lsendfile [ library... ]
+#include <sys/sendfile.h>
+ssize_t sendfilev(int fildes, const struct sendfilevec *vec,
+ int sfvcnt, size_t *xferred);
+The sendfilev() function supports the following parameters:
+fildes A file descriptor to a regular file or to a AF_NCA, AF_INET, or AF_INET6 family type SOCK_STREAM
+socket that is open for writing. For AF_NCA, the protocol type should be zero.
+vec An array of SENDFILEVEC_T, as defined in the sendfilevec structure above.
+sfvcnt The number of members in vec.
+xferred The total number of bytes written to out_fd.
+The sendfilev() function attempts to write data from the sfvcnt buffers specified by the members of vec array: vec[0],
+vec[1], ... , vec[sfvcnt-1]. The fildes argument is a file descriptor to a regular file or to an AF_NCA, AF_INET, or
+AF_INET6 family type SOCK_STREAM socket that is open for writing.
+This function is analogous to writev(2), but can read from both buffers and file descriptors. Unlike writev(), in the
+case of multiple writers to a file the effect of sendfilev() is not necessarily atomic; the writes may be interleaved. Ap<hy>
+plication-specific synchronization methods must be employed if this causes problems.
+The following is the sendfilevec structure:
+ typedef struct sendfilevec {
+  int sfv_fd; /* input fd */
+  uint_t sfv_flag; /* Flags. see below */
+  off_t sfv_off; /* offset to start reading from */
+  size_t sfv_len; /* amount of data */
+ } sendfilevec_t;
+ #define SFV_FD_SELF (-2)
+To send a file, open the file for reading and point sfv_fd to the file descriptor returned as a result. See open(2).
+sfv_off should contain the offset within the file. sfv_len should have the length of the file to be transferred.
+The xferred argument is updated to record the total number of bytes written to out_fd.
+The sfv_flag field is reserved and should be set to zero.
+To send data directly from the address space of the process, set sfv_fd to SFV_FD_SELF. sfv_off should point to
+the data, with sfv_len containing the length of the buffer.
+Upon successful completion, the sendfilev() function returns total number of bytes written to out_fd. Otherwise, it
+returns -1, and errno is set to indicate the error. The xferred argument contains the amount of data successfuly trans<hy>
+ferred, which can be used to discover the error vector.
+EACCES The process does not have appropriate privileges or one of the files pointed by sfv_fd does not have ap<hy>
+propriate permissions.
+EAFNOSUPPORT The implementation does not support the specified address family for socket.
+EAGAIN Mandatory file or record locking is set on either the file descriptor or output file descriptor if it points at
+regular files. O_NDELAY or O_NONBLOCK is set, and there is a blocking record lock. An attempt has been made
+<beginning of page>
+to write to a stream that cannot accept data with the O_NDELAY or the O_NONBLOCK flag set.
+EBADF The fildes argument is not a valid descriptor open for writing or an sfv_fd is invalid or not open for reading.
+EFAULT The vec argument points to an illegal address.
+The xferred argument points to an illegal address.
+EINTR A signal was caught during the write operation and no data was transferred.
+EINVAL The sfvcnt argument was less than or equal to 0. One of the sfv_len values in vec array was less than or
+equal to 0, or greater than the file size. An sfv_fd is not seekable.
+Fewer bytes were transferred than were requested.
+EIO An I/O error occurred while accessing the file system.
+EPIPE The fildes argument is a socket that has been shut down for writing.
+EPROTOTYPE The socket type is not supported.
+The sendfilev() function has a transitional interface for 64-bit file offsets. See lf64(5).
+The following example sends 2 vectors, one of HEADER data and a file of length 100 over sockfd. sockfd is in a
+connected state, that is, socket(), accept(), and bind() operation are complete.
+ #include <sys/sendfile.h>
+ .
+ .
+ .
+ int
+ main (int argc, char *argv[]){
+  int sockfd;
+  ssize_t ret;
+  size_t xfer;
+  struct sendfilevec vec[2];
+  .
+  .
+  .
+  vec[0].sfv_fd = SFV_FD_SELF;
+  vec[0].sfv_flag = 0;
+  vec[0].sfv_off = "HEADER_DATA";
+  vec[0].sfv_len = strlen("HEADER_DATA");
+  vec[1].sfv_fd = open("input_file",.... );
+  vec[1].sfv_flag = 0;
+  vec[1].sfv_off = 0;
+  vec[1].sfv_len = 100;
+  ret = sendfilev(sockfd, vec, 2, &xfer);
+ .
+ .
+ .
+ }
+See attributes(5) for descriptions of the following attributes:
+<beginning of page>
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed _ MT-LevelMT-Safe
+open(2), writev(2), libsendfile(3LIB), sendfile(3EXT), socket(3SOCKET), attributes(5)

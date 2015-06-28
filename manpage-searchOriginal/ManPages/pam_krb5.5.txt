@@ -1,0 +1,188 @@
+<beginning of page>
+pam_krb5 <-> authentication, account, session, and password management PAM modules for Kerberos V5
+/usr/lib/security/pam_krb5.so.1
+The Kerberos V5 service module for PAM provides functionality for all four PAM modules: authentication, account
+management, session management, and password management. The service module is a shared object that can be
+dynamically loaded to provide the necessary functionality upon demand. Its path is specified in the PAM configura<hy>
+tion file.
+The Kerberos V5 authentication component provides functions to verify the identity of a user, pam_sm_authenti<hy>
+cate(), and to manage the Kerberos credentials cache, pam_sm_setcred().
+pam_sm_authenticate() authenticates a user principal through the Kerberos authentication service. If the authenti<hy>
+cation request is successful, the authentication service sends a ticket-granting ticket (TGT) back to the service mod<hy>
+ule, which then verifies that the TGT came from a valid Key Distribution Center (KDC) by attempting to get a ser<hy>
+vice ticket for the local host service. For this to succeed, the local host's keytab file (/etc/krb5/krb5.keytab) must
+contain the entry for the local host service. For example, in the file host/hostname.com@REALM, hostname.com is
+the fully qualified local hostname and REALM is the default realm of the local host as defined in
+/etc/krb5/krb5.conf. If the host entry is not found in the keytab file, the authentication fails. Administrators may op<hy>
+tionally disable this "strict" verification by setting "verify_ap_req_nofail = false" in /etc/krb5/krb5.conf. See
+krb5.conf(4) for more details on this option. This allows TGT verification to succeed in the absence of a keytab
+host principal entry.
+pam_sm_authenticate(3PAM) may be passed the following flag:
+PAM_DISALLOW_NULL_AUTHTOK
+This flag is ignored. The Kerberos authentication mechanism will not allow an empty password string by default.
+pam_sm_setcred() creates and modifies the user's credential cache. This function initializes the user's credential
+cache, if it does not already exist, and stores the initial credentials for later use by Kerberized network applications.
+The following flags may be set in the flags field. They are best described by their effect on the user's credential
+cache.
+PAM_ESTABLISH_CRED
+Stores the initial credentials in the user's credential cache so that the user may access Kerberos network services. If a
+successful authentication pass was made, the new credentials are stored in the credential cache, overwriting any ex<hy>
+isting credentials that were previously stored. If an unsuccessful authentication pass was made, PAM_CRED_UN<hy>
+AVAIL is returned.
+PAM_DELETE_CRED
+This flag has no effect on the credential cache and always returns PAM_SUCCESS. The credential cache is not
+deleted because there is no accurate method to determine if the credentials are needed by another process. The cre<hy>
+dential cache may be deleted with the kdestroy(1) command.
+PAM_REINITIALIZE_CRED
+Deletes the user's existing credential cache, if it exists, and creates a new credential cache. The new credentials are
+stored in the new cache and the user's ticket lifetime and renewable life time values are reset.
+PAM_REFRESH_CRED
+Does not require a previous authentication pass, but if a successful one is made, the new credentials are stored in the
+credential cache. If a previous authentication pass was not made or was unsuccessful, an attempt to renew the exist<hy>
+ing credentials is made. Note that this function fails if the user's renewable ticket lifetime is expired.
+The following options can be passed to the Kerberos V5 authentication module:
+debug Provides syslog(3C) debugging information at LOG_DEBUG level.
+<beginning of page>
+nowarn Turns off warning messages.
+The Kerberos account management component provides a function to perform account management, pam_sm_ac<hy>
+ct_mgmt(). This function checks to see if the pam_krb5 authentication module has noted that the user's password
+has not expired. The following options may be passed in to the Kerberos V5 account management module:
+debug Provides syslog(3C) debugging information at LOG_DEBUG level
+nowarn Turns off warning messages. Also, does not query KDC for impending password expiration information
+used to warn the user.
+The Kerberos V5 session management component provides functions to initiate pam_sm_open_session() and termi<hy>
+nate pam_sm_close_session() Kerberos sessions. For Kerberos V5, both pam_sm_open_session and
+pam_sm_close_session() are null functions, returning PAM_IGNORE.
+The Kerberos V5 password management component provides a function to change passwords, pam_sm_chauth<hy>
+tok(), in the Key Distribution Center (KDC) database. The following flags may be passed to pam_sm_chauth<hy>
+tok(3PAM):
+PAM_CHANGE_EXPIRED_AUTHTOK
+The password service should only update the user's Kerberos password if it is expired. Otherwise, this function re<hy>
+turns PAM_IGNORE. The default behaviour is to always change the user's Kerberos password.
+PAM_PRELIM_CHECK
+This is a null function that always returns PAM_IGNORE.
+PAM_UPDATE_AUTHTOK
+This flag is necessary to change the user's Kerberos password. If this flag is not set, pam_krb5 returns PAM_SYS<hy>
+TEM_ERR.
+The following option can be passed to the Kerberos V5 password module:
+debug Provides syslog(3C) debugging information at LOG_DEBUG level.
+The following error codes are returned for pam_sm_authenticate():
+PAM_AUTH_ERR Authentication failure
+PAM_BUF_ERR Memory buffer error.
+PAM_IGNORE The user is "root" and the root key exists in the default keytab.
+PAM_SUCCESS Successfully obtained Kerberos credentials .
+PAM_SYSTEM_ERR System error.
+PAM_USER_UNKNOWN An unknown Kerberos principal was requested.
+The following error codes are returned for pam_sm_setcred():
+<beginning of page>
+PAM_AUTH_ERR Authentication failure.
+PAM_BUF_ERR Memory buffer error.
+PAM_IGNORE The user is "root" and the root key exists in the default keytab.
+PAM_SYSTEM_ERR System error.
+PAM_SUCCESS Successfully modified the Kerberos credential cache.
+The following error codes are returned for pam_sm_acct_mgmt():
+PAM_AUTH_ERR Authentication failure.
+PAM_IGNORE Kerberos service module pam_sm_authenticate() was never called, or the user is "root" and the
+root key exists in the default keytab.
+PAM_NEW_AUTHTOK_REQD Obtain new authentication token from the user.
+PAM_SERVICE_ERR Error in underlying service module.
+PAM_SUCCESS Kerberos principal account is valid.
+PAM_SYSTEM_ERR System error.
+PAM_USER_UNKNOWN An unknown Kerberos principal was requested.
+The following error code is returned for pam_sm_open_session() and pam_sm_close_session():
+PAM_IGNORE These two functions are null functions in pam_krb5:
+The following error codes are returned for pam_sm_chauthtok():
+PAM_AUTH_ERR Authentication failure.
+PAM_IGNORE The user has not been authenticated by Kerberos service module pam_sm_authenticate(), or the
+user is "root" and the root key exists in the default keytab.
+PAM_NEW_AUTHTOK_REQD User's Kerberos password has expired.
+PAM_SERVICE_ERR Error in module. At least one input parameter is missing.
+PAM_SYSTEM_ERR System error.
+PAM_USER_UNKNOWN An unknown Kerberos principal was requested.
+<beginning of page>
+PAM_SUCCESS Successfully changed the user's Kerberos password.
+Example 1 Authenticate Users Through Kerberos as First Choice
+The following is an excerpt of a sample pam.conf configuration file that authenticates users through the Kerberos
+authentication service and authenticates through the Unix login only if the Kerberos authentication fails. This ar<hy>
+rangement is helpful when a majority of the users are networked by means of Kerberos and when there are only a
+few non-Kerberos type user accounts, such as root. The service illustrated below is for dtlogin.
+ dtlogin auth requisite pam_smartcard.so.1
+ dtlogin auth requisite pam_authtok_get.so.1
+ dtlogin auth required pam_dhkeys.so.1
+ dtlogin auth required pam_unix_cred.so.1
+ dtlogin auth sufficient pam_krb5.so.1
+ dtlogin auth required pam_unix_auth.so.1
+Note that these changes should not be made to the existing krlogin, krsh, and ktelnet service entries. Those services
+require Kerberos authentication, so using a seemingly sufficient control flag would not provide the necessary func<hy>
+tionality for privacy and integrity. There should be no need to change those entries.
+The following entries check for password expiration when dealing with Kerberos and Unix password aging policies:
+ other account requisite pam_roles.so.1
+ other account required pam_unix_account.so.1
+ other account required pam_krb5.so.1
+The following entries would change the Kerberos password of the user and continue to change the Unix login pass<hy>
+word only if the Kerberos password change had failed:
+ other password required pam_dhkeys.so.1
+ other password requisite pam_authtok_get.so.1
+ other password requisite pam_authtok_check.so.1
+ other password sufficient pam_krb5.so.1
+ other password required pam_authtok_store.so.1
+When changing Kerberos based user's password, use kpasswd(1). When changing a non-Kerberos user's password,
+it is recommended that the repository is specified (-r) with the passwd(1) command.
+Example 2 Authenticate Users Through Kerberos Only
+The following example allows authentication only to users that have Kerberos-based accounts.
+ dtlogin auth requisite pam_smartcard.so.1
+ dtlogin auth requisite pam_authtok_get.so.1
+ dtlogin auth required pam_dhkeys.so.1
+ dtlogin auth required pam_unix_cred.so.1
+ dtlogin auth binding pam_krb5.so.1
+ dtlogin auth required pam_unix_auth.so.1
+Typically, you would have another service specified in the pam.conf file that would allow local users, such as data<hy>
+base, web server, system administrator accounts, to log in to the host machine. For example, the service name "lo<hy>
+gin" could be used for these users. Note that these users should not belong to any roles.
+The rest of the module types look similar to that shown in the previous example:
+<beginning of page>
+ other account requisite pam_roles.so.1
+ other account required pam_unix_account.so.1
+ other account required pam_krb5.so.1
+With binding specified in the following, it is important that non-Kerberos users specify the repository in which they
+reside using the -r option with the passwd(1) command. This configuration is also based on the assumptions that:
+<bu> Kerberos users maintain only their Kerberos passwords; <bu> changing their Unix password is not necessary, given that
+they are authenticated only through their Kerberos passwords when logging in.
+ other password required pam_dhkeys.so.1
+ other password requisite pam_authtok_get.so.1
+ other password requisite pam_authtok_check.so.1
+ other password binding pam_krb5.so.1
+ other password required pam_authtok_store.so.1
+Example 3 Authenticate Through Kerberos Optionally
+This configuration is helpful when the majority of users are non-Kerberos users and would like to authenticate
+through Kerberos if they happened to exist in the Kerberos database. The effect of this is similar to users voluntarily
+executing kinit(1) after they have successfully logged in:
+ dtlogin auth requisite pam_smartcard.so.1
+ dtlogin auth requisite pam_authtok_get.so.1
+ dtlogin auth required pam_dhkeys.so.1
+ dtlogin auth required pam_unix_cred.so.1
+ dtlogin auth required pam_unix_auth.so.1
+ dtlogin auth optional pam_krb5.so.1
+The rest of the configuration is as follows:
+ other account requisite pam_roles.so.1
+ other account required pam_unix_account.so.1
+ other account required pam_krb5.so.1
+ other password required pam_dhkeys.so.1
+ other password requisite pam_authtok_get.so.1
+ other password requisite pam_authtok_check.so.1
+ other password required pam_authtok_store.so.1
+ other password optional pam_krb5.so.1
+Non-Kerberos users should specify their respective repositories by using the -r option when changing their password
+with the passwd(1) command.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stabili<hy>
+tyEvolving
+kdestroy(1), kinit(1), kpasswd(1), passwd(1), ktkt_warnd(1M), libpam(3LIB), pam(3PAM), pam_sm(3PAM),
+pam_sm_acct_mgmt(3PAM), pam_sm_authenticate(3PAM), pam_sm_chauthtok(3PAM), pam_sm_close_ses<hy>
+sion(3PAM), pam_sm_open_session(3PAM), pam_sm_setcred(3PAM), syslog(3C), pam.conf(4), attributes(5),
+kerberos(5), krb5envvar(5)
+The interfaces in libpam(3LIB) are MT-Safe only if each thread within the multi-threaded application uses its own
+PAM handle.
+<beginning of page>
+On successful acquisition of initial credentials (ticket-granting ticket), ktkt_warnd(1M) will be notified, to alert the
+user when the initial credentials are about to expire.

@@ -1,0 +1,89 @@
+<beginning of page>
+mount <-> mount a file system
+#include <sys/types.h>
+#include <sys/mount.h>
+#include <sys/mntent.h>
+int mount(const char *spec, const char *dir, int mflag,
+ char *fstype, char *dataptr,int datalen, char *optptr,
+ int optlen);
+The mount() function requests that a removable file system contained on the block special file identified by spec be
+mounted on the directory identified by dir. The spec and dir arguments are pointers to path names.
+After a successful call to mount(), all references to the file dir refer to the root directory on the mounted file system.
+The mounted file system is inserted into the kernel list of all mounted file systems. This list can be examined through
+the mounted file system table (see mnttab(4)).
+The fstype argument is the file system type name. Standard file system names are defined with the prefix MNT<hy>
+TYPE_ in <sys/mntent.h>. If neither MS_DATA nor MS_OPTIONSTR is set in mflag, then fstype is ignored and
+the type of the root file system is assumed.
+The dataptr argument is 0 if no file system-specific data is to be passed; otherwise it points to an area of size datalen
+that contains the file system-specific data for this mount and the MS_DATA flag should be set.
+If the MS_OPTIONSTR flag is set, then optptr points to a buffer containing the list of options to be used for this
+mount. The optlen argument specifies the length of the buffer. On completion of the mount() call, the options in ef<hy>
+fect for the mounted file system are returned in this buffer. If MS_OPTIONSTR is not specified, then the options
+for this mount will not appear in the mounted file systems table.
+If the caller does not have all privileges available in the current zone, the nosuid option is automatically set on the
+mount point. The restrict option is automatically added for autofs mounts.
+If the caller is not in the global zone, the nodevices option is automatically set.
+The mflag argument is constructed by a bitwise-inclusive-OR of flags from the following list, defined in
+<sys/mount.h>.
+MS_DATA The dataptr and datalen arguments describe a block of file system-specific binary data at address datap<hy>
+tr of length datalen. This is interpreted by file system-specific code within the operating system and its format de<hy>
+pends on the file system type. If a particular file system type does not require this data, dataptr and datalen should
+both be 0.
+MS_GLOBAL Mount a file system globally if the system is configured and booted as part of a cluster (see clin<hy>
+fo(1M)).
+MS_NOSUID Prevent programs that are marked set-user-ID or set-group-ID from executing (see chmod(1)). It also
+causes open(2) to return ENXIO when attempting to open block or character special files.
+MS_OPTIONSTR The optptr and optlen arguments describe a character buffer at address optptr of size optlen.
+When calling mount(), the character buffer should contain a null-terminated string of options to be passed to the file
+system-specific code within the operating system. On a successful return, the file system-specific code will return the
+list of options recognized. Unrecognized options are ignored. The format of the string is a list of option names sepa<hy>
+rated by commas. Options that have values (rather than binary options such as suid or nosuid), are separated by "="
+such as dev=2c4046c. Standard option names are defined in <sys/mntent.h>. Only strings defined in the "C" locale
+are supported. The maximum length option string that can be passed to or returned from a mount() call is defined by
+the MAX_MNTOPT_STR constant. The buffer should be long enough to contain more options than were passed
+in, as the state of any default options that were not passed in the input option string may also be returned in the rec<hy>
+ognized options list that is returned.
+MS_OVERLAY Allow the file system to be mounted over an existing file system mounted on dir, making the un<hy>
+derlying file system inaccessible. If a mount is attempted on a pre-existing mount point without setting this flag, the
+mount will fail.
+<beginning of page>
+MS_RDONLY Mount the file system for reading only. This flag should also be specified for file systems that are in<hy>
+capable of writing (for example, CDROM). Without this flag, writing is permitted according to individual file acces<hy>
+sibility.
+MS_REMOUNT Remount a read-only file system as read-write.
+Upon successful completion, 0 is returned. Otherwise, <mi>1 is returned and errno is set to indicate the error.
+The mount() function will fail if:
+EACCES The permission bits of the mount point do not permit read/write access or search permission is denied on
+a component of the path prefix.
+The calling process is not the owner of the mountpoint.
+The mountpoint is not a regular file or a directory and the caller does not have all privileges available in a its zone.
+The special device device does not permit read access in the case of read-only mounts or read-write access in the
+case of read/write mounts.
+EBUSY The dir argument is currently mounted on, is someone's current working directory, or is otherwise busy; or
+the device associated with spec is currently mounted.
+EFAULT The spec, dir, fstype, dataptr, or optptr argument points outside the allocated address space of the process.
+EINVAL The super block has an invalid magic number, the fstype is invalid, or dir is not an absolute path.
+ELOOP Too many symbolic links were encountered in translating spec or dir.
+ENAMETOOLONG The length of the path argument exceeds PATH_MAX, or the length of a path component ex<hy>
+ceeds NAME_MAX while _POSIX_NO_TRUNC is in effect.
+ENOENT None of the named files exists or is a null pathname.
+ENOLINK The path argument points to a remote machine and the link to that machine is no longer active.
+ENOSPC The file system state in the super-block is not FsOKAY and mflag requests write permission.
+ENOTBLK The spec argument is not a block special device.
+ENOTDIR The dir argument is not a directory, or a component of a path prefix is not a directory.
+ENOTSUP A global mount is attempted (the MS_GLOBAL flag is set in mflag) on a machine which is not booted
+as a cluster; a local mount is attempted and dir is within a globally mounted file system; or a remount was attempted
+on a file system that does not support remounting.
+ENXIO The device associated with spec does not exist.
+<beginning of page>
+EOVERFLOW The length of the option string to be returned in the optptr argument exceeds the size of the buffer
+specified by optlen.
+EPERM The {PRIV_SYS_MOUNT} privilege is not asserted in the effective set of the calling process.
+EREMOTE The spec argument is remote and cannot be mounted.
+EROFS The spec argument is write protected and mflag requests write permission.
+The mount() function can be invoked only by processes with appropriate privileges.
+mount(1M), umount(2), mnttab(4)
+MS_OPTIONSTR-type option strings should be used.
+Some flag bits set file system options that can also be passed in an option string. Options are first set from the option
+string with the last setting of an option in the string determining the value to be set by the option string. Any options
+controlled by flags are then applied, overriding any value set by the option string.

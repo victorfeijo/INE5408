@@ -1,0 +1,92 @@
+<beginning of page>
+metarename <-> rename metadevice or switch layered metadevice names
+/usr/sbin/metarename [-s setname] metadevice1 metadevice2
+/usr/sbin/metarename [-s setname] [-f] -x metadevice1 metadevice2
+/usr/sbin/metarename -h
+There are two ways to use metarename, one with and one without the -x option. The first method (without -x) re<hy>
+names an existing metadevice to a new name. This makes managing the metadevice namespace easier. The metade<hy>
+vice being renamed cannot be mounted or open, nor can the new name already exist. For example, to rename a
+metadevice that contains a mounted file system, you would first need to unmount the file system.
+With the second way to use metarename, using the -x option, metarename switches (exchanges) the names of an
+existing layered metadevice and one of its subdevices. In Solaris Volume Manager terms, a layered metadevice can
+be either a mirror or a trans metadevice. The -x option enables you to switch the metadevice names of a mirror and
+one of its submirrors, or a trans metadevice and its master device.
+metarename -x makes it easier to mirror or unmirror an existing stripe or concatenation, and to remove a trans de<hy>
+vice.
+When used to mirror an existing stripe or concatenatation, you must stop access to the device. For example, if the
+device contains a mounted file system, you must first unmount the file system before doing the rename.
+You can also use the metarename -x command to untrans a trans metadevice from an existing device. This applies
+only to the master device. You cannot remove a logging device with metarename. Before you can rename a trans
+device, you must detach the logging device. Then you must stop access to the trans metadevice itself.
+You cannot rename or switch metadevices that are in an error state or that have subcomponents in an error state, or
+metadevices actively using a hot spare replacement.
+You can only switch metadevices that have a direct child/parent relationship. You could not, for example, directly
+exchange a stripe in a mirror that is a master device with the trans metadevice.
+You must use the -f flag when switching members of a trans metadevice.
+Only metadevices can be switched, not slices.
+The following options are supported:
+-f Force the switching of trans metadevice members.
+-h Display a help message.
+-s setname Specifies the name of the diskset on which metarename will work. Using the -s option will cause the
+command to perform its administrative function within the specified diskset. Without this option, the command will
+perform its function on the local metadevices.
+-x Exchange the metadevice names metadevice1 and metadevice2.
+metadevice1 Specifies the metadevice to be renamed or switched.
+metadevice2 Specifies the target metadevice name for the rename or switch operation.
+Example 1 Renaming a Metadevice
+This example renames a metadevice named d10 to account_records. Note that account_records must not exist for
+the rename to succeed.
+ # metarename d10 account_records
+<beginning of page>
+Example 2 Creating a Two-Way Mirror
+This example creates a two-way mirror from an existing stripe named d1 with a mounted file system, /home2.
+ # metainit d2 1 1 c13d0s1
+ # metainit -f d20 -m d1
+ # umount /home2
+ # metarename -x d20 d1
+ # metattach d1 d2
+ # mount /home2
+First, a second concatenation d2, is created. (d1 already exists.) The metainit command creates a one-way mirror,
+d20, from d1. Next, you umount the file system and switch d1 for d20, making d1 the top-level device (mirror). You
+attach the second submirror, d2, to create a two-way mirror. Lastly, you remount the file system.
+Example 3 Mounting a Mirrored File System on Stripe
+This example takes an existing mirror named d1 with a mounted file system, and ends up with the file system
+mounted on a stripe d1.
+ # umount /fs2
+ # metarename -x d1 d20
+ # metadetach d20 d1
+ # metaclear -r d20
+ # mount /fs2
+First, you unmount the file system, then switch the mirror d1 and its submirror d20. This makes the mirror into d20.
+Next, you detach d1 from d20, then delete the mirror d20 and its other submirror. You then remount the file system.
+Example 4 Deleting a Trans Metadevice
+This example deletes a trans metadevice named d10 while its mount point is /myhome. The master device, which is
+a stripe, is named d2. The logging device, also a stripe, is named d5.
+ # umount /myhome
+ # metadetach d10
+ # metarename -f -x d10 d2
+ # metaclear d2
+ # metaclear d5
+ # fsck /dev/md/dsk/d10
+ # mount /myhome
+You umount the file system first, then detach the trans metadevice's logging device. The trans metadevice is
+switched with the master device, making the trans metadevice d2 and the underlying stripe d10. You clear the trans
+metadevice d2 and the logging device d5. d10 must be fsck'd, and then the file system is remounted.
+The following exit values are returned:
+0 Successful completion.
+>0 An error occurred.
+<beginning of page>
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wmdu _ Interface StabilityStable
+mdmonitord(1M), metaclear(1M), metadb(1M), metadetach(1M), metahs(1M), metainit(1M), metaoffline(1M),
+metaonline(1M), metaparam(1M), metarecover(1M), metareplace(1M), metaroot(1M), metaset(1M), metas<hy>
+sist(1M), metastat(1M), metasync(1M), metattach(1M), md.tab(4), md.cf(4), mddb.cf(4), md.tab(4), at<hy>
+tributes(5), md(7D)
+
+Renaming and exchanging metadevice names can only be used for metadevices. A physical slice cannot be renamed
+to a metadevice, nor can a metadevice be exchanged with a physical slice name.
+Metadevice names are strings of the pattern d<xyz> where xyz is a value between 0 and 8192. You cannot use logical
+names for metadevices.
+Trans metadevices have been replaced by UFS logging. Existing trans devices are not logging--they pass data direct<hy>
+ly through to the underlying device. See mount_ufs(1M) for more information about UFS logging.

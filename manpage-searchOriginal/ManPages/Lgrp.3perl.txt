@@ -1,0 +1,328 @@
+<beginning of page>
+Lgrp <-> Perl interface to Solaris liblgrp library
+use Sun::Solaris::Lgrp qw(:ALL);
+# initialize lgroup interface
+my $cookie = lgrp_init(LGRP_VIEW_OS | LGRP_VIEW_CALLER);
+my $l = Sun::Solaris::Lgrp->new(LGRP_VIEW_OS |
+ LGRP_VIEW_CALLER);
+my $version = lgrp_version(LGRP_VER_CURRENT | LGRP_VER_NONE);
+$version = $l->version(LGRP_VER_CURRENT | LGRP_VER_NONE);
+$home = lgrp_home(P_PID, P_MYID);
+$home = l->home(P_PID, P_MYID);
+lgrp_affinity_set(P_PID, $pid, $lgrp,
+ LGRP_AFF_STRONG | LGRP_AFF_WEAK | LGRP_AFF_NONE);
+$l->affinity_set(P_PID, $pid, $lgrp,
+ LGRP_AFF_STRONG | LGRP_AFF_WEAK | LGRP_AFF_NONE);
+my $affinity = lgrp_affinity_get(P_PID, $pid, $lgrp);
+$affinity = $l->affinity_get(P_PID, $pid, $lgrp);
+my $nlgrps = lgrp_nlgrps($cookie);
+$nlgrps = $l->nlgrps();
+my $root = lgrp_root($cookie);
+$root = l->root();
+$latency = lgrp_latency($lgrp1, $lgrp2);
+$latency = $l->latency($lgrp1, $lgrp2);
+my @children = lgrp_children($cookie, $lgrp);
+@children = l->children($lgrp);
+my @parents = lgrp_parents($cookie, $lgrp);
+@parents = l->parents($lgrp);
+my @lgrps = lgrp_lgrps($cookie);
+@lgrps = l->lgrps();
+@lgrps = lgrp_lgrps($cookie, $lgrp);
+@lgrps = l->lgrps($lgrp);
+my @leaves = lgrp_leaves($cookie);
+@leaves = l->leaves();
+my $is_leaf = lgrp_isleaf($cookie, $lgrp);
+$is_leaf = $l->is_leaf($lgrp);
+my @cpus = lgrp_cpus($cookie, $lgrp,
+ LGRP_CONTENT_HIERARCHY | LGRP_CONTENT_DIRECT);
+@cpus = l->cpus($lgrp, LGRP_CONTENT_HIERARCHY |
+ LGRP_CONTENT_DIRECT);
+my $memsize = lgrp_mem_size($cookie, $lgrp,
+ LGRP_MEM_SZ_INSTALLED | LGRP_MEM_SZ_FREE,
+ LGRP_CONTENT_HIERARCHY | LGRP_CONTENT_DIRECT);
+$memsize = l->mem_size($lgrp,
+ LGRP_MEM_SZ_INSTALLED | LGRP_MEM_SZ_FREE,
+ LGRP_CONTENT_HIERARCHY | LGRP_CONTENT_DIRECT);
+my $is_stale = lgrp_cookie_stale($cookie);
+$stale = l->stale();
+lgrp_fini($cookie);
+<beginning of page>
+# The following is available for API version greater than 1:
+my @lgrps = lgrp_resources($cookie, $lgrp, LGRP_RSRC_CPU);
+# Get latencies from cookie
+$latency = lgrp_latency_cookie($cookie, $from, $to);
+This module provides access to the liblgrp(3LIB) library and to various constants and functions defined in
+<sys/lgrp_sys.h>. It provides both the procedural and object interface to the library. The procedural interface re<hy>
+quires (in most cases) passing around a transparent cookie. The object interface hides all the cookie manipulations
+from the user.
+Functions returning a scalar value indicate an error by returning undef. The caller can examine the $! variable to get
+the error value.
+Functions returning a list value return the number of elements in the list when called in scalar context. In the event
+of error, the empty list is returned in the array context and undef is returned in the scalar context.
+The constants are exported with :CONSTANTS or :ALL tags:
+ use Sun::Solaris::Lgrp ':ALL';
+or
+ use Sun::Solaris::Lgrp ':CONSTANTS';
+The following constants are available for use in Perl programs:
+ LGRP_NONE
+ LGRP_VER_CURRENT
+ LGRP_VER_NONE
+ LGRP_VIEW_CALLER
+ LGRP_VIEW_OS
+ LGRP_AFF_NONE
+ LGRP_AFF_STRONG
+ LGRP_AFF_WEAK
+ LGRP_CONTENT_DIRECT
+ LGRP_CONTENT_HIERARCHY
+ LGRP_MEM_SZ_FREE
+ LGRP_MEM_SZ_FREE
+ LGRP_RSRC_CPU (1)
+ LGRP_RSRC_MEM (1)
+ LGRP_CONTENT_ALL (1)
+ LGRP_LAT_CPU_TO_MEM (1)
+ P_PID
+ P_LWPID
+ P_MYID
+(1) Available for versions of the liblgrp(3LIB) API greater than 1.
+A detailed description of each function follows. Since this module is intended to provide a Perl interface to the func<hy>
+tions in liblgrp(3LIB), a very short description is given for the corresponding functions in this module and a refer<hy>
+ence is given to the complete description in the liblgrp manual pages. Any differences or additional functionality in
+the Perl module are highlighted and fully documented here.
+lgrp_init([LGRP_VIEW_CALLER | LGRP_VIEW_OS])
+This function initializes the lgroup interface and takes a snapshot of the lgroup hierarchy with the given view. Given
+the view, lgrp_init() returns a cookie representing this snapshot of the lgroup hierarchy. This cookie should be used
+with other routines in the lgroup interface needing the lgroup hierarchy. The lgrp_fini() function should be called
+with the cookie when it is no longer needed. Unlike lgrp_init(3LGRP), LGRP_VIEW_OS is assumed as the de<hy>
+fault if no view is provided.
+Upon successful completion, lgrp_init() returns a cookie. Otherwise it returns undef and sets $! to indicate the er<hy>
+ror.
+<beginning of page>
+See lgrp_init(3LGRP) for more information.
+lgrp_fini($cookie)
+This function takes a cookie, frees the snapshot of the lgroup hierarchy created by lgrp_init(), and cleans up any<hy>
+thing else set up by lgrp_init(). After this function is called, the cookie returned by the lgroup interface might no
+longer be valid and should not be used.
+Upon successful completion, 1 is returned. Otherwise, undef is returned and $! is set to indicate the error.
+See lgrp_fini(3LGRP) for more information.
+lgrp_view($cookie)
+This function takes a cookie representing the snapshot of the lgroup hierarchy and returns the snapshot's view of the
+lgroup hierarchy.
+If the given view is LGRP_VIEW_CALLER, the snapshot contains only the resources that are available to the call<hy>
+er (such as those with respect to processor sets). When the view is LGRP_VIEW_OS, the snapshot contains what is
+available to the operating system.
+Upon succesful completion, the function returns the view for the snapshot of the lgroup hierarchy represented by the
+given cookie. Otherwise, undef is returned and $! is set to indicate the error.
+See lgrp_view(3LGRP) for more information.
+lgrp_home($idtype, $id)
+This function returns the home lgroup for the given process or thread. The $idtype argument should be P_PID to
+specify a process and the $id argument should be its process ID. Otherwise, the $idtype argument should be P_LW<hy>
+PID to specify a thread and the $id argument should be its LWP ID. The value P_MYID can be used for the $id ar<hy>
+gument to specify the current process or thread.
+Upon successful completion, lgrp_home() returns the ID of the home lgroup of the specified process or thread. Oth<hy>
+erwise, undef is returned and $! is set to indicate the error.
+See lgrp_home(3LGRP) for more information.
+lgrp_cookie_stale($cookie)
+Upon successful completion, this function returns whether the cookie is stale. Otherwise, it returns undef and sets $!
+to indicate the error.
+The lgrp_cookie_stale() function will fail with EINVAL if the cookie is not valid.
+See lgrp_cookie_stale(3LGRP) for more information.
+lgrp_cpus($cookie, $lgrp, $context)
+This function takes a cookie representing a snapshot of the lgroup hierarchy and returns the list of CPUs in the
+lgroup specified by $lgrp. The $context argument should be set to one of the following values to specify whether the
+direct contents or everything in this lgroup including its children should be returned:
+LGRP_CONTENT_HIERARCHY everything within this hierarchy
+LGRP_CONTENT_DIRECT directly contained in lgroup
+When called in scalar context, lgrp_cpus() function returns the number of CPUs contained in the specified lgroup.
+In the event of error, undef is returned in scalar context and $! is set to indicate the error. In list context, the empty
+list is returned and $! is set.
+<beginning of page>
+See lgrp_cpus(3LGRP) for more information.
+lgrp_children($cookie, $lgrp)
+This function takes a cookie representing a snapshot of the lgroup hierarchy and returns the list of lgroups that are
+children of the specified lgroup.
+When called in scalar context, lgrp_children() returns the number of children lgroups for the specified lgroup.
+In the event of error, undef or empty list is returned and $! is set to indicate the error.
+See lgrp_children(3LGRP) for more information.
+lgrp_parents($cookie, $lgrp)
+This function takes a cookie representing a snapshot of the lgroup hierarchy and returns the list of parents of the
+specified lgroup.
+When called in scalar context, lgrp_parents() returns the number of parent lgroups for the specified lgroup.
+In the event of error, undef or an empty list is returned and $! is set to indicate the error.
+See lgrp_parents(3LGRP) for more information.
+lgrp_nlgrps($cookie)
+This function takes a cookie representing a snapshot of the lgroup hierarchy. It returns the number of lgroups in the
+hierarchy, where the number is always at least one.
+In the event of error, undef is returned and $! is set to EINVAL, indicating that the cookie is not valid.
+See lgrp_nlgrps(3LGRP) for more information.
+lgrp_root($cookie)
+This function returns the root lgroup ID.
+In the event of error, undef is returned and $! is set to EINVAL, indicatng that the cookie is not valid.
+See lgrp_root(3LGRP) for more information.
+lgrp_mem_size($cookie, $lgrp, $type, $content)
+This function takes a cookie representing a snapshot of the lgroup hierarchy. The function returns the memory size
+of the given lgroup in bytes. The $type argument should be set to one of the following values:
+LGRP_MEM_SZ_FREE free memory
+LGRP_MEM_SZ_INSTALLED installed memory
+The $content argument should be set to one of the following values to specify whether the direct contents or every<hy>
+thing in this lgroup including its children should be returned:
+LGRP_CONTENT_HIERARCHY Return everything within this hierarchy.
+LGRP_CONTENT_DIRECT Return that which is directly contained in this lgroup.
+The total sizes include all the memory in the lgroup including its children, while the others reflect only the memory
+contained directly in the given lgroup.
+Upon successful completion, the size in bytes is returned. Otherwise, undef is returned and $! is set to indicate the
+<beginning of page>
+error.
+See lgrp_mem_size(3LGRP) for more information.
+lgrp_version([$version])
+This function takes an interface version number, $version, as an argument and returns an lgroup interface version.
+The $version argument should be the value of LGRP_VER_CURRENT or LGRP_VER_NONE to find out the
+current lgroup interface version on the running system.
+If $version is still supported by the implementation, then lgrp_version() returns the requested version. If
+LGRP_VER_NONE is returned, the implementation cannot support the requested version.
+If $version is LGRP_VER_NONE, lgrp_version() returns the current version of the library.
+The following example tests whether the version of the interface used by the caller is supported:
+ lgrp_version(LGRP_VER_CURRENT) == LGRP_VER_CURRENT or
+  die("Built with unsupported lgroup interface");
+See lgrp_version(3LGRP) for more information.
+lgrp_affinity_set($idtype, $id, $lgrp, $affinity)
+This function sets the affinity that the LWP or set of LWPs specified by $idtype and $id have for the given lgroup.
+The lgroup affinity can be set to LGRP_AFF_STRONG, LGRP_AFF_WEAK, or LGRP_AFF_NONE.
+If the $idtype is P_PID, the affinity is retrieved for one of the LWPs in the process or set for all the LWPs of the
+process with process ID (PID) $id. The affinity is retrieved or set for the LWP of the current process with LWP ID
+$id if $idtype is P_LWPID. If $id is P_MYID, then the current LWP or process is specified.
+There are different levels of affinity that can be specified by a thread for a particuliar lgroup. The levels of affinity
+are the following from strongest to weakest:
+LGRP_AFF_STRONG strong affinity
+LGRP_AFF_WEAK weak affinity
+LGRP_AFF_NONE no affinity
+Upon successful completion, lgrp_affinity_set() returns 1. Otherwise, it returns undef and set $! to indicate the er<hy>
+ror.
+See lgrp_affinity_set(3LGRP) for more information.
+lgrp_affinity_get($idtype, $id, $lgrp)
+This function returns the affinity that the LWP has to a given lgroup.
+See lgrp_affinity_get(3LGRP) for more information.
+lgrp_latency_cookie($cookie, $from, $to, [$between=LGRP_LAT_CPU_TO_MEM])
+This function takes a cookie representing a snapshot of the lgroup hierarchy and returns the latency value between a
+hardware resource in the $from lgroup to a hardware resource in the $to lgroup. If $from is the same lgroup as $to,
+the latency value within that lgroup is returned.
+The optional $between argument should be set to LGRP_LAT_CPU_TO_MEM to specify between which hard<hy>
+ware resources the latency should be measured. The only valid value is LGRP_LAT_CPU_TO_MEM, which rep<hy>
+resents latency from CPU to memory.
+Upon successful completion, lgrp_latency_cookie() return 1. Otherwise, it returns undef and set $! to indicate the
+<beginning of page>
+error. For LGRP API version 1, the lgrp_latency_cookie() is an alias for lgrp_latency.()
+See lgrp_latency_cookie(3LGRP) for more information.
+lgrp_latency($from, $to)
+This function is similiar to the lgrp_latency_cookie() function, but returns the latency between the given lgroups at
+the given instant in time. Since lgroups can be freed and reallocated, this function might not be able to provide a
+consistent answer across calls. For that reason, lgrp_latency_cookie() should be used in its place.
+See lgrp_latency(3LGRP) for more information.
+lgrp_resources($cookie, $lgrp, $type)
+This function returns the list of lgroups directly containing resources of the specified type. The resources are repre<hy>
+sented by a set of lgroups in which each lgroup directly contains CPU and/or memory resources.
+The type can be specified as:
+LGRP_RSRC_CPU CPU resources
+LGRP_RSRC_MEM memory resources
+In the event of error, undef or an empty list is returned and $! is set to indicate the error.
+This function is available only for API version 2 and returns undef or an empty list for API version 1 and sets $! to
+EINVAL.
+See lgrp_resources(3LGRP) for more information.
+lgrp_lgrps($cookie, [$lgrp])
+This function returns a list of all lgroups in a hierarchy starting from $lgrp. If $lgrp is not specified, uses the value of
+lgrp_root($cookie). This function returns the empty list on failure.
+When called in scalar context, this function returns the total number of lgroups in the system.
+lgrp_leaves($cookie, [$lgrp])
+This function returns a list of all leaf lgroups in a hierarchy starting from $lgrp. If $lgrp is not specified, this func<hy>
+tion uses the value of lgrp_root($cookie). It returns undef or an empty list on failure.
+When called in scalar context, this function returns the total number of leaf lgroups in the system.
+lgrp_isleaf($cookie, $lgrp)
+This function returns True if $lgrp is a leaf (has no children). Otherwise it returns False.
+new([$view])
+This method creates a new Sun::Solaris::Lgrp object. An optional argument is passed to the lgrp_init() function.
+By default this method uses LGRP_VIEW_OS.
+cookie()
+This method returns a transparent cookie that can be passed to functions accepting the cookie.
+version([$version])
+Without the argument, this method returns the current version of the liblgrp(3LIB) library. This method is a wrapper
+for lgrp_version() with LGRP_VER_NONE as the default version argument.
+<beginning of page>
+stale()
+This method returns T if the lgroup information in the object is stale and F otherwise. It is a wrapper for lgrp_cook<hy>
+ie_stale().
+view()
+This method returns the snapshot's view of the lgroup hierarchy. It is a wrapper for lgrp_view().
+root()
+This method returns the root lgroup. It is a wrapper for lgrp_root().
+children($lgrp)
+This method returns the list of lgroups that are children of the specified lgroup. It is a wrapper for lgrp_children().
+parents($lgrp)
+This method returns the list of lgroups that are parents of the specified lgroup. It is a wrapper for lgrp_parents().
+nlgrps()
+This method returns the number of lgroups in the hierarchy. It is a wrapper for lgrp_nlgrps().
+mem_size($lgrp, $type, $content)
+This method returns the memory size of the given lgroup in bytes. It is a wrapper for lgrp_mem_size().
+cpus($lgrp, $context)
+This method returns the list of CPUs in the lgroup specified by $lgrp. It is a wrapper for lgrp_cpus().
+resources($lgrp, $type)
+This method returns the list of lgroups directly containing resources of the specified type. It is a wrapper for
+lgrp_resources().
+home($idtype, $id)
+This method returns the home lgroup for the given process or thread. It is a wrapper for lgrp_home().
+affinity_get($idtype, $id, $lgrp)
+This method returns the affinity that the LWP has to a given lgrp. It is a wrapper for lgrp_affinity_get().
+affinity_set($idtype, $id, $lgrp, $affinity)
+This method sets the affinity that the LWP or set of LWPs specified by $idtype and $id have for the given lgroup. It
+is a wrapper for lgrp_affinity_set.
+lgrps([$lgrp])
+This method returns list of all lgroups in a hierarchy starting from $lgrp or the lgrp_root() if $lgrp is not specified.
+It is a wrapper for lgrp_lgrps().
+<beginning of page>
+leaves([$lgrp])
+This method returns a list of all leaf lgroups in a hierarchy starting from $lgrp. If $lgrp is not specified, this method
+uses the value of lgrp_root(). It is a wrapper for lgrp_leaves().
+isleaf($lgrp)
+This method returns True if $lgrp is leaf (has no children) and False otherwise. It is a wrapper for lgrp_isleaf().
+latency($from, $to)
+This method returns the latency value between a hardware resource in the $from lgroup to a hardware resource in the
+$to lgroup. It uses lgrp_latency() for version 1 of liblgrp and lgrp_latency_cookie() for newer versions.
+By default nothing is exported from this module. The following tags can be used to selectively import constants and
+functions defined in this module:
+:LGRP_CONSTANTS LGRP_AFF_NONE, LGRP_AFF_STRONG, LGRP_AFF_WEAK, LGRP_CON<hy>
+TENT_DIRECT, LGRP_CONTENT_HIERARCHY, LGRP_MEM_SZ_FREE, LGRP_MEM_SZ_IN<hy>
+STALLED, LGRP_VER_CURRENT, LGRP_VER_NONE, LGRP_VIEW_CALLER, LGRP_VIEW_OS,
+LGRP_NONE, LGRP_RSRC_CPU, LGRP_RSRC_MEM, LGRP_CONTENT_ALL,
+LGRP_LAT_CPU_TO_MEM
+:PROC_CONSTANTS P_PID, P_LWPID, P_MYID
+:CONSTANTS :LGRP_CONSTANTS, :PROC_CONSTANTS
+:FUNCTIONS lgrp_affinity_get(), lgrp_affinity_set(), lgrp_children(), lgrp_cookie_stale(), lgrp_cpus(),
+lgrp_fini(), lgrp_home(), lgrp_init(), lgrp_latency(), lgrp_latency_cookie(), lgrp_mem_size(), lgrp_nlgrps(),
+lgrp_parents(), lgrp_root(), lgrp_version(), lgrp_view(), lgrp_resources(), lgrp_lgrps(), lgrp_leaves(),
+lgrp_isleaf()
+:ALL :CONSTANTS, :FUNCTIONS
+The functions in this module return undef or an empty list when an underlying library function fails. The $! is set to
+provide more information values for the error. The following error codes are possible:
+EINVAL The value supplied is not valid.
+ENOMEM There was not enough system memory to complete an operation.
+EPERM The effective user of the calling process does not have appropriate privileges, and its real or effective user
+ID does not match the real or effective user ID of one of the threads.
+ESRCH The specified process or thread was not found.
+The liblgrp(3LIB) library is versioned. The exact version that was used to compile a module is available through the
+lgrp_version() function.
+Version 2 of the lgrp_user API introduced the following constants and functions not present in version 1:
+ LGRP_RSRC_CPU constant
+ LGRP_RSRC_MEM constant
+ LGRP_CONTENT_ALL constant
+ LGRP_LAT_CPU_TO_MEM constant
+ lgrp_resources() function
+ lgrp_latency_cookie() function
+<beginning of page>
+The LGRP_RSRC_CPU and LGRP_RSRC_MEM constants are not defined for version 1. The lgrp_resources()
+function is defined for version 1 but always returns an empty list. The lgrp_latency_cookie() function is an alias for
+lgrp_latency() for version 1.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUNW<hy>
+pl5u _ Interface StabilityUnstable
+lgrp_affinity_get(3LGRP), lgrp_affinity_set(3LGRP), lgrp_children(3LGRP), lgrp_cookie_stale(3LGRP),
+lgrp_cpus(3LGRP), lgrp_fini(3LGRP), lgrp_home(3LGRP), lgrp_init(3LGRP), lgrp_latency(3LGRP), lgrp_la<hy>
+tency_cookie(3LGRP), lgrp_mem_size(3LGRP), lgrp_nlgrps(3LGRP), lgrp_parents(3LGRP), lgrp_re<hy>
+sources(3LGRP), lgrp_root(3LGRP), lgrp_version(3LGRP), lgrp_view(3LGRP), liblgrp(3LIB), attributes(5)

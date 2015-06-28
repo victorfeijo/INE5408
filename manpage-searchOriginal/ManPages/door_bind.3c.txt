@@ -1,0 +1,93 @@
+<beginning of page>
+door_bind, door_unbind <-> bind or unbind the current thread with the door server pool
+cc -mt [ flag... ] file... [ library... ]
+#include <door.h>
+int door_bind(int did);
+int door_unbind(void);
+The door_bind() function associates the current thread with a door server pool. A door server pool is a private pool
+of server threads that is available to serve door invocations associated with the door did.
+The door_unbind() function breaks the association of door_bind() by removing any private door pool binding that
+is associated with the current thread.
+Normally, door server threads are placed in a global pool of available threads that invocations on any door can use
+to dispatch a door invocation. A door that has been created with DOOR_PRIVATE only uses server threads that
+have been associated with the door by door_bind(). It is therefore necessary to bind at least one server thread to
+doors created with DOOR_PRIVATE.
+The server thread create function, door_server_create(), is initially called by the system during a door_create() op<hy>
+eration. See door_server_create(3C) and door_create(3C).
+The current thread is added to the private pool of server threads associated with a door during the next door_re<hy>
+turn() (that has been issued by the current thread after an associated door_bind()). See door_return(3C). A server
+thread performing a door_bind() on a door that is already bound to a different door performs an implicit door_un<hy>
+bind() of the previous door.
+If a process containing threads that have been bound to a door calls fork(2), the threads in the child process will be
+bound to an invalid door, and any calls to door_return(3C) will result in an error.
+Upon successful completion, a 0 is returned. Otherwise, <mi>1 is returned and errno is set to indicate the error.
+The door_bind() and door_unbind() functions fail if:
+EBADF The did argument is not a valid door.
+EBADF The door_unbind() function was called by a thread that is currently not bound.
+EINVAL did was not created with the DOOR_PRIVATE attribute.
+Example 1 Use door_bind() to create private server pools for two doors.
+The following example shows the use of door_bind() to create private server pools for two doors, d1 and d2. Func<hy>
+tion my_create() is called when a new server thread is needed; it creates a thread running function, my_server_cre<hy>
+ate(), which binds itself to one of the two doors.
+ #include <door.h>
+ #include <thread.h>
+ #include <pthread.h>
+ thread_key_t door_key;
+ int d1 = -1;
+ int d2 = -1;
+ cond_t cv; /* statically initialized to zero */
+ mutex_t lock; /* statically initialized to zero */
+ extern void foo(void *, char *, size_t, door_desc_t *, uint_t);
+ extern void bar(void *, char *, size_t, door_desc_t *, uint_t);
+ static void *
+ my_server_create(void *arg)
+ {
+  /* wait for d1 & d2 to be initialized */
+<beginning of page>
+  mutex_lock(&lock);
+  while (d1 == -1 || d2 == -1)
+  cond_wait(&cv, &lock);
+  mutex_unlock(&lock);
+  if (arg == (void *)foo){
+  /* bind thread with pool associated with d1 */
+  thr_setspecific(door_key, (void *)foo);
+  if (door_bind(d1) < 0) {
+  perror("door_bind"); exit (-1);
+  }
+  } else if (arg == (void *)bar) {
+  /* bind thread with pool associated with d2 */
+  thr_setspecific(door_key, (void *)bar);
+  if (door_bind(d2) < 0) {
+  /* bind thread to d2 thread pool */
+  perror("door_bind"); exit (-1);
+  }
+  }
+  pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
+  door_return(NULL, 0, NULL, 0); /* Wait for door invocation */
+ }
+ static void
+ my_create(door_info_t *dip)
+ {
+  /* Pass the door identity information to create function */
+  thr_create(NULL, 0, my_server_create, (void *)dip->di_proc,
+  THR_BOUND | THR_DETACHED, NULL);
+ }
+ main()
+ {
+  (void) door_server_create(my_create);
+  if (thr_keycreate(&door_key, NULL) != 0) {
+  perror("thr_keycreate");
+  exit(1);
+  }
+  mutex_lock(&lock);
+  d1 = door_create(foo, NULL, DOOR_PRIVATE); /* Private pool */
+  d2 = door_create(bar, NULL, DOOR_PRIVATE); /* Private pool */
+  cond_signal(&cv);
+  mutex_unlock(&lock);
+  while (1)
+  pause();
+ }
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Architectureall _
+AvailabilitySUNWcsu _ Interface StabilityStable _ MT-LevelSafe
+fork(2),door_create(3C), door_return(3C), door_server_create(3C), attributes(5)

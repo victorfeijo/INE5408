@@ -1,0 +1,138 @@
+<beginning of page>
+ea_pack_object, ea_unpack_object, ea_get_creator, ea_get_hostname, ea_next_object, ea_previous_object,
+ea_get_object, ea_write_object, ea_copy_object, ea_copy_object_tree, ea_get_object_tree <-> construct, read, and
+write extended accounting records
+cc [ flag... ] file... -lexacct [ library... ]
+#include <exacct.h>
+size_t ea_pack_object(ea_object_t *obj, void *buf,
+ size_t bufsize);
+ea_object_type_t ea_unpack_object(ea_object_t **objp, int flag,
+ void *buf, size_t bufsize);
+const char *ea_get_creator(ea_file_t *ef);
+const char *ea_get_hostname(ea_file_t *ef);
+ea_object_type_t ea_next_object(ea_file_t *ef, ea_object_t *obj);
+ea_object_type_t ea_previous_object(ea_file_t *ef,
+ ea_object_t *obj);
+ea_object_type_t ea_get_object(ea_file_t *ef, ea_object_t *obj);
+int ea_write_object(ea_file_t *ef, ea_object_t *obj);
+ea_object_type_t *ea_copy_object(const ea_object_t *src);
+ea_object_type_t *ea_copy_object_tree(const ea_object_t *src);
+ea_object_type_t *ea_get_object_tree(ea_file_t *ef,
+ uint32_tnobj);
+The ea_pack_object() function converts exacct objects from their in-memory representation to their file representa<hy>
+tion. It is passed an object pointer that points to the top of an exacct object hierarchy representing one or more exac<hy>
+ct records. It returns the size of the buffer required to contain the packed buffer representing the object hierarchy. To
+obtain the correct size of the required buffer, the buf and bufsize parameters can be set to NULL and 0 respectively,
+and the required buffer size will be returned. The resulting packed record can be passed to putacct(2) or to
+ea_set_item(3EXACCT) when constructing an object of type EXT_EXACCT_OBJECT.
+The ea_unpack_object() function reverses the packing process performed by ea_pack_object(). A packed buffer
+passed to ea_unpack_object() is unpacked into the original hierarchy of objects. If the unpack operation fails (for
+example, due to a corrupted or incomplete buffer), it returns EO_ERROR; otherwise, the object type of the first ob<hy>
+ject in the hierarchy is returned. If ea_unpack_object() is invoked with flag equal to EUP_ALLOC, it allocates
+memory for the variable-length data in the included objects. Otherwise, with flag equal to EUP_NOALLOC, it sets
+the variable length data pointers within the unpacked object structures to point within the buffer indicated by buf. In
+both cases, ea_unpack_object() allocates all the necessary exacct objects to represent the unpacked record. The re<hy>
+sulting object hierarchy can be freed using ea_free_object(3EXACCT) with the same flag value.
+The ea_get_creator() function returns a pointer to a string representing the recorded creator of the exacct file. The
+ea_get_hostname() function returns a pointer to a string representing the recorded hostname on which the exacct
+file was created. These functions will return NULL if their respective field was not recorded in the exacct file header.
+The ea_next_object() function reads the basic fields (eo_catalog and eo_type) into the ea_object_t indicated by obj
+from the exacct file referred to by ef and rewinds to the head of the record. If the read object is corrupted,
+ea_next_object() returns EO_ERROR and records the extended accounting error code, accessible with ea_er<hy>
+ror(3EXACCT). If end-of-file is reached, EO_ERROR is returned and the extended accounting error code is set to
+EXR_EOF.
+The ea_previous_object() function skips back one object in the file and reads its basic fields (eo_catalog and
+eo_type) into the indicated ea_object_t. If the read object is corrupted, ea_previous_object() returns EO_ERROR
+and records the extended accounting error code, accessible with ea_error(3EXACCT). If end-of-file is reached,
+EO_ERROR is returned and the extended accounting error code is set to EXR_EOF.
+The ea_get_object() function reads the value fields into the ea_object_t indicated by obj, allocating memory as nec<hy>
+essary, and advances to the head of the next record. Once a record group object is retrieved using ea_get_object(),
+<beginning of page>
+subsequent calls to ea_get_object() and ea_next_object() will track through the objects within the record group,
+and on reaching the end of the group, will return the next object at the same level as the group from the file. If the
+read object is corrupted, ea_get_object() returns EO_ERROR and records the extended accounting error code, ac<hy>
+cessible with ea_error(3EXACCT). If end-of-file is reached, EO_ERROR is returned and the extended accounting
+error code is set to EXR_EOF.
+The ea_write_object() function appends the given object to the open exacct file indicated by ef and returns 0. If the
+write fails, ea_write_object() returns <mi>1 and sets the extended accounting error code to indicate the error, accessible
+with ea_error(3EXACCT).
+The ea_copy_object() function copies an ea_object_t. If the source object is part of a chain, only the current object
+is copied. If the source object is a group, only the group object is copied without its list of members and the eg_nob<hy>
+js and eg_objs fields are set to 0 and NULL, respectively. Use ea_copy_tree() to copy recursively a group or a list of
+items.
+The ea_copy_object_tree() function recursively copies an ea_object_t. All elements in the eo_next list are copied,
+and any group objects are recursively copied. The returned object can be completely freed with ea_free_ob<hy>
+ject(3EXACCT) by specifying the EUP_ALLOC flag.
+The ea_get_object_tree() function reads in nobj top-level objects from the file, returning the same data structure
+that would have originally been passed to ea_write_object(). On encountering a group object, the ea_get_object()
+function reads only the group header part of the group, whereas ea_get_object_tree() reads the group and all its
+member items, recursing into sub-records if necessary. The returned object data structure can be completely freed
+with ea_free_object() by specifying the EUP_ALLOC flag.
+The ea_pack_object() function returns the number of bytes required to hold the exacct object being operated upon.
+If the returned size exceeds bufsize, the pack operation does not complete and the function returns (size_t) -1 and
+sets the extended accounting error code to indicate the error.
+The ea_get_object() function returns the ea_object_type of the object if the object was retrieved successfully. Oth<hy>
+erwise, it returns EO_ERROR and sets the extended accounting error code to indicate the error.
+The ea_next_object() function returns the ea_object_type of the next exacct object in the file. It returns EO_ER<hy>
+ROR if the exacct file is corrupted sets the extended accounting error code to indicate the error.
+The ea_unpack_object() function returns the ea_object_type of the first exacct object unpacked from the buffer. It
+returns EO_ERROR if the exacct file is corrupted, and sets the extended accounting error code to indicate the error.
+The ea_write_object() function returns 0 on success. Otherwise it returns <mi>1 and sets the extended accounting error
+code to indicate the error.
+The ea_copy_object() and ea_copy_object_tree() functions return the copied object on success. Otherwise they re<hy>
+turn NULL and set the extended accounting error code to indicate the error.
+The ea_get_object_tree() function returns the list of objects read from the file on success. Otherwise it returns
+NULL and sets the extended accounting error code to indicate the error.
+The extended account error code can be retrieved using ea_error(3EXACCT).
+These functions may fail if:
+EXR_SYSCALL_FAIL
+A system call invoked by the function failed. The errno variable contains the error value set by the underlying call.
+On memory allocation failure, errno will be set to ENOMEM.
+EXR_CORRUPT_FILE
+The file referred to by name is not a valid exacct file, or is unparsable, and therefore appears corrupted. This error is
+also used by ea_unpack_buffer() to indicate a corrupted buffer.
+EXR_EOF
+The end of the file has been reached. In the case of ea_previous_record(), the previous record could not be
+reached, either because the head of the file was encountered or because the previous record could not be skipped
+over.
+<beginning of page>
+The exacct file format can be used to represent data other than that in the extended accounting format. By using a
+unique creator type in the file header, application writers can develop their own format suited to the needs of their
+application. Example 1 Open and close exacct file.
+The following example opens the extended accounting data file for processes. The exacct file is then closed.
+ #include <stdio.h>
+ #include <exacct.h>
+ ea_file_t ef;
+ ea_object_t *obj;
+ ...
+ ea_open(&ef, "foo", O_RDONLY, ...);
+ while ((obj = ea_get_object_tree(&ef, 1)) != NULL) {
+  if (obj->eo_type == EO_ITEM) {
+  /* handle item */
+  } else {
+  /* handle group */
+  }
+  ea_free_object(obj, EUP_ALLOC);
+ }
+ if (ea_error() != EXR_EOF) {
+  /* handle error */
+ }
+ ea_close(&ef);
+Example 2 Construct an exacct file consisting of a single object containing the current process ID.
+ #include <sys/types.h>
+ #include <unistd.h>
+ #include <exacct.h>
+ ...
+ ea_file_t ef;
+ ea_object_t obj;
+ pid_t my_pid;
+ ea_open(&ef, "foo", O_CREAT | O_WRONLY, ...);
+ my_pid = getpid();
+ ea_set_item(&obj, EXT_UINT32 | EXC_DEFAULT | EXT_PROC_PID, &my_pid, 0);
+ (void) ea_write_object(&ef, &obj);
+ ea_close(&ef);
+ ...
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed _ MT-LevelMT-Safe
+read(2), ea_error(3EXACCT), ea_open(3EXACCT), ea_set_item(3EXACCT), libexacct(3LIB), attributes(5)

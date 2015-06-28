@@ -1,0 +1,377 @@
+<beginning of page>
+tar <-> create tape archives and add or extract files
+tar c[BDeEFhilnopPqTvw@/[0-7]][bfk][X...] [blocksize]
+ [tarfile] [size] [exclude-file]...
+ {file | <mi>I include-file | <mi>C directory file}...
+tar r[BDeEFhilnqTvw@/[0-7]][bfk] [blocksize] [tarfile]
+ [size]
+ {file | <mi>I include-file | <mi>C directory file}...
+tar t[BeFhilnqTv[0-7]][fk][X...] [tarfile] [size]
+ [exclude-file]... {file | <mi>I include-file}...
+tar u[BDeEFhilnqTvw@/[0-7]][bfk] [blocksize] [tarfile]
+ [size] file...
+tar x[BeFhilmnopqTvw@/[0-7]][fk][X...] [tarfile] [size]
+ [exclude-file]... [file]...
+The tar command archives and extracts files to and from a single file called a tarfile. A tarfile is usually a magnetic
+tape, but it can be any file. tar's actions are controlled by the key argument. The key is a string of characters contain<hy>
+ing exactly one function letter (c, r, t , u, or x) and zero or more function modifiers (letters or digits), depending on
+the function letter used. The key string contains no SPACE characters. Function modifier arguments are listed on the
+command line in the same order as their corresponding function modifiers appear in the key string.
+The <mi>I include-file, <mi>C directory file, and file arguments specify which files or directories are to be archived or ex<hy>
+tracted. In all cases, appearance of a directory name refers to the files and (recursively) subdirectories of that directo<hy>
+ry. Arguments appearing within braces ({ }) indicate that one of the arguments must be specified.
+The following operands are supported:
+<mi>C directory file
+Performs a chdir (see cd(1)) operation on directory and performs the c (create) or r (replace) operation on file. Use
+short relative path names for file. If file is ".", archive all files in directory. This operand enables archiving files from
+multiple directories not related by a close common parent.
+<mi>I include-file
+Opens include-file containing a list of files, one per line, and treats it as if each file appeared separately on the com<hy>
+mand line. Be careful of trailing white spaces. Also beware of leading white spaces, since, for each line in the in<hy>
+cluded file, the entire line (apart from the newline) is used to match against the initial string of files to include. In the
+case where excluded files (see X function modifier) are also specified, they take precedence over all included files. If
+a file is specified in both the exclude-file and the include-file (or on the command line), it is excluded.
+file
+A path name of a regular file or directory to be archived (when the c, r or u functions are specified), extracted (x) or
+listed (t). When file is the path name of a directory, the action applies to all of the files and (recursively) subdirecto<hy>
+ries of that directory.
+When a file is archived, and the E flag (see Function Modifiers) is not specified, the filename cannot exceed 256
+characters. In addition, it must be possible to split the name between parent directory names so that the prefix is no
+longer than 155 characters and the name is no longer than 100 characters. If E is specified, a name of up to
+PATH_MAX characters can be specified.
+For example, a file whose basename is longer than 100 characters could not be archived without using the E flag. A
+file whose directory portion is 200 characters and whose basename is 50 characters could be archived (without using
+E) if a slash appears in the directory name somewhere in character positions 151-156.
+The function portion of the key is specified by one of the following letters:
+c
+Create. Writing begins at the beginning of the tarfile, instead of at the end.
+<beginning of page>
+r
+Replace. The named files are written at the end of the tarfile. A file created with extended headers must be updated
+with extended headers (see E flag under Function Modifiers). A file created without extended headers cannot be
+modified with extended headers.
+t
+Table of Contents. The names of the specified files are listed each time they occur in the tarfile. If no file argument is
+specified, the names of all files and any associated extended attributes in the tarfile are listed. With the v function
+modifier, additional information for the specified files is displayed.
+u
+Update. The named files are written at the end of the tarfile if they are not already in the tarfile, or if they have been
+modified since last written to that tarfile. An update can be rather slow. A tarfile created on a 5.x system cannot be
+updated on a 4.x system. A file created with extended headers must be updated with extended headers (see E flag un<hy>
+der Function Modifiers). A file created without extended headers cannot be modified with extended headers.
+x
+Extract or restore. The named files are extracted from the tarfile and written to the directory specified in the tarfile,
+relative to the current directory. Use the relative path names of files and directories to be extracted.
+Absolute path names contained in the tar archive are unpacked using the absolute path names, that is, the leading
+forward slash (/) is not stripped off.
+If a named file matches a directory whose contents has been written to the tarfile, this directory is recursively ex<hy>
+tracted. The owner, modification time, and mode are restored (if possible); otherwise, to restore owner, you must be
+the super-user. Character-special and block-special devices (created by mknod(1M)) can only be extracted by the
+super-user. If no file argument is specified, the entire content of the tarfile is extracted. If the tarfile contains several
+files with the same name, each file is written to the appropriate directory, overwriting the previous one. Filename
+substitution wildcards cannot be used for extracting files from the archive. Rather, use a command of the form:
+ tar xvf ... /dev/rmt/0 <ga>tar tf ... /dev/rmt/0 | \
+  grep 'pattern' <ga>
+When extracting tapes created with the r or u functions, directory modification times can not be set correctly. These
+same functions cannot be used with many tape drives due to tape drive limitations such as the absence of backspace
+or append capabilities.
+When using the r, u, or x functions or the X function modifier, the named files must match exactly the correspond<hy>
+ing files in the tarfile. For example, to extract ./thisfile, you must specify ./thisfile, and not thisfile. The t function dis<hy>
+plays how each file was archived.
+The characters below can be used in conjunction with the letter that selects the desired function.
+b blocksize
+Blocking Factor. Use when reading or writing to raw magnetic archives (see f below). The blocksize argument speci<hy>
+fies the number of 512-byte tape blocks to be included in each read or write operation performed on the tarfile. The
+minimum is 1, the default is 20. The maximum value is a function of the amount of memory available and the block<hy>
+ing requirements of the specific tape device involved (see mtio(7I) for details.) The maximum cannot exceed
+INT_MAX/512 (4194303).
+When a tape archive is being read, its actual blocking factor is automatically detected, provided that it is less than or
+equal to the nominal blocking factor (the value of the blocksize argument, or the default value if the b modifier is not
+specified). If the actual blocking factor is greater than the nominal blocking factor, a read error results. See Example
+5 in EXAMPLES.
+<beginning of page>
+B
+Block. Force tar to perform multiple reads (if necessary) to read exactly enough bytes to fill a block. This function
+modifier enables tar to work across the Ethernet, since pipes and sockets return partial blocks even when more data
+is coming. When reading from standard input, "<mi>", this function modifier is selected by default to ensure that tar can
+recover from short reads.
+D
+Data change warnings. Used with c, r, or u function letters. Ignored with t or x function letters. If the size of a file
+changes while the file is being archived, treat this condition as a warning instead of as an error. A warning message
+is still written, but the exit status is not affected.
+e
+Error. Exit immediately with a positive exit status if any unexpected errors occur. The SYSV3 environment variable
+overrides the default behavior. (See ENVIRONMENT VARIABLES section below.)
+E
+Write a tarfile with extended headers. (Used with c, r, or u function letters. Ignored with t or x function letters.)
+When a tarfile is written with extended headers, the modification time is maintained with a granularity of microsec<hy>
+onds rather than seconds. In addition, filenames no longer than PATH_MAX characters that could not be archived
+without E, and file sizes greater than 8GB, are supported. The E flag is required whenever the larger files and/or files
+with longer names, or whose UID/GID exceed 2097151, are to be archived, or if time granularity of microseconds is
+desired.
+f
+File. Use the tarfile argument as the name of the tarfile. If f is specified, /etc/default/tar is not searched. If f is omit<hy>
+ted, tar uses the device indicated by the TAPE environment variable, if set. Otherwise, tar uses the default values
+defined in /etc/default/tar. The number matching the archiveN string is used as the output device with the blocking
+and size specifications from the file. For example,
+ tar -c 2/tmp/*
+writes the output to the device specified as archive2 in /etc/default/tar.
+If the name of the tarfile is "<mi>", tar writes to the standard output or reads from the standard input, whichever is ap<hy>
+propriate. tar can be used as the head or tail of a pipeline. tar can also be used to move hierarchies with the com<hy>
+mand:
+ example% cd fromdir; tar cf <mi> .| (cd todir; tar xfBp <mi>)
+F
+With one F argument, tar excludes all directories named SCCS and RCS from the tarfile. With two arguments, FF,
+tar excludes all directories named SCCS and RCS, all files with .o as their suffix, and all files named errs, core, and
+a.out. The SYSV3 environment variable overrides the default behavior. (See ENVIRONMENT VARIABLES sec<hy>
+tion below.)
+h
+Follow symbolic links as if they were normal files or directories. Normally, tar does not follow symbolic links.
+i
+Ignore directory checksum errors.
+<beginning of page>
+k size
+Requires tar to use the size argument as the size of an archive in kilobytes. This is useful when the archive is intend<hy>
+ed for a fixed size device such as floppy disks. Large files are then split across volumes if they do not fit in the speci<hy>
+fied size.
+l
+Link. Output error message if unable to resolve all links to the files being archived. If l is not specified, no error mes<hy>
+sages are printed.
+m
+Modify. The modification time of the file is the time of extraction. This function modifier is valid only with the x
+function.
+n
+The file being read is a non-tape device. Reading of the archive is faster since tar can randomly seek around the ar<hy>
+chive.
+o
+Ownership. Assign to extracted files the user and group identifiers of the user running the program, rather than those
+on tarfile. This is the default behavior for users other than root. If the o function modifier is not set and the user is
+root, the extracted files takes on the group and user identifiers of the files on tarfile (see chown(1) for more informa<hy>
+tion). The o function modifier is only valid with the x function.
+p
+Restore the named files to their original modes, and ACLs if applicable, ignoring the present umask(1). This is the
+default behavior if invoked as super-user with the x function letter specified. If super-user, SETUID, and sticky in<hy>
+formation are also extracted, and files are restored with their original owners and permissions, rather than owned by
+root. When this function modifier is used with the c function, ACLs are created in the tarfile along with other infor<hy>
+mation. Errors occur when a tarfile with ACLs is extracted by previous versions of tar.
+P
+Suppress the addition of a trailing "/" on directory entries in the archive.
+q
+Stop after extracting the first occurrence of the named file. tar normally continues reading the archive after finding
+an occurrence of a file.
+T
+This modifier is only available if the system is configured with Trusted Extensions.
+When this modifier is used with the function letter c, r, or u for creating, replacing or updating a tarfile, the sensitivi<hy>
+ty label associated with each archived file and directory is stored in the tarfile.
+Specifying T implies the function modifier p.
+When used with the function letter x for extracting a tarfile, the tar program verifies that the file's sensitivity label
+specified in the archive equals the sensitivity label of the destination directory. If not, the file is not restored. This op<hy>
+eration must be invoked from the global zone. If the archived file has a relative pathname, it is restored to the corre<hy>
+sponding directory with the same label, if available. This is done by prepending to the current destination directory
+the root pathname of the zone whose label equals the file. If no such zone exists, the file is not restored.
+Limited support is provided for extracting labeled archives from Trusted Solaris 8. Only sensitivity labels, and multi-
+<beginning of page>
+level directory specifications are interpreted. Privilege specifications and audit attribute flags are silently ignored.
+Multilevel directory specifications including symbolic links to single level directories are are mapped into zone-rela<hy>
+tive pathnames if a zone with the same label is available. This support is intended to facilitate migration of home di<hy>
+rectories. Architectural differences preclude the extraction of arbitrarily labeled files from Trusted Solaris 8 into
+identical pathnames in Trusted Extensions. Files cannot be extracted unless their archived label matches the destina<hy>
+tion label.
+v
+Verbose. Output the name of each file preceded by the function letter. With the t function, v provides additional in<hy>
+formation about the tarfile entries. The listing is similar to the format produced by the -l option of the ls(1) com<hy>
+mand.
+w
+What. Output the action to be taken and the name of the file, then await the user's confirmation. If the response is af<hy>
+firmative, the action is performed; otherwise, the action is not performed. This function modifier cannot be used with
+the t function.
+X
+Exclude. Use the exclude-file argument as a file containing a list of relative path names for files (or directories) to be
+excluded from the tarfile when using the functions c, x, or t. Be careful of trailing white spaces. Also beware of lead<hy>
+ing white spaces, since, for each line in the excluded file, the entire line (apart from the newline) is used to match
+against the initial string of files to exclude. Lines in the exclude file are matched exactly, so an entry like "/var" does
+not exclude the /var directory if tar is backing up relative pathnames. The entry should read "./var" under these cir<hy>
+cumstances. The tar command does not expand shell metacharacters in the exclude file, so specifying entries like
+"*.o" does not have the effect of excluding all files with names suffixed with ".o". If a complex list of files is to be
+excluded, the exclude file should be generated by some means such as the find(1) command with appropriate condi<hy>
+tions.
+Multiple X arguments can be used, with one exclude-file per argument. In the case where included files (see <mi>I in<hy>
+clude-file operand) are also specified, the excluded files take precedence over all included files. If a file is specified in
+both the exclude-file and the include-file (or on the command line), it is excluded.
+@
+Include extended attributes in archive. By default, tar does not place extended attributes in the archive. With this
+flag, tar looks for extended attributes on the files to be placed in the archive and add them to the archive. Extended
+attributes go in the archive as special files with a special type label. When this modifier is used with the x function,
+extended attributes are extracted from the tape along with the normal file data. Extended attribute files can only be
+extracted from an archive as part of a normal file extract. Attempts to explicitly extract attribute records are ignored.
+/
+Include extended system attributes in archive. By default, tar does not place extended system attributes in the ar<hy>
+chive. With this flag, tar looks for extended system attributes on the files to be placed in the archive and adds them
+to the archive. Extended system attributes go in the archive as special files with a special type label. When this modi<hy>
+fier is used with the x function, extended system attributes are extracted from the tape along with the normal file da<hy>
+ta. Extended system attribute files can only be extracted from an archive as part of a normal file extract. Attempts to
+explicitly extract attribute records are ignored.
+[0-7]
+Select an alternative drive on which the tape is mounted. The default entries are specified in /etc/default/tar. If no
+digit or f function modifier is specified, the entry in /etc/default/tar with digit "0" is the default.
+See largefile(5) for the description of the behavior of tar when encountering files greater than or equal to 2 Gbyte (
+2^31 bytes).
+The automatic determination of the actual blocking factor can be fooled when reading from a pipe or a socket (see
+the B function modifier below).
+<beginning of page>
+1/4" streaming tape has an inherent blocking factor of one 512-byte block. It can be read or written using any block<hy>
+ing factor.
+This function modifier works for archives on disk files and block special devices, among others, but is intended prin<hy>
+cipally for tape devices.
+For information on tar header format, see archives.h(3HEAD). Example 1 Creating an archive of your home direc<hy>
+tory
+The following is an example using tar to create an archive of your home directory on a tape mounted on drive
+/dev/rmt/0:
+ example% cd
+ example% tar cvf /dev/rmt/0 .
+ messages from tar
+The c function letter means create the archive. The v function modifier outputs messages explaining what tar is do<hy>
+ing. The f function modifier indicates that the tarfile is being specified (/dev/rmt/0 in this example). The dot (.) at
+the end of the command line indicates the current directory and is the argument of the f function modifier.
+Display the table of contents of the tarfile with the following command:
+ example% tar tvf /dev/rmt/0
+The output is similar to the following for the POSIX locale:
+ rw<mi>r<mi><mi>r<mi><mi> 1677/40 2123 Nov 7 18:15 1985 ./test.c
+ ...
+ example%
+The columns have the following meanings:
+<bu> column 1 is the access permissions to ./test.c <bu> column 2 is the user-id/group-id of ./test.c <bu> column 3 is the size of
+./test.c in bytes <bu> column 4 is the modification date of ./test.c. When the LC_TIME category is not set to the POSIX
+locale, a different format and date order field can be used. <bu> column 5 is the name of ./test.c
+To extract files from the archive:
+ example% tar xvf /dev/rmt/0
+ messages from tar
+ example%
+If there are multiple archive files on a tape, each is separated from the following one by an EOF marker. To have tar
+read the first and second archives from a tape with multiple archives on it, the non-rewinding version of the tape de<hy>
+vice name must be used with the f function modifier, as follows:
+ example% tar xvfp /dev/rmt/0n read first archive from tape
+ messages from tar
+ example% tar xvfp /dev/rmt/0n read second archive from tape
+ messages from tar
+ example%
+<beginning of page>
+Notice that in some earlier releases, the above scenario did not work correctly, and intervention with mt(1) between
+tar invocations was necessary. To emulate the old behavior, use the non-rewind device name containing the letter b
+for BSD behavior. See the Close Operations section of the mtio(7I) manual page.
+Example 2 Archiving files from /usr/include and from /etc to default tape drive 0
+To archive files from /usr/include and from /etc to default tape drive 0:
+ example% tar c -C /usr include -C /etc .
+The table of contents from the resulting tarfile would produce output like the following:
+ include/
+ include/a.out.h
+ and all the other files in /usr/include ...
+ ./chown and all the other files in /etc
+To extract all files in the include directory:
+ example% tar xv include
+ x include/, 0 bytes, 0 tape blocks \
+  and all files under include ...
+Example 3 Transferring files across the network
+The following is an example using tar to transfer files across the network. First, here is how to archive files from the
+local machine (example) to a tape on a remote system (host):
+ example% tar cvfb <mi> 20 files| \
+  rsh host dd of=/dev/rmt/0 obs=20b
+ messages from tar
+ example%
+In the example above, we are creating a tarfile with the c key letter, asking for verbose output from tar with the v
+function modifier, specifying the name of the output tarfile using the f function modifier (the standard output is
+where the tarfile appears, as indicated by the `<mi>' sign), and specifying the blocksize (20) with the b function modifi<hy>
+er. If you want to change the blocksize, you must change the blocksize arguments both on the tar command and on
+the dd command.
+Example 4 Retrieving files from a tape on the remote system back to the local system
+The following is an example that uses tar to retrieve files from a tape on the remote system back to the local system:
+ example% rsh -n host dd if=/dev/rmt/0 bs=20b | \
+  tar xvBfb <mi> 20 files
+ messages from tar
+ example%
+In the example above, we are extracting from the tarfile with the x key letter, asking for verbose output from tar with
+<beginning of page>
+the v function modifier, telling tar it is reading from a pipe with the B function modifier, specifying the name of the
+input tarfile using the f function modifier (the standard input is where the tarfile appears, as indicated by the "<mi>"
+sign), and specifying the blocksize (20) with the b function modifier.
+Example 5 Creating an archive of the home directory
+The following example creates an archive of the home directory on /dev/rmt/0 with an actual blocking factor of 19:
+ example% tar cvfb /dev/rmt/0 19 $HOME
+To recognize this archive's actual blocking factor without using the b function modifier:
+ example% tar tvf /dev/rmt/0
+ tar: blocksize = 19
+ ...
+To recognize this archive's actual blocking factor using a larger nominal blocking factor:
+ example% tar tvf /dev/rmt/0 30
+ tar: blocksize = 19
+ ...
+Attempt to recognize this archive's actual blocking factor using a nominal blocking factor that is too small:
+ example% tar tvf /dev/rmt/0 10
+ tar: tape read error
+SYSV3
+This variable is used to override the default behavior of tar, provide compatibility with INTERACTIVE UNIX Sys<hy>
+tems and SCO UNIX installation scripts, and should not be used in new scripts. (It is intended for compatibility pur<hy>
+poses only.) When set, the following function modifiers behave differently:
+F filename
+Uses filename to obtain a list of command line switches and files on which to operate.
+e
+Prevents files from being split across volumes. If there is insufficient room on one volume, tar prompts for a new
+volume. If the file does not fit on the new volume, tar exits with an error.
+See environ(5) for descriptions of the following environment variables that affect the execution of tar: LC_COL<hy>
+LATE, LC_CTYPE, LC_MESSAGES, LC_TIME, TZ, and NLSPATH.
+Affirmative responses are processed using the extended regular expression defined for the yesexpr keyword in the
+LC_MESSAGES category of the user's locale. The locale specified in the LC_COLLATE category defines the be<hy>
+havior of ranges, equivalence classes, and multi-character collating elements used in the expression defined for ye<hy>
+sexpr. The locale specified in LC_CTYPE determines the locale for interpretation of sequences of bytes of text data
+a characters, the behavior of character classes used in the expression defined for the yesexpr. See locale(5).
+The following exit values are returned:
+<beginning of page>
+0
+Successful completion.
+>0
+An error occurred.
+/dev/rmt/[0-7][b][n]
+/dev/rmt/[0-7]l[b][n]
+/dev/rmt/[0-7]m[b][n]
+/dev/rmt/[0-7]h[b][n]
+/dev/rmt/[0-7]u[b][n]
+/dev/rmt/[0-7]c[b][n]
+/etc/default/tar
+Settings might look like this:
+ archive0=/dev/rmt/0
+ archive1=/dev/rmt/0n
+ archive2=/dev/rmt/1
+ archive3=/dev/rmt/1n
+ archive4=/dev/rmt/0
+ archive5=/dev/rmt/0n
+ archive6=/dev/rmt/1
+ archive7=/dev/rmt/1n
+/tmp/tar*
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu _ CSIEnabled _ Interface StabilityCommitted
+ar(1), basename(1), cd(1), chown(1), cpio(1), csh(1), dirname(1), find(1), ls(1), mt(1), pax(1), setfacl(1),
+umask(1), mknod(1M), archives.h(3HEAD), attributes(5), environ(5), fsattr(5), largefile(5), mtio(7I)
+Diagnostic messages are output for bad key characters and tape read/write errors, and for insufficient memory to
+<beginning of page>
+hold the link tables.
+There is no way to access the n-th occurrence of a file.
+Tape errors are handled ungracefully.
+The tar archive format allows UIDs and GIDs up to 2097151 to be stored in the archive header. Files with UIDs and
+GIDs greater than this value is archived with the UID and GID of 60001.
+If an archive is created that contains files whose names were created by processes running in multiple locales, a sin<hy>
+gle locale that uses a full 8-bit codeset (for example, the en_US locale) should be used both to create the archive and
+to extract files from the archive.
+Neither the r function letter nor the u function letter can be used with quarter-inch archive tapes, since these tape
+drives cannot backspace.
+Since tar has no options, the standard "<mi><mi>" argument that is normally used in other utilities to terminate recognition
+of options is not needed. If used, it is recognized only as the first argument and is ignored.
+Since <mi>C directory file and <mi>I include-file are multi-argument operands, any of the following methods can be used to
+archive or extract a file named <mi>C or <mi>I: 1. Specify them using file operands containing a / character on the com<hy>
+mand line (such as /home/joe/<mi>C or ./<mi>I). 2. Include them in an include file with <mi>I include-file. 3. Specify the di<hy>
+rectory in which the file resides:
+ -C directory -C
+or
+ -C directory -I
+4. Specify the entire directory in which the file resides:
+ -C directory .

@@ -1,0 +1,68 @@
+<beginning of page>
+devmap_unload, devmap_load <-> control validation of memory address translations
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+int devmap_load(devmap_cookie_t dhp, offset_t off, size_t len,
+ uint_t type, uint_t rw);
+int devmap_unload(devmap_cookie_t dhp, offset_t off, size_t len);
+Solaris DDI specific (Solaris DDI).
+dhp An opaque mapping handle that the system uses to describe the mapping.
+off User offset within the logical device memory at which the loading or unloading of the address translations be<hy>
+gins.
+len Length (in bytes) of the range being affected.
+type Type of access operation.
+rw Direction of access.
+devmap_unload() and devmap_load() are used to control the validation of the memory mapping described by dhp
+in the specified range. devmap_unload() invalidates the mapping translations and will generate calls to the de<hy>
+vmap_access(9E) entry point next time the mapping is accessed. The drivers use devmap_load() to validate the
+mapping translations during memory access.
+A typical use of devmap_unload() and devmap_load() is in the driver's context management callback function, de<hy>
+vmap_contextmgt(9E). To manage a device context, a device driver calls devmap_unload() on the context about to
+be switched out. It switches contexts, and then calls devmap_load() on the context switched in. devmap_unload()
+can be used to unload the mappings of other processes as well as the mappings of the calling process, but de<hy>
+vmap_load() can only be used to load the mappings of the calling process. Attempting to load another process's
+mappings with devmap_load() will result in a system panic.
+For both routines, the range to be affected is defined by the off and len arguments. Requests affect the entire page
+containing the off and all pages up to and including the page containing the last byte as indicated by off + len. The
+arguments type and rw are provided by the system to the calling function (for example, devmap_contextmgt(9E))
+and should not be modified.
+Supplying a value of 0 for the len argument affects all addresses from the off to the end of the mapping. Supplying
+a value of 0 for the off argument and a value of 0 for len argument affect all addresses in the mapping.
+A non-zero return value from either devmap_unload() or devmap_load() will cause the corresponding operation to
+fail. The failure may result in a SIGSEGV or SIGBUS signal being delivered to the process.
+0 Successful completion.
+Non-zero An error occurred.
+These routines can be called from user or kernel context only. Example 1 Managing a One-Page Device Context
+The following shows an example of managing a device context that is one page in length.
+ struct xx_context cur_ctx;
+<beginning of page>
+ static int
+ xxdevmap_contextmgt(devmap_cookie_t dhp, void *pvtp, offset_t off,
+  size_t len, uint_t type, uint_t rw)
+ {
+  int err;
+  devmap_cookie_t cur_dhp;
+  struct xx_pvt *p;
+  struct xx_pvt *pvp = (struct xx_pvt *)pvtp;
+  /* enable access callbacks for the current mapping */
+  if (cur_ctx != NULL && cur_ctx != pvp->ctx) {
+  p = cur_ctx->pvt;
+  /*
+  * unload the region from off to the end of the mapping.
+  */
+  cur_dhp = p->dhp;
+  if ((err = devmap_unload(cur_dhp, off, len)) != 0)
+  return (err);
+  }
+  /* Switch device context - device dependent*/
+  ...
+  /* Make handle the new current mapping */
+  cur_ctx = pvp->ctx;
+  /*
+  * Disable callbacks and complete the access for the
+  * mapping that generated this callback.
+  */
+  return (devmap_load(pvp->dhp, off, len, type, rw));
+ }
+devmap_access(9E), devmap_contextmgt(9E)
+Writing Device Drivers

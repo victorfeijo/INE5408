@@ -1,0 +1,155 @@
+<beginning of page>
+sip_stack_init <-> initializes SIP stack
+cc [ flag ... ] file ... -lsip [ library ... ]
+#include <sip.h>
+int sip_stack_init(sip_stack_init_t * stack_val);
+The sip_stack_init() function is used to initialize the SIP stack. The stack can be initialized by a process only once.
+Any shared library that is linked with a main program or another library that has already initialized the stack will en<hy>
+counter a failure when trying to initialize the stack.
+The initialization structure is given by:
+ typedef struct sip_stack_init_s {
+  int sip_version;
+  uint32_t sip_stack_flags;
+  sip_io_pointers_t *sip_io_pointers;
+  sip_ulp_pointers_t *sip_ulp_pointers;
+  sip_header_function_t *sip_function_table;
+ };
+sip_version This must be set to SIP_STACK_VERSION.
+sip_stack_flags If the application wants the SIP stack to maintain dialogs, this flag must be set to SIP_STACK_DI<hy>
+ALOGS. Otherwise, it must be set to 0. If SIP_STACK_DIALOGS is not set, the stack does not deal with dialogs
+at all.
+These include callbacks that are invoked to deliver incoming messages or error notification.
+The callback functions should not create a thread and invoke a function that could recursively invoke the callback.
+For example, the callback function for a transition state change notification should not create a thread to send a SIP
+message that results in a change in the state of the transaction, which would again invoke the callback function.
+The registration structure is supplied by:
+ typedef struct sip_ulp_pointers_s {
+  void (*sip_ulp_recv)(const sip_conn_object_t,
+  sip_msg_t, const sip_dialog_t);
+  uint_t (*sip_ulp_timeout)(void *,
+  void (*func)(void *),
+  struct timeval *);
+  boolean_t (*sip_ulp_untimeout)(uint_t);
+  int (*sip_ulp_trans_error)
+  (sip_transaction_t, int, void *);
+  void (*sip_ulp_dlg_del)(sip_dialog_t,
+  sip_msg_t, void *);
+  void (*sip_ulp_trans_state_cb)
+  (sip_transaction_t, sip_msg_t,
+  int, int);
+  void (*sip_ulp_dlg_state_cb)(sip_dialog_t,
+  sip_msg_t, int, int);
+ }sip_io_pointers_t;
+sip_ulp_recv This is a mandatory routine that the application registers for the stack to deliver an inbound SIP mes<hy>
+sage. The SIP stack invokes the function with the connection object on which the message arrived, the SIP message,
+and any associated dialog.
+The SIP message is freed once the function returns. If the application wishes to use the message beyond that, it has
+to hold a reference on the message using sip_hold_msg(). Similarly, if the application wishes to cache the dialog, it
+must hold a reference on the dialog using sip_hold_msg().
+<beginning of page>
+sip_ulp_timeout
+sip_ulp_untimeout An application can register these two routines to implement its own routines for the stack
+timers. Typically, an application should allow the stack to use its own built-in timer routines. The built-in timer rou<hy>
+tines are used only by the stack and are not available to applications. If the application registers one routine, it must
+also register the other.
+These functions must be registered for single-threaded application. Otherwise, the timer thread provided by the stack
+could result in invoking a registered callback function.
+sip_ulp_trans_error The application can register this routine to be notified of a transaction error. An error can oc<hy>
+cur when the transaction layer tries to send a message using a cached connection object which results in a failure. If
+this routine is not registered the transaction is terminated on such a failure. The final argument is for future use. It is
+always set to NULL.
+sip_ulp_dlg_del An application can register this routine to be notified when a dialog is deleted. The dialog to be
+deleted is passed along with the SIP message which caused the dialog to be deleted. The final argument is for future
+use. It is always set to NULL.
+sip_ulp_trans_state_cb
+sip_ulp_dlg_state_cb If these callback routines are registered, the stack invokes sip_ulp_trans_state_cb when a
+transaction changes states and sip_ulp_dlg_state_cb when a dialog changes states.
+The connection manager interfaces must be registered by the application to provide I/O related functionality to the
+stack. These interfaces act on a connection object that is defined by the application. The application registers the in<hy>
+terfaces for the stack to work with the connection object. The connection object is application defined, but the stack
+requires that the first member of the connection object is a void *, used by the stack to store connection object spe<hy>
+cific information which is private to the stack.
+The connection manager structure is supplied by:
+ typedef struct sip_io_pointers_s {
+  int (*sip_conn_send)(const sip_conn_object_t, char *, int);
+  void (*sip_hold_conn_object)(sip_conn_object_t);
+  void (*sip_rel_conn_object)(sip_conn_object_t);
+  boolean_t (*sip_conn_is_stream)(sip_conn_object_t);
+  boolean_t (*sip_conn_is_reliable)(sip_conn_object_t);
+  int (*sip_conn_remote_address)(sip_conn_object_t, struct sockaddr *,
+  socklen_t *);
+  int (*sip_conn_local_address)(sip_conn_object_t, struct sockaddr *,
+  socklen_t *);
+  int (*sip_conn_transport)(sip_conn_object_t);
+  int (*sip_conn_timer1)(sip_conn_object_t);
+  int (*sip_conn_timer2)(sip_conn_object_t);
+  int (*sip_conn_timer4)(sip_conn_object_t);
+  int (*sip_conn_timerd)(sip_conn_object_t);
+ }sip_io_pointers_t;
+sip_conn_send This function is invoked by the stack after processing an outbound SIP message. This function is re<hy>
+sponsible for sending the SIP message to the peer. A return of 0 indicates success. The SIP message is passed to the
+function as a string, along with the length information and the associated connection object.
+sip_hold_conn_object
+sip_rel_conn_object The application provides a mechanism for the stack to indicate that a connection object is in
+use by the stack and must not be freed. The stack uses sip_hold_conn_object to indicate that the connection object
+is in use and sip_rel_conn_object to indicate that it has been released. The connection object is passed as the argu<hy>
+ment to these functions. The stack expects that the application will not free the connection object if it is in use by the
+stack.
+sip_conn_is_stream The stack uses this to determine whether the connection object, passed as the argument, is
+byte-stream oriented. Byte-stream protocols include TCP while message-based protocols include SCTP and UDP.
+<beginning of page>
+sip_conn_is_reliable The stack uses this to determine whether the connection object, passed as the argument, is reli<hy>
+able. Reliable protocols include TCP and SCTP. Unreliable protocols include UDP.
+sip_conn_local_address
+sip_conn_remote_address These two interfaces are used by the stack to obtain endpoint information for a connec<hy>
+tion object. The sip_conn_local_address provides the local address/port information. The sip_conn_remote_ad<hy>
+dress provides the address/port information of the peer. The caller allocates the buffer and passes its associated
+length along with it. On return, the length is updated to reflect the actual length.
+sip_conn_transport The stack uses this to determine the transport used by the connection object, passed as the ar<hy>
+gument. The transport could be TCP, UDP, SCTP.
+sip_conn_timer1
+sip_conn_timer2
+sip_conn_timer4
+sip_conn_timerd These four interfaces may be registered by an application to provide connection object specific
+timer information. If these are not registered the stack uses default values.
+The interfaces provide the timer values for Timer 1 (RTT estimate - default 500 msec), Timer 2 (maximum retrans<hy>
+mit interval for non-INVITE request and INVITE response - default 4 secs), Timer 4 (maximum duration a mes<hy>
+sage will remain in the network - default 5 secs) and Timer D (wait time for response retransmit interval - default 32
+secs).
+In addition to the SIP headers supported by the stack, an application can optionally provide a table of custom head<hy>
+ers and associated parsing functions. The table is an array with an entry for each header. If the table includes headers
+supported by the stack, parsing functions or other application-specific table entries take precedence over libsip sup<hy>
+ported headers. The header table structure is supplied by:
+ typedef struct header_function_table {
+  char *header_name;
+  char *header_short_name;
+  int (*header_parse_func)
+  (struct sip_header *,
+  struct sip_parsed_header **);
+  boolean_t (*header_check_compliance)
+  (struct sip_parsed_header *);
+  boolean_t (*header_is_equal)
+  (struct sip_parsed_header *,
+  struct sip_parsed_header *);
+  void (*header_free)
+  (struct sip_parsed_header *);
+ }
+header_name The full name of the header. The application must ensure that he name does not conflict with existing
+headers. If it does, the one registered by the application takes precedence.
+header_short_name Compact name, if any, for the header.
+header_parse_func The parsing function for the header. The parser will set the second argument to the resulting
+parsed structure. A return value of 0 indicates success.
+header_free The function that frees the parsed header
+header_check_compliance An application can optionally provide this function that will check if the header is com<hy>
+pliant or not. The compliance for a custom header will be defined by the application.
+header_is_equal An application can optionally provide this function to determine whether two input headers are
+equivalent. The equivalence criteria is defined by the application.
+<beginning of page>
+On success sip_stack_init() returns 0. Otherwise, the function returns the error value.
+The value of errno is not changed by these calls in the event of an error.
+On failure, the sip_stack_init() function returns the following error value:
+EINVAL If the stack version is incorrect, or if any of the mandatory functions is missing.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed _ MT-LevelMT-Safe
+libsip(3LIB)

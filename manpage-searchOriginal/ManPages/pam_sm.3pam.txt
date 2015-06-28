@@ -1,0 +1,93 @@
+<beginning of page>
+pam_sm <-> PAM Service Module APIs
+#include <security/pam_appl.h>
+#include <security/pam_modules.h>
+cc [ flag ...] file ... -lpam [ library ...]
+PAM gives system administrators the flexibility of choosing any authentication service available on the system to
+perform authentication. The framework also allows new authentication service modules to be plugged in and made
+available without modifying the applications.
+The PAM framework, libpam, consists of an interface library and multiple authentication service modules. The
+PAM interface library is the layer that implements the Application Programming Interface ( API ). The authentica<hy>
+tion service modules are a set of dynamically loadable objects invoked by the PAM API to provide a particular type
+of user authentication.
+This manual page gives an overview of the PAM APIs for the service modules, also called the Service Provider In<hy>
+terface (PAM-SPI).
+The PAM service module interface consists of functions which can be grouped into four categories. The names for
+all the authentication library functions start with pam_sm. The only difference between the pam_*() interfaces and
+their corresponding pam_sm_*() interfaces is that all the pam_sm_*() interfaces require extra parameters to pass
+service-specific options to the shared modules. They are otherwise identical.
+The first category contains functions to authenticate an individual user, pam_sm_authenticate(3PAM), and to set
+the credentials of the user, pam_sm_setcred(3PAM). These back-end functions implement the functionality of
+pam_authenticate(3PAM) and pam_setcred(3PAM) respectively.
+The second category contains the function to do account management: pam_sm_acct_mgmt(3PAM). This includes
+checking for password aging and access-hour restrictions. This back-end function implements the functionality of
+pam_acct_mgmt(3PAM).
+The third category contains the functions pam_sm_open_session(3PAM) and pam_sm_close_session(3PAM) to
+perform session management after access to the system has been granted. These back-end functions implement the
+functionality of pam_open_session(3PAM) and pam_close_session(3PAM), respectively.
+The fourth category consists a function to change authentication tokens pam_sm_chauthtok(3PAM). This back-end
+function implements the functionality of pam_chauthtok(3PAM).
+A sequence of calls sharing a common set of state information is referred to as an authentication transaction. An au<hy>
+thentication transaction begins with a call to pam_start(). pam_start() allocates space, performs various initializa<hy>
+tion activities, and assigns an authentication handle to be used for subsequent calls to the library. Note that the ser<hy>
+vice modules do not get called or initialized when pam_start() is called. The modules are loaded and the symbols
+resolved upon first use of that function.
+The PAM handle keeps certain information about the transaction that can be accessed through the pam_get_item()
+API. Though the modules can also use pam_set_item() to change any of the item information, it is recommended
+that nothing be changed except PAM_AUTHTOK and PAM_OLDAUTHTOK.
+If the modules want to store any module specific state information then they can use the pam_set_data(3PAM)
+function to store that information with the PAM handle. The data should be stored with a name which is unique
+across all modules and module types. For example, SUNW_PAM_UNIX_AUTH_userid can be used as a name by
+the UNIX module to store information about the state of user's authentication. Some modules use this technique to
+share data across two different module types.
+Also, during the call to pam_authenticate(), the UNIX module may store the authentication status (success or rea<hy>
+son for failure) in the handle, using a unique name such as SUNW_SECURE_RPC_DATA. This information is in<hy>
+tended for use by pam_setcred().
+During the call to pam_acct_mgmt(), the account modules may store data in the handle to indicate which pass<hy>
+words have aged. This information is intended for use by pam_chauthtok().
+The module can also store a cleanup function associated with the data. The PAM framework calls this cleanup func<hy>
+tion, when the application calls pam_end() to close the transaction.
+The PAM service modules do not communicate directly with the user; instead they rely on the application to per<hy>
+form all such interactions. The application passes a pointer to the function, conv(), along with any associated appli<hy>
+<beginning of page>
+cation data pointers, through the pam_conv structure when it initiates an authentication transaction (by means of a
+call to pam_start(). The service module will then use the function, conv(), to prompt the user for data, output error
+messages, and display text information. Refer to pam_start(3PAM) for more information. The modules are respon<hy>
+sible for the localization of all messages to the user.
+By convention, applications that need to prompt for a user name should call pam_set_item() and set the value of
+PAM_USER_PROMPT before calling pam_authenticate(). The service module's pam_sm_authenticate() func<hy>
+tion will then call pam_get_user() to prompt for the user name. Note that certain PAM service modules (such as a
+smart card module) may override the value of PAM_USER_PROMPT and pass in their own prompt.
+Though the PAM framework enforces no rules about the module's names, location, options and such, there are cer<hy>
+tain conventions that all module providers are expected to follow.
+By convention, the modules should be located in the /usr/lib/security directory. Additional modules may be located
+in /opt/<pkg>/lib. Architecture specific libraries (for example, sparcv9 or amd64) are located in their respective sub<hy>
+directories.
+For every such module, there should be a corresponding manual page in section 5 which should describe the mod<hy>
+ule_type it supports, the functionality of the module, along with the options it supports. The dependencies should be
+clearly identified to the system administrator. For example, it should be made clear whether this module is a stand-
+alone module or depends upon the presence of some other module. One should also specify whether this module
+should come before or after some other module in the stack.
+By convention, the modules should support the following options:
+debug Syslog debugging information at LOG_DEBUG level. Be careful as to not log any sensitive information
+such as passwords.
+nowarn Turn off warning messages such as "password is about to expire."
+If an unsupported option is passed to the modules, it should syslog the error at LOG_ERR level.
+The permission bits on the service module should be set such that it is not writable by either "group" or "other." The
+service module should also be owned by root. The PAM framework will not load the module if the above permission
+rules are not followed.
+If there are any errors, the modules should log them using syslog(3C) at the LOG_ERR level.
+The PAM service module functions may return any of the PAM error numbers specified in the specific man pages. It
+can also return a PAM_IGNORE error number to mean that the PAM framework should ignore this module regard<hy>
+less of whether it is required, optional or sufficient. This error number is normally returned when the module does
+not contribute to the decision being made by the PAM framework.
+See attributes(5) for description of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability
+Stable _ MT-LevelMT-Safe with exceptions
+pam(3PAM), pam_authenticate(3PAM), pam_chauthtok(3PAM), pam_get_user(3PAM), pam_open_ses<hy>
+sion(3PAM), pam_setcred(3PAM), pam_set_item(3PAM), pam_sm_authenticate(3PAM), pam_sm_chauth<hy>
+tok(3PAM), pam_sm_open_session(3PAM), pam_sm_setcred(3PAM), pam_start(3PAM), pam_strerror(3PAM),
+syslog(3C), pam.conf(4), attributes(5), pam_authtok_check(5), pam_authtok_get(5), pam_authtok_store(5),
+pam_dhkeys(5), pam_passwd_auth(5), pam_unix_account(5), pam_unix_auth(5), pam_unix_session(5)
+The interfaces in libpam are MT-Safe only if each thread within the multithreaded application uses its own PAM
+handle.

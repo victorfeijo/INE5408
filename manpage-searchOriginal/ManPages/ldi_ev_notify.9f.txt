@@ -1,0 +1,68 @@
+<beginning of page>
+ldi_ev_notify <-> propagate notification of a state change event
+#include <sys/sunldi.h>
+int ldi_ev_notify(dev_info_t *dip, minor_t minor, int spec_type,
+ ldi_ev_cookie_t cookie, void *ev_data);
+Solaris DDI specific (Solaris DDI)
+dev_info_t *dip
+The devinfo node of the layered consumer exporting the minor device.
+minor_t minor
+The minor number of the exported minor device.
+int spec_type
+The type of minor device (S_IFCHR or S_IFBLK).
+ldi_ev_cookie_t cookie
+An opaque event cookie for the event type returned by a previous call to ldi_ev_get_cookie(9F).
+void *ev_data
+Event specific data.
+The ldi_ev_notify() function propagates an event up the software stack. It may result in two actions: <bu> Invocation of
+LDI callback handlers registered by layered drivers up the software stack. <bu> Device contract events generated on mi<hy>
+nors exported to userland.
+The event propagated up the software stack may be different than the event received by the layered driver invoking
+ldi_ev_notify(). For example, a volume manager may receive an "offline" event on one of it's LDI opened disks, but
+may choose to propagate a "degraded" event on minors it exports to userland (since it may have more than one copy
+of the data). The event cookie argument to ldi_ev_notify() may be different from the event cookie currently pos<hy>
+sessed by the layered driver. If that is the case, the layered driver must generate another event cookie via a new
+ldi_ev_get_cookie(9F) call.
+Theldi_ev_* interfaces are designed to ensure that a "finalize" call is generated for layered driver consumers at the
+earliest point where an LDI_EV_FAILURE is detected. If this happens inside the LDI event framework, then the
+framework will invoke finalize. In the event a layered driver detects/generates an LDI_EV_FAILURE, then the lay<hy>
+ered driver must invoke ldi_ev_finalize(). The following is an example of a layered driver invoking ldi_ev_finalize()
+for the "foo" event:
+ static int
+  widget_notify(ldi_handle_t lh, ldi_ev_cookie_t foo_cookie, void *arg,
+  void *ev_data)
+  {
+  ASSERT(strcmp(ldi_ev_get_type(foo_cookie), LDI_EV_FOO) == 0);
+  /* Map imported minors to exported minor */
+  widget_map(lh, &minor, &spec_type);
+  /*
+  * Call ldi_ev_notify() to propagate events to our consumers.
+  * This *must* happen before we check if widget should block
+  * foo
+  */
+  if (ldi_ev_notify(dip, minor, spec_type, foo_cookie, ev_data)
+  != LDI_EV_SUCCESS)
+<beginning of page>
+  return (LDI_EV_FAILURE);
+  /*
+  * Next, check if we can allow the foo event
+  */
+  if (widget_release(lh, LDI_EV_FOO) == WIDGET_SUCCESS) {
+  return (LDI_EV_SUCCESS)
+  }
+  /*
+  * We cannot permit the foo event. The first layer that detects
+  * failure i.e. us, must generate finalize events for *our*
+  * consumers
+  */
+  ldi_ev_finalize(dip, minor, spec_type, LDI_EV_FAILURE,
+  foo_cookie, ev_data);
+  return (LDI_EV_FAILURE);
+ }
+The return values for this function are:
+LDI_EV_SUCCESS
+Consumers up the software stack permit state change.
+LDI_EV_FAILURE
+Consumers are blocking the state change.
+This function can be called from user and kernel context only.
+ldi_ev_get_cookie(9F), ldi_ev_register_callbacks(9F), ldi_ev_remove_callbacks(9F)

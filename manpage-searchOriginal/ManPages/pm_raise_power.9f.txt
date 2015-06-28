@@ -1,0 +1,110 @@
+<beginning of page>
+pm_raise_power, pm_lower_power <-> Raise or lower power of components
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+int pm_raise_power(dev_info_t *dip, int component, int level);
+int pm_lower_power(dev_info_t *dip, int component, int level);
+Solaris DDI specific (Solaris DDI)
+dip Pointer to the device's dev_info structure
+component The number of the component for which a power level change is desired
+level The power level to which the indicated component will be raised
+dip Pointer to the device's dev_info structure
+component Number of the component for which a power level change is desired
+level Power level to which the indicated component will be lowered
+The pm_raise_power(9F) function requests the Power Management framework to raise the power level of compo<hy>
+nent of dip to at least level.
+The state of the device should be examined before each physical access. The pm_raise_power(9F) function should
+be called to set a component to the required power level if the operation to be performed requires the component to
+be at a power level higher than its current power level.
+When pm_raise_power(9F) returns with success, the component is guaranteed to be at least at the requested power
+level. All devices that depend on this will be at their full power level. Since the actual device power level may be
+higher than requested by the driver, the driver should not make any assumption about the absolute power level on
+successful return from pm_raise_power(9F).
+The pm_raise_power(9F) function may cause re-entry of the driver power(9E) to raise the power level. Deadlock
+may result if the driver locks are held across the call to pm_raise_power(9F).
+The pm_lower_power(9F) function requests the Power Management framework to lower the power level of compo<hy>
+nent of dip to at most level.
+Normally, transitions to lower power levels are initiated by the Power Management framework based on component
+idleness. However, when detaching, the driver should also initiate reduced power levels by setting the power level of
+all device components to their lowest levels. The pm_lower_power(9F) function is intended for this use only, and
+will return DDI_FAILURE if the driver is not detaching at the time of the call.
+If automatic Power Management is disabled (see dtpower(1M) and power.conf(4)), pm_lower_power(9F) returns
+DDI_SUCCESS without changing the power level of the component. Otherwise, when pm_lower_power(9F) re<hy>
+turns with success, the component is guaranteed to be at most at the requested power level. Since the actual device
+power level may be lower than requested by the driver, the driver should not make any assumption about the abso<hy>
+lute power level on successful return from pm_lower_power(9F).
+The pm_lower_power(9F) function may cause re-entry of the driver power(9E) to lower the power level. Deadlock
+may result if the driver locks are held across the call to pm_lower_power(9F). Note -
+If these functions are called as a result of entry into the driver's attach(9E), detach(9E) or power(9E) entry point,
+these functions must be called from the same thread which entered attach(9E), detach(9E) or power(9E).
+The pm_raise_power(9F) function returns:
+<beginning of page>
+DDI_SUCCESS Component is now at the requested power level or higher.
+DDI_FAILURE Component or level is out of range, or the framework was unable to raise the power level of the
+component to the requested level.
+The pm_lower_power(9F) function returns:
+DDI_SUCCESS
+ Component is now at the requested power level or lower, or automatic Power Management is disabled.
+DDI_FAILURE
+ Component or level is out of range, or the framework was unable to lower the power level of the component to the
+requested level, or the device is not detaching.
+A hypothetical disk driver might include this code to handle pm_raise_power(9F):
+ static int
+ xxdisk_strategy(struct buf *bp)
+ {
+  ...
+  /*
+  * At this point we have determined that we need to raise the
+  * power level of the device. Since we have to drop the
+  * mutex, we need to take care of case where framework is
+  * lowering power at the same time we are raising power.
+  * We resolve this by marking the device busy and failing
+  * lower power in power() entry point when device is busy.
+  */
+  ASSERT(mutex_owned(xsp->lock));
+  if (xsp->pm_busycnt < 1) {
+  /*
+    * Component is not already marked busy
+    */
+  if (pm_busy_component(xsp->dip,
+    XXDISK_COMPONENT) != DDI_SUCCESS) {
+     bioerror(bp,EIO);
+     biodone(bp);
+     return (0);
+    }
+    xsp->pm_busycnt++;
+  }
+  mutex_exit(xsp->lock);
+  if (pm_raise_power(xsp->dip,
+   XXDISK_COMPONENT, XXPOWER_SPUN_UP) != DDI_SUCCESS) {
+    bioerror(bp,EIO);
+    biodone(bp);
+    return (0);
+  }
+   mutex_enter(xsp->lock);
+   ....
+ }
+ xxdisk_power(dev_info *dip, int comp, int level)
+ {
+ ...
+<beginning of page>
+  /*
+  * We fail the power() entry point if the device is busy and
+  * request is to lower the power level.
+ */
+  ASSERT(mutex_owned( xsp->lock));
+  if (xsp->pm_busycnt >= 1) {
+    if (level < xsp->cur_level) {
+  mutex_exit( xsp->lock);
+  return (DDI_FAILURE);
+  }
+  }
+ ...
+ }
+These functions can be called from user or kernel context.
+See attributes(5) for a description of the following attribute:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface stability<hy>
+Committed
+power.conf(4), pm(7D), attach(9E), detach(9E), power(9E), pm_busy_component(9F), pm_idle_compo<hy>
+nent(9F), pm(9P), pm-components(9P)
+Writing Device Drivers

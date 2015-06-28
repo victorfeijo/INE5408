@@ -1,0 +1,74 @@
+<beginning of page>
+ldap_search, ldap_search_s, ldap_search_ext, ldap_search_ext_s, ldap_search_st <-> LDAP search operations
+cc [ flag... ] file... -lldap[ library...]
+#include <sys/time.h> /* for struct timeval definition */
+#include <lber.h>
+#include <ldap.h>
+int ldap_search(LDAP *ld, char *base, int scope, char *filter,
+ char *attrs[], int attrsonly);
+int ldap_search_s(LDAP *ld, char *base, int scope, char *filter,
+ char *attrs[],int attrsonly, LDAPMessage **res);
+int ldap_search_st(LDAP *ld, char *base, int scope, char *filter,
+ char *attrs[], int attrsonly, struct timeval *timeout,
+ LDAPMessage **res);
+int ldap_search_ext(LDAP *ld, char *base, int scope, char
+ *filter, char **attrs, int attrsonly, LDAPControl **serverctrls,
+ LDAPControl **clientctrls, struct timeval *timeoutp,
+ int sizelimit, int *msgidp);
+int ldap_search_ext_s(LDAP *ld,char *base, int scope, char *filter,
+ char **attrs, int attrsonly, LDAPControl **serverctrls,
+ LDAPControl **clientctrls, struct timeval *timeoutp,
+ int sizelimit, LDAPMessage **res);
+These functions are used to perform LDAP search operations. The ldap_search_s() function does the search syn<hy>
+chronously (that is, not returning until the operation completes). The ldap_search_st() function does the same, but
+allows a timeout to be specified. The ldap_search() function is the asynchronous version, initiating the search and
+returning the message ID of the operation it initiated.
+The base is the DN of the entry at which to start the search. The scope is the scope of the search and should be one
+of LDAP_SCOPE_BASE, to search the object itself, LDAP_SCOPE_ONELEVEL, to search the object's imme<hy>
+diate children, or LDAP_SCOPE_SUBTREE, to search the object and all its descendents.
+The filter is a string representation of the filter to apply in the search. Simple filters can be specified as attribute<hy>
+type=attributevalue. More complex filters are specified using a prefix notation according to the following BNF:
+  <filter> ::= '(' <filtercomp> ')'
+  <filtercomp> ::= <and> | <or> | <not> | <simple>
+  <and> ::= '&' <filterlist>
+  <or> ::= '|' <filterlist>
+  <not> ::= '!' <filter>
+  <filterlist> ::= <filter> | <filter> <filterlist>
+  <simple> ::= <attributetype> <filtertype> <attributevalue>
+  <filtertype> ::= '=' | '~=' | '<=' | '>='
+The '~=' construct is used to specify approximate matching. The representation for <attributetype> and <attributeval<hy>
+ue> are as described in RFC 1778. In addition, <attributevalue> can be a single * to achieve an attribute existence
+test, or can contain text and *'s interspersed to achieve substring matching.
+For example, the filter mail=* finds entries that have a mail attribute. The filter mail=*@termina<hy>
+tor.rs.itd.umich.edu finds entries that have a mail attribute ending in the specified string. Use a backslash (\fR) to
+escape parentheses characters in a filter. See RFC 1588 for a more complete description of the filters that are
+allowed. See ldap_getfilter(3LDAP) for functions to help construct search filters automatically.
+The attrs is a null-terminated array of attribute types to return from entries that match filter. If NULL is specified, all
+attributes are returned. The attrsonly is set to 1 when attribute types only are wanted. The attrsonly is set to 0 when
+both attributes types and attribute values are wanted.
+The sizelimit argument returns the number of matched entries specified for a search operation. When sizelimit is set
+to 50, for example, no more than 50 entries are returned. When sizelimit is set to 0, all matched entries are returned.
+The LDAP server can be configured to send a maximum number of entries, different from the size limit specified. If
+5000 entries are matched in the database of a server configured to send a maximum number of 500 entries, no more
+<beginning of page>
+than 500 entries are returned even when sizelimit is set to 0.
+The ldap_search_ext() function initiates an asynchronous search operation and returns LDAP_SUCCESS when the
+request is successfully sent to the server. Otherwise, ldap_search_ext() returns an LDAP error code. See ldap_er<hy>
+ror(3LDAP). If successful, ldap_search_ext() places the message ID of the request in *msgidp. A subsequent call
+to ldap_result(3LDAP) can be used to obtain the result of the add request.
+The ldap_search_ext_s() function initiates a synchronous search operation and returns the result of the operation it<hy>
+self.
+The ldap_search_s() and ldap_search_st() functions return the LDAP error code that results from a search opera<hy>
+tion. See ldap_error(3LDAP) for details.
+The ldap_search() function returns <mi>1 when the operation terminates unsuccessfully.
+See attributes(5) for a description of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE Interface StabilityE<hy>
+volving
+ldap(3LDAP), ldap_result(3LDAP), ldap_getfilter(3LDAP), ldap_error(3LDAP) , attributes(5)
+Howes, T., Kille, S., Yeong, W., Robbins, C., Wenn, J. RFC 1778, The String Representation of Standard Attribute
+Syntaxes. Network Working Group. March 1995.
+Postel, J., Anderson, C. RFC 1588, White Pages Meeting Report. Network Working Group. February 1994.
+The read and list functionality are subsumed by ldap_search() functions, when a filter such as objectclass=* is used
+with the scope LDAP_SCOPE_BASE to emulate read or the scope LDAP_SCOPE_ONELEVEL to emulate list.
+The ldap_search() functions may allocate memory which must be freed by the calling application. Return values are
+contained in <ldap.h>.

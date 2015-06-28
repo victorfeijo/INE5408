@@ -1,0 +1,275 @@
+<beginning of page>
+svccfg <-> import, export, and modify service configurations
+/usr/sbin/svccfg [-v] [-s FMRI]
+/usr/sbin/svccfg [-v] [-s FMRI] subcommand [args]...
+/usr/sbin/svccfg [-v] [-s FMRI] -f command-file
+The svccfg command manipulates data in the service configuration repository. svccfg can be invoked interactively,
+with an individual subcommand, or by specifying a command file that contains a series of subcommands.
+Changes made to an existing service in the repository typically do not take effect for that service until the next time
+the service instance is refreshed. See the refresh subcommand on the svcadm(1M) man page for more details.
+The following options are supported:
+-f command-file
+Reads and executes svccfg subcommands from command-file.
+-s FMRI
+Selects the entity indicated by FMRI (a fault management resource identifier) before executing any subcommands.
+See smf(5).
+-v
+Verbose.
+Subcommands are divided into the categories specified in the subsections that follow.
+All subcommands that accept FMRIs also accept abbreviated or globbed patterns. Instances and services can be ab<hy>
+breviated by specifying the instance name, or the trailing portion of the service name. For example, given the FMRI:
+ svc:/network/smtp:sendmail
+All the following are valid abbreviations:
+ sendmail
+ :sendmail
+ smtp
+ smtp:sendmail
+ network/smtp
+While the following are invalid:
+ mail
+ network
+ network/smt
+Abbreviated forms of FMRIs are unstable, and should not be used in scripts or other permanent tools. If a pattern
+matches more than one instance or service, an error message is printed and no action is taken.
+end
+exit
+quit
+Exits immediately.
+<beginning of page>
+repository repfile
+Uses repfile as a repository. By default, svccfg(1M) uses the system repository.
+Use repository only with files from the identical version of Solaris, including patches, that you are currently running.
+Do not use this subcommand with the system repository, /etc/svc/repository.db.
+set [-v|-V]
+Sets optional behavior. If no options are specified, set displays the options currently in effect.
+-v
+Turns on verbose mode.
+-V
+Turns off verbose mode.
+apply [-n] file
+If a file is a service profile, properties, including general/enabled, that are specified in the file are modified in the
+SMF repository. Not-yet-existent properties and property groups will be created. The type of the pre-existing proper<hy>
+ty groups will not be changed by the profile. Existing properties (as distinguished from property groups) can have
+their type changed by the profile. Nonexistent services and instances are ignored. Services and instances modified by
+the profile will be refreshed. If -n is specified, the profile is processed and no changes are applied to the SMF reposi<hy>
+tory. Any syntax error found will be reported on stderr and an exit code of 1 will be returned. See smf(5) for a de<hy>
+scription of service profiles. This command requires privileges to modify properties in the service and instance. See
+smf_security(5) for the privileges required to modify properties. If file is not a service profile, the subcommand
+fails.
+extract [> file]
+Prints a service profile which represents the enabled status of the service instances in the repository to standard out<hy>
+put. The output may be redirected to a file.
+archive [-a]
+Dumps a full XML service description for all services, instances, and their persistent properties in the repository.
+This does not include transient properties such as service state, and is suitable for a relocatable repository backup.
+Without the -a option, property groups containing protected information (identified by the presence of the read_au<hy>
+thorization property<em>see smf_security(5)) will be archived without their property values. When the -a option is
+specified, all values will be archived. An error results if there are insufficient privileges to read these values.
+export [-a] service_FMRI [>file]
+The service description for the specified service and its instances is written to standard output or redirected to the
+given file. Dependencies with a boolean "external" property set to true are omitted in the belief that they were creat<hy>
+ed on behalf of another service.
+Without the -a option, property groups containing protected information (identified by the presence of the read_au<hy>
+thorization property<em>see smf_security(5)) will be exported without their property values. When the -a option is
+specified, all values will be archived. An error results if there are insufficient privileges to read these values.
+Note that export requires a service FMRI. If you specify an instance (including an abbreviation, such as apache2 or
+sendmail, that specifies an instance), the command fails.
+import [-V] file
+If file is a service manifest, then the services and instances it specifies are imported into the repository. According to
+<beginning of page>
+the file, dependencies may be created in other services. See smf(5) for a description of service manifests. See
+smf_security(5) for the privileges required to create and modify service configurations.
+Services and instances in the manifest will be validated against template data in the manifest and the repository, and
+warnings will be issued for all template violations. See smf_template(5) for a description of templates. If the -V op<hy>
+tion is specified, manifests that violate the defined templates will fail to import. In interactive invocations of svccfg,
+-V is the default behavior.
+For existing services and instances, properties which have not changed since the last import snapshot was taken are
+upgraded to those specified by the manifest. Conflicts (properties which have been changed both in the repository
+and the manifest) are reported on the standard error stream. svccfg will never upgrade the "general/enabled" and
+"general/restarter" properties, since they represent administrator preference.
+inventory file
+If file is determined to be a service manifest, then the FMRIs of the services and instances the file describes are
+printed. For each service, the FMRIs of its instances are displayed before the FMRI of the service.
+restore
+Restores the contents of the repository from a full XML service description previously created by the archive sub<hy>
+command. If the archive was generated without the use of the -a option, the contents of the repository following
+completion of the restore will not include the values of any read-protected properties (see smf_security(5)). If these
+are required, they must be restored manually.
+Restoring an archive which is inconsistent with currently installed software (including patch revisions) might yield
+unpredictable results. Therefore, prior to restoring an archive, all system and application software, including any ser<hy>
+vice manifests, should be restored to the same state it was in at the time the archive was made.
+validate [file | fmri]
+The validate subcommand can operate on a manifest file, an instance FMRI, or the current instance or snapshot enti<hy>
+ty selection. When an argument is specified, svccfg will check to see whether the specified file exists. If the file ex<hy>
+ists, it will be validated. If a file of the specified name does not exist, the argument is treated as an FMRI pattern. If a
+conflict arises between a filename and an FMRI, use the svc: and file: prefixes to tell svccfg how to interpret the ar<hy>
+gument.
+When you specify a file, the file is processed in a manner similar to import -V, but no changes are made to the
+repository. If any errors are detected, svccfg displays the errors and exits with a nonzero exit status.
+For an instance fmri, instance entity selection, or snapshot entity selection, the specified instance in its composed
+form (see "Properties and Property Groups" in smf(5)) will be validated against template data in the repository. In<hy>
+stance FMRIs and instance entity selections use the "running" snapshot for validation. Warnings will be issued for
+all template violations. See smf_template(5) for a description of templates.
+An "entity" refers to a scope, service, or service instance.
+add name
+A new entity with the given name is created as a child of the current selection. See smf_security(5) for the privi<hy>
+leges required to create entities.
+delete [-f] {name | fmri}
+The named child of the current selection or the entity specified by fmri is deleted. Attempts to delete service in<hy>
+stances in the "online" or "degraded" state will fail unless the -f flag is specified. If a service or service instance has a
+"dependents" property group of type "framework", then for each of its properties with type "astring" or "fmri", if the
+property has a single value which names a service or service instance then the dependency property group in the in<hy>
+dicated service or service instance with the same name as the property will be deleted. See smf_security(5) for the
+privileges required to delete service configurations.
+<beginning of page>
+list [pattern]
+The child entities of the current selection whose names match the glob pattern pattern are displayed (see fn<hy>
+match(5)). ':properties' is also listed for property-bearing entities, namely services and service instances.
+select {name | fmri}
+If the argument names a child of the current selection, it becomes the current selection. Otherwise, the argument is
+interpreted as an FMRI and the entity that the argument specifies becomes the current selection.
+unselect
+The parent of the current selection becomes the current selection.
+addpg name type [flags]
+Adds a property group with the given name and type to the current selection. flags is a string of characters which
+designates the flags with which to create the property group. 'P' represents SCF_PG_FLAG_NONPERSISTENT
+(see scf_service_add_pg(3SCF)). See smf_security(5) for the privileges required to create property groups.
+addpropvalue pg/name [type:] value
+Adds the given value to a property. If type is given and the property exists, then if type does not agree with the prop<hy>
+erty's type, the subcommand fails. The values may be enclosed in double-quotes. String values containing double-
+quotes or backslashes must be enclosed by double-quotes and the contained double-quotes and backslashes must be
+quoted by backslashes. Nonexistent properties are created, in which case the type specifier must be present. See
+scf_value_create(3SCF) for a list of available property types. See smf_security(5) for the privileges required to
+modify properties. The new value will be appended to the end of the list of property values associated with the prop<hy>
+erty.
+delpg name
+Deletes the property group name of the current selection. See smf_security(5) for the privileges required to delete
+property groups.
+delprop pg[/name]
+Deletes the named property group or property of the current selection. See smf_security(5) for the privileges re<hy>
+quired to delete properties.
+delpropvalue pg/name globpattern
+Deletes all values matching the given glob pattern in the named property. Succeeds even if no values match. See
+smf_security(5) for the privileges required to modify properties.
+describe [-v] [-t] [propertygroup/property]
+Describes either the current or the possible settings.
+When invoked without arguments, describe gives basic descriptions (if available) of the currently selected entity and
+all of its currently set property groups and properties. A property group or specific property can be queried by speci<hy>
+fying either the property group name, or the property group name and property name, separated by a slash (/), as an
+argument.
+The -v option gives all information available, including descriptions for current settings, constraints, and other possi<hy>
+ble setting choices.
+The -t option shows only the template data for the selection (see smf_template(5)), and does not display the current
+settings for property groups and properties.
+<beginning of page>
+editprop
+Comments of commands to reproduce the property groups and properties of the current selection are placed in a
+temporary file and the program named by the EDITOR environment variable is invoked to edit it. Upon completion,
+the commands in the temporary file are executed. The default editor is vi(1). See smf_security(5) for the privileges
+required to create, modify, or delete properties.
+listpg [pattern]
+Displays the names, types, and flags of property groups of the current selection. If an argument is given, it is taken as
+a glob pattern and only property groups with names which match the argument are listed.
+In interactive mode, a basic description of the property groups is also given.
+listprop [pattern]
+Lists property groups and properties of the current selection. For property groups, names, types, and flags are listed.
+For properties, names (prepended by the property group name and a slash (/)), types, and values are listed. See
+scf_value_create(3SCF) for a list of available property types. If an argument is supplied it is taken as a glob pattern
+and only property groups and properties with names which match the argument are listed.
+setenv [-i | -s] [-m method_name] envvar value
+Sets a method environment variable for a service or instance by changing the "environment" property in the
+method_name property  group, if that property group has type "method". If method_name is not specified and the
+-i option is used, the "method_context" property group is used, if an instance is currently selected. If the -s option is
+used and a service is currently selected, its "method_context" property group is used. If the -s option is used and an
+instance is currently selected, the "method_context" property group of its parent is used. If neither the -i option nor
+the -s option is used, the "start" property group is searched for in the currently selected entity and, if an instance is
+currently selected, its parent is also searched. If the "inetd_start" property group is not located, it is searched for in a
+similiar manner.
+Once the property is located, all values which begin with envvar followed by a "=" are removed, and the value
+"envvar=value" is added. See smf_security(5) for the privileges required to modify properties.
+setprop pg/name = [type:] value
+setprop pg/name = [type:] ([values ...])
+Sets the name property of the pg property group of the current selection to the given values of type type. See
+scf_value_create(3SCF) for a list of available property types. If the property already exists and the type disagrees
+with the existing type on the property, the subcommand fails. Values may be enclosed in double-quotes. String val<hy>
+ues which contain double-quotes or backslashes must be enclosed by double-quotes and the contained double-quotes
+and backslashes must be quoted by backslashes. If the named property does not exist, it is created, as long as the
+type is specified. See smf_security(5) for the privileges required to create or modify properties. Multiple values will
+be stored in the order in which they are specified.
+unsetenv [-i | -s] [-m method_name] envvar value
+Removes a method environment variable for a service or instance by changing the "environment" property in the
+method_name property  group, if that property group has type "method". If method_name is not specified and the
+-i option is used, the "method_context" property group is used, if an instance is currently selected. If the -s option is
+used and a service is currently selected, its "method_context" property group is used. If the -s option is used and an
+instance is currently selected, the "method_context" property group of its parent is used. If neither the -i option nor
+the -s option is used, the "start" property group is searched for in the currently selected entity and, if an instance is
+currently selected, its parent is also searched. If the "inetd_start" property group is not located, it is searched for in a
+similiar manner.
+Once the property is located, all values which begin with envvar followed by "=" are removed. See smf_security(5)
+for the privileges required to modify properties.
+listsnap
+Displays snapshots available for the currently selected instance.
+<beginning of page>
+revert [snapshot]
+Reverts the properties of the currently selected instance and its service to those recorded in the named snapshot. If
+no argument is given, use the currently selected snapshot and deselect it on success. The changed property values
+can be made active via the refresh subcommand of svcadm(1M). See smf_security(5) for the privileges required to
+change properties.
+selectsnap [name]
+Changes the current snapshot to the one named by name. If no name is specified, deselect the currently selected
+snapshot. Snapshots are read-only.
+refresh
+Commit the values from the current configuration to the running snapshot, making them available for use by the cur<hy>
+rently selected instance. If the repository subcommand has not been used to select a repository, direct the instance's
+restarter to reread the updated configuration.
+Example 1 Importing a Service Description
+The following example imports a service description for the seismic service in the XML manifest specified on the
+command line.
+ # svccfg import /var/svc/manifest/site/seismic.xml
+Note that the manifest must follow the format specified in service_bundle(4).
+Example 2 Exporting a Service Description
+To export a service description on the local system:
+ # svccfg export dumpadm >/tmp/dump.xml
+Example 3 Deleting a Service Instance
+To delete a service instance:
+ # svccfg delete network/inetd-upgrade:default
+Example 4 Checking Properties in an Alternate Repository
+To examine the state of a service's properties after loading an alternate repository, use the sequence of commands
+shown below. One might use such commands, for example, to determine whether a service was enabled in a particu<hy>
+lar repository backup.
+ # svccfg
+ svc:> repository /etc/svc/repository-boot
+ svc:> select telnet:default
+ svc:/network/telnet:default> listprop general/enabled
+ general/enabled boolean false
+ svc:/network/telnet:default> exit
+Example 5 Enabling Debugging
+To modify LD_PRELOAD for a start method and enable the use of libumem(3LIB) with debugging features active:
+<beginning of page>
+ $ svccfg -s system/service setenv LD_PRELOAD libumem.so
+ $ svccfg -s system/service setenv UMEM_DEBUG default
+Example 6 Using describe Subcommand
+The following command illustrates the use of the describe subcommand.
+ # svccfg -s console-login describe ttymon
+ ttymon application
+ ttymon/device astring /dev/console
+  terminal device to be used for the console login prompt
+ ttymon/label astring console
+  appropriate entry from /etc/ttydefs
+  ...
+EDITOR
+The command to run when the editprop subcommand is used. The default editor is vi(1).
+The following exit values are returned:
+0
+Successful execution.
+1
+One or more subcommands resulted in failure. Error messages are written to the standard error stream.
+2
+Invalid command line options were specified.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu _ Interface StabilitySee below.
+The interactive output is Uncommitted. The invocation and non-interactive output are Committed.
+svcprop(1), svcs(1), svcadm(1M), svc.configd(1M), libscf(3LIB), libumem(3LIB), scf_service_add_pg(3SCF),
+scf_value_create(3SCF), contract(4), service_bundle(4), attributes(5), fnmatch(5), smf(5), smf_method(5),
+smf_security(5), smf_template(5)

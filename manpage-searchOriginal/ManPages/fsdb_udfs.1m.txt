@@ -1,0 +1,221 @@
+<beginning of page>
+fsdb_udfs <-> udfs file system debugger
+fsdb [-F] udfs [generic_option] [-o specific_option] special
+The fsdb_udfs command is an interactive tool that can be used to patch up a damaged udfs file system. fsdb_udfs
+has conversions to translate block and i-numbers into their corresponding disk addresses. Mnemonic offsets to ac<hy>
+cess different parts of an inode are also included. Mnemonic offsets greatly simplify the process of correcting con<hy>
+trol block entries or descending the file system tree.
+fsdb contains several error-checking routines to verify inode and block addresses. These can be disabled if necessary
+by invoking fsdb with the -o option or by using the o command.
+fsdb reads one block at a time, and therefore works with raw as well as block I/O devices. A buffer management
+routine is used to retain commonly used blocks of data in order to reduce the number of read system calls. All as<hy>
+signment operations result in an immediate write-through of the corresponding block. In order to modify any portion
+of the disk, fsdb must be invoked with the -w option.
+Wherever possible, adb-like syntax has been adopted to promote the use of fsdb through familiarity.
+The following options are supported:
+-o specific_option Specify udfs file system specific options in a comma-separated list with no intervening spaces.
+The following specific options are supported:
+o Override some error conditions.
+p=string Set prompt to string.
+w Open for write.
+? Display usage.
+Numbers are considered hexadecimal by default. The user has control over how data is to be displayed or accepted.
+The base command displays or sets the input and output base. Once set, all input defaults to this base and all output
+displays in this base. The base can be overriden temporarily for input by preceding hexadecimal numbers by 0x, pre<hy>
+ceding decimal numbers with a 0t, or octal numbers with a 0. Hexadecimal numbers beginning with a-f or A -F
+must be preceded with a 0x to distinguish them from commands.
+Disk addressing by fsdb is at the byte level. However, fsdb offers many commands to convert a desired inode, direc<hy>
+tory entry, block, and so forth, to a byte address. After the address has been calculated, fsdb records the result in the
+current address (dot).
+Several global values are maintained by fsdb: <bu> Current base (referred to as base) <bu> Current address (referred to as
+dot) <bu> Current inode (referred to as inode) <bu> Current count (referred to as count) <bu> Current type (referred to as type)
+Most commands use the preset value of dot in their execution. For example,
+  > 2:inode
+first sets the value of dot (.) to 2, colon (:), signifies the start of a command, and the inode command sets inode to 2.
+A count is specified after a comma (,). Once set, count remains at this value until a new command is encountered
+that resets the value back to 1 (the default).
+So, if
+ > 2000,400/X
+<beginning of page>
+is entered, 400 hex longs are listed from 2000, and when completed, the value of dot is 2000 + 400 * sizeof (long).
+If a RETURN is then entered, the output routine uses the current values of dot, count, and type and displays 400
+more hex longs. An asterisk (*) causes the entire block to be displayed. An example showing several commands and
+the use of RETURN would be:
+ > 2:ino; 0:dir?d
+or
+ > 2:ino; 0:db:block?d
+The two examples are synonymous for getting to the first directory entry of the root of the file system. Once there,
+subsequently entering a RETURN, plus (+), or minus (-) advances to subsequent entries. Notice that
+ > 2:inode; :ls
+or
+ > :ls /
+is again synonymous.
+The following symbols are recognized by fsdb:
+RETURN Update the value of dot by the current value of type and display using the current value of count.
+# Update the value of dot by specifying a numeric expression. Specify numeric expressions using addition, subtrac<hy>
+tion, mulitiplication, and division operators ( +, -, *, and %). Numeric expressions are evaluated from left to right
+and can use parentheses. After evaluation, the value of dot is updated.
+, count Update the count indicator. The global value of count is updated to count. The value of count remains until a
+new command is run. A count specifier of * attempts to show a blocks's worth of information. The default for count
+is 1.
+? f Display in structured style with format specifier f. See Formatted Output.
+/ f Display in unstructured style with format specifier f. See Formatted Output.
+. Display the value of dot.
++e Increment the value of dot by the expression e. The amount actually incremented is dependent on the size of type:
+dot = dot + e * sizeof (type) The default for e is 1.
+<mi>e Decrement the value of dot by the expression e . See +.
+*e Multiply the value of dot by the expression e. Multiplication and division don't use type. In the above calculation
+of dot, consider the sizeof (type) to be 1.
+<beginning of page>
+%e Divide the value of dot by the expression e. See *.
+< name Restore an address saved in register name. name must be a single letter or digit.
+> name Save an address in register name. name must be a single letter or digit.
+= f Display indicator. If f is a legitimate format specifier (see Formatted Output), then the value of dot is displayed
+using format specifier f. Otherwise, assignment is assumed. See = [s] [e].
+= [s] [e] Change the value of dot using an assignment indicator. The address pointed to by dot has its contents
+changed to the value of the expression e or to the ASCII representation of the quoted (") string s. This can be useful
+for changing directory names or ASCII file information.
+=+ e Change the value of dot using an incremental assignment. The address pointed to by dot has its contents incre<hy>
+mented by expression e.
+=- e Change the value of dot using a decremental assignment. Decrement the contents of the address pointed to by
+dot by expression e.
+A command must be prefixed by a colon (:). Only enough letters of the command to uniquely distinguish it are need<hy>
+ed. Multiple commands can be entered on one line by separating them by a SPACE, TAB, or semicolon (;).
+To view a potentially unmounted disk in a reasonable manner, fsdb supports the cd, pwd, ls, and find commands.
+The functionality of each of these commands basically matches that of its UNIX counterpart. See cd(1),
+pwd(1),ls(1), andfind(1) for details. The *, ,, ?, and - wildcard characters are also supported.
+The following commands are supported:
+base[=b]
+Display or set the base. All input and output is governed by the current base. Without the = b, displays the current
+base. Otherwise, sets the current base to b. Base is interpreted using the old value of base, so to ensure correctness
+use the 0, 0t, or 0x prefix when changing the base. The default for base is hexadecimal.
+block
+Convert the value of dot to a block address.
+cd [dir]
+Change the current directory to directory dir. The current values of inode and dot are also updated. If dir is not
+specified, changes directories to inode 2, root (/).
+directory
+If the current inode is a directory, converts the value of dot to a directory slot offset in that directory, and dot now
+points to this entry.
+file
+Set the value of dot as a relative block count from the beginning of the file. The value of dot is updated to the first
+byte of this block.
+find dir [-name n] | [-inum i]
+Find files by name or i-number. Recursively searches directory dir and below for file names whose i-number match<hy>
+es i or whose name matches pattern n. Only one of the two options (-name or -inum) can be used at one time. The
+<beginning of page>
+find -print is not necessary or accepted.
+fill=p
+Fill an area of disk with pattern p. The area of disk is delimited by dot and count.
+inode
+Convert the value of dot to an inode address. If successful, the current value of inode is updated as well as the value
+of dot. As a convenient shorthand, if :inode appears at the beginning of the line, the value of dot is set to the current
+inode and that inode is displayed in inode format.
+ls [ -R ] [-l ] pat1 pat2...
+List directories or files. If no file is specified, the current directory is assumed. Either or both of the options can be
+used (but, if used, must be specified before the filename specifiers). Wild card characters are available and multiple
+arguments are acceptable. The long listing shows only the i-number and the name; use the inode command with ?i to
+get more information.
+override
+Toggle the value of override. Some error conditions might be overridden if override is toggled to on.
+prompt "p"
+Change the fsdb prompt to p. p must be enclosed in quotes.
+pwd
+Display the current working directory.
+quit
+Quit fsdb.
+tag
+Convert the value of dot and if this is a valid tag, print the volume structure according to the tag.
+!
+Escape to the shell.
+In addition to the above commands, several other commands deal with inode fields and operate directly on the cur<hy>
+rent inode (they still require the colon (:). They can be used to more easily display or change the particular fields.
+The value of dot is only used by the :db and :ib commands. Upon completion of the command, the value of dot is
+changed so that it points to that particular field. For example,
+ > :ln=+1
+increments the link count of the current inode and sets the value of dot to the address of the link count field.
+The following inode commands are supported:
+at Access time
+<beginning of page>
+bs Block size
+ct Creation time
+gid Group id
+ln Link number
+mt Modification time
+md Mode
+maj Major device number
+min Minor device number
+nm This command actually operates on the directory name field. Once poised at the desired directory entry (us<hy>
+ing the directory command), this command allows you to change or display the directory name. For example,
+  > 7:dir:nm="foo"
+gets the 7th directory entry of the current inode and changes its name to foo. Directory names cannot be made larger
+than the field allows. If an attempt is made to make a directory name larger than the field allows,, the string is trun<hy>
+cated to fit and a warning message is displayed.
+sz File size
+uid User ID
+uniq Unique ID
+Formatted output comes in two styles and many format types. The two styles of formatted output are: structured and
+unstructured. Structured output is used to display inodes, directories, and so forth. Unstructured output displays raw
+data.
+Format specifiers are preceded by the slash (/) or question mark (?) character. type is updated as necessary upon
+completion.
+The following format specifiers are preceded by the ? character:
+i Display as inodes in the current base.
+d Display as directories in the current base.
+The following format specifiers are preceded by the / character:
+b Display as bytes in the current base.
+c Display as characters.
+<beginning of page>
+o | O Display as octal shorts or longs.
+d | D Display as decimal shorts or longs.
+x | X Display as hexadecimal shorts or longs.
+Example 1 Using fsdb as a calculator for complex arithmetic
+The following command displays 2010 in decimal format, and is an example of using fsdb as a calculator for com<hy>
+plex arithmetic.
+ > 2000+400%(20+20)=D
+Example 2 Using fsdb to display an i-number in idode fomat
+The following command displays the i-number 386 in inode format.386 becomes the current inode.
+ > 386:ino?i
+Example 3 Using fsdb to change the link count
+The following command changes the link count for the current inode to 4.
+ > :ln=4
+Example 4 Using fsdb to increment the link count
+The following command increments the link count by 1.
+ > :ln=+1
+Example 5 Using fsdb to display the creation time as a hexadecimal long
+The following command displays the creation time as a hexadecimal long.
+ > :ct=X
+Example 6 Using fsdb to display the modification time in time format
+The following command displays the modification time in time format.
+ > :mt=t
+Example 7 Using fsdb to display in ASCII
+The following command displays, in ASCII, block 0 of the file associated with the current inode.
+ > 0:file/c
+<beginning of page>
+Example 8 Using fsdb to display the directory enteries for the root inode
+The following command displays the first block's directory entries for the root inode of this file system. This com<hy>
+mand stops prematurely if the EOF is reached.
+ > 2:ino,*?d
+Example 9 Using fsdb to change the current inode
+ The following command changes the current inode to that associated with the 5th directory entry (numbered from 0)
+of the current inode. The first logical block of the file is then displayed in ASCII.
+ > 5:dir:inode; 0:file,*/c
+Example 10 Using fsdb to change the i-number
+ The following command changes the i-number for the 7th directory slot in the root directory to 3.
+ > 2:inode; 7:dir=3
+Example 11 Using fsdb to change the name field
+The following command changes the name field in the directory slot to name.
+  > 7:dir:nm="name"
+Example 12 Using fsdb to display the a block
+The following command displays the 3rd block of the current inode as directory entries.
+Example 13 Using fsdb to set the contents of address
+The following command sets the contents of address 2050 to 0xffffffff. 0xffffffff can be truncated, depending on the
+current type.
+ > 2050=0xffff
+Example 14 Using fsdb to place an ASCII string at an address
+The following command places the ASCII string this is some text at address 1c92434.
+ > 1c92434="this is some text"
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wudf
+clri(1M), fsck_udfs(1M), dir(4), attributes(5)

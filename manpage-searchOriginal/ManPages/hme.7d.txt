@@ -1,0 +1,126 @@
+<beginning of page>
+hme <-> SUNW,hme Fast-Ethernet device driver
+/dev/hme
+The SUNW,hme Fast-Ethernet driver is a multi-threaded, loadable, clonable, STREAMS hardware driver support<hy>
+ing the connectionless Data Link Provider Interface, dlpi(7P), over a SUNW,hme Fast-Ethernet controller. The
+motherboard and add-in SBus SUNW,hme controllers of several varieties are supported. Multiple SUNW,hme con<hy>
+trollers installed within the system are supported by the driver.
+The hme driver provides basic support for the SUNW,hme hardware. It is used to handle the SUNW,hme device.
+Functions include chip initialization, frame transit and receive, multicast and promiscuous support, and error recov<hy>
+ery and reporting. SUNW,hme The SUNW,hme device provides 100Base-TX networking interfaces using SUN's
+FEPS ASIC and an Internal Transceiver. The FEPS ASIC provides the Sbus interface and MAC functions and the
+Physical layer functions are provided by the Internal Transceiver which connects to a RJ-45 connector. In addition
+to the RJ-45 connector, an MII (Media Independent Interface) connector is also provided on all SUNW,hme de<hy>
+vices except the SunSwith SBus adapter board. The MII interface is used to connect to an External Transceiver
+which may use any physical media (copper or fiber) specified in the 100Base-TX standard. When an External Trans<hy>
+ceiver is connected to the MII, the driver selects the External Transceiver and disables the Internal Transceiver.
+The 100Base-TX standard specifies an "auto-negotiation" protocol to automatically select the mode and speed of op<hy>
+eration. The Internal transceiver is capable of doing "auto-negotiation" with the remote-end of the link (Link Part<hy>
+ner) and receives the capabilities of the remote end. It selects the Highest Common Denominator mode of opera<hy>
+tion based on the priorities. It also supports forced-mode of operation where the driver can select the mode of oper<hy>
+ation.
+The cloning character-special device /dev/hme is used to access all SUNW,hme controllers installed within the sys<hy>
+tem.
+The hme driver is a "style 2" Data Link Service provider. All M_PROTO and M_PCPROTO type messages are
+interpreted as DLPI primitives. Valid DLPI primitives are defined in <sys/dlpi.h>. Refer to dlpi(7P) for more infor<hy>
+mation. An explicit DL_ATTACH_REQ message by the user is required to associate the opened stream with a par<hy>
+ticular device (ppa). The ppa ID is interpreted as an unsigned long data type and indicates the corresponding device
+instance (unit) number. An error (DL_ERROR_ACK) is returned by the driver if the ppa field value does not corre<hy>
+spond to a valid device instance number for this system. The device is initialized on first attach and de-initialized
+(stopped) at last detach.
+The values returned by the driver in the DL_INFO_ACK primitive in response to the DL_INFO_REQ from the us<hy>
+er are as follows: <bu> The maximum SDU is 1500 (ETHERMTU - defined in <sys/ethernet.h> ). <bu> The minimum
+SDU is 0. <bu> The dlsap address length is 8. <bu> The MAC type is DL_ETHER. <bu> The sap length values is <mi>2 mean<hy>
+ing the physical address component is followed immediately by a 2 byte sap component within the DLSAP ad<hy>
+dress. <bu> The service mode is DL_CLDLS. <bu> No optional quality of service (QOS) support is included at present so
+the QOS fields are 0. <bu> The provider style is DL_STYLE2. <bu> The version is DL_VERSION_2. <bu> The broadcast
+address value is Ethernet/IEEE broadcast address (0xFFFFFF).
+Once in the DL_ATTACHED state, the user must send a DL_BIND_REQ to associate a particular SAP (Service
+Access Pointer) with the stream. The hme driver interprets the sap field within the DL_BIND_REQ as an Ethernet
+"type" therefore valid values for the sap field are in the [0-0xFFFF] range. Only one Ethernet type can be bound to
+the stream at any time.
+If the user selects a sap with a value of 0, the receiver will be in "802.3 mode". All frames received from the media
+having a "type" field in the range [0-1500] are assumed to be 802.3 frames and are routed up all open Streams which
+are bound to sap value 0. If more than one Stream is in "802.3 mode" then the frame will be duplicated and routed
+up multiple Streams as DL_UNITDATA_IND messages.
+In transmission, the driver checks the sap field of the DL_BIND_REQ if the sap value is 0, and if the destination
+type field is in the range [0-1500]. If either is true, the driver computes the length of the message, not including ini<hy>
+tial M_PROTO mblk (message block), of all subsequent DL_UNITDATA_REQ messages and transmits 802.3
+frames that have this value in the MAC frame header length field.
+The hme driver DLSAP address format consists of the 6 byte physical (Ethernet) address component followed im<hy>
+mediately by the 2 byte sap (type) component producing an 8 byte DLSAP address. Applications should not hard<hy>
+code to this particular implementation-specific DLSAP address format but use information returned in the DL_IN<hy>
+FO_ACK primitive to compose and decompose DLSAP addresses. The sap length, full DLSAP length, and
+sap/physical ordering are included within the DL_INFO_ACK. The physical address length can be computed by
+subtracting the sap length from the full DLSAP address length or by issuing the DL_PHYS_ADDR_REQ to obtain
+the current physical address associated with the stream.
+<beginning of page>
+Once in the DL_BOUND state, the user may transmit frames on the Ethernet by sending DL_UNITDATA_REQ
+messages to the hme driver. The hme driver will route received Ethernet frames up all those open and bound streams
+having a sap which matches the Ethernet type as DL_UNITDATA_IND messages. Received Ethernet frames are
+duplicated and routed up multiple open streams if necessary. The DLSAP address contained within the DL_UNIT<hy>
+DATA_REQ and DL_UNITDATA_IND messages consists of both the sap (type) and physical (Ethernet) compo<hy>
+nents.
+In addition to the mandatory connectionless DLPI message set the driver additionally supports the following primi<hy>
+tives.
+The DL_ENABMULTI_REQ and DL_DISABMULTI_REQ primitives enable/disable reception of individual
+multicast group addresses. A set of multicast addresses may be iteratively created and modified on a per-stream basis
+using these primitives. These primitives are accepted by the driver in any state following DL_ATTACHED.
+The DL_PROMISCON_REQ and DL_PROMISCOFF_REQ primitives with the DL_PROMISC_PHYS flag set
+in the dl_level field enables/disables reception of all ("promiscuous mode") frames on the media including frames
+generated by the local host. When used with the DL_PROMISC_SAP flag set this enables/disables reception of all
+sap (Ethernet type) values. When used with the DL_PROMISC_MULTI flag set this enables/disables reception of
+all multicast group addresses. The effect of each is always on a per-stream basis and independent of the other sap
+and physical level configurations on this stream or other streams.
+The DL_PHYS_ADDR_REQ primitive returns the 6 octet Ethernet address currently associated (attached) to the
+stream in the DL_PHYS_ADDR_ACK primitive. This primitive is valid only in states following a successful
+DL_ATTACH_REQ.
+The DL_SET_PHYS_ADDR_REQ primitive changes the 6 octet Ethernet address currently associated (attached)
+to this stream. The credentials of the process which originally opened this stream must be superuser. Otherwise
+EPERM is returned in the DL_ERROR_ACK. This primitive is destructive in that it affects all other current and
+future streams attached to this device. An M_ERROR is sent up all other streams attached to this device when this
+primitive is successful on this stream. Once changed, all streams subsequently opened and attached to this device
+will obtain this new physical address. Once changed, the physical address will remain until this primitive is used to
+change the physical address again or the system is rebooted, whichever comes first.
+By default, the hme driver performs "auto-negotiation" to select the mode and speed of the link, when the Internal
+Transceiver is used.
+When an External Transceiver is connected to the MII interface, the driver selects the External Transceiver for net<hy>
+working operations. If the External Transceiver supports "auto-negotiation", the driver uses the auto-negotiation pro<hy>
+cedure to select the link speed and mode. If the External Transceiver does not support auto-negotiation, it will select
+the highest priority mode supported by the transceiver. <bu> 100 Mbps, full-duplex <bu> 100 Mbps, half-duplex <bu> 10 Mbps,
+full-duplex <bu> 10 Mbps, half-duplex
+The link can be in one of the 4 following modes:
+These speeds and modes are described in the 100Base-TX standard.
+The auto<mi>negotiation protocol automatically selects: <bu> Operation mode (half-duplex or full-duplex) <bu> Speed (100
+Mbps or 10 Mbps)
+The auto<mi>negotiation protocol does the following: <bu> Gets all the modes of operation supported by the Link Partner <bu>
+Advertises its capabilities to the Link Partner <bu> Selects the highest common denominator mode of operation based on
+the priorities
+The internal transceiver is capable of all of the operating speeds and modes listed above. When the internal trans<hy>
+ceiver is used, by default, auto-negotiation is used to select the speed and the mode of the link and the common
+mode of operation with the Link Partner.
+When an external transceiver is connected to the MII interface, the driver selects the external transceiver for net<hy>
+working operations. If the external transceiver supports auto-negotiation: <bu> The driver uses the auto-negotiation pro<hy>
+cedure to select the link speed and mode.
+If the external transceiver does not support auto-negotiation <bu> The driver selects the highest priority mode supported
+by the transceiver.
+Sometimes, the user may want to select the speed and mode of the link. The SUNW,hme device supports program<hy>
+<beginning of page>
+mable "IPG" (Inter-Packet Gap) parameters ipg1 and ipg2. By default, the driver sets ipg1 to 8 byte-times and
+ipg2 to 4 byte-times (which are the standard values). Sometimes, the user may want to alter these values depending
+on whether the driver supports 10 Mbps or 100 Mpbs and accordingly, IPG will be set to 9.6 or 0.96 microseconds.
+The hme driver provides for setting and getting various parameters for the SUNW,hme device. The parameter list
+includes:
+ current transceiver status
+ current link status
+ inter-packet gap
+ local transceiver capabilities
+ link partner capabilities
+The local transceiver has two set of capabilities: one set reflects the capabilities of the hardware, which are read-
+only (RO) parameters and the second set reflects the values chosen by the user and is used in speed selection.
+There are read/write (RW) capabilities. At boot time, these two sets of capabilities will be the same. The Link Part<hy>
+ner capabilities are also read only parameters because the current default value of these parameters can only be read
+and cannot be modified.
+/dev/hme hme special character device
+/kernel/drv/hme.conf System-wide default device driver properties
+ndd(1M), netstat(1M), driver.conf(4), dlpi(7P)

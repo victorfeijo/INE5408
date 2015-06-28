@@ -1,0 +1,98 @@
+<beginning of page>
+dupb <-> duplicate a message block descriptor
+#include <sys/stream.h>
+mblk_t *dupb(mblk_t *bp);
+Architecture independent level 1 (DDI/DKI).
+dupb() creates a new mblk_t structure (see msgb(9S)) to reference the message block pointed to by bp.
+Unlike copyb(9F), dupb() does not copy the information in the dblk_t structure (see datab(9S)), but creates a new
+mblk_t structure to point to it. The reference count in the dblk_t structure (db_ref) is incremented. The new
+mblk_t structure contains the same information as the original. Note that b_rptrand b_wptr are copied from the
+bp.
+Printed copy or docs.sun.com shows a figure that shows a new mblk_t structure created, with the original and new
+bp both pointing to the dblk_t structure, and db_ref incremented by one
+bp Pointer to the message block to be duplicated. mblk_t is an instance of the msgb(9S) structure.
+If successful, dupb() returns a pointer to the new message block. A NULL pointer is returned if dupb() cannot al<hy>
+locate a new message block descriptor or if the db_ref field of the data block structure (see datab(9S)) has reached a
+maximum value (255).
+dupb() can be called from user, kernel, or interrupt context. Example 1 Using dupb()
+This srv(9E) (service) routine adds a header to all M_DATA messages before passing them along. dupb is used
+instead of copyb(9F) because the contents of the header block are not changed.
+For each message on the queue, if it is a priority message, pass it along immediately (lines 10-11). Otherwise, if it is
+anything other than an M_DATA message (line 12), and if it can be sent along (line 13), then do so (line 14). Other<hy>
+wise, put the message back on the queue and return (lines 16-17). For all M_DATA messages, first check to see if
+the stream is flow-controlled (line 20). If it is, put the message back on the queue and return (lines 37-38). If it is
+not, the header block is duplicated (line 21).
+dupb() can fail either due to lack of resources or because the message block has already been duplicated 255 times.
+In order to handle the latter case, the example calls copyb(9F) (line 22). If copyb(9F) fails, it is due to buffer allo<hy>
+cation failure. In this case, qbufcall(9F) is used to initiate a callback (lines 30-31) if one is not already pending
+(lines 26-27).
+The callback function, xxxcallback(), clears the recorded qbufcall(9F) callback id and schedules the service proce<hy>
+dure (lines 49-50). Note that the close routine, xxxclose(), must cancel any outstanding qbufcall(9F) callback re<hy>
+quests (lines 58-59).
+If dupb() or copyb(9F) succeed, link the M_DATA message to the new message block (line 34) and pass it along
+(line 35).
+  1 xxxsrv(q)
+  2 queue_t *q;
+  3 {
+  4 struct xx *xx = (struct xx *)q->q_ptr;
+  5 mblk_t *mp;
+  6 mblk_t *bp;
+  7 extern mblk_t *hdr;
+  8
+  9 while ((mp = getq(q)) != NULL) {
+  10 if (mp->b_datap->db_type >= QPCTL) {
+  11 putnext(q, mp);
+<beginning of page>
+  12 } else if (mp->b_datap->db_type != M_DATA) {
+  13 if (canputnext(q))
+  14 putnext(q, mp);
+  15 else {
+  16 putbq(q, mp);
+  17 return;
+  18 }
+  19 } else { /* M_DATA */
+  20 if (canputnext(q)) {
+  21 if ((bp = dupb(hdr)) == NULL)
+  22 bp = copyb(hdr);
+  23 if (bp == NULL) {
+  24 size_t size = msgdsize(mp);
+  25 putbq(q, mp);
+  26 if (xx->xx_qbufcall_id) {
+  27 /* qbufcall pending */
+  28 return;
+  29 }
+  30 xx->xx_qbufcall_id = qbufcall(q, size,
+  31 BPRI_MED, xxxcallback, (intptr_t)q);
+  32 return;
+  33 }
+  34 linkb(bp, mp);
+  35 putnext(q, bp);
+  36 } else {
+  37 putbq(q, mp);
+  38 return;
+  39 }
+  40 }
+  41 }
+  42 }
+  43 void
+  44 xxxcallback(q)
+  45 queue_t *q;
+  46 {
+  47 struct xx *xx = (struct xx *)q->q_ptr;
+  48
+  49 xx->xx_qbufcall_id = 0;
+  50 qenable(q);
+  51 }
+  52 xxxclose(q, cflag, crp)
+  53 queue_t *q;
+  54 int cflag;
+  55 cred_t *crp;
+  56 {
+  57 struct xx *xx = (struct xx *)q->q_ptr;
+  ...
+  58 if (xx->xx_qbufcall_id)
+  59 qunbufcall(q, xx->xx_qbufcall_id);
+  ...
+  60 }
+srv(9E), copyb(9F), qbufcall(9F), datab(9S), msgb(9S)
+Writing Device Drivers STREAMS Programming Guide

@@ -1,0 +1,156 @@
+<beginning of page>
+svc.ipfd <-> IP Filter firewall monitoring daemon
+/lib/svc/bin/svc.ipfd
+svc:/network/ipfilter:default
+The svc.ipfd daemon monitors actions on services that use firewall configuration and initiates update services' IP
+Filter configuration. The daemon allows the system to react to changes in system's firewall configuration in an incre<hy>
+mental fashion, at a per-service level.
+A service's firewall policy is activated when it is enabled, deactivated when it is disabled, and updated when its con<hy>
+figuration property group is modified. svc.ipfd monitors the services management facility (SMF) repository for these
+actions and invokes the IP Filter rule-generation process to carry out the service's firewall policy.
+This daemon is started by the network/ipfilter service either through the start or refresh method. Thus, the daemon
+inherits the environment variables and credentials from the method and runs as root with all zone privileges.
+A static definition describes a service's network resource configuration that is used to generate service-specific IPF
+rules. The per-service firewall_context property group contains a service's static definition, similar to the inetd
+property group in inetd managed services. This property group supports:
+firewall_context/name
+For non-inetd services. The IANA name or RPC name, equivalent to the inetd/name property.
+firewall_context/isrpc
+For non-inetd services. A boolean property where a true value indicates an RPC service, equivalent to the inetd/isr<hy>
+pc property. For RPC services, the value of firewall_context/name is not an IANA name but is either an RPC pro<hy>
+gram number or name. See rpc(4).
+Additionally, some services may require a mechanism to generate and supply their own IPF rules. An optional prop<hy>
+erty ipf_method, provides a mechanism to allow such custom rule generation:
+firewall_context/ipf_method
+A command. Normally a script that generates IPF rules for a service. The framework does not generate rules for ser<hy>
+vices with this property definition. Rather, the framework expects these services to provide their own rules.
+A service's ipf_method specifies a command that takes an additional argument, its own fault management resource
+identifier (FMRI), and generates the service's firewall rules and outputs those rules to stdout. To generate rules for a
+service with the ipf_method property, the framework execs the command specified in ipf_method, passing the ser<hy>
+vice FMRI as the additional argument, and stores the rules for that service by redirecting the command output, the
+rules, to the service's rule file. Because an ipf_method is exec'ed from the context of either the network/ipfilter
+start or refresh method process, it inherits the execution context and runs as root.
+The service static configuration is delivered by the service developer and not intended to be modified by users. These
+properties are only modified upon installation of an updated service definition.
+A per-service property group, firewall_config, stores the services' firewall policy configuration. Because net<hy>
+work/ipfilter:default is responsible for two firewall policies, the Global Default and Global Override system-wide
+policies (as explained in ipfilter(5)), it has two property groups, firewall_config_default and firewall_config_over<hy>
+ride, to store the respective system-wide policies.
+Below are the properties, their possible values, and corresponding semantics:
+policy
+The policy has the following modes:
+none policy mode
+No access restriction. For a global policy, this mode allows all incoming traffic. For a service policy, this mode al<hy>
+lows all incoming traffic to its service.
+<beginning of page>
+deny policy mode
+More restrictive than none. This mode allows incoming traffic from all sources except those specified in the ap<hy>
+ply_to property.
+allow policy mode
+Most restrictive mode. This mode blocks incoming traffic from all sources except those specified in the apply_to
+property.
+apply_to
+A multi-value property listing network entities to enforce the chosen policy mode. Entities listed in apply_to proper<hy>
+ty will be denied if policy is deny and allowed if policy is allow. The syntax for possible values are:
+ host: host:IP "host:192.168.84.14"
+ subnet: network:IP/netmask "network:129.168.1.5/24"
+ ippool: pool:pool number "pool:77"
+ interface: if:interface_name "if:e1000g0"
+exceptions
+A multi-value property listing network entities to be excluded from the apply_to list. For example, when deny poli<hy>
+cy is applied to a subnet, exceptions can be made to some hosts in that subnet by specifying them in the exceptions
+property. This property has the same value syntax as apply_to property.
+For individual network services only:
+firewall_config/policy
+A service's policy can also be set to use_global. Services with use_global policy mode inherits the Global Default
+firewall policy.
+For the Global Default only:
+firewall_config_default/policy
+Global Default policy, firewall_config property group in svc:/network/ipfilter:default, can also be set to custom.
+Users can set policy to custom to use prepopulated IP Filter configuration, for example, an existing IP Filter config<hy>
+uration or custom configurations that cannot be provided by the framework. This Global Default-only policy mode
+allows users to supply a text file containing the complete set of IPF rules. When custom mode is selected, the speci<hy>
+fied set of IPF rules is complete and the framework will not generate IPF rules from configured firewall policies.
+firewall_config_default/custom_policy_file
+A file path to be used when Global Default policy is set to custom. The file contains a set of IPF rules that provide
+the desired IP Filter configuration. For example, users with existing IPF rules in /etc/ipf/ipf.conf can execute the fol<hy>
+lowing commands to use the existing rules: 1. Set custom policy:
+ # svccfg -s ipfilter:default setprop \
+ firewall_config_default/policy = astring: "custom"
+2. Specify custom file:
+ # svccfg -s ipfilter:default setprop \
+ firewall_config_default/custom_policy_file = astring: \
+ "/etc/ipf/ipf.conf"
+<beginning of page>
+3. Refresh configuration:
+ # svcadm refresh ipfilter:default
+firewall_config_default/open_ports
+Non-service program requiring allowance of its incoming traffic can request that the firewall allow traffic to its com<hy>
+munication ports. This multi-value property contains protocol and port(s) tuple in the form:
+ "{tcp | udp}:{PORT | PORT-PORT}"
+Initially, the system-wide policies are set to none and network services' policies are set to use_global. Enabling net<hy>
+work/ipfilter activates the firewall with an empty set of IP Filter rules, since system-wide policy is none and all ser<hy>
+vices inherit that policy. To configure a more restrictive policy, use svccfg(1M) to modify network services and sys<hy>
+tem-wide policies.
+A user configures firewall policy by modifying the service's firewall_config property group. A new authorization,
+solaris.smf.value.firewall.config, is created to allow delegation of the firewall administration privilege to users.
+Users with Service Operator privileges will need this new authorization to be able to configure firewall policy.
+During boot, a firewall is configured for enabled services prior to the starting of those services. Thus, services are
+protected on boot. While the system is running, administrative actions such as service restarting, enabling, and re<hy>
+freshing may cause a brief service vulnerability during which the service runs while its firewall is being configured.
+svc.ipfd monitors a service's start and stop events and configures or unconfigures a service's firewall at the same
+time that SMF is starting or stopping the service. Because the two operations are simultaneous, there is a possible
+window of exposure (less than a second) if the service is started before its firewall configuration completed. RPC
+services typically listen on ephemeral addresses, which are not known until the services are actually running. Thus
+RPC services are subjected to similar exposure since their firewalls are not configured until the services are running.
+Services providing remote capabilities are encouraged to participate in the firewall framework to control network ac<hy>
+cess to the service. While framework integration is not mandatory, remote access to services that are not integrated
+in the framework may not function correctly when a system-wide policy is configured.
+Integrating a service into the framework is as straightforward as defining two additional property groups and their
+corresponding properties in the service manifest. IP Filter rules are generated when a user enables the service. In the
+non-trivial case of custom rule generation, where a shell script is required, there are existing scripts that can be used
+as examples.
+The additional property groups, firewall_config and firewall_context, stores firewall policy configuration and pro<hy>
+vides static firewall definition, respectively. Below is a summary of new property groups and properties and their ap<hy>
+propriate default values.
+Firewall policy configuration:
+firewall_config
+Access to the system is protected by a new authorization definition and a user-defined property type. The new autho<hy>
+rization should be assigned to the property group value_authorization property in a way such as:
+ <propval name='value_authorization' type='astring'
+ value='solaris.smf.value.firewall.config' />
+A third party should follow the service symbol namespace convention to generate a user-defined type. Sun-delivered
+services can use com.sun,fw_configuration as the property type.
+See "Firewall Policy Configuration," above, for more information.
+<beginning of page>
+firewall_config/policy
+This property's initial value should be use_global since services, by default, inherit the Global Default firewall poli<hy>
+cy.
+firewall_config/apply_to
+An empty property, this property has no initial value.
+firewall_config/exceptions
+An empty property, this property has no initial value.
+Firewall static definition:
+firewall_context
+A third party should follow service symbol namespace convention to generate a user-defined type, Sun delivered ser<hy>
+vices can use com.sun,fw_definition as the property type.
+See "Firewall Static Configuration," above, for more information.
+firewall_context/name
+Service with well-known, IANA defined port, which can be obtained by getservbyname(3SOCKET). The service's
+IANA name is stored in this property. For RPC services, the RPC program number is stored in this property.
+firewall_context/isrpc
+For RPC services, this property should be created with its value set to true.
+firewall_context/ipf_method
+In general, the specified firewall policy is used to generate IP Filter rules to the service's communication port, de<hy>
+rived from the firewall_context/name property. Services that do not have IANA-defined ports and are not RPC ser<hy>
+vices will need to generate their own IP Filter rules. Services that generate their own rules may choose not to have
+firewall_context/name and firewall_context/isrpc properties. See the following services:
+ svc:/network/ftp:default
+ svc:/network/nfs/server:default
+ svc:/network/ntp:default
+...and others with the ipf_method for guidance.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu, SUNWipfr _ Interface StabilityCommitted
+svcprop(1), svcs(1), ipf(1M), svcadm(1M), svccfg(1M), getservbyname(3SOCKET), rpc(4), attributes(5), ipfil<hy>
+ter(5), smf(5)

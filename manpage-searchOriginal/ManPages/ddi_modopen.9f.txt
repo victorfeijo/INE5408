@@ -1,0 +1,135 @@
+<beginning of page>
+ddi_modopen, ddi_modsym, ddi_modclose <-> dynamically-loaded kernel module functions
+#include <sys/modctl.h>
+ddi_modhandle_t ddi_modopen(const char*modname, int mode,
+ int *errnop);
+void *ddi_modsym(ddi_modhandle_t handle, const char *symname,
+ int *errnop);
+int ddi_modclose(ddi_modhandle_t handle);
+Solaris DDI specific (Solaris DDI).
+modname The name of the dynamically-loaded kernel module (file) to be opened. The modname string is of the
+form:
+ "[namespace/[dirspace/]]modulename"
+Each "namespace/" directory along the standard kernel moddir/module-path path (system(4)) is searched to locate
+the module. If "namespace/" is not specified, "misc/" is assumed. If "dirspace" is specified, then "namespace/" must
+be explicitly provided.
+mode Currently, KRTLD_MODE_FIRST.
+errnop Pointer to errno returned on error, if NULL then no additional error information is available.
+handle Opaque handle returned from ddi_modopen(), invalidated by ddi_modclose().
+symname Symbol's name as a character string.
+The function prototypes for ddi_modopen(), ddi_modsym(), and ddi_modclose() are modeled after the userland
+libdl(3LIB), dlopen(3C), dlsym(3C) , anddlclose(3C) interfaces, however not all userland features are available and
+the kernel symbol resolution is different. The dlerror(3C) interface is not appropriate for the kernel environment, so
+the new errnop return argument was added for ddi_modopen() and ddi_modsym().
+The ddi_modopen()function makes a dynamically-loaded kernel module named by "modname" available to a run<hy>
+ning kernel. ddi_modopen() returns a handle that the caller can use on subsequent calls to ddi_modsym() and
+ddi_modclose(). The value of this handle should not be interpreted in any way by the caller.
+The ddi_modopen() interface works best as a dynamic component/object plug-in mechanism when targeting kernel
+"misc" modules that contain a single "struct modlmisc" module linkage, however non-"misc" modules and modules
+with multiple linkage structures can also be targeted.
+There are two different symbol resolution search orders associated with the ddi_modopen() function: one search or<hy>
+der to resolve symbols during the load of the targeted module, another search order o resolve ddi_modsym() calls
+against the handle returned by ddi_modopen(). To resolve symbols during module load, the standard kernel module
+load search order is used; to resolve symbols during module "A" load, the order is as follows:
+ A -> A's _depends_on -> unix -> unix's _depends_on
+A single-level, left-to-right search in _depends_on (or the "ld -N" alternative) modules occurs. For UNIX on Sparc,
+_depends_on is similar to "genunix misc/platmod cpu/SUNW,UltraSPARC-III+ dtracestubs" for Intel, it is "ge<hy>
+nunix dtracestubs". The ddi_modsym() search is limited to the module directly associated with the handle.
+The ddi_modopen() function increments the reference count on the named kernel module. Upon the first load of a
+module, the_init(9E) initialization code in the module is called; ddi_modopen() does not return until _init com<hy>
+pletes.
+<beginning of page>
+The ddi_modsym() function allows a caller to obtain the address of a symbol that is defined within a module. The
+handle argument is a valid ddi_modhandle_t as returned by ddi_modopen(), the symname argument is the sym<hy>
+bol's name as a character string. The special handle values supported by ddi_modsym(3C) are not supported.
+The ddi_modclose() function decrements the reference count of the kernel module associated with the specified
+handle. After the ddi_modclose() function is called, all ddi_modsym() resolutions obtained (either directly or indi<hy>
+rectly) using the now closed handle are invalid; further use of these resolutions can cause undefined behavior (that is,
+may lead to a panic). When the last ddi_modclose() of a module occurs, and there are no further references to the
+module, the module _fini(9E)entry point may be called. If _fini returns success then the module may be unloaded.
+The ddi_modopen() function returns a handle to the dynamically-loaded kernel module. The ddi_modopen() func<hy>
+tion returns NULL if the module cannot be found, the object cannot be relocated, or an error occurs during the
+process of resolving and relocating its symbolic references.
+The ddi_modsym() function returns NULL if the symname symbol cannot be found directly within the module as<hy>
+sociated with the handle.
+If the handle was not referenced, ddi_modclose() returns 0. If the handle is invalid, ddi_modclose() may return a
+non-zero value.
+When either ddi_modopen() or ddi_modsym() return NULL, additional errno information related to the failure is
+returned in *errnop if it is not NULL.
+ddi_modopen() can be called from user context only. Example 1 Coding a Dynamically Loaded Kernel Module
+The following example shows code to dynamically load and call a "test" interface in a module called "dltest". The
+"test" interface then adds one to its integer argument.
+ ddi_modhandle_t modh;
+ int (*test)(int);
+ int i = 0;
+ int errno;
+ ---%<---
+ /* dynamically load "dltest" kernel 'misc' module */
+ modh = ddi_modopen("dltest", KRTLD_MODE_FIRST, &errno);
+ if (modh == NULL)
+  goto fail; /* failed to open dltest module */
+ test = (int (*)())ddi_modsym(modh, "test", &errno);
+ if (test == NULL) {
+  (void) ddi_modclose(modh);
+  goto fail; /* failed to find "test" interface */
+ }
+ /* invoke test interface and verify result */
+ i = (*test)(0);
+ ASSERT(i == 1);
+ (void) ddi_modclose(modh);
+ ---%<---
+The implementation of the "dltest" "misc" module is as follows:
+ #include <sys/modctl.h>
+ static dltest_add = 0;
+ /* define the module linkage */
+ static struct modlmisc modlmisc = {&mod_miscops, "dltest"};
+ static struct modlinkage modlinkage = {
+  MODREV_1, (void *)&modmisc, NULL
+ };
+ int
+<beginning of page>
+ _init(void)
+ {
+  int i;
+  dltest_add = 1; /* initialization */
+  if ((i = mod_install(&modlinkage)) != 0)
+  dltest_add = -1; /* un-initialization */
+  return (i);
+ }
+ int
+ _fini()
+ {
+  int i;
+  if ((i = mod_remove(&modlinkage)) == 0)
+  dltest_add = -1; /* un-initialization */
+  return (i);
+ }
+ int
+ _info(struct modinfo *modinfop)
+ {
+  return (mod_info(&modlinkage, modinfop));
+ }
+ /* "test" interface */
+ int
+ test(int i)
+ {
+  return (i + dltest_add);
+ }
+Example 2 Dynamically Accessing a Kernel Module within a Drive
+The following example shows driver code to dynamically load into the kernel a module constructed via the
+elfwrap(1) utility and containing firmware intended for download to a device. The "start" and "end" pointers pro<hy>
+vide the addresses of the beginning of the data and first byte beyond the data.
+ ddi_modhandle_t modp;
+ char *data_startp, *data_endp;
+ size_t nbytes;
+ int rv;
+ modp = ddi_modopen("firmware-rev1.2a", KRTLD_MODE_FIRST, &rv);
+ data_startp = (char *)ddi_modsym(modp, "fw-rev1.2a_start", &rv);
+ data_endp = (char *)ddi_modsym(modp, "fw-rev1.2a_end", &rv);
+ nbytes = data_endp - data_startp;
+ rv = ddi_modclose(modp);
+dlclose(3C), dlopen(3C), dlsym(3C), libdl(3LIB), boot(1M), elfwrap(1), modload(1M), system(4), _fini(9E), _in<hy>
+fo(9E), _init(9E)
+Writing Device Drivers
+A system(4)forceload must be established for modules targeted by ddi_modopen() by code involved in the mount
+of root on "bootdev" during machine boot(1M).

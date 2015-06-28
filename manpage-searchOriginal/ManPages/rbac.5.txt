@@ -1,0 +1,108 @@
+<beginning of page>
+rbac, RBAC <-> role-based access control
+The addition of role-based access control (RBAC) to the Solaris operating environment gives developers the oppor<hy>
+tunity to deliver fine-grained security in new and modified applications. RBAC is an alternative to the all-or-nothing
+security model of traditional superuser-based systems. With RBAC, an administrator can assign privileged functions
+to specific user accounts (or special accounts called roles).
+There are two ways to give applications privileges: 1. Administrators can assign special attributes such as setUID to
+application binaries (executable files). 2. Administrators can assign special attributes such as setUID to applications
+using execution profiles.
+Special attribute assignment along with the theory behind RBAC is discussed in detail in "Role Based Access Con<hy>
+trol" chapter of the System Administration Guide: Security Services. This chapter describes what authorizations are
+and how to code for them.
+An authorization is a unique string that represents a user's right to perform some operation or class of operations.
+Authorization definitions are stored in a database called auth_attr(4). For programming authorization checks, only
+the authorization name is significant.
+Some typical values in an auth_attr database are shown below.
+ solaris.jobs.:::Cron and At Jobs::help=JobHeader.html
+ solaris.jobs.grant:::Delegate Cron & At \
+  Administration::help=JobsGrant.html
+ solaris.jobs.admin:::Manage All Jobs::help=AuthJobsAdmin.html
+ solaris.jobs.user:::Cron & At User::help=JobsUser.html
+Authorization name strings ending with the grant suffix are special authorizations that give a user the ability to dele<hy>
+gate authorizations with the same prefix and functional area to other users.
+To check authorizations, use the chkauthattr(3SECDB) library function, which verifies whether or not a user has a
+given authorization. The synopsis is:
+ int chkauthattr(const char *authname, const char *username);
+The chkauthattr() function checks the policy.conf(4), user_attr(4), and prof_attr(4) databases in order for a match
+to the given authorization.
+If you are modifying existing code that tests for root UID, you should find the test in the code and replace it with the
+chkauthattr() function. A typical root UID check is shown in the first code segment below. An authorization check
+replacing it is shown in the second code segment; it uses the solaris.jobs.admin authorization and a variable called
+real_login representing the user. Example 1 Standard root check
+ ruid = getuid();
+ if ((eflag || lflag || rflag) && argc == 1) {
+  if ((pwp = getpwnam(*argv)) == NULL)
+  crabort(INVALIDUSER);
+  if (ruid != 0) {
+  if (pwp->pw_uid != ruid)
+  crabort(NOTROOT);
+  else
+  pp = getuser(ruid);
+  } else
+  pp = *argv++;
+ } else {
+Example 2 Authorization check
+ ruid = getuid();
+ if ((pwp = getpwuid(ruid)) == NULL)
+  crabort(INVALIDUSER);
+<beginning of page>
+ strcpy(real_login, pwp->pw_name);
+ if ((eflag || lflag || rflag) && argc == 1) {
+  if ((pwp = getpwnam(*argv)) == NULL)
+  crabort(INVALIDUSER);
+  if (!chkauthattr("solaris.jobs.admin", real_login)) {
+  if (pwp->pw_uid != ruid)
+  crabort(NOTROOT);
+  else
+  pp = getuser(ruid);
+  } else
+  pp = *argv++;
+ } else {
+For new applications, find an appropriate location for the test and use chkauthattr() as shown above. Typically the
+authorization check makes an access decision based on the identity of the calling user to determine if a privileged
+action (for example, a system call) should be taken on behalf of that user.
+Applications that perform a test to restrict who can perform their security-relevant functionality are generally setuid
+to root. Programs that were written prior to RBAC and that are only available to the root user may not have such
+checks. In most cases, the kernel requires an effective user ID of root to override policy enforcement. Therefore, au<hy>
+thorization checking is most useful in programs that are setuid to root.
+For instance, if you want to write a program that allows authorized users to set the system date, the command must
+be run with an effective user ID of root. Typically, this means that the file modes for the file would be -rwsr-xr-x
+with root ownership.
+Use caution, though, when making programs setuid to root. For example, the effective UID should be set to the real
+UID as early as possible in the program's initialization function. The effective UID can then be set back to root after
+the authorization check is performed and before the system call is made. On return from the system call, the effec<hy>
+tive UID should be set back to the real UID again to adhere to the principle of least privilege.
+Another consideration is that LD_LIBRARY path is ignored for setuid programs (see SECURITY section in
+ld.so.1(1)) and that shell scripts must be modified to work properly when the effective and real UIDs are different.
+For example, the -p flag in Bourne shell is required to avoid resetting the effective UID back to the real UID.
+Using an effective UID of root instead of the real UID requires extra care when writing shell scripts. For example,
+many shell scripts check to see if the user is root before executing their functionality. With RBAC, these shell scripts
+may be running with the effective UID of root and with a real UID of a user or role. Thus, the shell script should
+check euid instead of uid. For example,
+ WHO=`id | cut -f1 -d" "`
+ if [ ! "$WHO" = "uid=0(root)" ]
+ then
+  echo "$PROG: ERROR: you must be super-user to run this script."
+  exit 1
+ fi
+should be changed to
+ WHO=`/usr/xpg4/bin/id -n -u`
+ if [ ! "$WHO" = "root" ]
+ then
+  echo "$PROG: ERROR: you are not authorized to run this script."
+  exit 1
+ fi
+Authorizations can be explicitly checked in shell scripts by checking the output of the auths(1) utility. For example,
+ for auth in `auths | tr , " "` NOTFOUND
+ do
+  [ "$auth" = "solaris.date" ] && break # authorization found
+<beginning of page>
+ done
+ if [ "$auth" != "solaris.date" ]
+ then
+  echo >&2 "$PROG: ERROR: you are not authorized to set the date"
+  exit 1
+ fi
+ld.so.1(1), chkauthattr(3SECDB), auth_attr(4), policy.conf(4), prof_attr(4), user_attr(4)
+System Administration Guide: Security Services

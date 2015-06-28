@@ -1,0 +1,74 @@
+<beginning of page>
+mktime <-> converts a tm structure to a calendar time
+#include <time.h>
+time_t mktime(struct tm *timeptr);
+The mktime() function converts the time represented by the tm structure pointed to by timeptr into a calendar time
+(the number of seconds since 00:00:00 UTC, January 1, 1970).
+The tm structure contains the following members:
+ int tm_sec; /* seconds after the minute [0, 60] */
+ int tm_min; /* minutes after the hour [0, 59] */
+ int tm_hour; /* hour since midnight [0, 23] */
+ int tm_mday; /* day of the month [1, 31] */
+ int tm_mon; /* months since January [0, 11] */
+ int tm_year; /* years since 1900 */
+ int tm_wday; /* days since Sunday [0, 6] */
+ int tm_yday; /* days since January 1 [0, 365] */
+ int tm_isdst; /* flag for daylight savings time */
+In addition to computing the calendar time, mktime() normalizes the supplied tm structure. The original values of
+the tm_wday and tm_yday components of the structure are ignored, and the original values of the other components
+are not restricted to the ranges indicated in the definition of the structure. On successful completion, the values of the
+tm_wday and tm_yday components are set appropriately, and the other components are set to represent the speci<hy>
+fied calendar time, but with their values forced to be within the appropriate ranges. The final value of tm_mday is
+not set until tm_mon and tm_year are determined.
+The tm_year member must be for year 1901 or later. Calendar times before 20:45:52 UTC, December 13, 1901 or
+after 03:14:07 UTC, January 19, 2038 cannot be represented. Portable applications should not try to create dates be<hy>
+fore 00:00:00 UTC, January 1, 1970 or after 00:00:00 UTC, January 1, 2038.
+The original values of the components may be either greater than or less than the specified range. For example, a
+tm_hour of <mi>1 means 1 hour before midnight, tm_mday of 0 means the day preceding the current month, and
+tm_mon of <mi>2 means 2 months before January of tm_year.
+If tm_isdst is positive, the original values are assumed to be in the alternate timezone. If it turns out that the alter<hy>
+nate timezone is not valid for the computed calendar time, then the components are adjusted to the main timezone.
+Likewise, if tm_isdst is zero, the original values are assumed to be in the main timezone and are converted to the al<hy>
+ternate timezone if the main timezone is not valid. If tm_isdst is negative, mktime() attempts to determine whether
+the alternate timezone is in effect for the specified time.
+Local timezone information is used as if mktime() had called tzset(). See ctime(3C).
+If the calendar time can be represented in an object of type time_t, mktime() returns the specified calendar time
+without changing errno. If the calendar time cannot be represented, the function returns the value (time_t)<mi>1 and
+sets errno to indicate the error.
+The mktime() function will fail if:
+EOVERFLOW The date represented by the input tm struct cannot be represented in a time_t. Note that the errno
+setting may change if future revisions to the standards specify a different value.
+The mktime() function is MT-Safe in multithreaded applications, as long as no user-defined function directly modi<hy>
+fies one of the following variables: timezone, altzone, daylight, and tzname. See ctime(3C).
+Note that <mi>1 can be a valid return value for the time that is one second before the Epoch. The user should clear er<hy>
+rno before calling mktime(). If mktime() then returns <mi>1, the user should check errno to determine whether or not
+an error actually occurred.
+The mktime() function assumes Gregorian dates. Times before the adoption of the Gregorian calendar will not
+match historial records. Example 1 Sample code using mktime().
+What day of the week is July 4, 2001?
+<beginning of page>
+ #include <stdio.h>
+ #include <time.h>
+ static char *const wday[] = {
+  "Sunday", "Monday", "Tuesday", "Wednesday",
+  "Thursday", "Friday", "Saturday", "-unknown-"
+ };
+ struct tm time_str;
+ /*...*/
+ time_str.tm_year = 2001 - 1900;
+ time_str.tm_mon = 7 - 1;
+ time_str.tm_mday = 4;
+ time_str.tm_hour = 0;
+ time_str.tm_min = 0;
+ time_str.tm_sec = 1;
+ time_str.tm_isdst = <mi>1;
+ if (mktime(&time_str)== <mi>1)
+  time_str.tm_wday=7;
+ printf("%s\n", wday[time_str.tm_wday]);
+The zoneinfo timezone data files do not transition past Tue Jan 19 03:14:07 2038 UTC. Therefore for 64-bit appli<hy>
+cations using zoneinfo timezones, calculations beyond this date may not use the correct offset from standard time,
+and could return incorrect values. This affects the 64-bit version of mktime().
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Standard _ MT-LevelMT-Safe with exceptions
+ctime(3C), getenv(3C), TIMEZONE(4), attributes(5), standards(5)

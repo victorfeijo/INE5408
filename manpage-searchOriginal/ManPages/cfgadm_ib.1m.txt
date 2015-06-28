@@ -1,0 +1,285 @@
+<beginning of page>
+cfgadm_ib <-> InfiniBand hardware specific commands for cfgadm
+/usr/sbin/cfgadm -f [-y | -n] [-v] -c function ap_id...
+/usr/sbin/cfgadm [-f] [-y | -n] [-v] [-o hardware_options]
+ -x hardware_function ap_id...
+/usr/sbin/cfgadm -v [-a] [-s listing_option] [-] [ap_id | ap_type...]
+/usr/sbin/cfgadm -v -h [ap_id]...
+The InfiniBand hardware specific library /usr/lib/cfgadm/ib.so.1 provides the functionality for administering its fab<hy>
+ric through the cfgadm(1M) utility. cfgadm operates on attachment points. See cfgadm(1M).
+An InfiniBand (IB) device is enumerated by the IB nexus driver, ib(7D), based on the services from the IB Device
+Manager (IBDM).
+The IB nexus driver creates and initializes five types of child device nodes: <bu> IB Port devices <bu> IB HCA service
+(HCA_SVC) devices <bu> IB Virtual Physical Point of Attachment (VPPA) devices <bu> I/O Controller (IOC) <bu> IB Pseudo
+devices
+See ib(7D) for details on enumeration of IB Port, IB VPPA, and IB HCA_SVC devices. For additional information
+on IBDM, see ibdm(7D). See ib(4) for details on IB Pseudo devices.
+For IB administration, two types of static attachment point are created for the fabric administration as seen by the
+given host. There is one static attachment point ib and all IB devices (either an IOC, Port, VPPA, HCA_SVC, or a
+Pseudo device) in the fabric are represented as dynamic attachment points based off of it. There is another static at<hy>
+tachment point for each Host Channel Adapter (HCA) in the host based on its node Globally Unique Identifier
+(GUID) value.
+Attachment points are named through ap_ids. There are two types of ap_ids: logical and physical. The physical
+ap_id is based on the physical path name. For the IB fabric it is /devices/ib:fabric. The logical ap_id is a shorter,
+and has a more user friendly name.
+The static ap_id for the IB fabric is ib. The IB devices are dynamic attachment points and have no physical ap_id.
+The logical ap_id of an IOC contains its GUID, ib::IOC-GUID. An example of an IOC ap_id is
+ib::80020123456789a. The logical ap_id of a Pseudo device, see ib(4) for details, is of the format ib::driv<hy>
+er_name,unit-address. An example of a pseudo ap_id would be ib::sdp,0 where "sdp" is the driver name and "0" is
+its unit-address property. The logical ap_id of Port, VPPA and HCA_SVC device contains its Partition Key
+(P_Key), Port GUID / Node GUID and a communication service-name. The format of ap_id is as below:
+Port device
+ib::PORT_GUID,0,service-name
+VPPA device
+ib::PORT_GUID,P_Key,service-name
+HCA_SVC device
+ib::HCA_GUID,0,servicename
+The Partition Key (P_Key) is 0 for Port and HCA_SVC devices. The P_Key helps determine the partition to which
+this port belongs for a VPPA device node. A port might have more than one P_Key. An example of a VPPA device
+logical ap_id point is ib::80245678,ffff,ipib. The port-GUID is 80245678, the P_Key is 0xffff, and the service
+name is ipib. The service-name information is obtained from the file /kernel/drv/ib.conf which contains service-
+name strings. The HCA's logical ap_id contains its node GUID value, hca:HCA-GUID. An example is
+hca:21346543210a987.
+A listing of the IB attachment points includes information on all IB devices (IOC, VPPA, HCA_SVC, Pseudo, and
+Port devices seen by the IBDM and the IB nexus driver) in the fabric even if they are not seen by the host and con<hy>
+figured for use.
+The following shows a listing of five IB devices (two IOC, one VPPA, one Port, one HCA_SVC) and one HCA:
+<beginning of page>
+ example# cfgadm -al
+ Ap_Id Type Receptacle Occupant Condition
+ hca:21346543210a987 IB-HCA connected configured ok
+ ib IB-FABRIC connected configured ok
+ ib::80020123456789a IB-IOC connected configured ok
+ ib::802abc9876543 IB-IOC connected unconfigured unknown
+ ib::80245678,ffff,ipib IB-VPPA connected configured ok
+ ib::12245678,0,nfs IB-PORT connected configured ok
+ ib::21346543,0,hnfs IB-HCA_SVC connected configured ok
+ ib::sdp,0 IB-PSEUDO connected configured ok
+The ap_id ib::802abc9876543 shows an IOC device that is not yet configured by the host for use or had been previ<hy>
+ously offlined by an explicit
+ cfgadm -c unconfigure
+operation. The distinction was made by the information displayed under the Condition column. The IB device with
+a zero P_Key and HCA GUID is a HCA_SVC device. Refer to cfgadm(1M) for more information regarding listing
+attachment points.
+The receptacle state for attachment points have the following meanings:
+connected
+For an IOC/VPPA/Port/Pseudo/HCA_SVC device, connected implies that it has been seen by the host. The device
+might not have been configured for use by Solaris.
+For a HCA attachment point, connected implies that it has been configured and is in use.
+All IB ap_ids are always shown as connected.
+The occupant state for attachment points have the following meanings:
+configured
+The IB device, and the HCA ap_id, are configured and usable by Solaris.
+unconfigured
+The IB device at the ap_id was explicitly offlined using cfgadm -c unconfigure, was not successfully configured.
+This could be because it wasn not successfully configuref for use with Solaris (no driver, or a device problem), or
+because it was never configured for use by the IB nexus driver.
+The unconfigured operation is not supported for the HCA attachment point. The IB static apid, ib, is shown uncon<hy>
+figured if the system has no IB hardware.
+The attachment point conditions are:
+failed
+Not used.
+failing
+Not used.
+ok
+Normal state. Ready for use.
+<beginning of page>
+unknown
+This state is only valid for IB device that have been probed by IBDM but not yet configured for use by Solaris. It is
+also shown for devices that have been explicitly offlined by a cfgadm -c unconfigure operation. This condition does
+not apply to a HCA attachment point.
+unusable
+Not used.
+The following options are supported:
+-c function
+The IB hardware specific library supports two generic commands (functions). These commands are not supported on
+the static attachment points (that is, the HCA ap_ids and the IB static ib ap_id).
+The following generic commands are supported:
+configure
+Configure the IB device to be used by Solaris.
+unconfigure
+Unconfigure the IB device. If successful, cfgadm reports the condition of this ap_id as unknown.
+-f
+Not supported.
+-h ap_id
+Obtain IB specific help for an IB attachment point.
+-l
+List the state and condition of IB attachment points. The -l option works as described in cfgadm(1M).
+When paired with the -a option, displays the dynamic attachment points as well (IOC, VPPA, Port, Pseudo, and
+HCA_SVC devices).
+When paired with -v option, displays verbose data about the ap_ids. For an IOC, the Info field in the
+ cfgadm -avl
+output displays the following information: VendorID, IOCDeviceID, DeviceVersion, SubsystemVendorID, Subsys<hy>
+temID, Class, Subclass, Protocol, ProtocolVersion and IDString from the IOCControllerProfile. If the ID string isn't
+provided then nothing is displayed in its place. These fields are defined in the InfiniBand Specification Volume 1
+(http://www.infinibandta.org).
+For a VPPA, Port, or HCA_SVC device the Info field in the cfgadm -lav display shows the service name informa<hy>
+tion to which this device is bound. If no such information exists, nothing is displayed.
+For a Pseudo device cfgadm -alv displays the driver name and its unit-address information. For a HCA the verbose
+listing displays the VendorID, ProductID of the HCA, number of ports it has, and the PortGUID value of its ports.
+See EXAMPLES.
+<beginning of page>
+-o hardware_option
+This option is not currently defined.
+-s listing_option
+Attachment points of class ib can be listed by using the select sub-option. Refer to the cfgadm(1M) man page for
+more information.
+-x hardware_function
+Perform a hardware specific function. Note that the name can not be more than 4 characters long.
+The following hardware specific functions are supported:
+add_service -ocomm=[port|vppa|hca_svc],service=name
+This hardware specific function is supported on the static IB attachment point. It can be used to add a new service to
+/kernel/drv/ib.conf file and to update the ib(7D) driver.
+You must use the service=name option to indicate the new service to be added. You must use the option
+comm=[port|vppa|hca_svc] option to add the name service to either port-svc-list or to the hca-svc-list in the /ker<hy>
+nel/drv/ib.conf file. See EXAMPLES.
+delete_service -ocomm=[port|vppa|hca_svc],service=name
+This hardware specific function is supported on the static IB attachment point only. It can be used to delete an exist<hy>
+ing service from the /kernel/drv/ib.conf file and also from the ib(7D) driver's data base. You must use the ser<hy>
+vice=name option to indicate which service to delete. You must use the comm=[port|vppa|hca_svc] option to
+delete this service from the port-svc-list, vppa-svc-list, or vppa-svc-list of the /kernel/drv/ib.conf file. See EX<hy>
+AMPLES.
+list_clients
+Supported on HCA attachment points. Displays all the kernel IB clients using this HCA. It also displays the respec<hy>
+tive ap_ids of these kernel IB clients and if they have opened an alternate HCA device. See EXAMPLES.
+.
+If a given kernel IB client does not have a valid ap_id then a - is displayed in that column.
+list_services
+This hardware specific function is supported on the static IB attachment point only. It lists all the Port and VPPA ser<hy>
+vices as read from the /kernel/drv/ib.conf file. See EXAMPLES.
+unconfig_clients
+This hardware specific function is supported on the static HCA attachment point only. It can be used to unconfigure
+all IB kernel clients of this given HCA. Only IB kernel clients that do not have an alternate HCA are unconfigured.
+See EXAMPLES.
+update_ioc_config
+This hardware specific function is supported on static ib attachment point and the IOC attachment points. For the ib
+APID, this function updates properties of all the IOC device nodes. For the IOC APID, this function updates the
+properties of specified IOC device node. This command updates the port-list, port-entries, service-id, and service-
+name IOC node properties .
+See ib(7D).
+<beginning of page>
+update_pkey_tbls
+Supported on the static ib attachment point. Updates the PKEY information inside IBTL. IBTL re-reads the P_Key
+tables for all the ports on each HCA present on the host.
+See ibtl(7D).
+Example 1 Listing the State and Condition of IB Devices
+The following command lists the state and condition of IB devices on the system. It only shows the static attachment
+points.
+ example# cfgadm
+ hca:21346543210a987 IB-HCA connected configured ok
+ ib IB-FABRIC connected configured ok
+The -a option lists all attachment points. The following example uses the -a option and lists all attachment points:
+ example# cfgadm -a
+ hca:21346543210a987 IB-HCA connected configured ok
+ ib IB-FABRIC connected configured ok
+ ib::80020123456789a IB-IOC connected unconfigured ok
+ ib::80245678,ffff,ipib IB-VPPA connected configured ok
+ ib::21346543,0,hnfs IB-HCA_SVC connected configured ok
+ ib::12245678,0,nfs IB-PORT connected configured ok
+ ib::sdp,0 IB-PSEUDO connected configured ok
+Example 2 Listing the Verbose Status of a IB VPPA Device
+The following command lists the verbose status of a IB VPPA device:
+ example# cfgadm -alv ib::80245678,ffff,ipib
+ Ap_Id Receptacle Occupant Condition Information
+ When Type Busy Phys_Id
+ ib::80245678,ffff,ipib connected configured ok ipib
+ unavailable IB-VPPA n /devices/ib:fabric::80245678,ffff,ipib
+A verbose listing of an IOC shows additional information. The following command shows a verbose listing:
+ example# cfgadm -alv ib::80020123456789a
+ Ap_Id Receptacle Occupant Condition Information
+ When Type Busy Phys_Id
+ ib::80020123456789a connected configured ok VID: 0xeaea
+ DEVID: 0xeaea VER: 0x5 SUBSYS_VID: 0x0 SUBSYS_ID: 0x0 CLASS: 0xffff
+ SUBCLASS: 0xff PROTO: 0xff PROTOVER: 0x1 ID_STRING: Sample Host Adapter
+ unavailable IB-IOC n /devices/ib:fabric::80020123456789a
+A verbose listing of a Pseudo device shows:
+ example# cfgadm -alv ib::sdp,0
+ Ap_Id Receptacle Occupant Condition Information
+ When Type Busy Phys_Id
+ ib::sdp,0 connected configured ok Driver = "sd
+ p" Unit-address = "0"
+<beginning of page>
+ unavailable IB-PSEUDO n /devices/ib:fabric::sdp,0
+A verbose listing of a HCA shows:
+ example# cfgadm -alv hca:21346543210a987
+ Ap_Id Receptacle Occupant Condition Information
+ When Type Busy Phys_Id
+ hca:21346543210a987 connected configured ok VID: 0x15b3,
+ PID: 0x5a44, #ports: 0x2, port1 GUID: 0x80245678, port2 GUID: 0x80245679
+ unavailable IB-HCA n /devices/ib:21346543210a987
+You can obtain more user-friendly output if you specify these following cfgadm class and field selection options: -s
+"select=class(ib),cols=ap_id:info"
+The following command displays only IB ap_ids. The output only includes the ap_id and Information fields.
+ # cfgadm -al -s "cols=ap_id:info" ib::80245678,ffff,ipib
+ Ap_Id Information
+ ib::80245678,ffff,ipib ipib
+Example 3 Unconfiguring an Existing IB IOC
+The following command unconfigures the IB IOC attached to ib::80020123456789a, then displays the status of the
+ap_id:
+ # cfgadm -c unconfigure ib::80020123456789a
+ Unconfigure the device: /devices/ib:fabric::80020123456789a
+ This operation will suspend activity on the IB device
+ Continue (yes/no)?
+Enter: y
+ IB device unconfigured successfully.
+ # cfgadm -al ib::80020123456789a
+ Ap_Id Type Receptacle Occupant Condition
+ ib::80020123456789 IB-IOC connected unconfigured unknown
+ #
+The condition unknown implies that the device node doesn't exist anymore and this IB device's existence is known
+only to the IB Device Manager.
+Example 4 Configuring an IB IOC
+The following series of commands configures an IB device attached to ib::80020123456789a:
+ # cfgadm -yc configure ib::80020123456789a
+ # cfgadm -al ib::80020123456789a
+ Ap_Id Type Receptacle Occupant Condition
+ ib::80020123456789a IB-IOC connected configured ok
+<beginning of page>
+Example 5 Listing All Kernel IB Clients of a HCA
+The following command lists all kernel IB clients of an HCA attached to hca:21346543210a987:
+ # cfgadm -x list_clients hca:21346543210a987
+ Attachment Point Clients Alternate HCA
+ ib::80020123456789a ioc1 Yes
+ ib::80245678,ffff,ipib ipib No
+ ib::21346543,0,hnfs hnfs No
+ - ibdm No
+ - ibmf No
+Example 6 Adding a Port Service
+The following command adds a new Port service called srp:
+  # cfgadm -o comm=port,service=srp -x add_service ib
+Example 7 Deleting a VPPA Service
+The following command deletes the ibd VPPA service ibd:
+ # cfgadm -o comm=vppa,service=ipib -x delete_service ib
+Example 8 Listing Port, VPPA, HCA_SVC Services
+The following command lists all Port, VPPA, and HCA_SVC services:
+ # cfgadm -x list_services ib
+ Port communication services:
+  srp
+ VPPA communication services:
+  ipib
+  nfs
+ HCA_SVC communication services:
+  hnfs
+Example 9 Reprobing IOC Devices
+The following command reprobes all IOC device nodes.
+ # cfgadm -x update_ioc_config ib
+ This operation can update properties of IOC devices.
+ Continue (yes/no)?
+ Enter: y
+ #
+Example 10 Unconfiguring All Kernel Clients of a HCA
+The following command unconfigures all kernel clients of a HCA
+<beginning of page>
+ # cfgadm -x unconfig_clients hca:21346543
+  This operation will unconfigure clients of this HCA.
+  Continue (yes/no)?
+  Enter: y
+/usr/lib/cfgadm/ib.so.1
+Hardware-specific library for generic InfiniBand device administration
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsl
+cfgadm(1M), config_admin(3CFGADM), libcfgadm(3LIB), ib(4), attributes(5), ib(7D), ibdm(7D), ibtl(7D)
+InfiniBand Specification Volume 1 (http://www.infinibandta.org)
+Apart from the listing (cfgadm -l or cfgadm -x list_clients), only the superuser can execute any functions on an at<hy>
+tachment point.

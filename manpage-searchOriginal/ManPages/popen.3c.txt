@@ -1,0 +1,75 @@
+<beginning of page>
+popen, pclose <-> initiate a pipe to or from a process
+#include <stdio.h>
+FILE *popen(const char *command, const char *mode);
+int pclose(FILE *stream);
+The popen() function creates a pipe between the calling program and the command to be executed. The arguments
+to popen() are pointers to null-terminated strings. The command argument consists of a shell command line. The
+mode argument is an I/O mode, either r for reading or w for writing. The value returned is a stream pointer such that
+one can write to the standard input of the command, if the I/O mode is w, by writing to the file stream (see Intro(3));
+and one can read from the standard output of the command, if the I/O mode is r, by reading from the file stream. Be<hy>
+cause open files are shared, a type r command may be used as an input filter and a type w as an output filter. A trail<hy>
+ing F character can also be included in the mode argument as described in fopen(3C) to enable extended FILE facili<hy>
+ty.
+The environment of the executed command will be as if a child process were created within the popen() call using
+fork(2). If the application is standard-conforming (see standards(5)), the child is created as if invoked with the call:
+execl("/usr/xpg4/bin/sh", "sh", "-c",command, (char *)0);
+otherwise, the child is created as if invoked with the call:
+execl("/usr/bin/sh", "sh", "-c",command, (char *)0);
+The pclose() function closes a stream opened by popen() by closing the pipe. It waits for the associated process to
+terminate and returns the termination status of the process running the command language interpreter. This is the
+value returned by waitpid(3C). See wait.h(3HEAD) for more information on termination status. If, however, a call
+to waitpid() with a pid argument equal to the process ID of the command line interpreter causes the termination sta<hy>
+tus to be unavailable to pclose(), then pclose() returns <mi>1 with errno set to ECHILD to report this condition.
+Upon successful completion, popen() returns a pointer to an open stream that can be used to read or write to the
+pipe. Otherwise, it returns a null pointer and may set errno to indicate the error.
+Upon successful completion, pclose() returns the termination status of the command language interpreter as returned
+by waitpid(). Otherwise, it returns <mi>1 and sets errno to indicate the error.
+The pclose() function will fail if:
+ECHILD The status of the child process could not be obtained, as described in the DESCRIPTION.
+The popen() function may fail if:
+EMFILE There are currently FOPEN_MAX or STREAM_MAX streams open in the calling process.
+EINVAL The mode argument is invalid.
+The popen() function may also set errno values as described by fork(2) or pipe(2).
+If the original and popen() processes concurrently read or write a common file, neither should use buffered I/O.
+Problems with an output filter may be forestalled by careful buffer flushing, for example, with fflush() (see
+fclose(3C)). A security hole exists through the IFS and PATH environment variables. Full pathnames should be
+used (or PATH reset) and IFS should be set to space and tab (" \t").
+Even if the process has established a signal handler for SIGCHLD, it will be called when the command terminates.
+Even if another thread in the same process issues a wait(3C) call, it will interfere with the return value of pclose().
+Even if the process's signal handler for SIGCHLD has been set to ignore the signal, there will be no effect on
+pclose(). Example 1 popen() example
+The following program will print on the standard output (see stdio(3C)) the names of files in the current directory
+with a .c suffix.
+<beginning of page>
+ #include <stdio.h>
+ #include <stdlib.h>
+ main()
+ {
+  char *cmd = "/usr/bin/ls *.c";
+  char buf[BUFSIZ];
+  FILE *ptr;
+  if ((ptr = popen(cmd, "r")) != NULL) {
+  while (fgets(buf, BUFSIZ, ptr) != NULL)
+  (void) printf("%s", buf);
+  (void) pclose(ptr);
+  }
+  return 0;
+ }
+Example 2 system() replacement
+The following function can be used in a multithreaded process in place of the most common usage of the Unsafe
+system(3C) function:
+ int my_system(const char *cmd)
+ {
+  FILE *p;
+  if ((p = popen(cmd, "w")) == NULL)
+  return (-1);
+  return (pclose(p));
+ }
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+See below. _ MT-LevelSafe
+The F character in the mode argument of popen() is Evolving. In all other respects this function is Standard. The
+pclose() function is Standard.
+ksh(1), pipe(2), fclose(3C), fopen(3C), posix_spawn(3C), stdio(3C), system(3C), wait(3C), waitpid(3C),
+wait.h(3HEAD), attributes(5), standards(5)

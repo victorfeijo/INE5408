@@ -1,0 +1,85 @@
+<beginning of page>
+ddi_add_intr, ddi_get_iblock_cookie, ddi_remove_intr <-> hardware interrupt handling routines
+#include <sys/types.h>
+#include <sys/conf.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+int ddi_get_iblock_cookie(dev_info_t *dip, uint_t inumber,
+ ddi_iblock_cookie_t *iblock_cookiep);
+int ddi_add_intr(dev_info_t *dip, uint_t inumber,
+ ddi_iblock_cookie_t *iblock_cookiep,
+ ddi_idevice_cookie_t *idevice_cookiep,
+ uint_t (*int_handler) (caddr_t),
+ caddr_t int_handler_arg);
+void ddi_remove_intr(dev_info_t *dip,
+ uint_t inumber, ddi_iblock_cookie_t iblock_cookie);
+Solaris DDI specific (Solaris DDI). These interfaces are obsolete. Use the new interrupt interfaces referenced in In<hy>
+tro(9F). Refer to Writing Device Drivers for more information.
+For ddi_get_iblock_cookie():
+dip Pointer to dev_info structure.
+inumber Interrupt number.
+iblock_cookiep Pointer to an interrupt block cookie.
+For ddi_add_intr():
+dip Pointer to dev_info structure.
+inumber Interrupt number.
+iblock_cookiep Optional pointer to an interrupt block cookie where a returned interrupt block cookie is stored.
+idevice_cookiep Optional pointer to an interrupt device cookie where a returned interrupt device cookie is stored.
+int_handler Pointer to interrupt handler.
+int_handler_arg Argument for interrupt handler.
+For ddi_remove_intr():
+dip Pointer to dev_info structure.
+inumber Interrupt number.
+iblock_cookie Block cookie which identifies the interrupt handler to be removed.
+<beginning of page>
+ddi_get_iblock_cookie() retrieves the interrupt block cookie associated with a particular interrupt specification.
+This routine should be called before ddi_add_intr() to retrieve the interrupt block cookie needed to initialize locks
+(mutex(9F), rwlock(9F)) used by the interrupt routine. The interrupt number inumber determines for which inter<hy>
+rupt specification to retrieve the cookie. inumber is associated with information provided either by the device (see
+sbus(4)) or the hardware configuration file (see sysbus(4), isa(4), and driver.conf(4)). If only one interrupt is associ<hy>
+ated with the device, inumber should be 0.
+On a successful return, *iblock_cookiep contains information needed for initializing locks associated with the inter<hy>
+rupt specification corresponding to inumber (see mutex_init(9F) and rw_init(9F)). The driver can then initialize
+locks acquired by the interrupt routine before calling ddi_add_intr() which prevents a possible race condition where
+the driver's interrupt handler is called immediately after the driver has called ddi_add_intr() but before the driver
+has initialized the locks. This may happen when an interrupt for a different device occurs on the same interrupt level.
+If the interrupt routine acquires the lock before the lock has been initialized, undefined behavior may result.
+ddi_add_intr() adds an interrupt handler to the system. The interrupt number inumber determines which interrupt
+the handler will be associated with. (Refer to ddi_get_iblock_cookie() above.)
+On a successful return, iblock_cookiep contains information used for initializing locks associated with this interrupt
+specification (see mutex_init(9F) and rw_init(9F)). Note that the interrupt block cookie is usually obtained using
+ddi_get_iblock_cookie() to avoid the race conditions described above (refer to ddi_get_iblock_cookie() above).
+For this reason, iblock_cookiep is no longer useful and should be set to NULL.
+On a successful return, idevice_cookiep contains a pointer to a ddi_idevice_cookie_t structure (see ddi_ide<hy>
+vice_cookie(9S)) containing information useful for some devices that have programmable interrupts. If ide<hy>
+vice_cookiep is set to NULL, no value is returned.
+The routine intr_handler, with its argument int_handler_arg, is called upon receipt of the appropriate interrupt. The
+interrupt handler should return DDI_INTR_CLAIMED if the interrupt was claimed, DDI_INTR_UNCLAIMED
+otherwise.
+If successful, ddi_add_intr() returns DDI_SUCCESS. If the interrupt information cannot be found on the sun4u ar<hy>
+chitecture, either DDI_INTR_NOTFOUND or DDI_FAILURE can be returned. On i86pc and sun4m architec<hy>
+tures, if the interrupt information cannot be found, DDI_INTR_NOTFOUND is returned.
+ddi_remove_intr() removes an interrupt handler from the system. Unloadable drivers should call this routine during
+their detach(9E) routine to remove their interrupt handler from the system.
+The device interrupt routine for this instance of the device will not execute after ddi_remove_intr() returns. ddi_re<hy>
+move_intr() may need to wait for the device interrupt routine to complete before returning. Therefore, locks ac<hy>
+quired by the interrupt handler should not be held across the call to ddi_remove_intr() or deadlock may result.
+For certain bus types, you can call these DDI functions from a high-interrupt context. These types include ISA and
+SBus buses. See sysbus(4), isa(4), and sbus(4) for details.
+ddi_add_intr() and ddi_get_iblock_cookie() return:
+DDI_SUCCESS On success.
+DDI_INTR_NOTFOUND On failure to find the interrupt.
+DDI_FAILURE On failure. DDI_FAILURE can also be returned on failure to find interrupt (sun4u).
+ddi_add_intr(), ddi_remove_intr(), and ddi_get_iblock_cookie() can be called from user or kernel context.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Obsolete
+driver.conf(4), isa(4), sbus(4), sysbus(4), attach(9E), detach(9E), ddi_intr_hilevel(9F), Intro(9F), mutex(9F),
+<beginning of page>
+mutex_init(9F), rw_init(9F), rwlock(9F), ddi_idevice_cookie(9S)
+Writing Device Drivers
+ddi_get_iblock_cookie() must not be called after the driver adds an interrupt handler for the interrupt specification
+corresponding to inumber.
+All consumers of these interfaces, checking return codes, should verify return_code != DDI_SUCCESS. Checking
+for specific failure codes can result in inconsistent behaviors among platforms.
+The idevice_cookiep should really point to a data structure that is specific to the bus architecture that the device op<hy>
+erates on. Currently the SBus and PCI buses are supported and a single data structure is used to describe both.

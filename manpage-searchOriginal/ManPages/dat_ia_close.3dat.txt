@@ -1,0 +1,62 @@
+<beginning of page>
+dat_ia_close <-> close an IA
+cc [ flag... ] file... -ldat [ library... ]
+#include <dat/udat.h>
+DAT_RETURN
+ dat_ia_close (
+ IN DAT_IA_HANDLE ia_handle,
+ IN DAT_CLOSE_FLAGS ia_flags
+ )
+ia_handle Handle for an instance of a DAT IA.
+ia_flags Flags for IA closure. Flag definitions are:
+DAT_CLOSE_ABRUPT_FLAG Abrupt close. Abrupt cascading close of IA including all Consumer created DAT
+objects.
+DAT_CLOSE_GRACEFUL_FLAG Graceful close. Closure is successful only if all DAT objects created by the
+Consumer have been freed before the graceful closure call.
+Default value of DAT_CLOSE_DEFAULT = DAT_CLOSE_ABRUPT_FLAG represents abrupt closure of IA.
+The dat_ia_close() function closes an IA (destroys an instance of the Interface Adapter).
+The ia_flags specify whether the Consumer wants abrupt or graceful close.
+The abrupt close does a phased, cascading destroy. All DAT Objects associated with an IA instance are destroyed.
+These include all the connection oriented Objects: public and reserved Service Points; Endpoints, Connection Re<hy>
+quests, LMRs (including lmr_contexts), RMRs (including rmr_contexts), Event Dispatchers, CNOs, and Protection
+Zones. All the waiters on all CNOs, including the OS Wait Proxy Agents, are unblocked with the DAT_HAN<hy>
+DLE_NULL handle returns for an unblocking EVD. All direct waiters on all EVDs are also unblocked and return
+with DAT_ABORT.
+The graceful close does a destroy only if the Consumer has done a cleanup of all DAT objects created by the Con<hy>
+sumer with the exception of the asynchronous EVD. Otherwise, the operation does not destroy the IA instance and
+returns the DAT_INVALID_STATE.
+If async EVD was created as part of the of dat_ia_open(3DAT), dat_ia_close() must destroy it. If async_evd_han<hy>
+dle was passed in by the Consumer at dat_ia_open(), this handle is not destroyed. This is applicable to both abrupt
+and graceful ia_flags values.
+Because the Consumer did not create async EVD explicitly, the Consumer does not need to destroy it for graceful
+close to succeed.
+DAT_SUCCESS The operation was successful.
+DAT_INSUFFICIENT_RESOURCES The operation failed due to resource limitations. This is a catastrophic er<hy>
+ror.
+DAT_INVALID_HANDLE Invalid DAT handle; ia_handle is invalid.
+DAT_INVALID_PARAMETER Invalid parameter; ia_flags is invalid.
+DAT_INVALID_STATE Parameter in an invalid state. IA instance has Consumer-created objects associated with it.
+The dat_ia_close() function is the root cleanup method for the Provider, and, thus, all Objects.
+<beginning of page>
+Consumers are advised to explicitly destroy all Objects they created prior to closing the IA instance, but can use this
+function to clean up everything associated with an open instance of IA. This allows the Consumer to clean up in case
+of errors.
+Note that an abrupt close implies destruction of EVDs and CNOs. Just as with explicit destruction of an EVD or
+CNO, the Consumer should take care to avoid a race condition where a Consumer ends up attempting to wait on an
+EVD or CNO that has just been deleted.
+The techniques described in dat_cno_free(3DAT) and dat_evd_free(3DAT) can be used for these purposes.
+If the Consumer desires to shut down the IA as quickly as possible, the Consumer can call dat_ia_close(abrupt)
+without unblocking CNO and EVD waiters in an orderly fashion. There is a slight chance that an invalidated DAT
+handle will cause a memory fault for a waiter. But this might be an acceptable behavior, especially if the Consumer
+is shutting down the process.
+No provision is made for blocking on event completion or pulling events from queues.
+This is the general cleanup and last resort method for Consumer recovery. An implementation must provide for suc<hy>
+cessful completion under all conditions, avoiding hidden resource leakage (dangling memory, zombie processes, and
+so on) eventually leading to a reboot of the operating system.
+The dat_ia_close() function deletes all Objects that were created using the IA handle.
+The dat_ia_close() function can decrement a reference count for the Provider Library that is incremented by
+dat_ia_open() to ensure that the Provider Library cannot be removed when it is in use by a DAT Consumer.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Standard: uDAPL, 1.1, 1.2 _ MT-LevelUnsafe
+dat_cno_free(3DAT), dat_evd_free(3DAT), dat_ia_open(3DAT), libdat(3LIB), attributes(5)

@@ -1,0 +1,199 @@
+<beginning of page>
+add_drv <-> add a new device driver to the system
+add_drv [-b basedir] [-c class_name]
+ [-i 'identify_name...'] [-m 'permission','...']
+ [-p 'policy'] [-P privilege] [-n] [-f] [-v] device_driver
+The add_drv command is used to inform the system about newly installed device drivers.
+Each device on the system has a name associated with it. This name is represented by the name property for the de<hy>
+vice. Similarly, the device may also have a list of driver names associated with it. This list is represented by the com<hy>
+patible property for the device.
+The system determines which devices will be managed by the driver being added by examining the contents of the
+name property and the compatible property (if it exists) on each device. If the value in the name property does not
+match the driver being added, each entry in the compatible property is tried, in order, until either a match occurs or
+there are no more entries in the compatible property.
+In some cases, adding a new driver may require a reconfiguration boot. See the NOTES section.
+Aliases might require quoting (with double-quotes) if they contain numbers. See EXAMPLES.
+add_drv and update_drv(1M) read the /etc/minor_perm file to obtain permission information. The permission
+specified is applied to matching minor nodes created when a device bound to the driver is attached. A minor node's
+permission may be manually changed by chmod(1). For such nodes, the specified permissions apply, overriding the
+default  permissions specified via add_drv or update_drv(1M).
+The format of the /etc/minor_perm file is as follows:
+ name:minor_name permissions owner group
+minor_name may be the actual name of the minor node, or contain shell metacharacters to represent several minor
+nodes (see sh(1)).
+For example:
+ sd:* 0640 root sys
+ zs:[a-z],cu 0600 uucp uucp
+ mm:kmem 0640 root bin
+The first line sets all devices exported by the sd node to 0640 permissions, owned by root, with group sys. In the
+second line, devices such as a,cu and z,cu exported by the zs driver are set to 0600 permission, owned by uucp,
+with group uucp. In the third line the kmem device exported by the mm driver is set to 0640 permission, owned by
+root, with group bin.
+When running add_drv from within the context of a package's postinstall script, you must consider whether the
+package is being added to a system image or to a running system. When a package is being installed on a system im<hy>
+age, such as occurs with the Live Upgrade or flash features (see live_upgrade(5) and flarcreate(1M)), the
+BASEDIR variable refers to the image's base directory. In this situation, add_drv should be invoked with -b
+$BASEDIR. This causes add_drv only to update the image's system files; a reboot of the system or client would be
+required to make the driver operational.
+When a package is being installed on the running system itself, the system files need to be updated, as in the case
+above. However, the running kernel can be informed of the existence of the new driver without requiring a reboot. To
+accomplish this, the postinstall script must invoke add_drv without the -b option. Accordingly, postinstall scripts
+invoking add_drv should be written thusly:
+ if [ "${BASEDIR:=/}" = "/" ]
+ then
+  ADD_DRV="add_drv"
+ else
+  ADD_DRV="add_drv -b ${BASEDIR}"
+ fi
+<beginning of page>
+ $ADD_DRV [<options>] <driver>
+...or, alternatively:
+ if [ "${BASEDIR:=/}" != "/" ]
+ then
+  BASEDIR_OPT="-b $BASEDIR"
+ fi
+  add_drv $BASEDIR_OPT [<options>] <driver>
+The -b option is described below.
+-b basedir Installs the driver on the system with a root directory of basedir rather than installing on the system ex<hy>
+ecuting add_drv. This option is typically used in package post-installation scripts when the package is not being in<hy>
+stalled on the system executing the pkgadd command. The system using basedir as its root directory must reboot to
+complete the driver installation. Note -
+The root file system of any non-global zones must not be referenced with the -b option. Doing so might damage the
+global zone's file system, might compromise the security of the global zone, and might damage the non-global
+zone's file system. See zones(5).
+-c class_name The driver being added to the system exports the class class_name.
+-f Normally if a reconfiguration boot is required to complete the configuration of the driver into the system, add_drv
+will not add the driver. The force flag forces add_drv to add the driver even if a reconfiguration boot is required. See
+the -v flag.
+-i 'identify_name' A white-space separated list of aliases for the driver device_driver.
+-m 'permission' Specify the file system permissions for device nodes created by the system on behalf of de<hy>
+vice_driver.
+-n Do not try to load and attach device_driver, just modify the system configuration files for the device_driver.
+-p 'policy' Specify an additional device security policy.
+The device security policy constists of several whitespace separated tokens:
+ {minorspec {token=value}+}+
+minorspec is a simple wildcard pattern for a minor device. A single * matches all minor devices. Only one * is al<hy>
+lowed in the pattern.
+Patterns are matched in the following order: <bu> entries without a wildcard <bu> entries with wildcards, longest wildcard
+first The following tokens are defined: read_priv_set and write_priv_set. read_priv_set defines the privileges that
+need to be asserted in the effective set of the calling process when opening a device for reading. write_priv_set de<hy>
+fines the privileges that need to be asserted in the effective set of the calling process when opening a device for writ<hy>
+ing. See privileges(5).
+A missing minor spec is interpreted as a *.
+-P 'privilege' Specify additional, comma separated, privileges used by the driver. You can also use specific privileges
+in the device's policy.
+<beginning of page>
+-v The verbose flag causes add_drv to provide additional information regarding the success or failure of a driver's
+configuration into the system. See the EXAMPLES section.
+Example 1 Adding SUNW Example Driver to the System
+The following example adds the SUNW,example driver to a 32-bit system, with an alias name of SUNW,alias. It as<hy>
+sumes the driver has already been copied to /usr/kernel/drv.
+ example# add_drv -m '* 0666 bin bin','a 0644 root sys' \
+  -p 'a write_priv_set=sys_config * write_priv_set=none' \
+  -i 'SUNW,alias' SUNW,example
+Every minor node created by the system for the SUNW,example driver will have the permission 0666, and be
+owned by user bin in the group bin, except for the minor device a, which will be owned by root, group sys, and
+have a permission of 0644. The specified device policy requires no additional privileges to open all minor nodes, ex<hy>
+cept minor device a, which requires the sys_config privilege when opening the device for writing.
+Example 2 Adding Driver to the Client /export/root/sun1
+The following example adds the driver to the client /export/root/sun1. The driver is installed and loaded when the
+client machine, sun1, is rebooted. This second example produces the same result as the first, except the changes are
+on the diskless client, sun1, and the client must be rebooted for the driver to be installed.
+ example# add_drv -m '* 0666 bin bin','a 0644 root sys' \
+  -i 'SUNW,alias' -b /export/root/sun1 \
+  SUNW,example
+See the note in the description of the -b option, above, specifying the caveat regarding the use of this option with the
+Solaris zones feature.
+Example 3 Adding Driver for a Device Already Managed by an Existing Driver
+The following example illustrates the case where a new driver is added for a device that is already managed by an
+existing driver. Consider a device that is currently managed by the driver dumb_framebuffer. The name and com<hy>
+patible properties for this device are as follows:
+ name="display"
+ compatible="whizzy_framebuffer", "dumb_framebuffer"
+If add_drv is used to add the whizzy_framebuffer driver, the following will result.
+ example# add_drv whizzy_framebuffer
+ Error: Could not install driver (whizzy_framebuffer)
+ Device managed by another driver.
+If the -v flag is specified, the following will result.
+ example# add_drv -v whizzy_framebuffer
+ Error: Could not install driver (whizzy_framebuffer)
+ Device managed by another driver.
+ Driver installation failed because the following
+ entries in /devices would be affected:
+<beginning of page>
+  /devices/iommu@f,e0000000/sbus@f,e0001000/display[:*]
+  (Device currently managed by driver "dumb_framebuffer")
+ The following entries in /dev would be affected:
+  /dev/fbs/dumb_framebuffer0
+If the -v and -f flags are specified, the driver will be added resulting in the following.
+ example# add_drv -vf whizzy_framebuffer
+ A reconfiguration boot must be performed to complete the
+ installation of this driver.
+ The following entries in /devices will be affected:
+  /devices/iommu@f,e0000000/sbus@f,e0001000/display[:*]
+  (Device currently managed by driver "dumb_framebuffer"
+ The following entries in /dev will be affected:
+  /dev/fbs/dumb_framebuffer0
+The above example is currently only relevant to devices exporting a generic device name.
+Example 4 Use of Double Quotes in Specifying Driver Alias
+The following example shows the use of double quotes in specifying a driver alias that contains numbers.
+ example# add_drv -i '"pci10c5,25"' smc
+add_drv returns 0 on success and 1 on failure.
+/kernel/drv
+32-bit boot device drivers
+/kernel/drv/sparcv9
+64-bit SPARC boot device drivers
+/kernel/drv/amd64
+64-bit x86 boot device drivers
+/usr/kernel/drv
+other 32-bit drivers that could potentially be shared between platforms
+/usr/kernel/drv/sparcv9
+other 64-bit SPARC drivers that could potentially be shared between platforms
+/usr/kernel/drv/amd64
+other 64-bit x86 drivers that could potentially be shared between platforms
+<beginning of page>
+/platform/`uname -i`/kernel/drv
+32-bit platform-dependent drivers
+/platform/`uname -i`/kernel/drv/sparcv9
+64-bit SPARC platform-dependent drivers
+/platform/`uname -i`/kernel/drv/amd64
+64-bit x86 platform-dependent drivers
+/etc/driver_aliases
+driver aliases file
+/etc/driver_classes
+driver classes file
+/etc/minor_perm
+minor node permissions
+/etc/name_to_major
+major number binding
+/etc/security/device_policy
+device policy
+/etc/security/extra_privs
+device privileges
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu
+boot(1M), chmod(1), devfsadm(1M), flarcreate(1M), kernel(1M), modinfo(1M), rem_drv(1M), up<hy>
+date_drv(1M), driver.conf(4), system(4), attributes(5), live_upgrade(5), privileges(5), devfs(7FS), ddi_cre<hy>
+ate_minor_node(9F)
+
+It is possible to add a driver for a device already being managed by a different driver, where the driver being added
+appears in the device's compatible list before the current driver. In such cases, a reconfiguration boot is required
+(see boot(1M) and kernel(1M)). After the reconfiguration boot, device links in /dev and references to these files
+may no longer be valid (see the -v flag). If a reconfiguration boot would be required to complete the driver installa<hy>
+tion, add_drv will fail unless the -f option is specified. See Example 3 in the EXAMPLES section.
+With the introduction of the device policy several drivers have had their minor permissions changed and a device
+policy instated. The typical network driver should use the following device policy:
+<beginning of page>
+ add_drv -p 'read_priv_set=net_rawaccess\
+  write_priv_set=net_rawaccess' -m '* 666 root sys'\
+  mynet
+This document does not constitute an API. /etc/minor_perm, /etc/name_to_major, /etc/driver_classes, and /de<hy>
+vices may not exist or may have different contents or interpretations in a future release. The existence of this notice
+does not imply that any other documentation that lacks this notice constitutes an API.
+/etc/minor_perm can only be updated by add_drv(1M), rem_drv(1M) or update_drv(1M).
+In the current version of add_drv, the use of double quotes to specify an alias is optional when used from the com<hy>
+mand line. However, when using add_drv from packaging scripts, you should continue to use double quotes to
+specify an alias.
+Previous versions of add_drv accepted a pathname for device_driver. This feature is no longer supported and results
+in failure.

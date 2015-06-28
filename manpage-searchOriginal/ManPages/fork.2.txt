@@ -1,0 +1,108 @@
+<beginning of page>
+fork, fork1, forkall, forkx, forkallx <-> create a new process
+#include <sys/types.h>
+#include <unistd.h>
+pid_t fork(void);
+pid_t fork1(void);
+pid_t forkall(void);
+#include <sys/fork.h>
+pid_t forkx(int flags);
+pid_t forkallx(int flags);
+The fork(), fork1(), forkall(), forkx(), and forkallx() functions create a new process. The address space of the new
+process (child process) is an exact copy of the address space of the calling process (parent process). The child
+process inherits the following attributes from the parent process: <bu> real user ID, real group ID, effective user ID, ef<hy>
+fective group ID <bu> environment <bu> open file descriptors <bu> close-on-exec flags (see exec(2)) <bu> signal handling settings
+(that is, SIG_DFL, SIG_IGN, SIG_HOLD, function address) <bu> supplementary group IDs <bu> set-user-ID mode bit <bu>
+set-group-ID mode bit <bu> profiling on/off status <bu> nice value (see nice(2)) <bu> scheduler class (see priocntl(2)) <bu> all at<hy>
+tached shared memory segments (see shmop(2)) <bu> process group ID -- memory mappings (see mmap(2)) <bu> session
+ID (see exit(2)) <bu> current working directory <bu> root directory <bu> file mode creation mask (see umask(2)) <bu> resource lim<hy>
+its (see getrlimit(2)) <bu> controlling terminal <bu> saved user ID and group ID <bu> task ID and project ID <bu> processor bind<hy>
+ings (see processor_bind(2)) <bu> processor set bindings (see pset_bind(2)) <bu> process privilege sets (see getppriv(2)) <bu>
+process flags (see getpflags(2)) <bu> active contract templates (see contract(4))
+Scheduling priority and any per-process scheduling parameters that are specific to a given scheduling class might or
+might not be inherited according to the policy of that particular class (see priocntl(2)). The child process might or
+might not be in the same process contract as the parent (see process(4)). The child process differs from the parent
+process in the following ways: <bu> The child process has a unique process ID which does not match any active process
+group ID. <bu> The child process has a different parent process ID (that is, the process ID of the parent process). <bu> The
+child process has its own copy of the parent's file descriptors and directory streams. Each of the child's file descrip<hy>
+tors shares a common file pointer with the corresponding file descriptor of the parent. <bu> Each shared memory seg<hy>
+ment remains attached and the value of shm_nattach is incremented by 1. <bu> All semadj values are cleared (see se<hy>
+mop(2)). <bu> Process locks, text locks, data locks, and other memory locks are not inherited by the child (see
+plock(3C) and memcntl(2)). <bu> The child process's tms structure is cleared: tms_utime, stime, cutime, and cstime
+are set to 0 (see times(2)). <bu> The child processes resource utilizations are set to 0; see getrlimit(2). The it_value and
+it_interval values for the ITIMER_REAL timer are reset to 0; see getitimer(2). <bu> The set of signals pending for
+the child process is initialized to the empty set. <bu> Timers created by timer_create(3C) are not inherited by the child
+process. <bu> No asynchronous input or asynchronous output operations are inherited by the child. <bu> Any preferred
+hardware address tranlsation sizes (see memcntl(2)) are inherited by the child. <bu> The child process holds no con<hy>
+tracts (see contract(4)).
+Record locks set by the parent process are not inherited by the child process (see fcntl(2)).
+Although any open door descriptors in the parent are shared by the child, only the parent will receive a door invoca<hy>
+tion from clients even if the door descriptor is open in the child. If a descriptor is closed in the parent, attempts to
+operate on the door descriptor will fail even if it is still open in the child.
+A call to forkall() or forkallx() replicates in the child process all of the threads (see thr_create(3C) and
+pthread_create(3C)) in the parent process. A call to fork1() or forkx() replicates only the calling thread in the child
+process.
+A call to fork() is identical to a call to fork1(); only the calling thread is replicated in the child process. This is the
+POSIX-specified behavior for fork().
+In releases of Solaris prior to Solaris 10, the behavior of fork() depended on whether or not the application was
+linked with the POSIX threads library. When linked with -lthread (Solaris Threads) but not linked with -lpthread
+(POSIX Threads), fork() was the same as forkall(). When linked with -lpthread, whether or not also linked with
+-lthread, fork() was the same as fork1().
+Prior to Solaris 10, either -lthread or -lpthread was required for multithreaded applications. This is no longer the
+case. The standard C library provides all threading support for both sets of application programming interfaces. Ap<hy>
+<beginning of page>
+plications that require replicate-all fork semantics must call forkall() or forkallx().
+The forkx() and forkallx() functions accept a flags argument consisting of a bitwise inclusive-OR of zero or more of
+the following flags, which are defined in the header <sys/fork.h>:
+FORK_NOSIGCHLD
+Do not post a SIGCHLD signal to the parent process when the child process terminates, regardless of the disposi<hy>
+tion of the SIGCHLD signal in the parent. SIGCHLD signals are still possible for job control stop and continue ac<hy>
+tions if the parent has requested them.
+FORK_WAITPID
+Do not allow wait-for-multiple-pids by the parent, as in wait(), waitid(P_ALL), or waitid(P_PGID), to reap the
+child and do not allow the child to be reaped automatically due the disposition of the SIGCHLD signal being set to
+be ignored in the parent. Only a specific wait for the child, as in waitid(P_PID, pid), is allowed and it is required,
+else when the child exits it will remain a zombie until the parent exits.
+If the flags argument is 0 forkx() is identical to fork() and forkallx() is identical to forkall().
+If a multithreaded application calls fork(), fork1(), or forkx(), and the child does more than simply call one of the
+exec(2) functions, there is a possibility of deadlock occurring in the child. The application should use pthread_at<hy>
+fork(3C) to ensure safety with respect to this deadlock. Should there be any outstanding mutexes throughout the
+process, the application should call pthread_atfork() to wait for and acquire those mutexes prior to calling fork(),
+fork1(), or forkx(). See "MT-Level of Libraries" on the attributes(5) manual page.
+The pthread_atfork() mechanism is used to protect the locks that libc(3LIB) uses to implement interfaces such as
+malloc(3C). All interfaces provided by libc are safe to use in a child process following a fork(), except when fork()
+is executed within a signal handler.
+The POSIX standard (see standards(5)) requires fork to be Async-Signal-Safe (see attributes(5)). This cannot be
+made to happen with fork handlers in place, because they acquire locks. To be in nominal compliance, no fork han<hy>
+dlers are called when fork() is executed within a signal context. This leaves the child process in a questionable state
+with respect to its locks, but at least the calling thread will not deadlock itself attempting to acquire a lock that it al<hy>
+ready owns. In this situation, the application should strictly adhere to the advice given in the POSIX specification:
+"To avoid errors, the child process may only execute Async-Signal-Safe operations until such time as one of the ex<hy>
+ec(2) functions is called."
+Upon successful completion, fork(), fork1(), forkall(), forkx(), and forkallx() return 0 to the child process and re<hy>
+turn the process ID of the child process to the parent process. Otherwise, (pid_t)<mi>1 is returned to the parent process,
+no child process is created, and errno is set to indicate the error.
+The fork(), fork1(), forkall(), forkx(), and forkallx() functions will fail if:
+EAGAIN A resource control or limit on the total number of processes, tasks or LWPs under execution by a single
+user, task, project, or zone has been exceeded, or the total amount of system memory available is temporarily insuffi<hy>
+cient to duplicate this process.
+ENOMEM There is not enough swap space.
+EPERM The {PRIV_PROC_FORK} privilege is not asserted in the effective set of the calling process.
+The forkx() and forkallx() functions will fail if:
+EINVAL The flags argument is invalid.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+<beginning of page>
+Committed _ MT-LevelAsync-Signal-Safe. _ StandardSee below.
+For fork(), see standards(5).
+alarm(2), exec(2), exit(2), fcntl(2), getitimer(2), getrlimit(2), memcntl(2), mmap(2), nice(2), priocntl(2), se<hy>
+mop(2), shmop(2), times(2), umask(2), waitid(2), door_create(3C), exit(3C), plock(3C), pthread_atfork(3C),
+pthread_create(3C), signal(3C), system(3C), thr_create(3C) timer_create(3C), wait(3C), contract(4),
+process(4), attributes(5), privileges(5), standards(5)
+An application should call _exit() rather than exit(3C) if it cannot execve(), since exit() will flush and close standard
+I/O channels and thereby corrupt the parent process's standard I/O data structures. Using exit(3C) will flush buffered
+data twice. See exit(2).
+The thread in the child that calls fork(), fork1(), or fork1x() must not depend on any resources held by threads that
+no longer exist in the child. In particular, locks held by these threads will not be released.
+In a multithreaded process, forkall() in one thread can cause blocking system calls to be interrupted and return with
+an EINTR error.

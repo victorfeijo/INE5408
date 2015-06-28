@@ -1,0 +1,168 @@
+<beginning of page>
+crontab <-> user crontab file
+/usr/bin/crontab [filename]
+/usr/bin/crontab -e [username]
+/usr/bin/crontab -l [username]
+/usr/bin/crontab -r [username]
+/usr/xpg4/bin/crontab [filename]
+/usr/xpg4/bin/crontab -e [username]
+/usr/xpg4/bin/crontab -l [username]
+/usr/xpg4/bin/crontab -r [username]
+/usr/xpg6/bin/crontab [filename]
+/usr/xpg6/bin/crontab -e [username]
+/usr/xpg6/bin/crontab -l [username]
+/usr/xpg6/bin/crontab -r [username]
+The crontab utility manages a user's access with cron (see cron(1M)) by copying, creating, listing, and removing
+crontab files. If invoked without options, crontab copies the specified file, or the standard input if no file is speci<hy>
+fied, into a directory that holds all users' crontabs.
+If crontab is invoked with filename, this overwrites an existing crontab entry for the user that invokes it.
+Users: Access to crontab is allowed: <bu> if the user's name appears in /etc/cron.d/cron.allow. <bu> if
+/etc/cron.d/cron.allow does not exist and the user's name is not in /etc/cron.d/cron.deny.
+Users: Access to crontab is denied: <bu> if /etc/cron.d/cron.allow exists and the user's name is not in it. <bu> if
+/etc/cron.d/cron.allow does not exist and user's name is in /etc/cron.d/cron.deny. <bu> if neither file exists, only a user
+with the solaris.jobs.user authorization is allowed to submit a job. <bu> if Solaris Auditing is enabled, the user's shell
+is not audited and the user is not the crontab owner. This can occur if the user logs in by way of a program, such as
+some versions of SSH, which does not set audit parameters.
+The rules for allow and deny apply to root only if the allow/deny files exist.
+The allow/deny files consist of one user name per line.
+A crontab file consists of lines of six fields each. The fields are separated by spaces or tabs. The first five are integer
+patterns that specify the following:
+ minute (0<mi>59),
+ hour (0<mi>23),
+ day of the month (1<mi>31),
+ month of the year (1<mi>12),
+ day of the week (0<mi>6 with 0=Sunday).
+Each of these patterns can be either an asterisk (meaning all legal values) or a list of elements separated by commas.
+An element is either a number or two numbers separated by a minus sign (meaning an inclusive range). Time speci<hy>
+fied here is interpreted in the currently active timezone. At the top of the crontab file this is the timezone which is set
+system-wide in /etc/default/init. A user can add a line such as:
+ TZ=timezone
+...and all subsequent entries will be interpreted using that timezone, until a new TZ=timezone line is encountered.
+<beginning of page>
+The specification of days can be made by two fields (day of the month and day of the week). Both are adhered to if
+specified as a list of elements. See EXAMPLES.
+The sixth field of a line in a crontab file is a string that is executed by the shell at the specified times. A percent
+character in this field (unless escaped by \) is translated to a NEWLINE character.
+Only the first line (up to a `%' or end of line) of the command field is executed by the shell. Other lines are made
+available to the command as standard input. Any blank line or line beginning with a `#' is a comment and is ig<hy>
+nored.
+The shell is invoked from your $HOME directory. As with $TZ, both $SHELL and $HOME can be set by having a
+line such as:
+ SHELL=/usr/bin/someshell
+...or:
+ HOME=somedirectory
+...which will take precedence for all the remaining entries in the crontab or until there is another HOME or SHELL
+entry. It is invoked with an arg0 of the basename of the $SHELL that is currently in effect. A user who wants to
+have his .profile or equivalent file executed must explicitly do so in the crontab file. cron supplies a default envi<hy>
+ronment for every shell, defining HOME, LOGNAME, SHELL, TZ, and PATH. The default PATH for user cron
+jobs is /usr/bin; while root cron jobs default to /usr/sbin:/usr/bin. The default PATH can be set in /etc/default/cron
+(see cron(1M)). The TZ, HOME, and SHELL environment variables are set to match those that are in effect in the
+crontab file at the time.
+If you do not redirect the standard output and standard error of your commands, any generated output or errors are
+mailed to you.
+The following variables are supported:
+HOME
+Allows the user to choose and alternative directory for cron to change directory to prior to running the command.
+For example:
+ HOME=/var/tmp
+SHELL
+The name of the shell to use to run subsequent commands. For example:
+ SHELL=/usr/bin/ksh
+TZ
+Allows the user to choose the timezone in which the cron entries are run. This effects both the environment of the
+command that is run and the timing of the entry. For example, to have your entries run using the timezone for Ice<hy>
+land, use:
+ TZ=Iceland
+Each of these variables affects all of the lines that follow it in the crontab file, until it is reset by a subsequent line
+resetting that variable. Hence, it is possible to have multiple timezones supported within a single crontab file.
+<beginning of page>
+The lines that are not setting these environment variables are the same as crontab entries that conform to the UNIX
+standard and are described elsewhere in this man page.
+The default timezone of the cron daemon sets the system-wide timezone for cron entries. This, in turn, is by set by
+default system-wide using /etc/default/init.
+If some form of daylight savings or summer/winter time is in effect, then jobs scheduled during the switchover pe<hy>
+riod could be executed once, twice, or not at all.
+The following options are supported:
+-e Edits a copy of the current user's crontab file, or creates an empty file to edit if crontab does not exist. When
+editing is complete, the file is installed as the user's crontab file.
+The environment variable EDITOR determines which editor is invoked with the -e option. All crontab jobs should
+be submitted using crontab. Do not add jobs by just editing the crontab file, because cron is not aware of changes
+made this way.
+If all lines in the crontab file are deleted, the old crontab file is restored. The correct way to delete all lines is to re<hy>
+move the crontab file using the -r option.
+If username is specified, the specified user's crontab file is edited, rather than the current user's crontab file. This
+can only be done by root or by a user with the solaris.jobs.admin authorization.
+-l Lists the crontab file for the invoking user. Only root or a user with the solaris.jobs.admin authorization can
+specify a username following the -l option to list the crontab file of the specified user.
+-r Removes a user's crontab from the crontab directory. Only root or a user with the solaris.jobs.admin authoriza<hy>
+tion can specify a username following the -r option to remove the crontab file of the specified user.
+Example 1 Cleaning up Core Files
+This example cleans up core files every weekday morning at 3:15 am:
+ 15 3 * * 1-5 find $HOME -namecore 2>/dev/null | xargs rm -f
+Example 2 Mailing a Birthday Greeting
+This example mails a birthday greeting:
+ 0 12 14 2 * mailx john%Happy Birthday!%Time for lunch.
+Example 3 Specifying Days of the Month and Week
+This example runs a command on the first and fifteenth of each month, as well as on every Monday:
+ 0 0 1,15 * 1
+To specify days by only one field, the other field should be set to *. For example:
+ 0 0 * * 1
+would run a command only on Mondays.
+<beginning of page>
+Example 4 Using Environment Variables
+The following entries take advantage of crontab support for certain environment variables.
+ TZ=GMT
+ HOME=/local/home/user
+ SHELL=/usr/bin/ksh
+ 0 0 * * * echo $(date) > midnight.GMT
+ TZ=PST
+ 0 0 * * * echo $(date) > midnight.PST
+ TZ=EST
+ HOME=/local/home/myuser
+ SHELL=/bin/csh
+The preceding entries allow two jobs to run. The first one would run at midnight in the GMT timezone and the sec<hy>
+ond would run at midnight in the PST timezone. Both would be run in the directory /local/home/user using the Korn
+shell. The file concludes with TZ, HOME, and SHELL entries that return those variable to their default values.
+See environ(5) for descriptions of the following environment variables that affect the execution of crontab: LANG,
+LC_ALL, LC_CTYPE, LC_MESSAGES, and NLSPATH.
+EDITOR Determine the editor to be invoked when the -e option is specified. This is overridden by the VISUAL en<hy>
+vironmental variable. The default editor is vi(1).
+PATH The PATH in crontab's environment specifies the search path used to find the editor.
+VISUAL Determine the visual editor to be invoked when the -e option is specified. If VISUAL is not specified, then
+the environment variable EDITOR is used. If that is not set, the default is vi(1).
+EDITOR Determine the editor to be invoked when the -e option is specified. The default editor is /usr/xpg4/bin/vi.
+EDITOR Determine the editor to be invoked when the -e option is specified. The default editor is /usr/xpg6/bin/vi.
+The following exit values are returned:
+0 Successful completion.
+>0 An error occurred.
+/etc/cron.d main cron directory
+/etc/cron.d/cron.allow list of allowed users
+/etc/default/cron contains cron default settings
+/etc/cron.d/cron.deny list of denied users
+/var/cron/log accounting information
+<beginning of page>
+/var/spool/cron/crontabs spool area for crontab
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu _ Interface StabilityStandard
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wxcu4 _ Interface StabilityStandard
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wxcu6 _ Interface StabilityStandard
+atq(1), atrm(1), auths(1), ed(1), sh(1), vi(1), cron(1M), su(1M), auth_attr(4), attributes(5), environ(5), stan<hy>
+dards(5)
+If you inadvertently enter the crontab command with no arguments, do not attempt to get out with Control-d. This
+removes all entries in your crontab file. Instead, exit with Control-c.
+When updating cron, check first for existing crontab entries that can be scheduled close to the time of the update.
+Such entries can be lost if the update process completes after the scheduled event. This can happen because, when
+cron is notified by crontab to update the internal view of a user's crontab file, it first removes the user's existing in<hy>
+ternal crontab and any internal scheduled events. Then it reads the new crontab file and rebuilds the internal
+crontab and events. This last step takes time, especially with a large crontab file, and can complete after an exist<hy>
+ing crontab entry is scheduled to run if it is scheduled too close to the update. To be safe, start a new job at least 60
+seconds after the current date and time.
+If an authorized user other than root modifies another user's crontab file, the resulting behavior can be unpre<hy>
+dictable. Instead, the authorized user should first use su(1M) to become superuser to the other user's login before
+making any changes to the crontab file.
+Care should be taken when adding TZ, SHELL and HOME variables to the crontab file when the crontab file
+could be shared with applications that do not expect those variables to be changed from the default. Resetting the
+values to their defaults at the bottom of the file will minimize the risk of problems.

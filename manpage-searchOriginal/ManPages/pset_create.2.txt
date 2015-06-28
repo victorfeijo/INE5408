@@ -1,0 +1,45 @@
+<beginning of page>
+pset_create, pset_destroy, pset_assign <-> manage sets of processors
+#include <sys/pset.h>
+int pset_create(psetid_t *newpset);
+int pset_destroy(psetid_t pset);
+int pset_assign(psetid_t pset, processorid_t cpu, psetid_t *opset);
+These functions control the creation and management of sets of processors. Processor sets allow a subset of the sys<hy>
+tem's processors to be set aside for exclusive use by specified LWPs and processes. The binding of LWPs and pro<hy>
+cesses to processor sets is controlled by pset_bind(2).
+The pset_create() function creates an empty processor set that contains no processors. On successful return, new<hy>
+pset will contain the ID of the new processor set.
+The pset_destroy() function destroys the processor set pset, releasing its constituent processors and processes. If
+pset is PS_MYID, the processor set to which the caller is bound is destroyed.
+The pset_assign() function assigns the processor cpu to the processor set pset. A processor that has been assigned to
+a processor set will run only LWPs and processes that have been explicitly bound to that processor set, unless anoth<hy>
+er LWP requires a resource that is only available on that processor.
+On successful return, if opset is non-null, opset will contain the processor set ID of the former processor set of the
+processor.
+If pset is PS_NONE, pset_assign() releases processor cpu from its current processor set.
+If pset is PS_QUERY, pset_assign() makes no change to processor sets, but returns the current processor set ID of
+processor cpu in opset.
+If pset is PS_MYID, processor cpu is assigned to the processor set to which the caller belongs. If the caller does not
+belong to a processor set, processor cpu is released from its current processor set.
+These functions are restricted to privileged processes, except for pset_assign() when pset is PS_QUERY.
+Upon successful completion, these functions return 0. Otherwise, <mi>1 is returned and errno is set to indicate the er<hy>
+ror.
+These functions will fail if:
+EBUSY The processor could not be moved to the specified processor set.
+EFAULT The location pointed to by newpset was not writable by the user, or the location pointed to by opset was
+not NULL and not writable by the user.
+EINVAL The specified processor does not exist, the specified processor is not on-line, or an invalid processor set
+was specified.
+ENOMEM There was insufficient space for pset_create to create a new processor set.
+ENOTSUP The pools facility is active. See pooladm(1M) and pool_set_status(3POOL) for information about en<hy>
+abling and disabling the pools facility.
+EPERM The {PRIV_SYS_RES_CONFIG} privilege is not asserted in the effective set of the calling process.
+See attributes(5) for descriptions of the following attributes:
+<beginning of page>
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed _ MT-LevelAsync-Signal-Safe
+pooladm(1M), psradm(1M), psrinfo(1M), psrset(1M), p_online(2), processor_bind(2), pset_bind(2), pset_in<hy>
+fo(2), pool_set_status(3POOL), pset_getloadavg(3C), attributes(5), privileges(5)
+The processor set type of PS_SYSTEM is no longer supported.
+Processors with LWPs bound to them using processor_bind(2) cannot be assigned to a new processor set. If this is
+attempted, pset_assign() will fail and set errno to EBUSY.

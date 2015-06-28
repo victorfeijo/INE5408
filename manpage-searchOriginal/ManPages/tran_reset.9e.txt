@@ -1,0 +1,35 @@
+<beginning of page>
+tran_reset <-> reset a SCSI bus or target
+#include <sys/scsi/scsi.h>
+ int prefixtran_reset(struct scsi_address *ap, int level);
+Solaris architecture specific (Solaris DDI).
+ap Pointer to the scsi_address(9S) structure.
+level The level of reset required.
+The tran_reset() vector in the scsi_hba_tran(9S) structure must be initialized during the HBA driver's attach(9E)
+to point to an HBA entry point to be called when a target driver calls scsi_reset(9F).
+tran_reset() must reset either the SCSI bus, a SCSI target device, or a SCSI logical unit as specified by level.
+level must be one of the following:
+RESET_ALL Reset the SCSI bus.
+RESET_TARGET Reset the target specified by ap.
+RESET_LUN Reset the logical unit specified by ap.
+tran_reset should set the pkt_reason field of all outstanding packets in the transport layer associated with each tar<hy>
+get or logical unit that was successfully reset to CMD_RESET and the pkt_statistics field must be OR'ed with ei<hy>
+ther STAT_BUS_RESET (if the SCSI bus was reset) or STAT_DEV_RESET (if the target or logical unit was re<hy>
+set).
+The HBA driver should use a SCSI Bus Device Reset Message to reset a target device. The HBA driver should use a
+SCSI Logical Unit Reset Message to reset a logical unit.
+Packets that are in the transport layer but not yet active on the bus should be returned with pkt_reason set to
+CMD_RESET and pkt_statistics OR'ed with STAT_ABORTED.
+Support for RESET_LUN is optional but strongly encouraged for new and updated HBA drivers. If an HBA driver
+provides RESET_LUN support, it must also create the lun-reset capability with a value of zero for each target de<hy>
+vice instance represented by a valid ap. The HBA is also required to provide the means to return the current value of
+the lun-reset capability in its tran_getcap(9E) routine, as well as the means to change the value of the lun_reset ca<hy>
+pability in its tran_getcap(9E) routine.
+tran_reset() should return:
+1 on success.
+0 on failure.
+The tran_reset() function can be called from user or interrupt context. This requirement comes from scsi_reset().
+attach(9E), ddi_dma_buf_setup(9F), scsi_hba_attach(9F), scsi_reset(9F), scsi_address(9S), scsi_hba_tran(9S)
+Writing Device Drivers
+If pkt_reason already indicates that an earlier error had occurred for a particular pkt, tran_reset() should not over<hy>
+write pkt_reason with CMD_RESET.

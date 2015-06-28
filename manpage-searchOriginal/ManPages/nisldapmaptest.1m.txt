@@ -1,0 +1,83 @@
+<beginning of page>
+nisldapmaptest <-> test NIS+ and LDAP mapping configuration files
+nisldapmaptest [-s | -r | -d] [-l | -t object] [-v] [-i]
+ [-o] [-m conffile] [-x attr=val...] [ col=val]...
+Use the nisldapmaptest utility to test NIS+ to LDAP mapping configuration files. See NIS+LDAPmapping(4). The
+nisldapmaptest utility uses much of the same internal interface as the rpc.nisd(1M) does to read, add, modify, or
+delete LDAP data, as specified by the column name and value operand pairs. nisldapmaptest does not read or modi<hy>
+fy any of the rpc.nisd(1M) database files.
+See for details on important differences between the ways that nisldapmaptest and rpc.nisd(1M) operate on LDAP
+data.
+The nisldapmaptest utility supports the following options:
+-d Delete data in LDAP.
+-i Ignore failures when obtaining information from the NIS+ server. This enables nisldapmaptest to work to some
+extent, even if the NIS+ server is unreachable, or if the system is not a NIS+ client. However, NIS+ lookups are still
+attempted, so there may be NIS+ error messages.
+In this mode, nisldapmaptest also tries to guess things such as NIS+ object types and derives table column infor<hy>
+mation from the mapping rules in the configuration files. Avoid using the -i option to add, modify, or delete, until
+you have determined that the nisldapmaptest's guesses are adequate for your needs.
+-l Parse the configuration file into internal data structures, and then print out the configuration per those structures.
+Note that the printed data is not in configuration file format.
+Either -l or -t must be specified. If both are present, -l is ignored.
+-m conffile Specify the name of the NIS+LDAPmapping(4) configuration file. The default directory is /var/nis ,
+and the default mapping file is NIS+LDAPmapping.
+-o For NIS+ tables, work on the NIS+ object itself, specified by means of the -t option, not on the table entries.
+-r Replace or add data in LDAP.
+-s Search for data in LDAP. This is the default.
+-t object Specify the NIS+ object on which to operate. If the object name is not fully qualified, that is, it does not end
+in a dot, the value of the nisplusLDAPbaseDomain attribute is appended.
+-v Set the verbose flag. This flag produces extra diagnostic information.
+-x attr=val... Specify mapping attribute and value pairs to override those obtained by means of the configuration
+file. Although any attributes defined on NIS+LDAPmapping(4) or rpc.nisd(4) can be specified, the ones that con<hy>
+trol rpc.nisd(1M) operation have no effect on nisldapmaptest.
+The following operands are supported:
+col=val... NIS+ column and value pairs used to specify which entries should be looked up, added, modified, or
+deleted. For additions and modifications, use col=val to specify the new values.
+Example 1 Searching for a User
+Use the following example to search for the user xyzzy in the LDAP container specified for the passwd.org_dir ta<hy>
+<beginning of page>
+ble.
+ example% nisldapmaptest -t passwd.org_dir name=xyzzy
+Example 2 Listing Table Entries
+Use the following example to list all entries in the container specified for the services.org_dir table.
+ example% nisldapmaptest -t services.org_dir
+Example 3 Listing an Object
+Use the following example to list the services.org_dir object itself, as it is stored in LDAP.
+ example% nisldapmaptest -o -t services.org_dir
+Example 4 Modifying a Table Entry
+Use the following example to modify the membership list of the group grp, in the container specified for the
+group.org_dir table, to be mem1, mem2, and mem3.
+ example% nisldapmaptest -r -t group.org_dir name=grp \
+  members=mem1,mem2,mem3
+Example 5 Deleting a Table Entry
+Use the following example to delete the host called bad from the container specified for the hosts.org_dir table.
+ example% nisldapmaptest -d -t hosts.org_dir name=bad
+The following exit values are returned:
+0 The requested operation was successful.
+!= 0 An error occurred.
+/var/nis/NIS+LDAPmapping.template
+/etc/default/rpd.nisd
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wnisr _ Interface StabilityObsolete
+<beginning of page>
+rpc.nisd(1M), NIS+LDAPmapping(4), rpc.nisd(4), attributes(5)
+There are several differences between the ways that nisldapmaptest and rpc.nisd operate: 1. nisldapmaptest ob<hy>
+tains information about NIS+ by means of the NIS+ API calls, while rpc.nisd looks in its internal database. Thus, if
+the NIS+ server is not available, nisldapmaptest may be unable to determine NIS+ object types or table column in<hy>
+formation. 2. While nisldapmaptest can add, modify, or delete LDAP data, it does not modify any NIS+ data. 3.
+When operating on table entries, if nisldapmaptest is unable to obtain the entry from NIS+, it composes LDAP op<hy>
+erations using only the supplied col=val operands. Depending on the mapping used, this can result in extra LDAP
+operations, for example, attempting to obtain a DN for add, modify, or delete. 4. The default value for nis<hy>
+plusLDAPbaseDomain is the system domain name per sysinfo(2) in nisldapmaptest, but the internal notion of the
+domain it serves in rpc.nisd. While the two usually are the same, this is not necessarily always the case. 5. When
+more than one NIS+ entry maps to a single LDAP entry, nisldapmaptest may be unable to perform a complete up<hy>
+date, unless you make sure that the col=val specification picks up all relevant NIS+ entries. For example, if you
+have the services.org_dir NIS+ entries:
+ cname name proto port
+ x x tcp 12345
+ x y tcp 12345
+ x z tcp 12345
+then specifying cname=x will pick up all three entries and create or modify the corresponding LDAP entry to have
+three CN values: x, y, and z. However, specifying name=x will match just the first NIS+ entry, and create or modify
+the LDAP entry to have just one CN: x.

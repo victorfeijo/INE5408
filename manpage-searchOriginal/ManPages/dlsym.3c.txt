@@ -1,0 +1,71 @@
+<beginning of page>
+dlsym <-> get the address of a symbol in a shared object or executable
+#include <dlfcn.h>
+void *dlsym(void *restrict handle, const char *restrict name);
+The dlsym() function allows a process to obtain the address of a symbol that is defined within a shared object or ex<hy>
+ecutable. The handle argument is either the value returned from a call to dlopen() or one of a family of special han<hy>
+dles. The name argument is the symbol's name as a character string.
+If handle is returned from dlopen(), the associated shared object must not have been closed using dlclose(). A han<hy>
+dle can be obtained from dlopen() using the RTLD_FIRST mode. With this mode, the dlsym() function searches
+for the named symbol in the initial object referenced by handle. Without this mode, the dlsym() function searches
+for the named symbol in the group of shared objects loaded automatically as a result of loading the object referenced
+by handle. See dlopen(3C) and NOTES.
+The following special handles are supported.
+RTLD_DEFAULT Instructs dlsym() to search for the named symbol starting with the first object loaded, typically
+the dynamic executable. The search continues through the list of initial dependencies that are loaded with the
+process, followed by any objects obtained with dlopen(3C). This search follows the default model that is used to re<hy>
+locate all objects within the process.
+This model also provides for transitioning into a lazy loading environment. If a symbol can not be found in the
+presently loaded objects, any pending lazy loaded objects are processed in an attempt to locate the symbol. This
+loading compensates for objects that have not fully defined their dependencies. However, this compensation can un<hy>
+dermine the advantages of lazy loading.
+RTLD_PROBE Instructs dlsym() to search for the named symbol in the same manner as occurs with a handle of
+RTLD_DEFAULT. However, this model only searches for symbols in the presently loaded objects, together with
+any lazy loadable objects specifically identified by the caller to provide the named symbol. This handle does not trig<hy>
+ger an exhaustive load of any lazy loadable symbols in an attempt to find the named symbol. This handle can pro<hy>
+vide a more optimal search than would occur using RTLD_DEFAULT.
+RTLD_NEXT Instructs dlsym() to search for the named symbol in the objects that were loaded following the object
+from which the dlsym() call is being made.
+RTLD_SELF Instructs dlsym() to search for the named symbol in the objects that were loaded starting with the ob<hy>
+ject from which the dlsym() call is being made.
+When used with a special handle, dlsym() is selective in searching objects that have been loaded using dlopen().
+These objects are searched for symbols if one of the following conditions are true. <bu> The object is part of the same
+local dlopen() dependency hierarchy as the calling object. See the Linker and Libraries Guide for a description of
+dlopen() dependency hierarchies. <bu> The object has global search access. See dlopen(3C) for a discussion of the
+RTLD_GLOBAL mode.
+The dlsym() function returns NULL if handle does not refer to a valid object opened by dlopen() or is not one of the
+special handles. The function also returns NULL if the named symbol cannot be found within any of the objects as<hy>
+sociated with handle. Additional diagnostic information is available through dlerror(3C). Example 1 Use dlopen()
+and dlsym() to access a function or data objects.
+The following code fragment demonstrates how to use dlopen() and dlsym() to access either function or data ob<hy>
+jects. For simplicity, error checking has been omitted.
+ void *handle;
+ int *iptr, (*fptr)(int);
+ /* open the needed object */
+ handle = dlopen("/usr/home/me/libfoo.so.1", RTLD_LAZY);
+ /* find the address of function and data objects */
+<beginning of page>
+ fptr = (int (*)(int))dlsym(handle, "my_function");
+ iptr = (int *)dlsym(handle, "my_object");
+ /* invoke function, passing value of integer as a parameter */
+ (*fptr)(*iptr);
+Example 2 Use dlsym() to verify that a particular function is defined.
+The following code fragment shows how to use dlsym() to verify that a function is defined. If the function exists, the
+function is called.
+ int (*fptr)();
+ if ((fptr = (int (*)())dlsym(RTLD_DEFAULT,
+  "my_function")) != NULL) {
+  (*fptr)();
+ }
+The dlsym() function is one of a family of functions that give the user direct access to the dynamic linking facilities.
+These facilities are available to dynamically-linked processes only. See the Linker and Libraries Guide.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Standard _ MT-LevelMT-Safe
+ld(1), ld.so.1(1), dladdr(3C), dlclose(3C), dldump(3C), dlerror(3C), dlinfo(3C), dlopen(3C), attributes(5), stan<hy>
+dards(5)
+Linker and Libraries Guide
+If an object is acting as a filter, care should be taken when interpreting the address of any symbol obtained using a
+handle to this object. For example, using dlsym(3C) to obtain the symbol _end for this object, results in returning the
+address of the symbol _end within the filtee, not the filter. For more information on filters see the Linker and Li<hy>
+braries Guide.

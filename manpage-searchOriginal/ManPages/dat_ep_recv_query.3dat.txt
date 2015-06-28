@@ -1,0 +1,69 @@
+<beginning of page>
+dat_ep_recv_query <-> provide Endpoint receive queue consumption on SRQ
+cc [ flag... ] file... -ldat [ library... ]
+#include <dat/udat.h>
+DAT_RETURN
+ dat_ep_recv_query (
+ IN DAT_EP_HANDLE ep_handle,
+ OUT DAT_COUNT *nbufs_allocated,
+ OUT DAT_COUNT *bufs_alloc_span
+ )
+ep_handle Handle for an instance of the EP.
+nbufs_allocated The number of buffers at the EP for which completions have not yet been generated.
+bufs_alloc_span The span of buffers that EP needs to complete arriving messages.
+The dat_ep_recv_query() function provides to the Consumer a snapshot for Recv buffers on EP. The values for
+nbufs_allocated and bufs_alloc_span are not defined when DAT_RETURN is not DAT_SUCCESS.
+The Provider might not support nbufs_allocated, bufs_alloc_span or both. Check the Provider attribute for EP Recv
+info support. When the Provider does not support both of these counts, the return value for the operation can be
+DAT_MODEL_NOT_SUPPORTED.
+If nbufs_allocated is not NULL, the count pointed to by nbufs_allocated will return a snapshot count of the number
+of buffers allocated to ep_handle but not yet completed.
+Once a buffer has been allocated to an EP, it will be completed to the EP recv_evd if the EVD has not overflowed.
+When an EP does not use SRQ, a buffer is allocated as soon as it is posted to the EP. For EP that uses SRQ, a buffer
+is allocated to the EP when EP removes it from SRQ.
+If bufs_alloc_span is not NULL, then the count to which bufs_alloc_span pointed will return the span of buffers allo<hy>
+cated to the ep_handle. The span is the number of additional successful Recv completions that EP can generate if all
+the messages it is currently receiving will complete successfully.
+If a message sequence number is assigned to all received messages, the buffer span is the difference between the lat<hy>
+est message sequence number of an allocated buffer minus the latest message sequence number for which comple<hy>
+tion has been generated. This sequence number only counts Send messages of remote Endpoint of the connection.
+The Message Sequence Number (MSN) represents the order that Send messages were submitted by the remote Con<hy>
+sumer. The ordering of sends is intrinsic to the definition of a reliable service. Therefore every send message does
+have a MSN whether or not the native transport has a field with that name.
+For both nbufs_allocated and bufs_alloc_span, the Provider can return the reserved value DAT_VALUE_UN<hy>
+KNOWN if it cannot obtain the requested count at a reasonable cost.
+DAT_SUCCESS The operation was successful.
+DAT_INVALID_PARAMETER Invalid parameter.
+DAT_INVALID_HANDLE The DAT handle ep_handle is invalid.
+DAT_MODEL_NOT_SUPPORTED The requested Model was not supported by the Provider.
+If the Provider cannot support the query for nbufs_allocated or bufs_alloc_span, the value returned for that attribute
+must be DAT_VALUE_UNKNOWN.
+An implementation that processes incoming packets out of order and allocates from SRQs on an arrival basis can
+<beginning of page>
+have gaps in the MSNs associated with buffers allocated to an Endpoint.
+For example, suppose Endpoint X has received buffer fragments for MSNs 19, 22, and 23. With arrival ordering, the
+EP would have allocated three buffers from the SRQ for messages 19, 22, and 23. The number allocated would be 3,
+but the span would be 5. The difference of two represents the buffers that will have to be allocated for messages 20
+and 21. They have not yet been allocated, but messages 22 and 23 will not be delivered until after messages 20 and
+21 have not only had their buffers allocated but have also completed.
+An implementation can choose to allocate 20 and 21 as soon as any higher buffer is allocated. This makes sense if
+you presume that this is a valid connection, because obviously 20 and 21 are in flight. However, it creates a greater
+vulnerability to Denial Of Service attacks. There are also other implementation tradeoffs, so the Consumer should
+accept that different RNICs for iWARP will employ different strategies on when to perform these allocations.
+Each implementation will have some method of tracking the receive buffers already associated with an EP and
+knowing which buffer matches which incoming message, though those methods might vary. In particular, there are
+valid implementations such as linked lists, where a count of the outstanding buffers is not instantly available. Such
+implementations would have to scan the allocated list to determine both the number of buffers and their span. If such
+a scan is necessary, it is important that it be only a single scan. The set of buffers that was counted must be the same
+set of buffers for which the span is reported.
+The implementation should not scan twice, once to count the buffers and then again to determine their span. Not on<hy>
+ly is it inefficient, but it might produce inconsistent results if buffers were completed or arrived between the two
+scans.
+Other implementations can simply maintain counts of these values to easily filter invalid packets. If so, these status
+counters should be updated and referenced atomically.
+The implementation must never report n buffers in a span that is less than n.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Standard: uDAPL, 1.2 _ MT-LevelUnsafe
+dat_ep_create(3DAT), dat_srq_create(3DAT), dat_srq_free(3DAT), dat_srq_query(3DAT), dat_ep_set_water<hy>
+mark(3DAT), libdat(3LIB), attributes(5)

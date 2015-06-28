@@ -1,0 +1,135 @@
+<beginning of page>
+select, pselect, FD_SET, FD_CLR, FD_ISSET, FD_ZERO <-> synchronous I/O multiplexing
+#include <sys/time.h>
+int select(int nfds,
+ fd_set *restrict readfds, fd_set *restrict writefds,
+ fd_set *restrict errorfds,
+ struct timeval *restrict timeout);
+int pselect(int nfds,
+ fd_set *restrict readfds, fd_set *restrict writefds,
+ fd_set *restrict errorfds,
+ const struct timespec *restrict timeout,
+ const sigset_t *restrict sigmask);
+void FD_SET(int fd, fd_set *fdset);
+void FD_CLR(int fd, fd_set *fdset);
+int FD_ISSET(int fd, fd_set *fdset);
+void FD_ZERO(fd_set *fdset);
+The pselect() function examines the file descriptor sets whose addresses are passed in the readfds, writefds, and er<hy>
+rorfds parameters to see if some of their descriptors are ready for reading, are ready for writing, or have an excep<hy>
+tional condition pending, respectively.
+The select() function is equivalent to the pselect() function, except as follows: <bu> For the select() function, the timeout
+period is given in seconds and microseconds in an argument of type struct timeval, whereas for the pselect() func<hy>
+tion the timeout period is given in seconds and nanoseconds in an argument of type struct timespec. <bu> The select()
+function has no sigmask argument. It behaves as pselect() does when sigmask is a null pointer. <bu> Upon successful
+completion, the select() function might modify the object pointed to by the timeout argument.
+The select() and pselect() functions support regular files, terminal and pseudo-terminal devices, STREAMS-based
+files, FIFOs, pipes, and sockets. The behavior of select() and pselect() on file descriptors that refer to other types of
+file is unspecified.
+The nfds argument specifies the range of file descriptors to be tested. The first nfds descriptors are checked in each
+set; that is, the descriptors from zero through nfds-1 in the descriptor sets are examined.
+If the readfs argument is not a null pointer, it points to an object of type fd_set that on input specifies the file de<hy>
+scriptors to be checked for being ready to read, and on output indicates which file descriptors are ready to read.
+If the writefs argument is not a null pointer, it points to an object of type fd_set that on input specifies the file de<hy>
+scriptors to be checked for being ready to write, and on output indicates which file descriptors are ready to write.
+If the errorfds argument is not a null pointer, it points to an object of type fd_set that on input specifies the file de<hy>
+scriptors to be checked for error conditions pending, and on output indicates which file descriptors have error condi<hy>
+tions pending.
+Upon successful completion, the objects pointed to by the readfs, writefs, and errorfds arguments are modified to in<hy>
+dicate which file descriptors are ready for reading, ready for writing, or have an error condition pending, respec<hy>
+tively, and return the total number of ready descriptors in all the output sets. For each file descriptor less than nfds,
+the corresponding bit will be set on successful completion if it was set on input and the associated condition is true
+for that file descriptor.
+If none of the selected descriptors are ready for the requested operation, the select() or pselect() function blocks un<hy>
+til at least one of the requested operations becomes ready, until the timeout occurs, or until interrupted by a signal.
+The timeout parameter controls how long the select() or pselect() function takes before timing out. If the timeout pa<hy>
+rameter is not a null pointer, it specifies a maximum interval to wait for the selection to complete. If the specified
+time interval expires without any requested operation becoming ready, the function returns. If the timeout parameter
+is a null pointer, then the call to select() or pselect() blocks indefinitely until at least one descriptor meets the speci<hy>
+fied criteria. To effect a poll, the timeout parameter should not be a null pointer, and should point to a zero-valued
+timespec structure.
+The use of a timeout does not affect any pending timers set up by alarm(2), ualarm(3C), or setitimer(2).
+<beginning of page>
+If sigmask is not a null pointer, then the pselect() function replaces the signal mask of the process by the set of sig<hy>
+nals pointed to by sigmask before examining the descriptors, and restores the signal mask of the process before re<hy>
+turning.
+A descriptor is considered ready for reading when a call to an input function with O_NONBLOCK clear would not
+block, whether or not the function would transfer data successfully. (The function might return data, an end-of-file
+indication, or an error other than one indicating that it is blocked, and in each of these cases the descriptor will be
+considered ready for reading.)
+A descriptor is considered ready for writing when a call to an output function with O_NONBLOCK clear would not
+block, whether or not the function would transfer data successfully.
+If a socket has a pending error, it is considered to have an exceptional condition pending. Otherwise, what consti<hy>
+tutes an exceptional condition is file type-specific. For a file descriptor for use with a socket, it is protocol-specific
+except as noted below. For other file types, if the operation is meaningless for a particular file type, select() or pse<hy>
+lect() indicates that the descriptor is ready for read or write operations and indicates that the descriptor has no excep<hy>
+tional condition pending.
+If a descriptor refers to a socket, the implied input function is the recvmsg(3XNET) function with parameters re<hy>
+questing normal and ancillary data, such that the presence of either type causes the socket to be marked as readable.
+The presence of out-of-band data is checked if the socket option SO_OOBINLINE has been enabled, as out-of-
+band data is enqueued with normal data. If the socket is currently listening, then it is marked as readable if an in<hy>
+coming connection request has been received, and a call to the accept function completes without blocking.
+If a descriptor refers to a socket, the implied output function is the sendmsg(3XNET) function supplying an amount
+of normal data equal to the current value of the SO_SNDLOWAT option for the socket. If a non-blocking call to the
+connect function has been made for a socket, and the connection attempt has either succeeded or failed leaving a
+pending error, the socket is marked as writable.
+A socket is considered to have an exceptional condition pending if a receive operation with O_NONBLOCK clear
+for the open file description and with the MSG_OOB flag set would return out-of-band data without blocking. (It is
+protocol-specific whether the MSG_OOB flag would be used to read out-of-band data.) A socket will also be con<hy>
+sidered to have an exceptional condition pending if an out-of-band data mark is present in the receive queue.
+A file descriptor for a socket that is listening for connections will indicate that it is ready for reading, when connec<hy>
+tions are available. A file descriptor for a socket that is connecting asynchronously will indicate that it is ready for
+writing, when a connection has been established.
+Selecting true for reading on a socket descriptor upon which a listen(3XNET) call has been performed indicates that
+a subsequent accept(3XNET) call on that descriptor will not block.
+If the timeout argument is not a null pointer, it points to an object of type struct timeval that specifies a maximum
+interval to wait for the selection to complete. If the timeout argument points to an object of type struct timeval
+whose members are 0, select() does not block. If the timeout argument is a null pointer, select() blocks until an event
+causes one of the masks to be returned with a valid (non-zero) value. If the time limit expires before any event oc<hy>
+curs that would cause one of the masks to be set to a non-zero value, select() completes successfully and returns 0.
+If the readfs, writefs, and errorfds arguments are all null pointers and the timeout argument is not a null pointer, se<hy>
+lect() or pselect() blocks for the time specified, or until interrupted by a signal. If the readfs, writefs, and errorfds ar<hy>
+guments are all null pointers and the timeout argument is a null pointer, select() blocks until interrupted by a signal.
+File descriptors associated with regular files always select true for ready to read, ready to write, and error conditions.
+On failure, the objects pointed to by the readfs, writefs, and errorfds arguments are not modified. If the timeout in<hy>
+terval expires without the specified condition being true for any of the specified file descriptors, the objects pointed
+to by the readfs, writefs, and errorfds arguments have all bits set to 0.
+File descriptor masks of type fd_set can be initialized and tested with the macros FD_CLR(), FD_ISSET(),
+FD_SET(), and FD_ZERO().
+FD_CLR(fd, &fdset) Clears the bit for the file descriptor fd in the file descriptor set fdset.
+FD_ISSET(fd, &fdset) Returns a non-zero value if the bit for the file descriptor fd is set in the file descriptor set
+pointed to by fdset, and 0 otherwise.
+<beginning of page>
+FD_SET(fd, &fdset) Sets the bit for the file descriptor fd in the file descriptor set fdset.
+FD_ZERO(&fdset) Initializes the file descriptor set fdset to have zero bits for all file descriptors.
+The behavior of these macros is undefined if the fd argument is less than 0 or greater than or equal to FD_SETSIZE,
+or if fd is not a valid file descriptor, or if any of the arguments are expressions with side effects.
+On successful completion, select() and pselect() return the total number of bits set in the bit masks. Otherwise, <mi>1 is
+returned and errno is set to indicate the error.
+The FD_CLR(), FD_SET(), and FD_ZERO() macros return no value. The FD_ISSET() macro returns a non-zero
+value if the bit for the file descriptor fd is set in the file descriptor set pointed to by fdset, and 0 otherwise.
+The select() and pselect() functions will fail if:
+EBADF One or more of the file descriptor sets specified a file descriptor that is not a valid open file descriptor.
+EINTR The function was interrupted before any of the selected events occurred and before the timeout interval ex<hy>
+pired.
+If SA_RESTART has been set for the interrupting signal, it is implementation-dependent whether select() restarts or
+returns with EINTR.
+EINVAL An invalid timeout interval was specified.
+EINVAL The nfds argument is less than 0 or greater than FD_SETSIZE.
+EINVAL One of the specified file descriptors refers to a STREAM or multiplexer that is linked (directly or indirect<hy>
+ly) downstream from a multiplexer.
+EINVAL A component of the pointed-to time limit is outside the acceptable range: t_sec must be between 0 and
+10^8, inclusive. t_usec must be greater than or equal to 0, and less than 10^6.
+The poll(2) function is preferred over this function. It must be used when the number of file descriptors exceeds
+FD_SETSIZE.
+The use of a timeout does not affect any pending timers set up by alarm(2), ualarm(3C) or setitimer(2).
+On successful completion, the object pointed to by the timeout argument may be modified.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Standard _ MT-LevelMT-Safe
+alarm(2), fcntl(2), poll(2), read(2), setitimer(2), write(2), accept(3SOCKET), listen(3SOCKET), ualarm(3C), at<hy>
+tributes(5), standards(5)
+The default value for FD_SETSIZE (currently 1024) is larger than the default limit on the number of open files. To
+accommodate 32-bit applications that wish to use a larger number of open files with select(), it is possible to in<hy>
+crease this size at compile time by providing a larger definition of FD_SETSIZE before the inclusion of any sys<hy>
+tem-supplied header. The maximum supported size for FD_SETSIZE is 65536. The default value is already 65536
+for 64-bit applications.

@@ -1,0 +1,132 @@
+<beginning of page>
+pm <-> Power Management driver
+/dev/pm
+The Power Management ( pm) driver provides an interface for applications to configure devices within the system
+for Power Management. The interface is provided through ioctl(2) commands. The pm driver may be accessed using
+/dev/pm.
+The Power Management framework model allows the system to be viewed as a collection of devices. Each device is
+a collection of components that comprise the smallest power manageable units. The device driver controls the defini<hy>
+tion of a device's power manageable components.
+A component can either be busy or idle at the current power level. Normally, the Power Management framework
+takes an idle component to the next lower power level. The Power Management framework uses two factors to deter<hy>
+mine this transition: the component must have been idle for at least the threshold time, and the device to which the
+component belongs must satisfy any dependency requirements. A dependency occurs when a device requires another
+device to be power managed before it can be power managed. Dependencies occur on a per device basis: when a de<hy>
+pendency exists, no components of a device may be managed unless all the devices it depends upon are first power
+managed.
+Using the commands below, an application may take control of the Power Management of a device from the Power
+Management framework driver and manage the transition of device power levels directly.
+For this set of ioctl commands, arg (see ioctl(2)) points to a structure of type pm_req defined in <sys/pm.h>:
+ typedef struct pm_req {
+  char *physpath; /* physical path of device */
+  /* to configure. See libdevinfo(3LIB) */
+  int component; /* device component */
+  int value; /* power level, threshold value, or count */
+  void *data; /* command-dependent variable-sized data */
+  size_t datasize; /* size of data buffer */
+  } pm_req_t;
+The fields should contain the following data:
+physpath Pointer to the physical path of a device. See libdevinfo(3LIB). For example, for the device /devices/pseu<hy>
+do/pm@0:pm the physpath value would be /pseudo/pm@0.
+component Non-negative integer specifying which component is being configured. The numbering starts at zero.
+value Non-negative integer specifying the threshold value in seconds or the desired power level, or the number of
+levels being specified.
+data Pointer to a buffer which contains or receives variable-sized data, such as the name of a device upon which this
+device has a dependency.
+size Size of the data buffer.
+Not all fields are used in each command.
+PM_DIRECT_PM
+The device named by physpath is disabled from being power managed by the framework. The caller will power
+manage the device directly using the PM_DIRECT_NOTIFY, PM_GET_TIME_IDLE and PM_GET_CUR<hy>
+RENT_POWER, PM_GET_FULL_POWER and PM_SET_CURRENT_POWER commands. If the device
+needs to have its power level changed either because its driver calls pm_raise_power(9F), pm_lower_power(9F),
+or pm_power_has_changed(9F) or because the device is the parent of another device that is changing power level
+or a device that this device depends on is changing power level, then the power level change of the device will be
+blocked and the caller will be notified as described below for the PM_DIRECT_NOTIFY command.
+<beginning of page>
+Error codes:
+EBUSY Device already disabled for Power Management by framework.
+EPERM Caller is neither superuser nor effective group ID of 0.
+PM_RELEASE_DIRECT_PM
+The device named by physpath (which must have been the target of a PM_DIRECT_PM command) is re-enabled
+for Power Management by the framework.
+Error codes:
+EINVAL Device component out of range.
+PM_DIRECT_NOTIFY PM_DIRECT_NOTIFY_WAIT
+These commands allow the process that is directly power managing a device to be notified of events that could
+change the power level of the device. When such an event occurs, this command returns information about the event.
+ arg (see ioctl(2)) points to a structure of type pm_state_change defined in <sys/pm.h>:
+ typedef struct pm_state_change {
+  char *physpath; /* device which has changed state */
+  int component; /* which component changed state */
+ #if defined(_BIG_ENDIAN)
+  ushort_t flags; /* PSC_EVENT_LOST, PSC_ALL_LOWEST */
+  ushort_t event; /* type of event */
+ #else
+  ushort_t event; /* type of event *
+  ushort_t flags; /* PSC_EVENT_LOST, PSC_ALL_LOWEST */
+ #endif
+  time_t timestamp; /* time of state change */+
+  int old_level; /* power level changing from */
+  int new_level; /* power level changing to */
+  size_t size; /* size of buffer physpath points to */
+ } pm_state_change_t;
+When an event occurs, the struct pointed to by arg is filled in. If the event type is PSC_PENDING_CHANGE, then
+the information in the rest of the struct describes an action that the framework would have taken if the device were
+not directly power managed by the caller. The caller is responsible for completing the indicated level changes using
+PM_SET_CURRENT_POWER below.
+An event type of PSC_HAS_CHANGED indicates that the driver for the directly power managed device has called
+pm_power_has_changed(9F) due to the device changing power on its own. It is provided to allow the caller to
+track the power state of the device.
+The system keeps events in a circular buffer. If the buffer overflow, the oldest events are lost and when the event that
+next follows a lost event is retrieved it will have PSC_EVENT_LOST set in flags.
+PM_DIRECT_NOTIFY returns EWOULDBLOCK if no event is pending, and PM_DIRECT_NOTIFY_WAIT
+blocks until an event is available.
+pm also supports the poll(2) interface. When an event is pending a poll(2) call that includes a file descriptor for
+/dev/pm and that has POLLIN or POLLRDNORM set in its event mask will return.
+PM_SET_CURRENT_POWER
+Component component of the device named by physpath (which must contain the physical path of a device against
+which the process has issued a PM_DIRECT_PM command) is set to power level value. If all components of the
+device named by physpath were at level 0, value is non-zero and some device has a dependency on this device, then
+all components of that device will be brought to full power before this command returns. Similarly, if the parent of
+<beginning of page>
+the target device is powered off, then it will be brought up as needed before this command returns. When
+PM_SET_CURRENT_POWER is issued against a device, the resulting power change is included in the event list for
+PM_DIRECT_NOTIFY.
+Error codes:
+EINVAL Device component out of range, or power level < 0.
+EIO Failed to power device or its ancestors or the devices on which this device has dependency or their ancestors.
+Note that this may not indicate a failure, the device driver may have rejected the command as inappropriate because
+the component has become busy.
+EPERM Caller has not previously issued a successful PM_DIRECT_PM command against this device.
+PM_GET_FULL_POWER
+The highest supported power level of component component of the device named by physpath is returned.
+PM_GET_CURRENT_POWER
+The current power level of component component of the device named by physpath is returned.
+Error codes:
+EAGAIN Device component power level is not currently known.
+PM_GET_TIME_IDLE
+PM_GET_TIME_IDLE returns the number of seconds that component component of the device named by phys<hy>
+path has been idle. If the device is not idle, then 0 is returned.
+Note that because the state of the device may change between the time the process issues the
+PM_GET_TIME_IDLE command and the time the process issues a PM_SET_CURRENT_POWER command
+to reduce the power level of an idle component, the process must be prepared to deal with a PM_SET_CUR<hy>
+RENT_POWER command returning failure because the driver has rejected the command as inappropriate because
+the device component has become busy. This can be differentiated from other types of failures by issuing the
+PM_GET_TIME_IDLE command again to see if the component has become busy.
+Upon error, the commands will return <mi>1, and set errno. In addition to the error codes listed above by command, the
+following error codes are common to all commands:
+EFAULT
+ Bad address passed in as argument.
+ENODEV
+ Device is not power manageable, or device is not configured.
+ENXIO
+ Too many opens attempted.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface stabili<hy>
+tyUnstable
+<beginning of page>
+pmconfig(1M), Intro(2), ioctl(2), libdevinfo(3LIB), power.conf(4), attributes(5), attach(9E), detach(9E), pow<hy>
+er(9E), pm_busy_component(9F), pm_idle_component(9F), pm_lower_power(9F), pm_pow<hy>
+er_has_changed(9F), pm_raise_power(9F)
+Writing Device Drivers

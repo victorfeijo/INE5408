@@ -1,0 +1,43 @@
+<beginning of page>
+rmvq <-> remove a message from a queue
+#include <sys/stream.h>
+void rmvq(queue_t *q, mblk_t *mp);
+Architecture independent level 1 (DDI/DKI).
+q Queue containing the message to be removed.
+mp Message to remove.
+The rmvq() function removes a message from a queue. A message can be removed from anywhere on a queue. To
+prevent modules and drivers from having to deal with the internals of message linkage on a queue, either rmvq() or
+getq(9F) should be used to remove a message from a queue.
+The rmvq() function can be called from user, interrupt, or kernel context.
+This code fragment illustrates how one may flush one type of message from a queue. In this case, only M_PROTO
+T_DATA_IND messages are flushed. For each message on the queue, if it is an M_PROTO message (line 8) of type
+T_DATA_IND (line 10), save a pointer to the next message (line 11), remove the T_DATA_IND message (line 12)
+and free it (line 13). Continue with the next message in the list (line 19).
+ 1 mblk_t *mp, *nmp;
+ 2 queue_t *q;
+ 3 union T_primitives *tp;
+ 4
+ 5 /* Insert code here to protect queue and message block */
+ 6 mp = q->q_first;
+ 7 while (mp) {
+ 8  if (mp->b_datap->db_type == M_PROTO) {
+ 9   tp = (union T_primitives *)mp->b_rptr;
+ 10   if (tp->type == T_DATA_IND) {
+ 11    nmp = mp->b_next;
+ 12    rmvq(q, mp);
+ 13    freemsg(mp);
+ 14    mp = nmp;
+ 15   } else {
+ 16    mp = mp->b_next;
+ 17   }
+ 18  } else {
+ 19   mp = mp->b_next;
+ 20  }
+ 21 }
+ 22 /* End of region that must be protected */
+When using rmvq(), you must ensure that the queue and the message block is not modified by another thread at the
+same time. You can achieve this either by using STREAMS functions or by implementing your own locking.
+freemsg(9F), getq(9F), insq(9F)
+Writing Device Drivers
+STREAMS Programming Guide
+Make sure that the message mp is linked onto q to avoid a possible system panic.

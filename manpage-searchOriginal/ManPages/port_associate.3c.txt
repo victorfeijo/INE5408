@@ -1,0 +1,196 @@
+<beginning of page>
+port_associate, port_dissociate <-> associate or dissociate the object with the port
+#include <port.h>
+int port_associate(int port, int source, uintptr_t object,
+ int events, void *user);
+int port_dissociate(int port, int source, uintptr_t object);
+The port_associate() function associates specific events of a given object with a port. Only objects associated with
+a particular port are able to generate events that can be retrieved using port_get(3C) or port_getn(3C). The delivery
+event has its portev_user member set to the value specified in the user parameter. If the specified object is already
+associated with the specified port, the port_associate() function serves to update the events and user arguments of
+the association. The port_dissociate() function removes the association of an object with a port.
+The objects that can be associated with a port by way of the port_associate() function are objects of type
+PORT_SOURCE_FD and PORT_SOURCE_FILE. Objects of other types have type-specific association mecha<hy>
+nisms. A port_notify_t structure, defined in <port.h>, is used to specify the event port and an application-defined
+cookie to associate with these event sources. See port_create(3C) and signal.h(3HEAD).
+The port_notify_t structure contains the following members:
+ int portntfy_port; /* bind request(s) to port */
+ void *portntfy_user; /* user defined cookie */
+Objects of type PORT_SOURCE_FD are file descriptors. The event types for PORT_SOURCE_FD objects are
+described in poll(2). At most one event notification will be generated per associated file descriptor. For example, if a
+file descriptor is associated with a port for the POLLRDNORM event and data is available on the file descriptor at
+the time the port_associate() function is called, an event is immediately sent to the port. If data is not yet available,
+one event is sent to the port when data first becomes available.
+When an event for a PORT_SOURCE_FD object is retrieved, the object no longer has an association with the port.
+The event can be processed without the possibility that another thread can retrieve a subsequent event for the same
+object. After processing of the file descriptor is completed, the port_associate() function can be called to reassoci<hy>
+ate the object with the port.
+Objects of type PORT_SOURCE_FILE are pointer to the structure file_obj defined in <sys/port.h>. This event
+source provides event notification when the specified file/directory is accessed or modified or when its status
+changes. The path name of the file/directory to be watched is passed in the struct file_obj along with the access,
+modification, and change time stamps acquired from a stat(2) call. If the file name is a symbolic links, it is fol<hy>
+lowed by default. The FILE_NOFOLLOW needs to be passed in along with the specified events if the symbolic
+link itself needs to be watched and lstat() needs to be used to get the file status of the symbolic link file.
+The struct file_obj contains the following elements:
+ timestruc_t fo_atime; /* Access time got from stat() */
+ timestruc_t fo_mtime; /* Modification time from stat() */
+ timestruc_t fo_ctime; /* Change time from stat() */
+ char *fo_name; /* Pointer to a null terminated path name */
+At the time the port_associate() function is called, the time stamps passed in the structure file_obj are compared
+with the file or directory's current time stamps and, if there has been a change, an event is immediately sent to the
+port. If not, an event will be sent when such a change occurs.
+The event types that can be specified at port_associate() time for PORT_SOURCE_FILE are FILE_ACCESS,
+FILE_MODIFIED, and FILE_ATTRIB, corresponding to the three time stamps. An fo_atime change results in
+the FILE_ACCESS event, an fo_mtime change results in the FILE_MODIFIED event, and an fo_time change re<hy>
+sults in the FILE_ATTRIB event.
+The following exception events are delivered when they occur. These event types cannot be filtered.
+ FILE_DELETE /* Monitored file/directory was deleted */
+ FILE_RENAME_TO /* Monitored file/directory was renamed */
+ FILE_RENAME_FROM /* Monitored file/directory was renamed */
+<beginning of page>
+ UNMOUNTED /* Monitored file system got unmounted */
+ MOUNTEDOVER /* Monitored file/directory was mounted over */
+At most one event notification will be generated per associated file_obj. When the event for the associated file_obj
+is retrieved, the object is no longer associated with the port. The event can be processed without the possibility that
+another thread can retrieve a subsequent event for the same object. The port_associate() can be called to reassociate
+the file_obj object with the port.
+The association is also removed if the port gets closed or when port_dissociate() is called.
+The parent and child processes are allowed to retrieve events from file descriptors shared after a call to fork(2). The
+process performing the first association with a port (parent or child process) is designated as the owner of the associ<hy>
+ation. Only the owner of an association is allowed to dissociate the file descriptor from a port. The association is re<hy>
+moved if the owner of the association closes the port .
+On NFS file systems, events from only the client side (local) access/modifications to files or directories will be deliv<hy>
+ered.
+Upon succesful completion, 0 is returned. Otherwise, <mi>1 is returned and errno is set to indicate the error.
+The port_associate() and port_dissociate() functions will fail if:
+EBADF The port identifier is not valid.
+EBADFD The source argument is of type PORT_SOURCE_FD and the object argument is not a valid file descrip<hy>
+tor.
+EINVAL The source argument is not valid.
+The port_associate() function will fail if:
+EACCES The source argument is PORT_SOURCE_FILE and, Search permission is denied on a component of
+path prefix or the file exists and the permissions, corresponding to the events argument, are denied.
+EAGAIN The maximum number of objects associated with the port was exceeded. The maximum allowable number
+of events or association of objects per port is the minimum value of the process.max-port-events resource control at
+the time port_create(3C) was used to create the port. See setrctl(2) and rctladm(1M) for information on using re<hy>
+source controls.
+The number of objects associated with a port is composed of all supported resource types. Some of the source types
+do not explicitly use the port_associate() function.
+ENOENT The source argument is PORT_SOURCE_FILE and the file does not exist or the path prefix does not
+exist or the path points to an empty string.
+ENOMEM The physical memory limits of the system have been exceeded.
+ENOTSUP The source argument is PORT_SOURCE_FILE and the file system on which the specified file resides,
+does not support watching for file events notifications.
+The port_dissociate() function will fail if:
+EACCES The process is not the owner of the association.
+ENOENT The specified object is not associated with the port.
+<beginning of page>
+Example 1 Retrieve data from a pipe file descriptor.
+The following example retrieves data from a pipe file descriptor.
+ #include <port.h>
+ int port;
+ int fd;
+ int error;
+ int index;
+ void *mypointer;
+ port_event_t pev;
+ struct timespec_t timeout;
+ char rbuf[STRSIZE];
+ int fds[MAXINDEX];
+ /* create a port */
+ port = port_create();
+ for (index = 0; index < MAXINDEX; index++) {
+  error = mkfifo(name[index], S_IRWXU | S_IRWXG | S_IRWXO);
+  if (error)
+  /* handle error code */
+  fds[index] = open(name[index], O_RDWR);
+  /* associate pipe file descriptor with the port */
+  error = port_associate(port, PORT_SOURCE_FD, fds[index],
+  POLLIN, mypointer);
+ }
+ ...
+ timeout.tv_sec = 1; /* user defined */
+ timeout.tv_nsec = 0;
+ /* loop to retrieve data from the list of pipe file descriptors */
+ for (...) {
+  /* retrieve a single event */
+  error = port_get(port, &pev, &timeout);
+  if (error) {
+  /* handle error code */
+  }
+  fd = pev.portev_object;
+  if (read(fd, rbuf, STRSIZE)) {
+  /* handle error code */
+  }
+  if (fd-still-accepting-data) {
+  /*
+  * re-associate the file descriptor with the port.
+  * The re-association is required for the
+  * re-activation of the data detection.
+  * Internals events and user arguments are set to the
+  * new (or the same) values delivered here.
+  */
+  error = port_associate(port, PORT_SOURCE_FD, fd, POLLIN,
+  pev.portev_user);
+  } else {
+  /*
+  * If file descriptor is no longer required,
+  * - it can remain disabled but still associated with
+  * the port, or
+  * - it can be dissociated from the port.
+  */
+  }
+Example 2 Bind AIO transaction to a specific port.
+<beginning of page>
+The following example binds the AIO transaction to a specific port.
+ #include <port.h>
+ int port;
+ port_notify_t pn;
+ aiocb_t aiocb;
+ aiocb_t *aiocbp;
+ void *mypointer;
+ int error;
+ int my_errno;
+ int my_status;
+ struct timespec_t timeout;
+ port_event_t pev;
+ port = port_create();
+ ...
+ /* fill AIO specific part */
+ aiocb.aio_fildes = fd;
+ aiocb.aio_nbytes = BUFSIZE;
+ aiocb.aio_buf = bufp;
+ aiocb.aio_offset = 0;
+ /* port specific part */
+ pn.portnfy_port = port;
+ pn.portnfy_user = mypointer;
+ aiocb.aio_sigevent.sigev_notify = SIGEV_PORT;
+ aiocb.aio_sigevent.sigev_value.sival_ptr = &pn
+ /*
+  * The aio_read() function binds internally the asynchronous I/O
+  * transaction with the port delivered in port_notify_t.
+  */
+ error = aio_read(&aiocb);
+ timeout.tv_sec = 1; /* user defined */
+ timeout.tv_nsec = 0;
+ /* retrieve a single event */
+ error = port_get(port, &pev, &timeout);
+ if (error) {
+  /* handle error code */
+ }
+ /*
+  * pev.portev_object contains a pointer to the aiocb structure
+  * delivered in port_notify_t (see aio_read()).
+  */
+ aiocbp = pev.portev_object;
+ /* check error code and return value in
+ my_errno = aio_error(aiocbp);
+ ...
+ my_status = aio_return(aiocbp);
+ ...
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Architectureall _
+AvailabilitySUNWcsr, SUNWhea _ Interface StabilityCommitted _ MT-LevelSafe
+<beginning of page>
+rctladm(1M), poll(2), setrctl(2), port_alert(3C), port_create(3C), port_get(3C), port_send(3C), sig<hy>
+nal.h(3HEAD), attributes(5)

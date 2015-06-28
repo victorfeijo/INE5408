@@ -1,0 +1,127 @@
+<beginning of page>
+pthread_create <-> create a thread
+cc -mt [ flag... ] file... -lpthread [ library... ]
+#include <pthread.h>
+int pthread_create(pthread_t *restrict thread,
+ const pthread_attr_t *restrict attr,
+ void *(*start_routine)(void*), void *restrict arg);
+The pthread_create() function is used to create a new thread, with attributes specified by attr, within a process. If
+attr is NULL, the default attributes are used. (See pthread_attr_init(3C)). If the attributes specified by attr are
+modified later, the thread's attributes are not affected. Upon successful completion, pthread_create() stores the ID
+of the created thread in the location referenced by thread.
+The thread is created executing start_routine with arg as its sole argument. If the start_routine returns, the effect is
+as if there was an implicit call to pthread_exit() using the return value of start_routine as the exit status. Note that
+the thread in which main() was originally invoked differs from this. When it returns from main(), the effect is as if
+there was an implicit call to exit() using the return value of main() as the exit status.
+The signal state of the new thread is initialised as follows: <bu> The signal mask is inherited from the creating thread. <bu>
+The set of signals pending for the new thread is empty.
+Default thread creation:
+ pthread_t tid;
+ void *start_func(void *), *arg;
+ pthread_create(&tid, NULL, start_func, arg);
+This would have the same effect as:
+ pthread_attr_t attr;
+ pthread_attr_init(&attr); /* initialize attr with default */
+  /* attributes */
+ pthread_create(&tid, &attr, start_func, arg);
+User-defined thread creation: To create a thread that is scheduled on a system-wide basis, use:
+ pthread_attr_init(&attr); /* initialize attr with default */
+  /* attributes */
+ pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
+  /* system-wide contention */
+ pthread_create(&tid, &attr, start_func, arg);
+To customize the attributes for POSIX threads, see pthread_attr_init(3C).
+A new thread created with pthread_create() uses the stack specified by the stackaddr attribute, and the stack contin<hy>
+ues for the number of bytes specified by the stacksize attribute. By default, the stack size is 1 megabyte for 32-bit
+processes and 2 megabyte for 64-bit processes (see pthread_attr_setstacksize(3C)). If the default is used for both
+the stackaddr and stacksize attributes, pthread_create() creates a stack for the new thread with at least 1 megabyte
+for 32-bit processes and 2 megabyte for 64-bit processes. (For customizing stack sizes, see NOTES).
+If pthread_create() fails, no new thread is created and the contents of the location referenced by thread are unde<hy>
+fined.
+If successful, the pthread_create() function returns 0. Otherwise, an error number is returned to indicate the error.
+The pthread_create() function will fail if:
+EAGAIN The system lacked the necessary resources to create another thread, or the system-imposed limit on the to<hy>
+tal number of threads in a process PTHREAD_THREADS_MAX would be exceeded.
+<beginning of page>
+EINVAL The value specified by attr is invalid.
+EPERM The caller does not have appropriate permission to set the required scheduling parameters or scheduling
+policy.
+Example 1 Example of concurrency with multithreading
+The following is an example of concurrency with multithreading. Since POSIX threads and Solaris threads are fully
+compatible even within the same process, this example uses pthread_create() if you execute a.out 0, or thr_cre<hy>
+ate() if you execute a.out 1.
+Five threads are created that simultaneously perform a time-consuming function, sleep(10). If the execution of this
+process is timed, the results will show that all five individual calls to sleep for ten-seconds completed in about ten
+seconds, even on a uniprocessor. If a single-threaded process calls sleep(10) five times, the execution time will be
+about 50-seconds.
+The command-line to time this process is:
+POSIX threading /usr/bin/time a.out 0
+Solaris threading /usr/bin/time a.out 1
+ /* cc thisfile.c -lthread -lpthread */
+ #define _REENTRANT /* basic 3-lines for threads */
+ #include <pthread.h>
+ #include <thread.h>
+ #define NUM_THREADS 5
+ #define SLEEP_TIME 10
+ void *sleeping(void *); /* thread routine */
+ int i;
+ thread_t tid[NUM_THREADS]; /* array of thread IDs */
+ int
+ main(int argc, char *argv[])
+ {
+  if (argc == 1) {
+  printf("use 0 as arg1 to use pthread_create()\n");
+  printf("or use 1 as arg1 to use thr_create()\n");
+  return (1);
+  }
+  switch (*argv[1]) {
+  case '0': /* POSIX */
+  for ( i = 0; i < NUM_THREADS; i++)
+  pthread_create(&tid[i], NULL, sleeping,
+  (void *)SLEEP_TIME);
+  for ( i = 0; i < NUM_THREADS; i++)
+  pthread_join(tid[i], NULL);
+  break;
+  case '1': /* Solaris */
+  for ( i = 0; i < NUM_THREADS; i++)
+  thr_create(NULL, 0, sleeping, (void *)SLEEP_TIME, 0,
+  &tid[i]);
+  while (thr_join(0, NULL, NULL) == 0)
+  ;
+  break;
+<beginning of page>
+  } /* switch */
+  printf("main() reporting that all %d threads have
+  terminated\n", i);
+  return (0);
+ } /* main */
+ void *
+ sleeping(void *arg)
+ {
+  int sleep_time = (int)arg;
+  printf("thread %d sleeping %d seconds ...\n", thr_self(),
+  sleep_time);
+  sleep(sleep_time);
+  printf("\nthread %d awakening\n", thr_self());
+  return (NULL);
+ }
+If main() had not waited for the completion of the other threads (using pthread_join(3C) or thr_join(3C)), it would
+have continued to process concurrently until it reached the end of its routine and the entire process would have exit<hy>
+ed prematurely. See exit(2).
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Standard _ MT-LevelMT-Safe
+fork(2), pthread_attr_init(3C), pthread_cancel(3C), pthread_exit(3C), pthread_join(3C), sysconf(3C), at<hy>
+tributes(5), standards(5)
+Multithreaded application threads execute independently of each other, so their relative behavior is unpredictable.
+Therefore, it is possible for the thread executing main() to finish before all other user application threads. The
+pthread_join(3C)function, on the other hand, must specify the terminating thread (IDs) for which it will wait.
+A user-specified stack size must be greater than the value PTHREAD_STACK_MIN. A minimum stack size may
+not accommodate the stack frame for the user thread function start_func. If a stack size is specified, it must accom<hy>
+modate start_func requirements and the functions that it may call in turn, in addition to the minimum requirement.
+It is usually very difficult to determine the runtime stack requirements for a thread. PTHREAD_STACK_MIN
+specifies how much stack storage is required to execute a NULL start_func. The total runtime requirements for stack
+storage are dependent on the storage required to do runtime linking, the amount of storage required by library run<hy>
+times (as printf()) that your thread calls. Since these storage parameters are not known before the program runs, it is
+best to use default stacks. If you know your runtime requirements or decide to use stacks that are larger than the de<hy>
+fault, then it makes sense to specify your own stacks.

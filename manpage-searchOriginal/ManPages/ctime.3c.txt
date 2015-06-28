@@ -1,0 +1,142 @@
+<beginning of page>
+ctime, ctime_r, localtime, localtime_r, gmtime, gmtime_r, asctime, asctime_r, tzset <-> convert date and time to string
+#include <time.h>
+char *ctime(const time_t *clock);
+struct tm *localtime(const time_t *clock);
+struct tm *gmtime(const time_t *clock);
+char *asctime(const struct tm *tm);
+extern time_t timezone, altzone;
+extern int daylight;
+extern char *tzname[2];
+void tzset(void);
+char *ctime_r(const time_t *clock, char *buf, int buflen);
+struct tm *localtime_r(const time_t *restrict clock,
+ struct tm *restrict res);
+struct tm *gmtime_r(const time_t *restrict clock,
+ struct tm *restrict res);
+char *asctime_r(const struct tm *restrict tm, char *restrict buf,
+ int buflen);
+cc [ flag... ] file... -D_POSIX_PTHREAD_SEMANTICS [ library... ]
+char *ctime_r(const time_t *clock, char *buf);
+char *asctime_r(const struct tm *tm, char *buf);
+The ctime() function converts the time pointed to by clock, representing the time in seconds since the Epoch
+(00:00:00 UTC, January 1, 1970), to local time in the form of a 26-character string, as shown below. Time zone and
+daylight savings corrections are made before string generation. The fields are in constant width:
+Fri Sep 13 00:00:00 1986\n\0
+The ctime() function is equivalent to:
+asctime(localtime(clock))
+The ctime(), asctime(), gmtime(), and localtime() functions return values in one of two thread-specific data objects:
+a broken-down time structure and an array of char. Execution of any of the functions can overwrite the information
+returned in either of these objects by any of the other functions executed by the same thread.
+The ctime_r() function has the same functionality as ctime() except that the caller must supply a buffer buf with
+length buflen to store the result; buf must be at least 26 bytes. The standard-conforming ctime_r() function does not
+take a buflen parameter.
+The localtime() and gmtime() functions return pointers to tm structures (see below). The localtime() function cor<hy>
+rects for the main time zone and possible alternate ("daylight savings") time zone; the gmtime() function converts
+directly to Coordinated Universal Time (UTC), which is what the UNIX system uses internally.
+The localtime_r() and gmtime_r() functions have the same functionality as localtime() and gmtime() respectively,
+except that the caller must supply a buffer res to store the result.
+The asctime() function converts a tm structure to a 26-character string, as shown in the previous example, and re<hy>
+turns a pointer to the string.
+The asctime_r() function has the same functionality as asctime() except that the caller must supply a buffer buf with
+length buflen for the result to be stored. The buf argument must be at least 26 bytes. The standard-conforming asc<hy>
+time_r() function does not take a buflen parameter. The asctime_r() function returns a pointer to buf upon success.
+<beginning of page>
+In case of failure, NULL is returned and errno is set.
+Declarations of all the functions and externals, and the tm structure, are in the <time.h> header. The members of the
+tm structure are:
+ int tm_sec; /* seconds after the minute <em> [0, 60] */
+  /* for leap seconds */
+ int tm_min; /* minutes after the hour <em> [0, 59] */
+ int tm_hour; /* hour since midnight <em> [0, 23] */
+ int tm_mday; /* day of the month <em> [1, 31] */
+ int tm_mon; /* months since January <em> [0, 11] */
+ int tm_year; /* years since 1900 */
+ int tm_wday; /* days since Sunday <em> [0, 6] */
+ int tm_yday; /* days since January 1 <em> [0, 365] */
+ int tm_isdst; /* flag for alternate daylight savings time */
+The value of tm_isdst is positive if daylight savings time is in effect, zero if daylight savings time is not in effect,
+and negative if the information is not available. Previously, the value of tm_isdst was defined as non-zero if daylight
+savings was in effect.
+The external time_t variable altzone contains the difference, in seconds, between Coordinated Universal Time and
+the alternate time zone. The external variable timezone contains the difference, in seconds, between UTC and local
+standard time. The external variable daylight indicates whether time should reflect daylight savings time. Both time<hy>
+zone and altzone default to 0 (UTC). The external variable daylight is non-zero if an alternate time zone exists. The
+time zone names are contained in the external variable tzname, which by default is set to:
+char *tzname[2] = { "GMT", "" };
+These functions know about the peculiarities of this conversion for various time periods for the U.S. (specifically, the
+years 1974, 1975, and 1987). They start handling the new daylight savings time starting with the first Sunday in
+April, 1987.
+The tzset() function uses the contents of the environment variable TZ to override the value of the different external
+variables. It is called by asctime() and can also be called by the user. If TZ is not specified or has an invalid setting,
+tzset() uses GMT0. See environ(5) for a description of the TZ environment variable.
+Starting and ending times are relative to the current local time zone. If the alternate time zone start and end dates and
+the time are not provided, the days for the United States that year will be used and the time will be 2 AM. If the start
+and end dates are provided but the time is not provided, the time will be 2 AM. The effects of tzset() change the val<hy>
+ues of the external variables timezone, altzone, daylight, and tzname.
+Note that in most installations, TZ is set to the correct value by default when the user logs on, using the local
+/etc/default/init file (see TIMEZONE(4)).
+Upon successful completion, the gmtime() and localtime() functions return a pointer to a struct tm. If an error is
+detected, gmtime() and localtime() return a null pointer.
+Upon successful completion, the gmtime_r() and localtime_r() functions return the address of the structure pointed
+to by the res argument. If an error is detected, gmtime_r() and localtime_r() return a null pointer and set errno to
+indicate the error.
+The ctime_r() and asctime_r() functions will fail if:
+ERANGE The length of the buffer supplied by the caller is not large enough to store the result.
+The gmtime(), gmtime_r(), localtime(), and localtime_r() functions will fail if:
+EOVERFLOW The result cannot be represented.
+These functions do not support localized date and time formats. The strftime(3C) function can be used when local<hy>
+ization is required.
+The localtime(), localtime_r(), gmtime(), gmtime_r(), ctime(), and ctime_r() functions assume Gregorian dates.
+<beginning of page>
+Times before the adoption of the Gregorian calendar will not match historial records. Example 1 Examples of the
+tzset() function.
+The tzset() function scans the contents of the environment variable and assigns the different fields to the respective
+variable. For example, the most complete setting for New Jersey in 1986 could be:
+ EST5EDT4,116/2:00:00,298/2:00:00
+or simply
+ EST5EDT
+An example of a southern hemisphere setting such as the Cook Islands could be
+ KDT9:30KST10:00,63/5:00,302/20:00
+In the longer version of the New Jersey example of TZ, tzname[0] is EST, timezone is set to 5*60*60, tzname[1] is
+EDT, altzone is set to 4*60*60, the starting date of the alternate time zone is the 117th day at 2 AM, the ending date
+of the alternate time zone is the 299th day at 2 AM (using zero-based Julian days), and daylight is set positive.
+Starting and ending times are relative to the current local time zone. If the alternate time zone start and end dates and
+the time are not provided, the days for the United States that year will be used and the time will be 2 AM. If the start
+and end dates are provided but the time is not provided, the time will be 2 AM. The effects of tzset() are thus to
+change the values of the external variables timezone, altzone, daylight, and tzname. The ctime(), localtime(), mk<hy>
+time(), and strftime() functions also update these external variables as if they had called tzset() at the time specified
+by the time_t or struct tm value that they are converting.
+The zoneinfo timezone data files do not transition past Tue Jan 19 03:14:07 2038 UTC. Therefore for 64-bit appli<hy>
+cations using zoneinfo timezones, calculations beyond this date might not use the correct offset from standard time,
+and could return incorrect values. This affects the 64-bit version of localtime(), localtime_r(), ctime(), and
+ctime_r().
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ CSIEnabled _ In<hy>
+terface StabilityStandard _ MT-LevelMT-Safe with exceptions
+The asctime(), ctime(), gmtime(), and localtime() functions are safe to use in multithread applications because they
+employ thread-specific data. However, their use is discouraged because standards do not require them to be thread-
+safe. The asctime_r() and gmtime_r() functions are MT-Safe. The ctime_r(), localtime_r(), and tzset() functions
+are MT-Safe in multithread applications, as long as no user-defined function directly modifies one of the following
+variables: timezone, altzone, daylight, and tzname. These four variables are not MT-Safe to access. They are modi<hy>
+fied by the tzset() function in an MT-Safe manner. The mktime(), localtime_r(), and ctime_r() functions call
+tzset().
+time(2), Intro(3), getenv(3C), mktime(3C), printf(3C), putenv(3C), setlocale(3C), strftime(3C), TIMEZONE(4),
+attributes(5), environ(5), standards(5)
+When compiling multithreaded programs, see Intro(3).
+The return values for asctime(), ctime(), gmtime(), and localtime() point to thread-specific data whose content is
+overwritten by each call by the same thread.
+Setting the time during the interval of change from timezone to altzone or vice versa can produce unpredictable re<hy>
+sults. The system administrator must change the Julian start and end days annually.
+If tzset() has previously evaluated the timezone identified by the value of the TZ environment variable, tzset() can
+<beginning of page>
+reuse the previous settings of the external variables altzone, daylight, timezone, and tzname[] associated with that
+timezone.
+Solaris 2.4 and earlier releases provided definitions of the ctime_r(), localtime_r(), gmtime_r(), and asctime_r()
+functions as specified in POSIX.1c Draft 6. The final POSIX.1c standard changed the interface for ctime_r() and as<hy>
+ctime_r(). Support for the Draft 6 interface is provided for compatibility only and might not be supported in future
+releases. New applications and libraries should use the standard-conforming interface.
+For POSIX.1c-conforming applications, the _POSIX_PTHREAD_SEMANTICS and _REENTRANT flags are
+automatically turned on by defining the _POSIX_C_SOURCE flag with a value >= 199506L.
+In Solaris 10, gmtime(), gmtime_r(), localtime(), and localtime_r() were updated to return a null pointer if an error
+is detected. This change was based on the SUSv3 specification. See standards(5).

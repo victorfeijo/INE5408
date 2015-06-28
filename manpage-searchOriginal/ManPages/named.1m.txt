@@ -1,0 +1,169 @@
+<beginning of page>
+named, in.named <-> Internet domain name server
+named [-fgsv] [-c config-file] [-d debug-level] [-m flag] [-n #cpus]
+ [-p port] [-t directory] [-u user] [-x cache-file] [-4 | -6]
+The named utility is a Domain Name System (DNS) server, part of the BIND 9 distribution from ISC. For more in<hy>
+formation on the DNS, see RFCs 1033, 1034, and 1035.
+When invoked without arguments, named reads the default configuration file /etc/named.conf, reads any initial da<hy>
+ta, and listens for queries.
+in.named is a link to named.
+The following options are supported:
+-4
+Use only IPv4 transport. By default, both IPv4 and IPv6 transports can be used. Options -4 and -6 are mutually ex<hy>
+clusive.
+-6
+Use only IPv6 transport. By default, both IPv4 and IPv6 transports can be used. Options -4 and -6 are mutually ex<hy>
+clusive.
+-c config-file
+Use config-file as the configuration file instead of the default /etc/named.conf. To ensure that reloading the configu<hy>
+ration file continues to work after the server has changed its working directory due to to a possible directory option
+in the configuration file, config-file should be an absolute pathname.
+-d debug-level
+Set the daemon's debug level to debug-level. Debugging traces from named become more verbose as the debug lev<hy>
+el increases.
+-f
+Run the server in the foreground (that is, do not daemonize).
+-g
+Run the server in the foreground and force all logging to stderr.
+-m flag
+Turn on memory usage debugging flags. Possible flags are "usage", "trace", and "record". These correspond to the
+ISC_MEM_DEBUGXXXX flags.
+-n #cpus
+Create #cpus worker threads to take advantage of multiple CPUs. If not specified, named will try to determine the
+number of CPUs present and create one thread per CPU. If it is unable to determine the number of CPUs, a single
+worker thread will be created.
+-p port
+Listen for queries on port port. If not specified, the default is port 53.
+<beginning of page>
+-s
+Write memory usage statistics to stdout on exit.
+This option is mainly of interest to BIND 9 developers and might be removed or changed in a future release.
+-t directory
+Change the root directory using chroot(2) to directory after processing the command line arguments, but before
+reading the configuration file.
+This option should be used in conjunction with the -u option, as chrooting a process running as root doesn't enhance
+security on most systems; the way chroot() is defined allows a process with root privileges to escape a chroot jail.
+-u user
+Set the real user ID using setuid(2) to user after completing privileged operations, such as creating sockets that lis<hy>
+ten on privileged ports.
+On Linux, named uses the kernel's capability mechanism to drop all root privileges except the ability to use
+bind(3SOCKET) to bind to a privileged port and set process resource limits. Unfortunately, this means that the -u
+option works only when named is run on kernel 2.2.18 or later, or kernel 2.3.99-pre3 or later, since previous kernels
+did not allow privileges to be retained after setuid().
+-v
+Report the version number and exit.
+-x cache-file
+Load data from cache-file into the cache of the default view.
+This option must not be used. It is of interest only to BIND 9 developers and might be removed or changed in a fu<hy>
+ture release.
+This section describes additional attributes of named.
+When starting named from the service management facility, smf(5), named configuration is read from the service
+configuration repository. Use svcprop(1) to list the properties and svccfg(1M) to make changes.
+The following application configuration properties are available to administrators:
+options/server
+Specifies the server executable to be used instead of the default server, /usr/sbin/named.
+options/configuration_file
+Specifies the configuration file to be used instead of the default, /etc/named.conf. A directory option might be speci<hy>
+fied in the configuration file. To ensure that reloading the configuration file continues to work in such a situation,
+configuration_file should be specified as an absolute pathname. This pathname should not include the chroot_dir
+pathname. This property is the equivalent of the -c option.
+options/ip_interfaces
+Specifies over which IP transport, IPv4 or IPv6, BIND will transmit. Possible values are IPv4 or IPv6. Any other
+setting assumes all, the default. This property is the equivalent of command line option -4 or -6
+options/listen_on_port
+Specifies the default UDP and TCP port to be used for listening to DNS requests. This property is the equivalent of
+the command line option -p port.
+<beginning of page>
+options/debug_level
+Specifies the default debug level. The default is 0, which means no debugging. The higher the number the more ver<hy>
+bose debug information becomes. Equivalent of the command line option -d debug_level.
+options/threads
+Specifies the number of CPU worker threads to create. The default of 0 causes named to try and determine the num<hy>
+ber of CPUs present and create one thread per CPU. Equivalent of command line option -n #cpus.
+options/chroot_dir
+Specifies the directory to be used as the root directory after processing SMF properties and the command line argu<hy>
+ments but before reading the configuration file. Use this property when using a chroot(2) environment. Synonymous
+to command line option -t pathname.
+When using chroot(2), named is unable to disable itself when receiving rndc(1M) stop or halt commands. Instead,
+you must use the svcadm(1M) disable command.
+In the event of a configuration error originating in one of the above SMF application options, named displays a mes<hy>
+sage providing information about the error and the parameters that need correcting. The process then exits with exit
+code SMF_EXIT_ERR_CONFIG.
+At startup, in the event of an error other than a configuration error, named exits with exit code SMF_EX<hy>
+IT_ERR_FATAL. Both of this code and SMF_EXIT_ERR_CONFIG cause the start method, smf_method(5), to
+place the service in the maintenance state, which can be observed with the svcs(1) command svcs -x.
+In addition to the properties listed above, the following property can be used to invoke named as a user other than
+root:
+start/user
+Specifies the identity of the user that is invoking named. See smf_method(5) and chroot(2). Note that the user must
+have solaris.smf.manage.bind authorization. Without this role the named will be unable to manage its SMF FMRI
+and named will automatically be restarted by the SMF after an rndc(1M) stop or halt command. See EXAMPLES
+for a sequence of commands that establishes the correct authorization.
+In routine operation, signals should not be used to control the nameserver; rndc(1M) should be used instead.
+SIGHUP
+Force a reload of the server.
+SIGINT, SIGTERM
+Shut down the server.
+The result of sending any other signals to the server is undefined.
+The named configuration file is too complex to describe in detail here. A list of configuration options is provided in
+the named.conf man page shipped with the BIND 9 distribution. A complete description is provided in the BIND 9
+Administrator Reference Manual. See SEE ALSO. Example 1 Configuring named to Transmit Only over IPv4
+Networks
+The following command sequence configures named such that it will transmit only over IPv4 networks.
+ # svccfg -s svc:network/dns/server:default setprop \
+ > options/ip_interfaces=IPv4
+ # svcadm refresh svc:network/dns/server:default
+ #
+<beginning of page>
+Example 2 Listing Current Configuration File and Setting an Alternative File
+The following sequence of commands lists the current named configuration file and sets an alternative file.
+ # svcprop -p options/configuration_file dns/server:default
+ /etc/named.conf
+ # svccfg -s dns/server:default setprop \
+ > options/configuration_file=/var/named/named.conf
+ # svcadm refresh dns/server:default
+ # svcprop -p options/configuration_file dns/server:default
+ /var/named/named.conf
+Example 3 Establishing Appropriate Authorization for named
+To have named start with the solaris.smf.manage.bind authorization, perform the steps shown below.
+Add the user dnsadmin to the solaris.smf.manage.bind role:
+ # usermod -A solaris.smf.manage.bind dnsadmin
+ Observe effect of command:
+ # tail -1 /etc/user_attr
+ dnsadmin::::type=normal;auths=solaris.smf.manage.bind
+Modify the service properties:
+ # svccfg
+ svc:> select svc:/network/dns/server:default
+ svc:/network/dns/server:default> setprop start/user = dnsadmin
+ svc:/network/dns/server:default> setprop start/group = dnsadmin
+ svc:/network/dns/server:default> exit
+ # svcadm refresh svc:/network/dns/server:default
+ # svcadm restart svc:/network/dns/server:default
+Because only root has write access to create the default process-ID file, /var/run/named.pid, named must be con<hy>
+figured to use an alternative path for the user dnsadmin. Here is an example of how to accomplish this:
+ # mkdir /var/named/tmp
+ # chown dnsadmin /var/named/tmp
+Shown below is what you must add to named.conf to make use of the directory created above.
+ # head /etc/named.conf
+ options {
+ directory "/var/named";
+ pid-file "/var/named/tmp/named.pid";
+ };
+/etc/named.conf
+default configuration file
+<beginning of page>
+/var/run/named.pid
+default process-ID file
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wbind _ Interface StabilityStandard
+svcs(1), rndc(1M), rndc-confgen(1M), svcadm(1M), svccfg(1M), svcprop(1), chroot(2), setuid(2), bind(3SOCK<hy>
+ET), attributes(5), smf(5), smf_method(5)
+RFC 1033, RFC 1034, RFC 1035
+BIND 9 Administrator Reference Manual, published by the Internet Systems Consortium and accessible at
+www.bind9.net
+named.conf man page shipped with the BIND 9 distribution
+By default, named attempts to contact remote name servers by either their IPv4 or IPv6 address, even though the
+host system does not have either IPv4 or IPv6 connectivity (that is, a configured and active interface). To address this
+issue, either provide the missing connectivity or use the relevant -4 or -6 command line option. When using svc<hy>
+cfg(1M), set application property options/ip_interfaces to either IPv4 or IPv6.

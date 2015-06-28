@@ -1,0 +1,81 @@
+<beginning of page>
+hosts.equiv, rhosts <-> trusted remote hosts and users
+The /etc/hosts.equiv and .rhosts files provide the "remote authentication" database for rlogin(1), rsh(1), rcp(1), and
+rcmd(3SOCKET). The files specify remote hosts and users that are considered "trusted". Trusted users are allowed
+to access the local system without supplying a password. The library routine ruserok() (see rcmd(3SOCKET)) per<hy>
+forms the authentication procedure for programs by using the /etc/hosts.equiv and .rhosts files. The
+/etc/hosts.equiv file applies to the entire system, while individual users can maintain their own .rhosts files in their
+home directories.
+These files bypass the standard password-based user authentication mechanism. To maintain system security, care
+must be taken in creating and maintaining these files.
+The remote authentication procedure determines whether a user from a remote host should be allowed to access the
+local system with the identity of a local user. This procedure first checks the /etc/hosts.equiv file and then checks the
+.rhosts file in the home directory of the local user who is requesting access. Entries in these files can be of two
+forms. Positive entries allow access, while negative entries deny access. The authentication succeeds when a match<hy>
+ing positive entry is found. The procedure fails when the first matching negative entry is found, or if no matching en<hy>
+tries are found in either file. The order of entries is important. If the files contain both positive and negative entries,
+the entry that appears first will prevail. The rsh(1) and rcp(1) programs fail if the remote authentication procedure
+fails. The rlogin program falls back to the standard password-based login procedure if the remote authentication
+fails.
+Both files are formatted as a list of one-line entries. Each entry has the form:
+ hostname [username]
+Hostnames must be the official name of the host, not one of its nicknames.
+Negative entries are differentiated from positive entries by a `<mi>' character preceding either the hostname or user<hy>
+name field.
+If the form:
+ hostname
+is used, then users from the named host are trusted. That is, they may access the system with the same user name as
+they have on the remote system. This form may be used in both the /etc/hosts.equiv and .rhosts files.
+If the line is in the form:
+ hostname username
+then the named user from the named host can access the system. This form may be used in individual .rhosts files to
+allow remote users to access the system as a different local user. If this form is used in the /etc/hosts.equiv file, the
+named remote user will be allowed to access the system as any local user.
+netgroup(4) can be used in either the hostname or username fields to match a number of hosts or users in one entry.
+The form:
+ +@netgroup
+allows access from all hosts in the named netgroup. When used in the username field, netgroups allow a group of re<hy>
+mote users to access the system as a particular local user. The form:
+ hostname +@netgroup
+<beginning of page>
+allows all of the users in the named netgroup from the named host to access the system as the local user. The form:
+ +@netgroup1 +@netgroup2
+allows the users in netgroup2 from the hosts in netgroup1 to access the system as the local user.
+The special character `+' can be used in place of either hostname or username to match any host or user. For exam<hy>
+ple, the entry
+ +
+will allow a user from any remote host to access the system with the same username. The entry
+ + username
+will allow the named user from any remote host to access the system. The entry
+ hostname +
+will allow any user from the named host to access the system as the local user.
+Negative entries are preceded by a `<mi>' sign. The form:
+ <mi>hostname
+will disallow all access from the named host. The form:
+ <mi>@netgroup
+means that access is explicitly disallowed from all hosts in the named netgroup. The form:
+ hostname <mi>username
+disallows access by the named user only from the named host, while the form:
+ + <mi>@netgroup
+will disallow access by all of the users in the named netgroup from all hosts.
+To help maintain system security, the /etc/hosts.equiv file is not checked when access is being attempted for super-
+user. If the user attempting access is not the super-user, /etc/hosts.equiv is searched for lines of the form described
+above. Checks are made for lines in this file in the following order: 1. + 2. +@netgroup 3. <mi>@netgroup 4. <mi>host<hy>
+name 5. hostname
+The user is granted access if a positive match occurrs. Negative entries apply only to /etc/hosts.equiv and may be
+overridden by subsequent .rhosts entries.
+If no positive match occurred, the .rhosts file is then searched if the user attempting access maintains such a file.
+This file is searched whether or not the user attempting access is the super-user. As a security feature, the .rhosts file
+must be owned by the user who is attempting access. Checks are made for lines in .rhosts in the following order: 1.
+<beginning of page>
++ 2. +@netgroup 3. <mi>@netgroup 4. <mi>hostname 5. hostname
+/etc/hosts.equiv system trusted hosts and users
+~/.rhosts user's trusted hosts and users
+rcp(1), rlogin(1), rsh(1), rcmd(3SOCKET), hosts(4), netgroup(4), passwd(4)
+Positive entries in /etc/hosts.equiv that include a username field (either an individual named user, a netgroup, or `+'
+sign) should be used with extreme caution. Because /etc/hosts.equiv applies system-wide, these entries allow one,
+or a group of, remote users to access the system as any local user. This can be a security hole. For example, because
+of the search sequence, an /etc/hosts.equiv file consisting of the entries
+ +
+ <mi>hostxxx
+will not deny access to "hostxxx".

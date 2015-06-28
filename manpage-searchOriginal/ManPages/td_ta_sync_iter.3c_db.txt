@@ -1,0 +1,53 @@
+<beginning of page>
+td_ta_sync_iter, td_ta_thr_iter, td_ta_tsd_iter <-> iterator functions on process handles from libc_db
+cc [ flag... ] file... -lc_db [ library... ]
+#include <proc_service.h>
+#include <thread_db.h>
+typedef int td_sync_iter_f(const td_synchandle_t *sh_p, void *cbdata_p);
+typedef int td_thr_iter_f(const td_thrhandle_t *th_p, void *cbdata_p);
+typedef int td_key_iter_f(thread_key_t key, void (*destructor)(), void *cbdata_p);
+td_err_e td_ta_sync_iter(const td_thragent_t *ta_p, td_sync_iter_f *cb,
+ void *cbdata_p);
+td_err_e td_ta_thr_iter(const td_thragent_t *ta_p, td_thr_iter_f *cb,
+ void *cbdata_p, td_thr_state_e state, int ti_pri, sigset_t *ti_sigmask_p,
+ unsigned ti_user_flags);
+td_err_e td_ta_tsd_iter(const td_thragent_t *ta_p, td_key_iter_f *cb,
+ void *cbdata_p);
+The td_ta_sync_iter(), td_ta_thr_iter(), and td_ta_tsd_iter() functions are iterator functions that when given a tar<hy>
+get process handle as an argument, return sets of handles for objects associated with the target process. The method
+is to call back a client-provided function once for each associated object, passing back a handle as well as the client-
+provided pointer cb_data_p. This enables a client to easily build a linked list of the associated objects. If the client-
+provided function returns non-zero, the iteration terminates, even if there are members remaining in the set of associ<hy>
+ated objects.
+The td_ta_sync_iter() function returns handles of synchronization objects (mutexes, readers-writer locks, sema<hy>
+phores, and condition variables) associated with a process. Some synchronization objects might not be known to
+libc_db and will not be returned. If the process has initialized the synchronization object (by calling mu<hy>
+tex_init(3C), for example) or a thread in the process has called a synchronization primitive (mutex_lock(), for ex<hy>
+ample) using this object after td_ta_new(3C_DB) was called to attach to the process and td_ta_sync_tracking_en<hy>
+able() was called to enable synchronization object tracking, then a handle for the synchronization object will be
+passed to the callback function. See td_sync_get_info(3C_DB) for operations that can be performed on synchro<hy>
+nization object handles.
+The td_ta_thr_iter() function returns handles for threads that are part of the target process. For td_ta_thr_iter(),
+the caller specifies several criteria to select a subset of threads for which the callback function should be called. Any
+of these selection criteria may be wild-carded. If all of them are wild-carded, then handles for all threads in the
+process will be returned.
+The selection parameters and corresponding wild-card values are:
+state (TD_THR_ANY_STATE):
+Select only threads whose state matches state. See td_thr_get_info(3C_DB) for a list of thread states.
+ti_pri (TD_THR_LOWEST_PRIORITY):
+Select only threads for which the priority is at least ti_pri.
+ti_sigmask_p (TD_SIGNO_MASK):
+Select only threads whose signal mask exactly matches *ti_sigmask_p.
+ti_user_flags (TD_THR_ANY_USER_FLAGS):
+Select only threads whose user flags (specified at thread creation time) exactly match ti_user_flags.
+The td_ta_tsd_iter() function returns the thread-specific data keys in use by the current process. Thread-specific
+data for a particular thread and key can be obtained by calling td_thr_tsd(3C_DB).
+<beginning of page>
+TD_OK The call completed successfully.
+TD_BADTA An invalid process handle was passed.
+TD_DBERR A call to one of the imported interface routines failed.
+TD_ERR The call did not complete successfully.
+See attributes(5) for description of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelSafe
+libc_db(3LIB), mutex_init(3C), td_sync_get_info(3C_DB), td_thr_get_info(3C_DB), td_thr_tsd(3C_DB), at<hy>
+tributes(5)

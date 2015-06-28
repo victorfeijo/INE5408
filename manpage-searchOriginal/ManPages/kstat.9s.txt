@@ -1,0 +1,41 @@
+<beginning of page>
+kstat <-> kernel statistics structure
+#include <sys/types.h>
+#include <sys/kstat.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+Solaris DDI specific (Solaris DDI)
+Each kernel statistic (kstat) exported by device drivers consists of a header section and a data section. The kstat
+structure is the header portion of the statistic.
+A driver receives a pointer to a kstat structure from a successful call to kstat_create(9F). Drivers should never allo<hy>
+cate a kstat structure in any other manner.
+After allocation, the driver should perform any further initialization needed before calling kstat_install(9F) to actu<hy>
+ally export the kstat.
+ void *ks_data; /* kstat type-specif. data */
+ ulong_t ks_ndata; /* # of type-specif. data
+  records */
+ ulong_t ks_data_size; /* total size of kstat data
+  section */
+ int (*ks_update)(struct kstat *, int);
+ void *ks_private; /* arbitrary provider-private
+  data */
+ void *ks_lock; /* protects kstat's data */
+The members of the kstat structure available to examine or set by a driver are as follows:
+ks_data Points to the data portion of the kstat. Either allocated by kstat_create(9F) for the drivers use, or by the
+driver if it is using virtual kstats.
+ks_ndata The number of data records in this kstat. Set by the ks_update(9E) routine.
+ks_data_size The amount of data pointed to by ks_data. Set by the ks_update(9E) routine.
+ks_update Pointer to a routine that dynamically updates kstat. This is useful for drivers where the underlying de<hy>
+vice keeps cheap hardware statistics, but where extraction is expensive. Instead of constantly keeping the kstat data
+section up to date, the driver can supply a ks_update(9E) function that updates the kstat data section on demand. To
+take advantage of this feature, set the ks_update field before calling kstat_install(9F).
+ks_private Is a private field for the driver's use. Often used in ks_update(9E).
+ks_lock Is a pointer to a mutex that protects this kstat. kstat data sections are optionally protected by the per-kstat
+ks_lock. If ks_lock is non-NULL, kstat clients (such as /dev/kstat) will acquire this lock for all of their operations
+on that kstat. It is up to the kstat provider to decide whether guaranteeing consistent data to kstat clients is suffi<hy>
+ciently important to justify the locking cost. Note, however, that most statistic updates already occur under one of
+the provider's mutexes. If the provider sets ks_lock to point to that mutex, then kstat data locking is free. ks_lock is
+really of type (kmutex_t*) and is declared as (void*) in the kstat header. That way, users do not have to be exposed
+to all of the kernel's lock-related data structures.
+kstat_create(9F)
+Writing Device Drivers

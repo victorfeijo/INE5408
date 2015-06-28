@@ -1,0 +1,479 @@
+<beginning of page>
+ipseckey <-> manually manipulate an IPsec Security Association Database (SADB)
+ipseckey [-nvp]
+ipseckey [-nvp] -f filename
+ipseckey -c filename
+ipseckey [-nvp] [delete | delete-pair | get] SA_TYPE {EXTENSION value...}
+ipseckey [-np] [monitor | passive_monitor | pmonitor]
+ipseckey [-nvp] flush {SA_TYPE}
+ipseckey [-nvp] dump {SA_TYPE}
+ipseckey [-nvp] save SA_TYPE {filename}
+ipseckey [-nvp] -s filename
+The ipseckey command is used to manually manipulate the security association databases of the network security
+services, ipsecah(7P) and ipsecesp(7P). You can use the ipseckey command to set up security associations between
+communicating parties when automated key management is not available.
+While the ipseckey utility has only a limited number of general options, it supports a rich command language. The
+user may specify requests to be delivered by means of a programmatic interface specific for manual keying. See
+pf_key(7P). When ipseckey is invoked with no arguments, it will enter an interactive mode which prints a prompt to
+the standard output and accepts commands from the standard input until the end-of-file is reached. Some commands
+require an explicit security association ("SA") type, while others permit the SA type to be unspecified and act on all
+SA types.
+ipseckey uses a PF_KEY socket and the message types SADB_ADD, SADB_DELETE, SADB_GET, SADB_UP<hy>
+DATE, SADB_FLUSH, and SADB_X_PROMISC. Thus, you must be a superuser to use this command.
+ipseckey handles sensitive cryptographic keying information. Please read the Security section for details on how to
+use this command securely.
+-c [filename]
+Analogous to the -f option (see following), except that the input is not executed but only checked for syntactical cor<hy>
+rectness. Errors are reported to stderr. This option is provided to debug configurations without making changes. See
+SECURITY and "Service Management Facility" for more information.
+-f [filename]
+Read commands from an input file, filename. The lines of the input file are identical to the command line language.
+The load command provides similar functionality. The -s option or the save command can generate files readable by
+the -f argument.
+-n
+Prevent attempts to print host and network names symbolically when reporting actions. This is useful, for example,
+when all name servers are down or are otherwise unreachable.
+-p
+Paranoid. Do not print any keying material, even if saving SAs. Instead of an actual hexadecimal digit, print an X
+when this flag is turned on.
+-s [filename]
+The opposite of the -f option. If '-' is given for a filename, then the output goes to the standard output. A snapshot of
+all current SA tables will be output in a form readable by the -f option. The output will be a series of add com<hy>
+mands, but with some names not used. This occurs because a single name may often indicate multiple addresses.
+<beginning of page>
+-v
+Verbose. Print the messages being sent into the PF_KEY socket, and print raw seconds values for lifetimes.
+add
+Add an SA. Because it involves the transfer of keying material, it cannot be invoked from the shell, lest the keys be
+visible in ps(1) output. It can be used either from the interactive ipseckey> prompt or in a command file specified by
+the -f command. The add command accepts all extension-value pairs described below.
+update
+Update SA lifetime, and in the cases of larval SAs (leftover from aborted automated key management), keying mate<hy>
+rial and other extensions. Like add, this command cannot be invoked from the shell because keying material would
+be seen by the ps(1) command. It can be used either from the interactive ipseckey> prompt or in a command file
+specified by the -f command. The update command accepts all extension-value pairs, but normally is only used for
+SA lifetime updates.
+update-pair
+As update, but apply the update to the SA and its paired SA, if there is one.
+delete
+Delete a specific SA from a specific SADB. This command requires the spi extension, and the dest extension for
+IPsec SAs. Other extension-value pairs are superfluous for a delete message. If the SA to be deleted is paired with
+another SA, the SA is deleted and the paired SA is updated to indicate that it is now unpaired.
+delete-pair
+Delete a specific SA from a specific SADB. If the SA is paired with another SA, delete that SA too. This command
+requires the spi extension and the dest extension for the IPsec SA, or its pair.
+get
+Lookup and display a security association from a specific SADB. Like delete, this command only requires spi and
+dest for IPsec.
+flush
+Remove all SA for a given SA_TYPE, or all SA for all types.
+monitor
+Continuously report on any PF_KEY messages. This uses the SADB_X_PROMISC message to enable messages
+that a normal PF_KEY socket would not receive to be received. See pf_key(7P).
+passive_monitor
+Like monitor, except that it does not use the SADB_X_PROMISC message.
+pmonitor
+Synonym for passive_monitor.
+dump
+Will display all SAs for a given SA type, or will display all SAs. Because of the large amount of data generated by
+<beginning of page>
+this command, there is no guarantee that all SA information will be successfully delivered, or that this command will
+even complete.
+save
+Is the command analog of the -s option. It is included as a command to provide a way to snapshot a particular SA
+type, for example, esp or ah.
+help
+Prints a brief summary of commands.
+all
+Specifies all known SA types. This type is only used for the flush and dump commands. This is equivalent to having
+no SA type for these commands.
+ah
+Specifies the IPsec Authentication Header ("AH") SA.
+esp
+Specifies the IPsec Encapsulating Security Payload ("ESP") SA.
+Commands like add, delete, get, and update require that certain extensions and associated values be specified. The
+extensions will be listed here, followed by the commands that use them, and the commands that require them. Re<hy>
+quirements are currently documented based upon the IPsec definitions of an SA. Required extensions may change in
+the future. <number> can be in either hex (0xnnn), decimal (nnn) or octal (0nnn).<string> is a text string.
+<hexstr> is a long hexadecimal number with a bit-length. Extensions are usually paired with values; however, some
+extensions require two values after them.
+spi <number>
+Specifies the security parameters index of the SA. This extension is required for the add, delete, get and update
+commands.
+pair-spi <number>
+When pair-spi is used with the add or update commands, the SA being added or updated will be paired with the SA
+defined by pair-spi. A pair of SAs can be updated or deleted with a single command.
+The two SAs that make up the pair need to be in opposite directions from the same pair of IP addresses. The com<hy>
+mand will fail if either of the SAs specified are already paired with another SA.
+If the pair-spi token is used in a command and the SA defined by pair-spi does not exist, the command will fail. If
+the command was add and the pairing failed, the SA to be added will instead be removed.
+inbound | outbound
+These optional flags specify the direction of the SA. When the inbound or outbound flag is specified with the add
+command, the kernel will insert the new SA into the specified hash table for faster lookups. If the flag is omitted,
+the kernel will decide into which hash table to insert the new SA based on its knowledge the IP addresses specified
+with the src and dst extensions.
+When these flags are used with the update, delete, update-pair or get commands, the flags provide a hint as to the
+hash table in which the kernel should find the SA.
+replay <number>
+Specifies the replay window size. If not specified, the replay window size is assumed to be zero. It is not recom<hy>
+<beginning of page>
+mended that manually added SAs have a replay window. This extension is used by the add and update commands.
+replay_value <number>
+Specifies the replay value of the SA. This extension is used by the add and update commands.
+state <string>|<number>
+Specifies the SA state, either by numeric value or by the strings "larval", "mature", "dying" or "dead". If not speci<hy>
+fied, the value defaults to mature. This extension is used by the add and update commands.
+auth_alg <string>|<number>
+authalg <string>|<number>
+Specifies the authentication algorithm for an SA, either by numeric value, or by strings indicating an algorithm
+name. Current authentication algorithms include:
+HMAC-MD5
+md5, hmac-md5
+HMAC-SH-1
+sha, sha-1, hmac-sha1, hmac-sha
+HMAC-SHA-256
+sha256, sha-256, hmac-sha256, hmac-sha-256
+HMAC-SHA-384
+sha384, sha-384, hmac-sha384, hmac-sha-384
+HMAC-SHA-512
+sha512, sha-512, hmac-sha512, hmac-sha-512
+Often, algorithm names will have several synonyms. This extension is required by the add command for certain SA
+types. It is also used by the update command.
+Use the ipsecalgs(1M) command to obtain the complete list of authentication algorithms.
+encr_alg <string>|<number>
+encralg <string>|<number>
+Specifies the encryption algorithm for an SA, either by numeric value, or by strings indicating an algorithm name.
+Current encryption algorithms include DES ("des"), Triple-DES ("3des"), Blowfish ("blowfish"), and AES ("aes").
+This extension is required by the add command for certain SA types. It is also used by the update command.
+Use the ipsecalgs(1M) command to obtain the complete list of encryption algorithms.
+The next six extensions are lifetime extensions. There are two varieties, "hard" and "soft". If a hard lifetime ex<hy>
+pires, the SA will be deleted automatically by the system. If a soft lifetime expires, an SADB_EXPIRE message
+will be transmitted by the system, and its state will be downgraded to dying from mature. See pf_key(7P). The
+monitor command to key allows you to view SADB_EXPIRE messages.
+idle_addtime <number>
+idle_usetime <number>
+Specifies the number of seconds that this SA can exist if the SA is not used before the SA is revalidated. If this ex<hy>
+tension is not present, the default value is half of the hard_addtime (see below). This extension is used by the add
+<beginning of page>
+and update commands.
+soft_bytes <number>
+hard_bytes <number>
+Specifies the number of bytes that this SA can protect. If this extension is not present, the default value is zero,
+which means that the SA will not expire based on the number of bytes protected. This extension is used by the add
+and update commands.
+soft_addtime <number>
+hard_addtime <number>
+Specifies the number of seconds that this SA can exist after being added or updated from a larval SA. An update of a
+mature SA does not reset the initial time that it was added. If this extension is not present, the default value is zero,
+which means the SA will not expire based on how long it has been since it was added. This extension is used by the
+add and update commands.
+soft_usetime <number>
+hard_usetime <number>
+Specifies the number of seconds this SA can exist after first being used. If this extension is not present, the default
+value is zero, which means the SA will not expire based on how long it has been since it was added. This extension
+is used by the add and update commands.
+saddr address | name
+srcaddr address | name
+saddr6 IPv6 address
+srcaddr6 IPv6 address
+src address | name
+src6 IPv6 address
+srcaddr address and src address are synonyms that indicate the source address of the SA. If unspecified, the source
+address will either remain unset, or it will be set to a wildcard address if a destination address was supplied. To not
+specify the source address is valid for IPsec SAs. Future SA types may alter this assumption. This extension is used
+by the add, update, get and delete commands.
+daddr <address>|<name>
+dstaddr <address>|<name>
+daddr6 <IPv6 address>|<name>
+dstaddr6 <IPv6 address>|<name>
+dst <addr>|<name>
+dst6 <IPv6 address>|<name>
+dstaddr <addr> and dst <addr> are synonyms that indicate the destination address of the SA. If unspecified, the
+destination address will remain unset. Because IPsec SAs require a specified destination address and spi for identifi<hy>
+cation, this extension, with a specific value, is required for the add, update, get and delete commands.
+If a name is given, ipseckey will attempt to invoke the command on multiple SAs with all of the destination address<hy>
+es that the name can identify. This is similar to how ipsecconf handles addresses.
+If dst6 or dstaddr6 is specified, only the IPv6 addresses identified by a name are used.
+sport <portnum>
+sport specifies the source port number for an SA. It should be used in combination with an upper-layer protocol (see
+below), but it does not have to be.
+dport <portnum>
+sport specifies the destination port number for an SA. It should be used in combination with an upper-layer protocol
+(see below), but it does not have to be.
+<beginning of page>
+encap <protocol>
+Identifies the protocol used to encapsulate NAT-traversal IPsec packets. Other NAT-traversal parameters (nat_*) are
+below. The only acceptable value for <protocol> currently is udp.
+proto <protocol number>
+ulp <protocol number>
+proto, and its synonym ulp, specify the IP protocol number of the SA.
+nat_loc <address>|<name>
+If the local address in the SA (source or destination) is behind a NAT, this extension indicates the NAT node's glob<hy>
+ally-routable address. This address can match the SA's local address if there is a nat_lport (see below) specified.
+nat_rem <address>|<name>
+If the remote address in the SA (source or destination) is behind a NAT, this extension indicates that node's internal
+(that is, behind-the-NAT) address. This address can match the SA's local address if there is a nat_rport (see below)
+specified.
+nat_lport <portnum>
+Identifies the local UDP port on which encapsulation of ESP occurs.
+nat_rport <portnum>
+Identifies the remote UDP port on which encapsulation of ESP occurs.
+isrc <address> | <name>[/<prefix>]
+innersrc <address> | <name>[/<prefix>]
+isrc6 <address> | <name>[/<prefix>]
+innersrc6 <address> | <name>[/<prefix>]
+proxyaddr <address> | <name>[/<prefix>]
+proxy <address> | <name>[/<prefix>]
+isrc <address>[/<prefix>] and innersrc <address>[/<prefix>] are synonyms. They indicate the inner source ad<hy>
+dress for a tunnel-mode SA.
+An inner-source can be a prefix instead of an address. As with other address extensions, there are IPv6-specific
+forms. In such cases, use only IPv6-specific addresses or prefixes.
+Previous versions referred to this value as the proxy address. The usage, while deprecated, remains.
+idst <address> | <name>[/<prefix>]
+innerdst <address> | <name>[/<prefix>]
+idst6 <address> | <name>[/<prefix>]
+innerdst6 <address> | <name>[/<prefix>]
+idst <address>[/<prefix>] and innerdst <address>[/<prefix>] are synonyms. They indicate the inner destination
+address for a tunnel-mode SA.
+An inner-destination can be a prefix instead of an address. As with other address extensions, there are IPv6-specific
+forms. In such cases, use only IPv6-specific addresses or prefixes.
+innersport <portnum>
+isport <portnum>
+innersport specifies the source port number of the inner header for a tunnel-mode SA. It should be used in combina<hy>
+tion with an upper-layer protocol (see below), but it does not have to be.
+<beginning of page>
+innerdport <portnum>
+idport <portnum>
+innerdport specifies the destination port number of the inner header for a tunnel-mode SA. It should be used in
+combination with an upper-layer protocol (see below), but it does not have to be.
+iproto <protocol number>iulp <protocol number>
+iproto, and its synonym iulp, specify the IP protocol number of the inner header of a tunnel-mode SA.
+authkey <hexstring>
+Specifies the authentication key for this SA. The key is expressed as a string of hexadecimal digits, with an optional
+/ at the end, for example, 123/12. Bits are counted from the most-significant bits down. For example, to express three
+'1' bits, the proper syntax is the string "e/3". For multi-key algorithms, the string is the concatenation of the multiple
+keys. This extension is used by the add and update commands.
+encrkey <hexstring>
+Specifies the encryption key for this SA. The syntax of the key is the same as authkey. A concrete example of a
+multi-key encryption algorithm is 3des, which would express itself as a 192-bit key, which is three 64-bit parity-in<hy>
+cluded DES keys. This extension is used by the add and update commands.
+Certificate identities are very useful in the context of automated key management, as they tie the SA to the public
+key certificates used in most automated key management protocols. They are less useful for manually added SAs.
+Unlike other extensions, srcidtype takes two values, a type, and an actual value. The type can be one of the follow<hy>
+ing:
+prefix
+An address prefix.
+fqdn
+A fully-qualified domain name.
+domain
+Domain name, synonym for fqdn.
+user_fqdn
+User identity of the form user@fqdn.
+mailbox
+Synonym for user_fqdn.
+The value is an arbitrary text string that should identify the certificate.
+srcidtype <type, value>
+Specifies a source certificate identity for this SA. This extension is used by the add and update commands.
+dstidtype <type, value>
+Specifies a destination certificate identity for this SA. This extension is used by the add and update commands
+An IPsec SA is a Tunnel Mode SA if the "proto" value is either 4 (ipip) or 41 (ipv6) and there is an inner-address or
+<beginning of page>
+inner-port value specified. Otherwise, the SA is a Transport Mode SA.
+Keying material is very sensitive and should be generated as randomly as possible. Some algorithms have known
+weak keys. IPsec algorithms have built-in weak key checks, so that if a weak key is in a newly added SA, the add
+command will fail with an invalid value.
+The ipseckey command allows a privileged user to enter cryptographic keying information. If an adversary gains ac<hy>
+cess to such information, the security of IPsec traffic is compromised. The following issues should be taken into ac<hy>
+count when using the ipseckey command. 1. Is the TTY going over a network (interactive mode)? <bu> If it is, then
+the security of the keying material is the security of the network path for this TTY's traffic. Using ipseckey over a
+clear-text telnet or rlogin session is risky. <bu> Even local windows might be vulnerable to attacks where a concealed
+program that reads window events is present. 2. Is the file accessed over the network or readable to the world (-f
+option)? <bu> A network-mounted file can be sniffed by an adversary as it is being read. <bu> A world-readable file with
+keying material in it is also risky. 3. The ipseckey command is designed to be managed by the manual-key smf(5)
+service. Because the smf(5) log files are world-readable, the ipseckey does not record any syntax errors in the log
+files, as these errors might include secret information.
+If a syntax error is found when the manual-key smf(5) service is enabled, the service enters maintenance mode. The
+log file will indicate that there was a syntax error, but will not specify what the error was.
+The administrator should use ipeckey -c filename from the command line to discover the cause of the errors. See
+OPTIONS.
+If your source address is a host that can be looked up over the network and your naming system itself is compro<hy>
+mised, then any names used will not be trustworthy.
+Security weaknesses often lie in misapplication of tools, not in the tools themselves. Administrators are urged to be
+cautious when using ipseckey. The safest mode of operation is probably on a console or other hard-connected TTY.
+For further thoughts on this subject, see the afterward by Matt Blaze in Bruce Schneier's Applied Cryptography:
+Protocols, Algorithms, and Source Code in C.
+IPsec manual keys are managed by the service management facility, smf(5). The services listed below manage the
+components of IPsec. These services are delivered as follows:
+ svc:/network/ipsec/policy:default (enabled)
+ svc:/network/ipsec/ipsecalgs:default (enabled)
+ svc:/network/ipsec/manual-key:default (disabled)
+ svc:/network/ipsec/ike:default (disabled)
+The manual-key service is delivered disabled. The system administrator must create manual IPsec Security Associa<hy>
+tions (SAs), as described in this man page, before enabling that service.
+The policy service is delivered enabled, but without a configuration file, so that, as a starting condition, packets are
+not protected by IPsec. After you create the configuration file /etc/inet/ipsecinit.conf and refresh the service (sv<hy>
+cadm refresh, see below), the policy contained in the configuration file is applied. If there is an error in this file, the
+service enters maintenance mode. See ipsecconf(1M).
+Services that are delivered disabled are delivered that way because the system administrator must create configura<hy>
+tion files for those services before enabling them. See ike.config(4) for the ike service.
+See ipsecalgs(1M) for the ipsecalgs service.
+The correct administrative procedure is to create the configuration file for each service, then enable each service us<hy>
+ing svcadm(1M).
+If the configuration needs to be changed, edit the configuration file then refresh the service, as follows:
+ example# svcadm refresh manual-key
+Warning: To prevent ipseckey complaining about duplicate Associations, the ipseckey command flushes the Secu<hy>
+rity Association Data Base (SADB) when the ipseckey command is run from smf(5), before adding any new Securi<hy>
+<beginning of page>
+ty Associations defined in the configuration file. This differs from the command line behavior where the SADB is
+not flushed before adding new Security Associations.
+The smf(5) framework will record any errors in the service-specific log file. Use any of the following commands to
+examine the logfile property:
+ example# svcs -l manual-key
+ example# svcprop manual-key
+ example# svccfg -s manual-key listprop
+The following property is defined for the manual-key service:
+ config/config_file
+This property can be modified using svccfg(1M) by users who have been assigned the following authorization:
+ solaris.smf.value.ipsec
+See auths(1), user_attr(4), rbac(5).
+The service needs to be refreshed using svcadm(1M) before the new property is effective. General non-modifiable
+properties can be viewed with the svcprop(1) command.
+ # svccfg -s ipsec/manual-key setprop config/config_file = \
+ /new/config_file
+ # svcadm refresh manual-key
+Administrative actions on this service, such as enabling, disabling, refreshing, and requesting restart can be per<hy>
+formed using svcadm(1M). A user who has been assigned the authorization shown below can perform these actions:
+ solaris.smf.manage.ipsec
+The service's status can be queried using the svcs(1) command.
+The ipseckey command is designed to be run under smf(5) management. While the ipsecconf command can be run
+from the command line, this is discouraged. If the ipseckey command is to be run from the command line, the man<hy>
+ual-key smf(5) service should be disabled first. See svcadm(1M). Example 1 Emptying Out All SAs
+To empty out all SA:
+ example# ipseckey flush
+Example 2 Flushing Out IPsec AH SAs Only
+To flush out only IPsec AH SAs:
+ example# ipseckey flush ah
+Example 3 Saving All SAs To Standard Output
+To save all SAs to the standard output:
+<beginning of page>
+ example# ipseckey save all
+Example 4 Saving ESP SAs To The File /tmp/snapshot
+To save ESP SAs to the file /tmp/snapshot:
+ example# ipseckey save esp /tmp/snapshot
+Example 5 Deleting an IPsec SA
+To delete an IPsec SA, only the SPI and the destination address are needed:
+ example# ipseckey delete esp spi 0x2112 dst 224.0.0.1
+An alternative would be to delete the SA and the SAs pair if it has one:
+ example# ipseckey delete-pair esp spi 0x2112 dst 224.0.0.1
+Example 6 Getting Information on an IPsec SA
+Likewise, getting information on a SA only requires the destination address and SPI:
+ example# ipseckey get ah spi 0x5150 dst mypeer
+Example 7 Adding or Updating IPsec SAs
+Adding or updating SAs requires entering interactive mode:
+ example# ipseckey
+ ipseckey> add ah spi 0x90125 src me.domain.com dst you.domain.com \
+  authalg md5 authkey 1234567890abcdef1234567890abcdef
+ ipseckey> update ah spi 0x90125 dst you.domain.com hard_bytes \
+  16000000
+ ipseckey> exit
+Adding two SAs that are linked together as a pair:
+ example# ipseckey
+ ipseckey> add esp spi 0x2345 src me.domain.com dst you.domain.com \
+  authalg md5 authkey bde359723576fdea08e56cbe876e24ad \
+  encralg des encrkey be02938e7def2839
+ ipseckey> add esp spi 0x5432 src me.domain.com dst you.domain.com \
+  authalg md5 authkey bde359723576fdea08e56cbe876e24ad \
+  encralg des encrkey be02938e7def2839 pair-spi 0x2345
+ ipseckey> exit
+Example 8 Adding an SA in the Opposite Direction
+In the case of IPsec, SAs are unidirectional. To communicate securely, a second SA needs to be added in the oppo<hy>
+site direction. The peer machine also needs to add both SAs.
+<beginning of page>
+ example# ipseckey
+ ipseckey> add ah spi 0x2112 src you.domain.com dst me.domain.com \
+  authalg md5 authkey bde359723576fdea08e56cbe876e24ad \
+  hard_bytes 16000000
+ ipseckey> exit
+Example 9 Monitoring PF_KEY Messages
+Monitoring for PF_KEY messages is straightforward:
+ example# ipseckey monitor
+Example 10 Using Commands in a File
+Commands can be placed in a file that can be parsed with the -f option. This file may contain comment lines that be<hy>
+gin with the "#" symbol. For example:
+ # This is a sample file for flushing out the ESP table and
+ # adding a pair of SAs.
+ flush esp
+ ### Watch out! I have keying material in this file. See the
+ ### SECURITY section in this manual page for why this can be
+ ### dangerous .
+ add esp spi 0x2112 src me.domain.com dst you.domain.com \
+  authalg md5 authkey bde359723576fdea08e56cbe876e24ad \
+  encralg des encrkey be02938e7def2839 hard_usetime 28800
+ add esp spi 0x5150 src you.domain.com dst me.domain.com \
+  authalg md5 authkey 930987dbe09743ade09d92b4097d9e93 \
+  encralg des encrkey 8bd4a52e10127deb hard_usetime 28800
+ ## End of file - This is a gratuitous comment
+Example 11 Adding SAs for IPv6 Addresses
+The following commands from the interactive-mode create an SA to protect IPv6 traffic between the site-local ad<hy>
+dresses
+ example # ipseckey
+ ipseckey> add esp spi 0x6789 src6 fec0:bbbb::4483 dst6 fec0:bbbb::7843\
+  authalg md5 authkey bde359723576fdea08e56cbe876e24ad \
+  encralg des encrkey be02938e7def2839 hard_usetime 28800
+ ipseckey>exit
+Example 12 Linking Two SAs as a Pair
+The following command links two SAs together, as a pair:
+ example# ipseckey update esp spi 0x123456 dst 192.168.99.2 \
+ pair-spi 0x654321
+/etc/inet/secret/ipseckeys
+Default configuration file used at boot time. See "Service Management Facility" and SECURITY for more informa<hy>
+<beginning of page>
+tion.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu Interface StabilityCommitted
+ps(1), svcprop(1), svcs(1), ipsecconf(1M), ipsecalgs(1M), route(1M), svcadm(1M), svccfg(1M), ike.config(4), at<hy>
+tributes(5), smf(5), ipsec(7P), ipsecah(7P), ipsecesp(7P), pf_key(7P)
+Schneier, B., Applied Cryptography: Protocols, Algorithms, and Source Code in C. Second ed. New York, New
+York: John Wiley & Sons, 1996.
+The ipseckey command parses the configuration file and reports any errors. In the case of multiple errors, ipseckey
+reports as many of these as possible.
+The ipseckey command does not attempt to use a COMMAND that has a syntax error. A COMMAND might be
+syntactically correct but can nevertheless generate an error because the kernel rejected the request made to
+pf_key(7P). This might occur because a key had an invalid length or because an unsupported algorithm was speci<hy>
+fied.
+If there are any errors in the configuration file, ipseckey reports the number of valid COMMANDS and the total
+number of COMMANDS parsed.
+Parse error on line N.
+If an interactive use of ipseckey would print usage information, this would print instead. Usually proceeded by an<hy>
+other diagnostic. Because COMMANDS can cover more than a single line in the configuration file by using the
+backslash character to delimit lines, its not always possible to pinpoint in the configuration file the exact line that
+caused the error.
+Unexpected end of command line.
+An additional argument was expected on the command line.
+Unknown
+A value for a specific extension was unknown.
+Address type N not supported.
+A name-to-address lookup returned an unsupported address family.
+N is not a bit specifier
+bit length N is too big for
+string is not a hex string
+Keying material was not entered appropriately.
+Can only specify single
+A duplicate extension was entered.
+Don't use extension for <string> for <command>.
+An extension not used by a command was used.
+<beginning of page>
+One of the entered values is incorrect: Diagnostic code NN: <msg>
+This is a general invalid parameter error. The diagnostic code and message provides more detail about what precise
+value was incorrect and why.
+In spite of its IPsec-specific name, ipseckey is analogous to route(1M), in that it is a command-line interface to a
+socket-based administration engine, in this case, PF_KEY. PF_KEY was originally developed at the United States
+Naval Research Laboratory.
+To have machines communicate securely with manual keying, SAs need to be added by all communicating parties. If
+two nodes wish to communicate securely, both nodes need the appropriate SAs added.
+In the future ipseckey may be invoked under additional names as other security protocols become available to
+PF_KEY.
+This command requires sys_ip_config privilege to operate and thus can run in the global zone and in exclusive-IP
+zones. The global zone can set up security associations with ipseckey to protect traffic for shared-IP zones on the
+system.

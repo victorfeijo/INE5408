@@ -1,0 +1,214 @@
+<beginning of page>
+nsswitch.conf <-> configuration file for the name service switch
+/etc/nsswitch.conf
+The operating system uses a number of databases of information about hosts, ipnodes, users (passwd(4), shadow(4),
+and user_attr(4)), and groups. Data for these can come from a variety of sources: hostnames and host addresses, for
+example, can be found in /etc/hosts, NIS, NIS+, LDAP, DNS or Multicast DNS. Zero or more sources can be used
+for each database; the sources and their lookup order are specified in the /etc/nsswitch.conf file.
+The following databases use the switch file:
+tab(); cw(2.18i) cw(3.32i) lw(2.18i) lw(3.32i) DatabaseUsed By aliasessendmail(1M) auth_attrgetauth<hy>
+nam(3SECDB) automountautomount(1M) bootparamsrpc.bootparamd(1M) ethersethers(3SOCKET)
+groupgetgrnam(3C) hostsT{ gethostbyname(3NSL), getaddrinfo(3SOCKET). See Interaction with netconfig.
+T} ipnodesSame as hosts. netgroupinnetgr(3C) netmasksifconfig(1M) networksgetnetbyname(3SOCKET)
+passwdT{ getpwnam(3C), getspnam(3C), getauusernam(3BSM), getusernam(3SECDB) T} printersT{ lp(1),
+lpstat(1), cancel(1), lpr(1B), lpq(1B), lprm(1B), in.lpd(1M), lpadmin(1M), lpget(1M), lpset(1M) T} prof_attr<hy>
+getprofnam(3SECDB), getexecprof(3SECDB) projectT{ getprojent(3PROJECT), getdefaultproj(3PROJECT),
+inproj(3PROJECT), newtask(1), setproject(3PROJECT) T} protocolsgetprotobyname(3SOCKET) publickeyget<hy>
+publickey(3NSL), secure_rpc(3NSL) rpcgetrpcbyname(3NSL) servicesgetservbyname(3SOCKET). See Inter<hy>
+action with netconfig. user_attrgetuserattr(3SECDB)
+The following sources can be used:
+tab(); cw(2.18i) cw(3.32i) lw(2.18i) lw(3.32i) SourceUses filesT{ /etc/hosts, /etc/passwd, /etc/inet/ipnodes,
+/etc/shadow, /etc/security/auth_attr, /etc/user_attr T} nisNIS(YP) nisplusNIS+ ldapLDAP adActive Directory
+dnsT{ Valid only for hosts and ipnodes. Uses the Internet Domain Name Service. T} mdnsT{ Valid only for hosts
+and ipnodes. Uses the Multicast Domain Name Service. T} compatT{ Valid only for passwd and group. Imple<hy>
+ments + and -. See Interaction with +/- syntax. T} userT{ Valid only for printers. Implements support for
+${HOME}/.printers. T}
+Note that /etc/inet/ipnodes is a symbolic link to /etc/hosts.
+There is an entry in /etc/nsswitch.conf for each database. Typically these entries are simple, such as protocols: files
+or networks: files nisplus. However, when multiple sources are specified, it is sometimes necessary to define pre<hy>
+cisely the circumstances under which each source is tried. A source can return one of the following codes:
+tab(); cw(2.18i) cw(3.32i) lw(2.18i) lw(3.32i) StatusMeaning SUCCESSRequested database entry was found. UN<hy>
+AVAILT{ Source is not configured on this system or internal failure. T} NOTFOUNDSource responded "no such
+entry" TRYAGAINT{ Source is busy or not responding, might respond to retries. T}
+For each status code, two actions are possible:
+tab(); cw(2.18i) cw(3.32i) lw(2.18i) lw(3.32i) ActionMeaning continueTry the next source in the list. returnReturn
+now.
+Additionally, for TRYAGAIN only, the following actions are possible:
+tab(); cw(2.18i) cw(3.32i) lw(2.18i) lw(3.32i) ActionMeaning foreverRetry the current source forever. nT{ Retry
+the current source n more times, where n is an integer between 0 and MAX_INT (that is, 2.14 billion). After n re<hy>
+tries has been exhausted, the TRYAGAIN action transitions to continue, until a future request receives a response,
+at which time TRYAGAIN=n is restored. T}
+<beginning of page>
+The complete syntax of an entry is:
+ <entry> ::= <database> ":" [<source> [<criteria>]]*
+ <criteria> ::= "[" <criterion>+ "]"
+ <criterion> ::= <status> "=" <action>
+ <status> ::= "success" | "notfound" | "unavail" | "tryagain"
+For every status except TRYAGAIN, the action syntax is:
+ <action> ::= "return" | "continue"
+For the TRYAGAIN status, the action syntax is:
+ <action> ::= "return" | "continue" | "forever" | <n>
+ <n> ::= 0...MAX_INT
+Each entry occupies a single line in the file. Lines that are blank, or that start with white space, are ignored. Every<hy>
+thing on a line following a # character is also ignored; the # character can begin anywhere in a line, to be used to be<hy>
+gin comments. The <database> and <source> names are case-sensitive, but <action> and <status> names are case-
+insensitive.
+The library functions contain compiled-in default entries that are used if the appropriate entry in nsswitch.conf is
+absent or syntactically incorrect.
+The default criteria for DNS and the NIS server in "DNS-forwarding mode" is [SUCCESS=return NOT<hy>
+FOUND=continue UNAVAIL=continue TRYAGAIN=3].
+The default criteria for all other sources is [SUCCESS=return NOTFOUND=continue UNAVAIL=continue
+TRYAGAIN=forever].
+The default, or explicitly specified, criteria are meaningless following the last source in an entry; and they are ig<hy>
+nored, since the action is always to return to the caller irrespective of the status code the source returns.
+In order to ensure that they all return consistent results, gethostbyname(3NSL), getaddrinfo(3SOCKET), get<hy>
+servbyname(3SOCKET), and netdir_getbyname(3NSL) functions are all implemented in terms of the same inter<hy>
+nal library function. This function obtains the system-wide source lookup policy for hosts, ipnodes, and services
+based on the inet family entries in netconfig(4) and uses the switch entries only if the netconfig entries have a - (hy<hy>
+phen) in the last column for nametoaddr libraries. See the Notes section in gethostbyname(3NSL) and getservby<hy>
+name(3SOCKET) for details.
+The NIS+ server can be run in YP-compatibility mode, where it handles NIS (YP) requests as well as NIS+ re<hy>
+quests. In this case, the clients get much the same results (except for getspnam(3C)) from the nis source as from
+nisplus; however, nisplus is recommended instead of nis.
+The NIS (YP) server can be run in DNS-forwarding mode, where it forwards lookup requests to DNS for host-
+names and -addresses that do not exist in its database. In this case, specifying nis as a source for hosts is sufficient to
+get DNS lookups; dns need not be specified explicitly as a source.
+In SunOS 5.3 (Solaris 2.3) and compatible versions, the NIS+ server in NIS/YP-compatibility mode can also be run
+in DNS-forwarding mode (see rpc.nisd(1M)). Forwarding is effective only for requests originating from its YP
+clients; hosts policy on these clients should be configured appropriately.
+When password aging is turned on, only a limited set of possible name services are permitted for the passwd: data<hy>
+base in the /etc/nsswitch.conf file:
+passwd: files
+passwd: files nis
+<beginning of page>
+passwd: files nisplus
+passwd: files ldap
+passwd: compat
+passwd_compat: nisplus
+passwd_compat: ldap
+You can add the ad keyword to any of the passwd configurations listed above. However, you cannot use the passwd
+command to change the password of an Active Directory (AD) user. If the ad keyword is found in the passwd entry
+during a password update operation, it is ignored. To update the password of an AD user, use the kpasswd(1) com<hy>
+mand.
+Any other settings causes the passwd(1) command to fail when it attempts to change the password after expiration
+and prevents the user from logging in. These are the only permitted settings when password aging has been turned
+on. Otherwise, you can work around incorrect passwd: lines by using the -r repository argument to the passwd(1)
+command and using passwd -r repository to override the nsswitch.conf settings and specify in which name service
+you want to modify your password.
+Releases prior to SunOS 5.0 did not have the name service switch but did allow the user some policy control. In
+/etc/passwd one could have entries of the form +user (include the specified user from NIS passwd.byname), -user
+(exclude the specified user) and + (include everything, except excluded users, from NIS passwd.byname). The de<hy>
+sired behavior was often everything in the file followed by everything in NIS, expressed by a solitary + at the end
+of /etc/passwd. The switch provides an alternative for this case (passwd: files nis) that does not require + entries in
+/etc/passwd and /etc/shadow (the latter is a new addition to SunOS 5.0, see shadow(4)).
+If this is not sufficient, the NIS/YP compatibility source provides full +/- semantics. It reads /etc/passwd for getpw<hy>
+nam(3C) functions and /etc/shadow for getspnam(3C) functions and, if it finds +/- entries, invokes an appropriate
+source. By default, the source is nis, but this can be overridden by specifying nisplus or ldap as the source for the
+pseudo-database passwd_compat.
+Note that in compat mode, for every /etc/passwd entry, there must be a corresponding entry in the /etc/shadow file.
+The NIS/YP compatibility source also provides full +/- semantics for group; the relevant pseudo-database is
+group_compat.
+The compiled-in default entries for all databases use NIS (YP) as the enterprise level name service and are identical
+to those in the default configuration of this file:
+passwd: files nis
+group: files nis
+hosts: nis [NOTFOUND=return] files
+ipnodes: nis [NOTFOUND=return] files
+networks: nis [NOTFOUND=return] files
+protocols: nis [NOTFOUND=return] files
+rpc: nis [NOTFOUND=return] files
+<beginning of page>
+ethers: nis [NOTFOUND=return] files
+netmasks: nis [NOTFOUND=return] files
+bootparams: nis [NOTFOUND=return] files
+publickey: nis [NOTFOUND=return] files
+netgroup: nis
+automount: files nis
+aliases: files nis
+services: files nis
+printers: user files nis nisplus
+auth_attr files nis
+prof_attr files nis
+project files nis
+Note that the files source for the ipnodes and hosts databases is identical, as /etc/inet/ipnodes is a symbolic link to
+/etc/hosts. Because other sources for the ipnodes and hosts databases are different, do not remove the ipnodes line
+from the /etc/nsswitch.conf file.
+The policy nis [NOTFOUND=return] files implies: if nis is UNAVAIL, continue on to files, and if nis returns
+NOTFOUND, return to the caller. In other words, treat nis as the authoritative source of information and try files
+only if nis is down. This, and other policies listed in the default configuration above, are identical to the hard-wired
+policies in SunOS releases prior to 5.0.
+If compatibility with the +/- syntax for passwd and group is required, simply modify the entries for passwd and
+group to:
+passwd: compat
+group: compat
+If NIS+ is the enterprise level name service, the default configuration should be modified to use nisplus instead of
+nis for every database on client machines. The file /etc/nsswitch.nisplus contains a sample configuration that can be
+copied to /etc/nsswitch.conf to set this policy.
+If LDAP is the enterprise level name service, the default configuration should be modified to use ldap instead of nis
+for every database on client machines. The file /etc/nsswitch.ldap contains a sample configuration that can be
+copied to /etc/nsswitch.conf to set this policy.
+When using Active Directory, dns is required to perform hosts resolution.
+If the use of +/- syntax is desired in conjunction with nisplus, use the following four entries:
+<beginning of page>
+passwd: compat
+passwd_compat: nisplus OR ldap
+group: compat
+group_compat: nisplus OR ldap
+In order to get information from the Internet Domain Name Service for hosts that are not listed in the enterprise level
+name service, NIS+ or LDAP, use the following configuration and set up the /etc/resolv.conf file (see resolv.conf(4)
+for more details):
+hosts: nisplus dns [NOTFOUND=return] files
+or
+hosts: ldap dns [NOTFOUND=return] files
+Many of the databases have enumeration functions: passwd has getpwent(), hosts has gethostent(), and so on.
+These were reasonable when the only source was files but often make little sense for hierarchically structured
+sources that contain large numbers of entries, much less for multiple sources. The interfaces are still provided and
+the implementations strive to provide reasonable results, but the data returned can be incomplete (enumeration for
+hosts is simply not supported by the dns source), inconsistent (if multiple sources are used), formatted in an unex<hy>
+pected fashion (for a host with a canonical name and three aliases, the nisplus source returns four hostents, and they
+might not be consecutive), or very expensive (enumerating a passwd database of 5,000 users is probably a bad idea).
+Furthermore, multiple threads in the same process using the same reentrant enumeration function (getXXXent_r()
+are supported beginning with SunOS 5.3) share the same enumeration position; if they interleave calls, they enumer<hy>
+ate disjoint subsets of the same database.
+In general, the use of the enumeration functions is deprecated. In the case of passwd, shadow, and group, it might
+sometimes be appropriate to use fgetgrent(), fgetpwent(), and fgetspent() (see getgrnam(3C), getpwnam(3C), and
+getspnam(3C), respectively), which use only the files source.
+A source named SSS is implemented by a shared object named nss_SSS.so.1 that resides in /usr/lib.
+/etc/nsswitch.conf Configuration file.
+/usr/lib/nss_compat.so.1 Implements compat source.
+/usr/lib/nss_dns.so.1 Implements dns source.
+/usr/lib/nss_files.so.1 Implements files source.
+/usr/lib/nss_mdns.so.1 Implements mdns source.
+/usr/lib/nss_nis.so.1 Implements nis source.
+/usr/lib/nss_nisplus.so.1 Implements nisplus source.
+/usr/lib/nss_ldap.so.1 Implements ldap source.
+<beginning of page>
+/usr/lib/nss_ad.so.1 Implements ad source.
+/usr/lib/nss_user.so.1 Implements user source.
+/etc/netconfig Configuration file for netdir(3NSL) functions that redirects hosts/devices policy to the switch.
+/etc/nsswitch.files Sample configuration file that uses files only.
+/etc/nsswitch.nis Sample configuration file that uses files and nis.
+/etc/nsswitch.nisplus Sample configuration file that uses files and nisplus.
+/etc/nsswitch.ldap Sample configuration file that uses files and ldap.
+/etc/nsswitch.ad Sample configuration file that uses files and ad.
+/etc/nsswitch.dns Sample configuration file that uses files, dns and mdns (dns and mdns only for hosts).
+kpasswd(1), ldap(1), newtask(1), NIS+(1), passwd(1), automount(1M), ifconfig(1M), mdnsd(1M), rpc.boot<hy>
+paramd(1M), rpc.nisd(1M), sendmail(1M), getauusernam(3BSM), getgrnam(3C), getnetgrent(3C), getpw<hy>
+nam(3C), getspnam(3C), gethostbyname(3NSL), getpublickey(3NSL), getrpcbyname(3NSL), netdir(3NSL), se<hy>
+cure_rpc(3NSL), getprojent(3PROJECT), getdefaultproj(3PROJECT), inproj(3PROJECT), setpro<hy>
+ject(3PROJECT), getauthnam(3SECDB), getexecprof(3SECDB), getprofnam(3SECDB), getuserattr(3SECDB),
+getusernam(3SECDB), ethers(3SOCKET), getaddrinfo(3SOCKET), getnetbyname(3SOCKET), getprotoby<hy>
+name(3SOCKET), getservbyname(3SOCKET), auth_attr(4), hosts(4), netconfig(4), project(4), resolv.conf(4),
+user_attr(4), ypfiles(4), ad(5)
+Within each process that uses nsswitch.conf, the entire file is read only once; if the file is later changed, the process
+continues using the old configuration.
+The use of both nis and nisplus as sources for the same database is strongly discouraged since both the name ser<hy>
+vices are expected to store similar information and the lookups on the database can yield different results depending
+on which name service is operational at the time of the request. The same applies for using ldap along with nis or
+nisplus.
+Do not use the ldap and ad keywords together when the Solaris LDAP client uses schema mapping to talk to Active
+Directory.
+Misspelled names of sources and databases are treated as legitimate names of (most likely nonexistent) sources and
+databases.
+The following functions do not use the switch: fgetgrent(3C), fgetprojent(3PROJECT), fgetpwent(3C), fget<hy>
+spent(3C), getpw(3C), putpwent(3C), shadow(4).

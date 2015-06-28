@@ -1,0 +1,88 @@
+<beginning of page>
+usbftdi <-> FTDI USB to serial converter driver
+#include <fcntl.h>
+#include <sys/termio.h>
+usbftdi@unit
+The usbftdi driver is a loadable STREAMS and USBA (Solaris USB Architecture) compliant client driver that pro<hy>
+vides basic asynchronous communication support for FTDI USB-to-serial converters. Serial device streams are built
+with appropriate modules that are pushed atop the usbftdi driver by the autopush(1M) facility.
+The usbftdi module supports the termio(7I) device control functions specified by flags in the c_cflag word of the
+termios structure, and by the IGNBRK, IGNPAR, PARMRK, and INPCK flags in the c_iflag word of the termios
+structure. All other termio(7I) functions must be performed by STREAMS modules pushed atop the driver. When a
+device is opened, the , ldterm(7M) and ttcompat(7M) STREAMS modules are automatically pushed on top of the
+stream, providing the standard termio(7I) interface.
+Use device logical names /dev/term/[0-9]* to access the serial ports for a dial-in line that is used with a modem.
+Use device logical names /dev/cua/[0-9]* to access the serial ports for other applications. These names are also used
+to provide a logical access point for a dial-out line.
+Device hot-removal is functionally equivalent to a modem disconnect event, as defined in termio(7I).
+Input and output line speeds can be set to the following baud rates: 300, 600, 1200, 2400, 4800, 9600, 19200, 38400,
+57600, 115200, 230400, 460800 or 921600. Input and output line speeds can not be set independently. For example,
+when the output speed is set, the input speed is automatically set to the same speed.
+Many devices that use this USB serial interface component are not, in fact dial-in lines connected to carefully con<hy>
+figured RS-232 modems. They are often intelligent peripherals whose manufacturers want to present a serial port in<hy>
+terface to application software. Some applications use only three wire connections, or are otherwise somewhat casu<hy>
+al about the state of the Carrier Detect (electrical) signal, and the other modem control lines.
+The configuration file delivered with this driver, usbftdi.conf, acknowledges this by setting the driver property ig<hy>
+nore-cd to 1. This enables soft carrier mode where the kernel does not block opens waiting for DCD to be asserted.
+This behavior also matches the default ignore carrier detect behavior of the onboard serial ports of machines that
+have them. See eeprom(1M) for further details.
+The hardware carrier behavior (the driver's internal default) can be selected by either unsetting (commenting out)
+the ignore-cd property, or by setting the value of the property to zero.
+More sophisticated selection of which devicesl ignore or obey the DCD signal can be effected using port-%d-ig<hy>
+nore-cd properties.
+A related feature is available for traditional usage that enables a single tty line to be connected to a modem and used
+for incoming and outgoing calls. By accessing through device logical name /dev/cua/[0-9]*, you can open a port
+without the carrier detect signal being asserted, either through hardware or an equivalent software mechanism. These
+devices are commonly known as dial-out lines.
+A dial-in line can be opened only if the corresponding dial-out line is closed. A blocking /dev/term open waits until
+the /dev/cua line is closed, which drops Data Terminal Ready, after which Carrier Detect usually drops as well.
+When the carrier is detected again with the /dev/cua device remaining closed, this indicates an incoming call and the
+blocking open seizes exclusive use of the line.
+A non-blocking /dev/term open returns an error if the /dev/cua device is open.
+If the /dev/term line is opened successfully (usually only when carrier is recognized on the modem, though see Soft
+Carrier Capabilities section of this manual page), the corresponding /dev/cua line can not be opened. This allows a
+modem and port to be used for dial-in (enabling the line for login in /etc/inittab) or dial-out (using tip(1) or
+uucp(1C)) when no-one is logged in on the line.
+An open() fails under the following conditions:
+ENXIO The unit being opened does not exist.
+<beginning of page>
+EBUSY The /dev/cua (dial-out) device is being opened while the /dev/term (dial-in device) is open, or the dial-in
+device is being opened with a no-delay open while the dial-out device is open.
+EBUSY The unit has been marked as exclusive-use by another process with a TIOCEXCL ioctl() call.
+EIO USB device I/O error.
+/usr/kernel/drv/usbftdi
+32-bit x86 ELF kernel module
+/usr/kernel/drv/usbftdi.conf
+Kernel module configuration file
+/usr/kernel/drv/amd64/usbftdi
+64-bit x86 ELF kernel module
+/usr/kernel/drv/sparcv9/usbftdi
+64-bit SPARC ELF kernel module
+/dev/cua/[0-9]*
+Dial-out tty lines
+/dev/term/[0-9]*
+Dial-in tty lines
+See attributes(5) for a description of the following attribute:
+tab() box; lw(2.75i) |lw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ ArchitectureS<hy>
+PARC, x86, PCI-based systems _ AvailabilitySUNWuftdi
+strconf(1), tip(1), uucp(1C), autopush(1M), eeprom(1M), ioctl(2), open(2), termios(3C), usba(7D), termio(7I),
+ldterm(7M), ttcompat(7M), eeprom(1M), attributes(5),
+In addition to being logged, the following messages might appear on the system console. All messages are formatted
+in the following manner:
+ Warning: device_path usbftdiinstance num): Error Message ...
+Device was disconnected while open. Data may have been lost.
+The device has been hot-removed or powered off while it was open and a possible data transfer was in progress. The
+job might be aborted.
+Device is not identical to the previous one on this port. Please disconnect and reconnect.
+The device was hot-removed while open. A new device was hot-inserted which is not identical to the original device.
+Please disconnect the device and reconnect the original device to the same port.
+<beginning of page>
+Device has been reconnected, but data may have been lost.
+The device that was hot-removed from its USB port has been re-inserted again to the same port. It is available for ac<hy>
+cess but data from a previous transfer might be lost.
+Cannot access device. Please reconnect.
+This device has been disconnected because a device other than the original one has been inserted. The driver informs
+you of this fact by displaying the name of the original device.
+The following messages might be logged into the system log. They are formatted in the following manner:
+ device_path usbftdiiinstance number): message ...
+Input overrun. Data was lost.

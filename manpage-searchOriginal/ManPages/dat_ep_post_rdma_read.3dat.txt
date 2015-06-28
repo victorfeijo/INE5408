@@ -1,0 +1,84 @@
+<beginning of page>
+dat_ep_post_rdma_read <-> transfer all data to the local data buffer
+cc [ flag... ] file... -ldat [ library... ]
+#include <dat/udat.h>
+DAT_RETURN
+ dat_ep_post_rdma_read (
+ IN DAT_EP_HANDLE ep_handle,
+ IN DAT_COUNT num_segments,
+ IN DAT_LMR_TRIPLET *local_iov,
+ IN DAT_DTO_COOKIE user_cookie,
+ IN DAT_RMR_TRIPLET *remote_buffer,
+ IN DAT_COMPLETION_FLAGS completion_flags
+ )
+ep_handle Handle for an instance of the Endpoint.
+num_segments Number of lmr_triplets in local_iov.
+local_iov I/O Vector that specifies the local buffer to fill.
+user_cookie User-provided cookie that is returned to the Consumer at the completion of the RDMA Read. Can be
+NULL.
+remote_buffer A pointer to an RMR Triplet that specifies the remote buffer from which the data is read.
+completion_flags Flags for posted RDMA Read. The default DAT_COMPLETION_DEFAULT_FLAG is 0x00.
+Other values are as follows:
+Completion Suppression DAT_COMPLETION_SUPPRESS_FLAG
+0x01 Suppress successful Completion.
+Notification of Completion DAT_COMPLETION_UNSIGNALLED_FLAG
+0x04 Non-notification completion. Local Endpoint must be configured for Notification Suppression.
+Barrier Fence DAT_COMPLETION_BARRIER_FENCE_FLAG
+0x08 Request for Barrier Fence.
+The dat_ep_post_rdma_read() function requests the transfer of all the data specified by the remote_buffer over the
+connection of the ep_handle Endpoint into the local_iov.
+The num_segments parameter specifies the number of segments in the local_iov. The local_iov segments are filled in
+the I/O Vector order until the whole message is received. This ensures that all the "front" segments of the local_iov
+I/O Vector are completely filled, only one segment is partially filled, if needed, and all segments that follow it are not
+filled at all.
+The user_cookie allows Consumers to have unique identifiers for each DTO. These identifiers are completely under
+user control and are opaque to the Provider. There is no requirement on the Consumer that the value user_cookie
+should be unique for each DTO. The user_cookie is returned to the Consumer in the Completion event for the posted
+RDMA Read.
+<beginning of page>
+A Consumer must not modify the local_iov or its content until the DTO is completed. When a Consumer does not
+adhere to this rule, the behavior of the Provider and the underlying Transport is not defined. Providers that allow
+Consumers to get ownership of the local_iov but not the memory it specifies back after the dat_ep_post_rd<hy>
+ma_read() returns should document this behavior and also specify its support in Provider attributes. This behavior
+allows Consumers full control of the local_iov after dat_ep_post_rdma_read() returns. Because this behavior is not
+guaranteed by all Providers, portable Consumers should not rely on this behavior. Consumers should not rely on the
+Provider copying local_iov information.
+The completion of the posted RDMA Read is reported to the Consumer asynchronously through a DTO Completion
+event based on the specified completion_flags value. The value of DAT_COMPLE<hy>
+TION_UNSIGNALLED_FLAG is only valid if the Endpoint Request Completion Flags DAT_COMPLE<hy>
+TION_UNSIGNALLED_FLAG. Otherwise, DAT_INVALID_PARAMETER is returned.
+The DAT_SUCCESS return of the dat_ep_post_rdma_read() is at least the equivalent of posting an RDMA Read
+operation directly by native Transport. Providers should avoid resource allocation as part of dat_ep_post_rd<hy>
+ma_read() to ensure that this operation is nonblocking and thread safe for an UpCall.
+The operation is valid for the Endpoint in the DAT_EP_STATE_CONNECTED and DAT_EP_STATE_DISCON<hy>
+NECTED states. If the operation returns successfully for the Endpoint in the DAT_EP_STATE_DISCONNECT<hy>
+ED state, the posted RDMA Read is immediately flushed to request_evd_handle.
+DAT_SUCCESS The operation was successful.
+DAT_INSUFFICIENT_RESOURCES The operation failed due to resource limitations.
+DAT_INVALID_PARAMETER Invalid parameter. For example, one of the IOV segments pointed to a memory
+outside its LMR.
+DAT_INVALID_HANDLE The ep_handle parameter is invalid.
+DAT_INVALID_STATE A parameter is in an invalid state. Endpoint was not in the DAT_EP_STATE_CON<hy>
+NECTED or DAT_EP_STATE_DISCONNECTED state.
+DAT_LENGTH_ERROR The size of the receiving buffer is too small for sending buffer data. The size of the local
+buffer is too small for the data of the remote buffer.
+DAT_PROTECTION_VIOLATION Protection violation for local or remote memory access. Protection Zone mis<hy>
+match between either an LMR of one of the local_iov segments and the local Endpoint or the rmr_context and the
+remote Endpoint.
+DAT_PRIVILEGES_VIOLATION Privileges violation for local or remote memory access. Either one of the
+LMRs used in local_iov is invalid or does not have the local write privileges, or rmr_context does not have the re<hy>
+mote read privileges.
+For best RDMA Read operation performance, the Consumer should align each buffer segment of local_iov to the
+Optimal Buffer Alignment attribute of the Provider. For portable applications, the Consumer should align each buf<hy>
+fer segment of local_iov to the DAT_OPTIMAL_ALIGNMENT.
+If connection was established without outstanding RDMA Read attributes matching on Endpoints on both sides (out<hy>
+standing RDMA Read outgoing on one end is larger than the outstanding RDMA Read incoming on the other end),
+connection is broken when the number of incoming RDMA Read exceeds the outstanding RDMA Read incoming
+attribute of the Endpoint. The Consumer can use its own flow control to ensure that it does not post more RDMA
+Reads then the remote EP outstanding RDMA Read incoming attribute is. Thus, they do not rely on the underlying
+Transport enforcing it.
+See attributes(5) for descriptions of the following attributes:
+<beginning of page>
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Standard: uDAPL, 1.1, 1.2 _ MT-LevelUnsafe
+libdat(3LIB), attributes(5)

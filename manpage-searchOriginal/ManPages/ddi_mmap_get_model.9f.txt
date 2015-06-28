@@ -1,0 +1,48 @@
+<beginning of page>
+ddi_mmap_get_model <-> return data model type of current thread
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+uint_t ddi_mmap_get_model(void);
+Solaris DDI specific (Solaris DDI).
+ddi_mmap_get_model() returns the C Language Type Model which the current thread expects.
+ddi_mmap_get_model() is used in combination with ddi_model_convert_from(9F) in the mmap(9E) driver entry
+point to determine whether there is a data model mismatch between the current thread and the device driver. The de<hy>
+vice driver might have to adjust the shape of data structures before exporting them to a user thread which supports a
+different data model.
+DDI_MODEL_ILP32 Current thread expects 32-bit (ILP32) semantics.
+DDI_MODEL_LP64 Current thread expects 64-bit (LP64) semantics.
+DDI_FAILURE The ddi_mmap_get_model() function was not called from the mmap(9E) entry point.
+The ddi_mmap_get_model() function can only be called from the mmap(9E) driver entry point. Example 1 : Us<hy>
+ing ddi_mmap_get_model()
+The following is an example of the mmap(9E) entry point and how to support 32-bit and 64-bit applications with the
+same device driver.
+ struct data32 {
+  int len;
+  caddr32_t addr;
+ };
+ struct data {
+  int len;
+  caddr_t addr;
+ };
+ xxmmap(dev_t dev, off_t off, int prot) {
+  struct data dtc; /* a local copy for clash resolution */
+  struct data *dp = (struct data *)shared_area;
+  switch (ddi_model_convert_from(ddi_mmap_get_model())) {
+  case DDI_MODEL_ILP32:
+  {
+  struct data32 *da32p;
+  da32p = (struct data32 *)shared_area;
+  dp = &dtc;
+  dp->len = da32p->len;
+  dp->address = da32->address;
+  break;
+  }
+  case DDI_MODEL_NONE:
+  break;
+  }
+  /* continues along using dp */
+  ...
+ }
+mmap(9E), ddi_model_convert_from(9F)
+<beginning of page>
+Writing Device Drivers

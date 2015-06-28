@@ -1,0 +1,247 @@
+<beginning of page>
+ipnat <-> IP Filter/NAT module interface
+The ipnat device provides interfaction with the NAT features of the Solaris IPFilter.
+The NAT features programming model is a component of the Solaris IP Filter and is accessed via the NAT device
+file /dev/ipnat. Opening the device for reading or writing determines which ioctl calls can be successfully made.
+The caller must construct a ipfobj structure when issuing a SIOCGNATL or SIOCSTPUT. The ipfobj structure is
+then passed to the ioctl call and is filled out with ipfo_type set to IPFOBJ_value. IPFOBJ_ value provides a
+matching name for the structure, while ipfo_size is set to the total size of the structure being passed and ipfo_ptr is
+set to the structure address. The ipfo_rev structure should be set to the current value of IPFILTER_VERSION, while
+ipfo_offset and ipfo_xxxpad should be set to 0.
+ /*
+  * Structure used with SIOCGNATL/SIOCSTPUT.
+  */
+  /*
+  * Object structure description. For passing through in ioctls.
+  */
+  typedef struct ipfobj {
+  u_32_t ipfo_rev; /* IPFilter version (IPFILTER_VERSION) */
+  u_32_t ipfo_size; /* size of object at ipfo_ptr */
+  void *ipfo_ptr; /* pointer to object */
+  int ipfo_type; /* type of object being pointed to */
+  int ipfo_offset; /* bytes from ipfo_ptr where to start */
+  u_char ipfo_xxxpad[32]; /* reserved for future use */
+  } ipfobj_t;
+  #define IPFILTER_VERSION 4010901 /* IPFilter version */
+  #define IPFOBJ_NATSAVE 8 /* struct nat_save */
+  #define IPFOBJ_NATLOOKUP 9 /* struct natlookup */
+The following ioctl() calls may be used to manipulate the ipnat sub-system inside of ipf. Note that the ipnat driver
+only accept calls from applications using the same data model as the kernel. In other words, 64-bit kernels can only
+accept calls from 64-bit applications. Calls from 32-bit applications fail with EINVAL.
+SIOCSTLCK Set or clear the NAT lock to prevent table updates attributable to packet flow-through.
+SIOCGNATL Search the NAT table for the rdr entry that matches the fields in the natlookup structure. The caller
+must populate the structure with the address/port information of the accepted TCP connection (nl_inip, nl_inport)
+and the address/port information of the peer (nl_outip, nl_outport). The nl_flags field must have the IPN_TCP option
+set. All other fields must be set to 0. If the call succeeds, nl_realip and nl_realport are set to the real destination
+address and port, respectively. The nl_inport and nl_outport fields must be in host byte order.
+If IPN_FINDFORWARD is set in nl_flags, a check is made to see if it is possible to create an outgoing NAT ses<hy>
+sion by checking if a packet coming from (nl_realip,nl_realport) and destined for (nl_outip,nl_outport) can be trans<hy>
+lated. If translation is possible, the flag remains set, otherwise it is cleared in the structure returned to the caller.
+  /*
+  * Structure used with SIOCGNATL.
+  */
+  typedef struct natlookup {
+  i6addr_t nl_inipaddr;
+  i6addr_t nl_outipaddr;
+  i6addr_t nl_realipaddr;
+  int nl_v;
+  int nl_flags;
+  u_short nl_inport;
+  u_short nl_outport;
+  u_short nl_realport;
+  } natlookup_t
+  #define nl_inip nl_inipaddr.in4
+  #define nl_outip nl_outipaddr.in4
+<beginning of page>
+  #define nl_realip nl_realipaddr.in4
+  #define nl_inip6 nl_inipaddr.in6
+  #define nl_outip6 nl_outipaddr.in6
+  #define nl_realip6 nl_realipaddr.in6
+  /*
+  * Accepted values for nl_flags
+  */
+  #define IPN_TCP 0x00001
+  #define IPN_FINDFORWARD 0x400000
+SIOCSTPUT Move a NAT mapping structure from user space into the kernel. This ioctl is used by ipfs(1M) to re<hy>
+store NAT sessions saved in /var/db/ipf/ipnat.ipf. The nat_save structure must have its ipn_nat and ipn_ipnat struc<hy>
+tures filled out correctly. Fields not assigned a value must be initialised to 0. All pointer fields are adjusted, as ap<hy>
+propriate, once the structure is passed into the kernel and none are preserved.
+To create a translation, the following fields must be set:
+ Interface name - The interface name on which the host is to be exited must be set in nat_ifnames[0].
+ Local IP address and port number - The connection's local IP address and port number are stored in network
+ byte order using nat_inip/nat_inport.
+ Destination address/port - The destination address/port are stored in nat_oip/nat_oport.
+ Target address/port - The translation's target address/port is stored in nat_outip/nat_outport.
+The caller must also precalculate the checksum adjustments necessary to complete the translation and store those
+values in nat_sumd (delta required for TCP header) and nat_ipsumd (delta required for IP header).
+ /*
+  * Structures used with SIOCSTPUT.
+  */
+  typedef struct nat_save {
+  void *ipn_next;
+  struct nat ipn_nat;
+  struct ipnat ipn_ipnat;
+  struct frentry ipn_fr;
+  int ipn_dsize;
+  char ipn_data[4];
+  } nat_save_t;
+  typedef struct nat {
+  ipfmutex_t nat_lock;
+  struct nat *nat_next;
+  struct nat **nat_pnext;
+  struct nat *nat_hnext[2];
+  struct nat **nat_phnext[2];
+  struct hostmap *nat_hm;
+  void *nat_data;
+  struct nat **nat_me;
+  struct ipstate *nat_state;
+  struct ap_session *nat_aps;
+  frentry_t *nat_fr;
+  struct ipnat *nat_ptr;
+  void *nat_ifps[2];
+  void *nat_sync;
+  ipftqent_t nat_tqe;
+  u_32_t nat_flags;
+  u_32_t nat_sumd[2];
+  u_32_t nat_ipsumd;
+  u_32_t nat_mssclamp;
+  i6addr_t nat_inip6;
+  i6addr_t nat_outip6;
+  i6addr_t nat_oip6;
+  U_QUAD_T nat_pkts[2];
+  U_QUAD_T nat_bytes[2];
+  union {
+  udpinfo_t nat_unu;
+<beginning of page>
+  tcpinfo_t nat_unt;
+  icmpinfo_t nat_uni;
+  greinfo_t nat_ugre;
+  } nat_un;
+  u_short nat_oport;
+  u_short nat_use;
+  u_char nat_p;
+  int nat_dir;
+  int nat_ref;
+  int nat_hv[2];
+  char nat_ifnames[2][LIFNAMSIZ];
+  int nat_rev;
+   int nat_v;
+  } nat_t;
+  #define nat_inip nat_inip6.in4
+  #define nat_outip nat_outip6.in4
+  #define nat_oip nat_oip6.in4
+  #define nat_inport nat_un.nat_unt.ts_sport
+  #define nat_outport nat_un.nat_unt.ts_dport
+  /*
+  * Values for nat_dir
+  */
+  #define NAT_INBOUND 0
+  #define NAT_OUTBOUND 1
+  /*
+  * Definitions for nat_flags
+  */
+  #define NAT_TCP 0x0001 /* IPN_TCP */
+The following example shows how to prepare and use SIOCSTPUT to insert a NAT session directly into the table.
+Note that the usual TCP/IP code is omitted is this example.
+In the code segment below, incoming_fd is the TCP connection file descriptor that is accepted as part of the redirect
+process, while remote_fd is the outgoing TCP connection to the remote server being translated back to the original
+IP address/port pair. Note -
+The following ipnat headers must be included before you can use the code shown in this example:
+ #include <netinet/in.h>
+ #include <arpa/inet.h>
+ #include <net/if.h>
+ #include <netinet/ipl.h>
+ #include <netinet/ip_compat.h>
+ #include <netinet/ip_fil.h>
+ #include <netinet/ip_nat.h>
+ #include <string.h>
+ #include <fcntl.h>
+Note -
+In the example below, various code fragments have been excluded to enhance clarity.
+ int
+  translate_connection(int incoming_fd)
+  {
+  struct sockaddr_in usin;
+  struct natlookup nlp;
+  struct nat_save ns;
+  struct ipfobj obj;
+  struct nat *nat;
+  int remote_fd;
+  int nat_fd;
+  int onoff;
+<beginning of page>
+  memset(&ns, 0, sizeof(ns));
+  nat = &ns.ipn_nat
+  namelen = sizeof(usin);
+  getsockname(remote_fd, (struct sockaddr *)&usin, &namelen);
+  namelen = sizeof(sin);
+  getpeername(incoming_fd, (struct sockaddr *) &sin, &namelen);
+  namelen = sizeof(sloc);
+  getsockname(incoming_fd, (struct sockaddr *) &sloc, &namelen);
+  bzero((char *) &obi, sizeof(obj));
+  obj.ipfo_rev = IPFILTER_VERSION;
+  obj.ipfo_size = sizeof(nlp);
+  obj.ipfo_ptr = &nip;
+  obj.ipfo_type = IPFOBJ_NATLOOKUP;
+  /*
+  * Build up the NAT natlookup structure.
+  */
+  bzero((char *) &nlp, sizeof(nlp));
+  nlp.nl_outip = sin.sin_addr;
+  nlp.nl_inip = sloc.sin_addr;
+  nlp.nl_flags = IPN_TCP;
+  nlp.nl_outport = ntohs(sin.sin_port);
+  nlp.nl_inport = ntohs(sloc.sin_port);
+  /*
+  * Open the NAT device and lookup the mapping pair.
+  */
+  nat_fd = open(IPNAT_NAME, O_RDWR);
+  if (ioctl(nat_fd, SIOCGNATL, &obj) != 0)
+  return -1;
+  nat->nat_inip = usin.sin_addr;
+  nat->nat_outip = nlp.nl_outip;
+  nat->nat_oip = nlp.nl_realip;
+  sum1 = LONG_SUM(ntohl(usin.sin_addr.s_addr)) +
+  ntohs(usin.sin_port);
+  sum2 = LONG_SUM(ntohl(nat->nat_outip.s_addr)) +
+  ntohs(nlp.nl_outport);
+  CALC_SUMD(sum1, sum2, sumd);
+  nat->nat_sumd[0] = (sumd & 0xffff) + (sumd >> 16);
+  nat->nat_sumd[1] = nat->nat_sumd[0];
+  sum1 = LONG_SUM(ntohl(usin.sin_addr.s_addr));
+  sum2 = LONG_SUM(ntohl(nat->nat_outip.s_addr));
+  CALC_SUMD(sum1, sum2, sumd);
+  nat->nat_ipsumd = (sumd & 0xffff) + (sumd >> 16);
+  nat->nat_inport = usin.sin_port;
+  nat->nat_outport = nlp.nl_outport;
+  nat->nat_oport = nlp.nl_realport;
+  nat->nat_flags = IPN_TCPUDP;
+  /*
+  * Prepare the ipfobj structure, accordingly.
+  */
+  bzero((char *)&obi, sizeof(obj));
+  obj.ipfo_rev = IPFILTER_VERSION;
+  obj.ipfo_size = sizeof(*nsp);
+  obj.ipfo_ptr = nsp;
+<beginning of page>
+  obj.ipfo_type = IPFOBJ_NATSAVE;
+  onoff = 1;
+  if (ioctl(nat_fd, SIOCSTPUT, &obj) != 0)
+  fprintf(stderr, "Error occurred\n");
+  return connect(rem_fd, (struct sockaddr ) &usin, sizeof(usin));
+  }
+EPERM The device has been opened for reading only. To succeed, the ioctl call must be opened for both reading
+and writing. The call may be returned if it is privileged and the calling process did not assert
+{PRIV_SYS_NET_CONFIG} in the effective set.
+ENOMEM More memory was allocated than the kernel can provide. The call may also be returned if the applica<hy>
+tion inserts a NAT entry that exceeds the hash bucket chain's maximum length.
+EFAULT The calling process specified an invalid pointer in the ipfobj structure.
+EINVAL The calling process detected a parameter or field set to an unacceptable value.
+EEXIST The calling process, via SIOCSTPUT, attempted to add a NAT entry that already exists in the NAT table.
+ESRCH The calling process called SIOCSTPUT before setting the SI_NEWFR flag and providing a pointer in the
+nat_fr field that cannot be found in the current rule set.
+EACESS The calling process issued a SIOCSTPUT before issuing a SIOCSTLCK.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed
+ipfs(1M), ipnat(1M), ioctl(2), attributes(5)

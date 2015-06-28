@@ -1,0 +1,164 @@
+<beginning of page>
+arp, ARP <-> Address Resolution Protocol
+#include <sys/fcntl.h>
+#include <sys/socket.h>
+#include <net/if_arp.h>
+#include <netinet/in.h>
+s = socket(AF_INET, SOCK_DGRAM, 0);
+d = open ("/dev/arp", oflag);
+ARP is a protocol used to map dynamically between Internet Protocol (IP) and Ethernet addresses. It is used by all
+Ethernet datalink providers (network drivers) and can be used by other datalink providers that support broadcast, in<hy>
+cluding FDDI and Token Ring. The only network layer supported in this implementation is the Internet Protocol,
+although ARP is not specific to that protocol.
+ARP caches IP-to-link-layer address mappings. When an interface requests a mapping for an address not in the
+cache, ARP queues the message that requires the mapping and broadcasts a message on the associated network re<hy>
+questing the address mapping. If a response is provided, ARP caches the new mapping and transmits any pending
+message. ARP will queue a maximum of four packets while awaiting a response to a mapping request. ARP keeps
+only the first four transmitted packets.
+The STREAMS device /dev/arp is not a Transport Level Interface (TLI) transport provider and may not be used
+with the TLI interface.
+To facilitate communications with systems that do not use ARP, ioctl() requests are provided to enter and delete
+entries in the IP-to-link address tables. Ioctls that change the table contents require sys_net_config privilege. See
+privileges(5).
+ #include <sys/sockio.h>
+ #include <sys/socket.h>
+ #include <net/if.h>
+ #include <net/if_arp.h>
+ struct arpreq arpreq;
+ ioctl(s, SIOCSARP, (caddr_t)&arpreq);
+ ioctl(s, SIOCGARP, (caddr_t)&arpreq);
+ ioctl(s, SIOCDARP, (caddr_t)&arpreq);
+SIOCSARP, SIOCGARP and SIOCDARP are BSD compatible ioctls. These ioctls do not communicate the mac
+address length between the user and the kernel (and thus only work for 6 byte wide Ethernet addresses). To manage
+the ARP cache for media that has different sized mac addresses, use SIOCSXARP, SIOCGXARP and
+SIOCDXARP ioctls.
+ #include <sys/sockio.h>
+ #include <sys/socket.h>
+ #include <net/if.h>
+ #include <net/if_dl.h>
+ #include <net/if_arp.h>
+ struct xarpreq xarpreq;
+ ioctl(s, SIOCSXARP, (caddr_t)&xarpreq);
+ ioctl(s, SIOCGXARP, (caddr_t)&xarpreq);
+ ioctl(s, SIOCDXARP, (caddr_t)&xarpreq);
+Each ioctl() request takes the same structure as an argument. SIOCS[X]ARP sets an ARP entry, SIOCG[X]ARP
+gets an ARP entry, and SIOCD[X]ARP deletes an ARP entry. These ioctl() requests may be applied to any Internet
+family socket descriptors, or to a descriptor for the ARP device. Note that SIOCS[X]ARP and SIOCD[X]ARP re<hy>
+quire a privileged user, while SIOCG[X]ARP
+does not.
+The arpreq structure contains
+<beginning of page>
+ /*
+ * ARP ioctl request
+ */
+ struct arpreq {
+  struct sockaddr arp_pa; /* protocol address */
+  struct sockaddr arp_ha; /* hardware address */
+  int arp_flags; /* flags */
+ };
+The xarpreq structure contains:
+ /*
+ * Extended ARP ioctl request
+ */
+ struct xarpreq {
+  struct sockaddr_storage xarp_pa; /* protocol address */
+  struct sockaddr_dl xarp_ha; /* hardware address */
+  int xarp_flags; /* arp_flags field values */
+ };
+ #define ATF_COM 0x2 /* completed entry (arp_ha valid) */
+ #define ATF_PERM 0x4 /* permanent (non-aging) entry */
+ #define ATF_PUBL 0x8 /* publish (respond for other host) */
+ #define ATF_USETRAILERS 0x10 /* send trailer pckts to host */
+ #define ATF_AUTHORITY 0x20 /* hardware address is authoritative */
+The address family for the [x]arp_pa sockaddr must be AF_INET. The ATF_COM flag bits ([x]arp_flags) cannot
+be altered. ATF_USETRAILERS is not implemented on Solaris and is retained for compatibility only.
+ATF_PERM makes the entry permanent (disables aging) if the ioctl() request succeeds. ATF_PUBL specifies that
+the system should respond to ARP requests for the indicated protocol address coming from other machines. This al<hy>
+lows a host to act as an ARP server, which may be useful in convincing an ARP-only machine to talk to a non-ARP
+machine. ATF_AUTHORITY indicates that this machine owns the address. ARP does not update the entry based
+on received packets.
+The address family for the arp_ha sockaddr must be AF_UNSPEC.
+Before invoking any of the SIOC*XARP ioctls, user code must fill in the xarp_pa field with the protocol (IP) ad<hy>
+dress information, similar to the BSD variant. The SIOC*XARP ioctls come in two (legal) varieties, depending on
+xarp_ha.sdl_nlen: 1. if sdl_nlen = 0, it behaves as an extended BSD ioctl. The kernel uses the IP address to deter<hy>
+mine the network interface. 2. if (sdl_nlen > 0) and (sdl_nlen < LIFNAMSIZ), the kernel uses the interface name
+in sdl_data[0] to determine the network interface; sdl_nlen represents the length of the string (excluding terminating
+null character). 3. if (sdl_nlen >= LIFNAMSIZ), an error (EINVAL) is flagged from the ioctl.
+Other than the above, the xarp_ha structure should be 0-filled except for SIOCSXARP, where the sdl_alen field
+must be set to the size of hardware address length and the hardware address itself must be placed in the LLAD<hy>
+DR/sdl_data[] area. (EINVAL will be returned if user specified sdl_alen does not match the address length of the
+identified interface).
+On return from the kernel on a SIOCGXARP ioctl, the kernel fills in the name of the interface (excluding terminat<hy>
+ing NULL) and its hardware address, one after another, in the sdl_data/LLADDR area; if the two are larger than
+can be held in the 244 byte sdl_data[] area, an ENOSPC error is returned. Assuming it fits, the kernel will also set
+sdl_alen with the length of hardware address, sdl_nlen with the length of name of the interface (excluding terminat<hy>
+ing NULL), sdl_type with an IFT_* value to indicate the type of the media, sdl_slen with 0, sdl_family with
+AF_LINK and sdl_index (which if not 0) with system given index for the interface. The information returned is
+very similar to that returned via routing sockets on an RTM_IFINFO message.
+The ARP ioctls have several additional restrictions and enhancements when used in conjunction with IPMP: <bu> ARP
+mappings for IPMP data and test addresses are managed by the kernel and cannot be changed through ARP ioctls,
+though they may be retrieved using SIOCGARP or SIOCGXARP. <bu> ARP mappings for a given IPMP group must
+be consistent across the group. As a result, ARP mappings cannot be associated with individual underlying IP in<hy>
+terfaces in an IPMP group and must instead be associated with the corresponding IPMP IP interface. <bu> roxy ARP
+mappings for an IPMP group are automatically managed by the kernel. Specifically, if the hardware address in a
+SIOCSARP or SIOCSXARP request matches the hardware address of an IP interface in an IPMP group and the
+IP address is not local to the system, the kernel regards this as a IPMP Proxy ARP entry. This IPMP Proxy ARP
+<beginning of page>
+entry will have its hardware address automatically adjusted in order to keep the IP address reachable (provided
+the IPMP group has not entirely failed).
+ <em>
+ <em>
+ <em>P
+ARP performs duplicate address detection for local addresses. When a logical interface is brought up (IFF_UP) or
+any time the hardware link goes up (IFF_RUNNING), ARP sends probes (ar$spa == 0) for the assigned address. If
+a conflict is found, the interface is torn down. See ifconfig(1M) for more details.
+ARP watches for hosts impersonating the local host, that is, any host that responds to an ARP request for the local
+host's address, and any address for which the local host is an authority. ARP defends local addresses and logs those
+with ATF_AUTHORITY set, and can tear down local addresses on an excess of conflicts.
+ARP also handles UNARP messages received from other nodes. It does not generate these messages.
+The arp driver registers itself with the netinfo interface. To gain access to these events, a handle from net_proto<hy>
+col_lookup must be acquired by passing it the value NHF_ARP. Through this interface, two packet events are sup<hy>
+ported:
+Physical in - ARP packets received via a network inter face
+Physical out - ARP packets to be sent out via a network interface
+For ARP packets, the hook_pkt_event structure is filled out as follows:
+hpe_ifp
+Identifier indicating the inbound interface for packets received with the physical in event.
+hpe_ofp
+Identifier indicating the outbound interface for packets received with the physical out event.
+hpe_hdr
+Pointer to the start of the ARP header (not the ethernet header).
+hpe_mp
+Pointer to the start of the mblk_t chain containing the ARP packet.
+hpe_mb
+Pointer to the mblk_t with the ARP header in it.
+In addition to events describing packets as they move through the system, it is also possible to receive notification
+of events relating to network interfaces. These events are all reported back through the same callback. The list of
+events is as follows:
+plumb
+A new network interface has been instantiated.
+unplumb
+A network interface is no longer associated with ARP.
+arp(1M), ifconfig(1M), privileges(5), if_tcp(7P), inet(7P), netinfo(9F)
+Plummer, Dave, An Ethernet Address Resolution Protocol or Converting Network Protocol Addresses to 48 .bit
+Ethernet Addresses for Transmission on Ethernet Hardware, RFC 826, STD 0037, November 1982.
+<beginning of page>
+Malkin, Gary, ARP Extension - UNARP, RFC 1868, November, 1995
+Several messages can be written to the system logs (by the IP module) when errors occur. In the following exam<hy>
+ples, the hardware address strings include colon (:) separated ASCII representations of the link layer addresses,
+whose lengths depend on the underlying media (for example, 6 bytes for Ethernet).
+Node %x:%x ... %x:%x is using our IP address %d.%d.%d.%d on %s.
+Duplicate IP address warning. ARP has discovered another host on a local network that responds to mapping re<hy>
+quests for the Internet address of this system, and has defended the system against this node by re-announcing the
+ARP entry.
+%s has duplicate address %d.%d.%d.%d (in use by %x:%x ... %x:%x); disabled.
+Duplicate IP address detected while performing initial probing. The newly-configured interface has been shut down.
+%s has duplicate address %d.%d.%d.%d (claimed by %x:%x ... %x:%x); disabled.
+Duplicate IP address detected on a running IP interface. The conflict cannot be resolved, and the interface has been
+disabled to protect the network.
+Recovered address %d.%d.%d.%d on %s.
+An interface with a previously-conflicting IP address has been recovered automatically and reenabled. The conflict
+has been resolved.
+Proxy ARP problem? Node '%x:%x ... %x:%x' is using %d.%d.%d.%d on %s
+This message appears if arp(1M) has been used to create a published permanent (ATF_AUTHORITY) entry, and
+some other host on the local network responds to mapping requests for the published ARP entry.

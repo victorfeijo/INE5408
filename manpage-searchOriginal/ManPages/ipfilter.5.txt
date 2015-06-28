@@ -1,0 +1,77 @@
+<beginning of page>
+ipfilter <-> IP packet filtering software
+IP Filter is software that provides packet filtering capabilities on a Solaris system. On a properly setup system, it can
+be used to build a firewall.
+Solaris IP Filter is installed with the Solaris operating system. However, packet filtering is not enabled by default.
+See ipf(1M) for a procedure to enable and activate the IP Filter feature.
+To simplify IP Filter configuration management, a firewall framework is created to allow users to configure IP Filter
+by expressing firewall policy at system and service level. Given the user-defined firewall policy, the framework gen<hy>
+erates a set of IP Filter rules to enforce the desired system behavior. Users specify system and service firewall poli<hy>
+cies that allow or deny network traffic from certain hosts, subnets, and interface(s). The policies are translated into a
+set of active IPF rules to enforce the specified firewall policies. Note -
+Users can still specify their own ipf rule file if they choose not to take advantage of the framework. See ipf(1M) and
+ipf(4).
+This section describes the host-based firewall framework. See svc.ipfd(1M) for details on how to configure firewall
+policies.
+A three-layer approach with different precedence levels helps the user achieve the desired behaviors.
+Global Default
+Global Default - Default system-wide firewall policy. This policy is automatically inherited by all services unless
+services modify their firewall policy.
+Network Services
+Higher precedence than Global Default. A service's policy allows/disallows traffic to its specific ports, regardless of
+Global Default policy.
+Global Override
+Another system-wide policy that takes precedence over the needs of specific services in Network Services layer.
+ Global Override
+  |
+  |
+ Network Services
+  |
+  |
+ Global Default
+A firewall policy includes a firewall mode and an optional set of network sources. Network sources are IP addresses,
+subnets, and local network interfaces, from all of which a system can receive incoming traffic. The basic set of fire<hy>
+wall modes are:
+None
+No firewall, allow all incoming traffic.
+Deny
+Allow all incoming traffic but deny from specified source(s).
+Allow
+Deny all incoming traffic but allow from specified source(s).
+The first system-wide layer, Global Default, defines a firewall policy that applies to any incoming traffic, for exam<hy>
+<beginning of page>
+ple, allowing or blocking all traffic from an IP address. This makes it simple to have a policy that blocks all incom<hy>
+ing traffic or all incoming traffic from unwanted source(s).
+The Network Services layer contains firewall policies for local programs that provide service to remote clients, for
+example, telnetd, sshd, and httpd. Each of these programs, a network service, has its own firewall policy that con<hy>
+trols access to its service. Initially, a service's policy is set to inherit Global Default policy, a "Use Global Default"
+mode. This makes it simple to set a single policy, at the Global Default layer, that can be inherited by all services.
+When a service's policy is different from Global Default policy, the service's policy has higher precedence. If Global
+Default policy is set to block all traffic from a subnet, the SSH service could be configured to allow access from cer<hy>
+tain hosts in that subnet. The set of all policies for all network services comprises the Network Service layer.
+The second system-wide layer, Global Override, has a firewall policy that also applies to any incoming network traf<hy>
+fic. This policy has highest precedence and overrides policies in the other layers, specifically overriding the needs of
+network services. The example is when it is desirable to block known malicious source(s) regardless of services'
+policies.
+This framework leverages IP Filter functionality and is active only when svc:/network/ipfilter is enabled and inac<hy>
+tive when network/ipfilter is disabled. Similarly, a network service's firewall policy is only active when that service
+is enabled and inactive when the service is disabled. A system with an active firewall has IP Filter rules for each run<hy>
+ning/enabled network service and system-wide policy(s) whose firewall mode is not None.
+A user configures a firewall by setting the system-wide policies and policy for each network service. See
+svc.ipfd(1M) on how to configure a firewall policy.
+The firewall framework composes of policy configuration and a mechanism to generate IP Filter rules from the poli<hy>
+cy and applying those rules to get the desired IP Filter configuration. A quick summary of the design and user inter<hy>
+action: <bu> system-wide policy(s) are stored in network/ipfilter <bu> network services' policies are stored in each SMF
+service <bu> a user activates a firewall by enabling network/ipfilter (see ipf(1M)) <bu> a user activates/deactivate a ser<hy>
+vice's firewall by enabling/disabling that network service <bu> changes to system-wide or per-service firewall policy re<hy>
+sults in an update to the system's firewall rules
+See attributes(5) for a description of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stabili<hy>
+tyCommitted
+svcs(1), ipf(1M), ipnat(1M), svcadm(1M), svc.ipfd(1M), ipf(4), ipnat(4), attributes(5), smf(5)
+System Administration Guide: IP Services
+The ipfilter service is managed by the service management facility, smf(5), under the service identifier:
+ svc:/network/ipfilter:default
+Administrative actions on this service, such as enabling, disabling, or requesting restart, can be performed using sv<hy>
+cadm(1M). The service's status can be queried using the svcs(1) command.
+IP Filter startup configuration files are stored in /etc/ipf.

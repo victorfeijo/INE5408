@@ -1,0 +1,191 @@
+<beginning of page>
+appcert <-> examine application-level products for unstable use of Solaris interfaces
+appcert [-h] [-n] [-f infile] [-w working_dir] [-B] [-L]
+ [-S] {obj | dir}...
+The appcert utility examines an application's conformance to the Solaris Application Binary Interface (ABI). The
+Solaris ABI defines the runtime library interfaces in Solaris that are safe and stable for application use. More specifi<hy>
+cally, appcert identifies any dependencies on unstable runtime interfaces, as well as certain other risks that could
+cause the product to fail to work on a subsequent release of Solaris.
+appcert checks for: <bu> Private symbol usage in Solaris libraries. These are private symbols, that is, functions or data,
+that are not intended for developer consumption. They are interfaces that Solaris libraries use to call one another.
+These symbols might change their semantic behavior or even disappear altogether (so-called demoted symbols), so
+it is a good practice to make sure your application does not depend upon any of them. <bu> Static linking. In particular,
+this refers to static linking of archives libc.a, libsocket.a, and libnsl.a, that is, instead of dynamically linking the
+corresponding shared object .so's. Because the semantics of private symbol calls from one Solaris library to another
+can change from one release to another, it is not a good practice to hardwire library code into your binary objects. <bu>
+Unbound symbols. These are library symbols (that is, functions or data) that the dynamic linker could not resolve
+when appcert was run. This might be an environment problem (for example, LD_LIBRARY_PATH) or a build
+problem (for example, not specifying -llib and/or -z defs with compiling). They are flagged to point these problems
+out and in case a more serious problem is indicated.
+An entire product can be readily examined by appcert (that is, if the product is a collection of many programs and
+supporting shared objects) by referring appcert to the directories where the product is installed.
+To perform its task, appcert constructs a profile of interface dependencies for each object file within the product
+(whether an executable object or shared object), to determine all the Solaris system interfaces that are depended up<hy>
+on. (Notice that appcert uses the Solaris runtime linker to make this determination.) These dependency profiles are
+then compared to a definition of the Solaris ABI to identify any interfaces that are Private (unsafe and unstable for
+application-level use).
+appcert generates a simple roll-up report that indicates which of the product's components, if any, had liabilities and
+what those liabilities were. The report aids developers who are examining their product's release-to-release stability.
+Notice that appcert produces complete interface dependency information, both the Public (safe and stable) Solaris
+interfaces and the Private (non-ABI) interfaces. This information can also be examined for each product component,
+if you want.
+IMPORTANT: appcert must run in the same environment in which the application being checked runs. See NOTES.
+The following options are supported:
+-B If appcert is run in batch mode, the output report will contain one line per binary, beginning with PASS if no
+problems were detected for the binary, FAIL if any problems were found, or INC if the binary could not be com<hy>
+pletely checked. Do not interpret these labels too literally. For example, PASS just means that none of the appcert
+warnings were triggered. These strings are flush left and so can be selected via grep ^FAIL ..., and so forth.
+-f infile Specifies the file infile that contains a list of files (one per line) to check. This list is appended to the list de<hy>
+termined from the command line operands (see OPERANDS below).
+-h Prints out the usage information.
+-L appcert examines your product for the presence of shared objects. If it finds some, it appends the directories they
+reside in to LD_LIBRARY_PATH. Use this flag to prevent appcert from doing this.
+-n When searching directories for binaries to check, this option does not follow symbolic links. See find(1).
+-S Appends Solaris library directories (that is, /usr/openwin/lib:/usr/dt/lib) to LD_LIBRARY_PATH.
+<beginning of page>
+-w working_dir Identifies the directory in which to run the library components and create temporary files (default is
+/tmp).
+The following operands are supported:
+{obj | dir} ... A complete list of objects and/or directories that contain the objects constituting the product to be
+checked. appcert recursively searches directories looking for object files; non-object files are ignored.
+The following exit values are returned:
+0 appcert ran successfully and found no potential binary stability problems.
+1 appcert failed to run successfully.
+2 Some of the objects checked have potential binary stability problems.
+3 No binary objects were located that could be checked.
+If the object file to be examined depends on libraries, those dependencies must be recorded in it (by using the com<hy>
+piler's -l switch).
+If the object file to be examined depends on other shared libraries, those libraries must be accessible via LD_LI<hy>
+BRARY_PATH or RUNPATH when appcert is run.
+To check 64-bit applications, the machine must be running the 64-bit Solaris kernel. See isalist(1). Also, the checks
+for static linking are currently not done on 64-bit applications.
+appcert cannot examine: <bu> Object files that are completely or partially statically linked.
+ Completely statically linked objects are reported as unstable.
+<bu> Executable files that do not have execute permission set.
+ These are skipped. Shared objects without execute permission are not skipped.
+<bu> Object files that are setuid root.
+ Due to limitations in ldd(1), these are skipped. Copy and/or change the permissions to check them.
+<bu> Non-ELF file executables such as shell scripts. <bu> Non-C language interfaces to Solaris; for example, C++ and Ja<hy>
+va.
+ The code itself need not be in C as long as the calls to Solaris libaries are in C.
+appcert records its findings in the following files in the working directory (/tmp/appcert.????? by default):
+Index A mapping between checked binaries and the subdirectory in the working directory in which the output spe<hy>
+cific to that binary can be found.
+Report A copy of the rollup report that was displayed on stdout when appcert was run.
+Skipped A list of binaries that appcert was asked to check but had to skip, along with a brief reason why each was
+skipped.
+In addition, there is per-object information in the subdirectories under appcert.?????/objects/, in the following files:
+check.demoted_symbols A list of symbols suspected to be demoted Solaris symbols.
+check.dynamic.private A list of private Solaris symbols to which the object makes direct bindings.
+check.dynamic.public A list of public Solaris symbols to which the object makes direct bindings.
+<beginning of page>
+check.dynamic.unbound A list of symbols not bound by the dynamic linker when ldd -r was run. For convenience,
+ldd output lines containing file not found are also included.
+summary.dynamic A pretty-printed summary of dynamic bindings for the objects examined, including tables of
+Public and Private symbols used from each Solaris library.
+Other files are temporary files used internally by appcert.
+Private symbols are functions or data variables in a Solaris library that are not intended for developer or external use.
+These symbols are interfaces that the Solaris libraries use to call and communicate with one another. They are
+marked in pvs(1) output with the symbol version name SUNWprivate.
+Private symbols can change their semantic behavior or even disappear altogether (demoted or deprecated symbols),
+so your application should not depend upon any of them.
+Demoted symbols are functions or data variables in a Solaris library that were once private to that library and have
+been removed (or possibly scoped local to the library) in a later Solaris release. If your application directly calls one
+of these demoted symbols, it will fail to run (relocation error) on the release in which the symbol was removed and
+releases thereafter.
+In some rare cases, a demoted symbol will return in a later release, but nevertheless there are still some releases on
+which the application will not run.
+Sun Microsystems Inc. performed most of the library scoping in the transition from Solaris 2.5.1 to 2.6. This action
+was done to increase binary stability. By making these completely internal interfaces invisible (that is, they cannot
+be dynamically linked against), a developer cannot accidentally or intentionally call these interfaces. For more infor<hy>
+mation, see the Linker and Libraries Guide, in particular the chapter on versioning. This document may be found
+online at http://docs.sun.com.
+Unbound symbols are library symbols (that is, functions or data) referenced by the application that the dynamic link<hy>
+er could not resolve when appcert was run. Note: appcert does not actually run your application, so some aspect of
+the environment that affects dynamic linking might not be set properly.
+Unbound symbols do not necessarily indicate a potential binary stability problem. They only mean that when ap<hy>
+pcert was run, the runtime dynamic linker could not resolve these symbols.
+Unbound symbols might be due to LD_LIBRARY_PATH not being correctly set. Make sure it is set, so that all of
+your binary objects can find all of the libraries they depend on (either your product's own libraries, Solaris libraries,
+or those of a third party). Then re-run appcert.
+You might find it useful to write a shell script that sets up the environment correctly and then runs appcert on the bi<hy>
+naries you want to check.
+Another common cause for unbound symbols is when a shared object under test has not recorded its dynamic depen<hy>
+dencies, that is, at build time the -l switch was not supplied to the compiler and ld(1). So the shared object requires
+that the executables that link against it have the correct dependencies recorded.
+Notice that such a shared object can either be linked in the standard way (that is, specified at an executable's build
+time) or dynamically opened (for example, an executable calls dlopen(3C) on the shared object sometimes when
+running). Either case can give rise to unbound symbols when appcert is run. The former can usually be resolved by
+setting LD_LIBRARY_PATH appropriately before running appcert. The latter (dlopen) is usually difficult to re<hy>
+solve. Under some circumstances, you might be able to set LD_PRELOAD appropriately to preload the needed li<hy>
+braries, but this procedure does not always work.
+How do you know if the environment has been set up correctly so that there will be no unbound symbols? It must be
+set up so that running ldd -r on the binary yields no "file not found" or "symbol not found" errors. See ld.so.1(1)
+and ldd(1) for more information on dynamic linking.
+In any event, appcert flags unbound symbols as a warning in case they might indicate a more serious problem. Un<hy>
+bound symbols can be an indicator of dependencies on demoted symbols (symbols that have been removed from a
+library or scoped local to it). Dependencies on demoted symbols will lead to serious binary stability problems.
+However, setting up the environment properly should remove most unbound symbols. In general, it is good practice
+<beginning of page>
+to record library dependencies at build time whenever possible because it helps make the binary object better defined
+and self-contained. Also recommended is using the -z defs flag when building shared objects, to force the resolution
+of all symbols during compilation. See ld(1) for more information.
+appcert runs /bin/ldd -r on each binary object to be tested. It sets the environment variable LD_DE<hy>
+BUG="files,bindings". (See ldd(1) and ld.so.1(1) for more information). If that command fails for some reason, ap<hy>
+pcert will have no dynamic symbol binding information and will find "no bindings".
+appcert can fail if any of the following is true: <bu> The binary object does not have read permission. <bu> The binary ob<hy>
+ject is SUID or SGID and the user does not have sufficient privileges. <bu> The binary object is an executable without
+the execute permission bit set. <bu> The binary object is completely statically linked. <bu> The binary object has no library
+dependency information recorded.
+Other cases exist as well (for example, out of memory). In general, this flag means that appcert could not complete<hy>
+ly examine the object due to permissions or environment. Try to modify the permissions or environment so that the
+dynamic bindings can be recorded.
+An obsolete library is one whose use is deprecated and that might, in some future release, be removed from Solaris
+altogether. appcert flags these because applications depending on them might not run in future releases of Solaris.
+All interfaces, including Private ones, in an obsolete library are frozen and will not change.
+Direct use of the symbols sys_errlist or sys_nerr presents a risk in which reference might be made past the end of
+the sys_errlist array. These symbols are deprecated in 32-bit versions of Solaris and are absent altogether in 64-bit
+versions. Use strerror(3C) instead.
+The "strong" symbols (for example, _socket) associated with "weak" symbols (for example, socket ) are reserved as
+private (their behavior could change in the future). Your application should only directly reference the weak symbol
+(usually the strong symbols begin with "_").
+Note: Under certain build environments, the strong/private symbol dependency gets recorded into your binary in<hy>
+stead of the weak/public one, even though the source code doesn't appear to reference the private symbol. Neverthe<hy>
+less, steps should be taken to trace down why this is occurring and fix the dependency.
+appcert needs to run in the same environment in which the application being checked runs. Otherwise it might not
+be able to resolve references correctly to interfaces in the Solaris libraries. Take the following steps: 1. Make sure
+that LD_LIBRARY_PATH and any other aspects of the environment are set to whatever settings are used when the
+application is run. Also make sure that it contains the directories containing any non-Solaris shared objects that are
+part of the product, so that they can be found when referenced. 2. Make sure that all the binaries to be checked: <bu>
+Are dynamically linked ELF objects <bu> Have execute permission set on executables (this is not necessary for shared
+objects) <bu> Are not SUID root (otherwise you will have to be root to check them; make non-SUID copies and check
+those if necessary).
+You might find it useful to write a shell script that sets up the environment correctly and then runs appcert.
+Some potential problems that can be encountered are: <bu> appcert reports unbound symbols that appear to be part of
+Solaris libraries.
+This is probably caused when the application uses dlopen(3C) to access a shared object that does not have its Solaris
+dependencies recorded. appcert cannot resolve symbol use in such cases, since the dynamic linker is never invoked
+on the shared object, and there is no other dependency information that could be used to resolve the Solaris symbol
+bindings. This can also occur with non-Solaris symbols.
+To avoid this problem, make sure that when a shared object is built, its dependencies on Solaris libraries are explicit<hy>
+ly recorded by using the -llib option on the compile line (see cc(1) and ld(1)). <bu> appcert reports that the application
+uses a Solaris private symbol that is not referenced in the application's source code.
+This problem is most likely due to static linking of a Solaris library that references that symbol. Since appcert uses
+the dynamic linker to resolve symbols, statically linked libraries appear to appcert to be part of the application code
+(which, in a sense, they are). This can also sometimes happen as a result of macro substitution in a Solaris header
+file.
+To avoid this problem, whenever possible do not statically link Solaris library archives into your application. <bu> ap<hy>
+pcert does not recognize a library as part of Solaris.
+Some obsolete Solaris libraries are so old that they were obsoleted before their symbols could be versioned. Conse<hy>
+quently, appcert cannot recognize them as being part of Solaris.
+<beginning of page>
+The use of the terms "public" and "private" as equivalent to "stable" and "unstable" is unfortunately somewhat
+confusing. In particular, experimental or evolving interfaces are public in the sense that they are documented and
+their use is encouraged. But they are unstable, because an application built with them might not run on subsequent
+releases. Thus, they are classified as private for appcert's purposes until they are no longer evolving. Conversely,
+obsolete interfaces will eventually disappear, and so are unstable, even though they have been public and stable in
+the past and are still treated as public by appcert. Fortunately, these two situations are rare.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wapct _ Interface stabilityStable
+cc(1), find(1), isalist(1), ld(1), ldd(1), ld.so.1(1), pvs(1), dlopen(3C), strerror(3C), Intro(4), attributes(5)

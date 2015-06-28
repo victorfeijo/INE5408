@@ -1,0 +1,260 @@
+<beginning of page>
+power.conf <-> Power Management configuration information file
+/etc/power.conf
+The power.conf file is used by the Power Management configuration program pmconfig(1M), to initialize the set<hy>
+tings for Power Management. If you make changes to this file, you must run pmconfig(1M) manually for the
+changes to take effect.
+The dtpower(1M) GUI allows the configuration of a subset of parameters allowed by this file. For ease-of-use, it is
+recommended that you use dtpower(1M) to configure the parameters. See the EXAMPLES section for information
+on disabling Power Management.
+Power Management addresses two specific management scenarios: management of individual devices and manage<hy>
+ment of the whole system. An individual device is power managed if the device supports multiple power levels and
+if the device driver uses Power Management interfaces provided by the kernel to save device power when the device
+is idle.
+All entries in the power.conf file are processed in the order that they occur in the file.
+Devices with drivers that use the automatic device Power Management interfaces are automatically power managed
+if the autopm entry is enabled. The autopm entry is described near the end of this section. The pm-components
+property describes the Power Management model of a device driver to the Power Management framework. See pm-
+components(9P) for more information.
+When a component has been idle at a given power level for its threshold time, the power level of the component is
+reduced to the next lower power level of that component, if any. For devices which implement multiple components,
+each component is power-managed independently.
+Default thresholds for components of automatically power managed devices are computed by the Power Manage<hy>
+ment framework based on the system idleness threshold. By default, all components of the device are powered off if
+they have all been idle for the system's idleness threshold. The default system idleness threshold is determined by
+the applicable United States Environmental Protection Agency's (EPA) Energy Star Memorandum of Understand<hy>
+ing. See the NOTES section of this manual page for more information.
+To set the system idleness threshold, use one of the following entries:
+ system-threshold threshold
+ system-threshold always-on
+where threshold is the value of the system idleness threshold in hours, minutes or seconds as indicated by a trailing
+h, m or s (defaulting to seconds if only a number is given). If always-on is specified, then by default, all devices are
+left at full power.
+The system-threshold entry is applicable to CPU Power Management only when CPU Power Management has been
+configured to operate in poll-mode, which is expressed through the cpupm keyword.
+If a system has power manageable CPUs, these can be managed independently of the system idleness threshold by
+using one of the following entries:
+ cpu-threshold threshold
+ cpu-threshold always-on
+where threshold is the value of the CPU idleness threshold in hours, minutes or seconds as indicated by a trailing h,
+m or s (defaulting to seconds if only a number is given). If always-on is specified, then by default, all CPUs are left
+at full power.
+The cpu-threshold keyword is used only when CPU Power Management has been configured to operate in poll-
+mode, which is expressed through the cpupm keyword.
+If no cpu-threshold entry is specified, then the system idleness threshold is used.
+<beginning of page>
+To override the default device component thresholds assigned by the Power Management framework, a device-
+thresholds entry can be used. A device-thresholds entry sets thresholds for a specific automatically power-managed
+device or disables automatic Power Management for the specific device.
+A device-thresholds entry has the form:
+ device-thresholds phys_path (threshold ...) ...
+or
+ device-thresholds phys_path threshold
+or
+ device-thresholds phys_path always-on
+where phys_path specifies the physical path (libdevinfo(3LIB)) of a specific device. For example,
+/pci@8,600000/scsi@4/ssd@w210000203700c3ee,0 specifies the physical path of a disk. A symbolic link into the
+/devices tree, for example /dev/dsk/c1t1d0s0, is also accepted. The thresholds apply (or keeping the device always
+on applies) to the specific device only.
+In the first form above, each threshold value represents the number of hours, minutes or seconds, depending on a
+trailing h, m or s with a default to seconds, to spend idle at the corresponding power level before power is reduced to
+the next lower level of that component. Parentheses are used to group thresholds per component, with the first (left<hy>
+most) group being applied to component 0, the next to component 1, and the like. Within a group, the last (right<hy>
+most) number represents the time to be idle in the highest power level of the component before going to the next-to-
+highest level, while the first (leftmost) number represents the time to be idle in the next-to-lowest power level before
+going to the lowest power level.
+If the number of groups does not match the number of components exported by the device (by means of pm-compo<hy>
+nents(9P) property), or the number of thresholds in a group is not one less than the number of power levels the cor<hy>
+responding component supports, then an error message is printed and the entry is ignored.
+For example, assume a device called xfb exports the components Frame Buffer and Monitor. Component Frame
+Buffer has two power levels: Off and On. Component Monitor has four power levels: Off, Suspend, Standby, and
+On.
+The following device-thresholds entry:
+ device-thresholds /pci@f0000/xfb@0 (0) (3m 5m 15m)
+would set the threshold time for the Monitor component of the specific xfb card to go from On to Standby in 15
+minutes, the threshold for Monitor to go from Standby to Suspendin 5 minutes, and the threshold for Monitor to
+go from Suspend to Off in 3 minutes. The threshold for Frame Buffer to go from On to Off is 0 seconds.
+In the second form above, where a single threshold value is specified without parentheses, the threshold value repre<hy>
+sents a maximum overall time within which the entire device should be powered down if it is idle. Because the sys<hy>
+tem does not know about any internal dependencies there can be among a device's components, the device can actu<hy>
+ally be powered down sooner than the specified threshold, but does take longer than the specified threshold, provided
+that all device components are idle.
+In the third form above, all components of the device are left at full power.
+Device Power Management entries are only effective if there is no user process controlling the device directly. For
+example, X Windows systems directly control frame buffers. The entries in the power.conf file are effective only
+when X Windows is not running.
+Dependencies among devices can also be defined. A device depends upon another if none of its components might
+have their power levels reduced unless all components of the other device are powered off. A dependency can be in<hy>
+dicated by an entry of the form:
+<beginning of page>
+ device-dependency dependent_phys_path phys_path [ phys_path ... ]
+where dependent_phys_path is the path name (as above) of the device that is kept up by the others, and the
+phys_path entries specify the devices that keep it up. A symbolic link into the /devices tree, such as /dev/fb, is also
+accepted. This entry is needed only for logical dependents for the device. A logical dependent is a device that is not
+physically connected to the power managed device (for example, the display and the keyboard). Physical dependents
+are automatically considered and need not be included.
+In addition to listing dependents by physical path, an arbitrary group of devices can be made dependent upon anoth<hy>
+er device by specifying a property dependency using the following syntax:
+ device-dependency-property property phys_path [phys_path ...]
+where each device that exports the property property is kept up by the devices named by phys_path(s). A symbolic
+link into the /devices tree (such as /dev/fb) is accepted as well as a pathname for phys_path.
+For example, the following entry ensures that every device that exports the boolean property named removable-me<hy>
+dia is kept up when the console framebuffer is up. See removable-media(9P).
+ # This entry keeps removable media from being powered down unless the
+ # console framebuffer and monitor are powered down
+ # (See removable-media(9P))
+ #
+ device-dependency-property removable-media /dev/fb
+An autopm entry can be used to enable or disable automatic device Power Management on a system-wide basis.
+The format of the autopm entry is:
+ autopm behavior
+Acceptable behavior values are described as follows:
+default The behavior of the system depends upon its model. Desktop models that fall under the United States Envi<hy>
+ronmental Protection Agency's Energy Star Memorandum of Understanding #3 have automatic device Power Man<hy>
+agement enabled, and all others do not. See the NOTES section of this manual page for more information.
+enable Automatic device Power Management is started when this entry is encountered.
+disable Automatic device Power Management is stopped when this entry is encountered.
+A cpupm entry can be used to enable or disable Power Management of CPUs on a system-wide basis, independent
+of autopm. The format of the cpupm entry is:
+ cpupm behavior
+Acceptable behavior values and their meanings are :
+enable CPU Power Management is started when this entry is encountered.
+Where the behavior is enable, an optional mode argument can be specified:
+ cpupm enable mode
+Acceptable mode values and their meanings are:
+event-mode CPU power state transitions is driven by thread scheduler/dispatcher events. The cpu-threshold, and
+system-threshold keywords are not used for CPUs in this mode.
+<beginning of page>
+poll-mode The Power Management framework polls the idleness of the system's CPUs, and manages their power
+once idle for the period of time specified by either the system-threshold or cpu-threshold.
+disable CPU Power Management is stopped when this entry is encountered.
+If supported by the platform, a cpu_deep_idle entry can be used to enable or disable automatic use of power saving
+cpu idle states. The format of the cpu_deep_idle entry is:
+ cpu_deep_idle behavior
+Acceptable values for behavior are:
+default Advanced cpu idle power saving features are enabled on hardware which supports it. On X86 systems this
+can translate to the use of ACPI C-States beyond C1.
+enable Enables the system to automatically use idle cpu power saving features.
+disable The system does not automatically use idle cpu power saving features. This option can be used when maxi<hy>
+mum performance is required at the expense of power.
+absent It the cpu_deep_idle keyword is absent from power.conf the behavior is the same as the default case.
+Once every device is at its lowest possible power state, additional power savings can be obtained by putting the sys<hy>
+tem into a sleep state (if the platform hardware is capable of doing so).
+Because of reliability problems encountered in BIOS implementations of X86 systems not produced by Sun Mi<hy>
+crosystems, by default, only X86 workstation products produced by Sun are considered to support S3 (suspend to
+RAM). To override this default, an S3-support entry (of the format S3-support behavior) can be used to indicate if
+the system supports S3.
+Acceptable behavior values are:
+enable The system supports entry into S3 state. If the BIOS of a system enabled using an S3-support enable entry
+does not support entry into S3, the attempt fails and the system returns to normal operation. If support for S3 in the
+BIOS of a system enabled via an S3-support entry contains bugs, the system can be unable to enter S3 or resume
+successfully, so use this entry with caution.
+disable The system does not support entry into S3 state.
+If supported by your platform, an autoS3 entry can be used to enable or disable automatic entry into the S3 state.
+When in the S3 state, the power button, keyboard and mouse activity or network traffic (depending upon the capabil<hy>
+ities of the platform hardware) can wake the system, returning it to the state it was in upon entry to the S3 state. If
+the platform doesn't support S3, the entry has no effect.
+The format of the autoS3 entry is autoS3 behavior.
+Acceptable behavior values are:
+default System behavior depends upon model. Sun X86 desktop and workstation models that fall under the United
+States Environmental Protection Agency's Energy Star Memorandum of Understanding #3 have automatic entry into
+the S3 state enabled. Non-Sun systems do not. See NOTES for more information.
+<beginning of page>
+enable Enables the system to automatically enter the S3 state if autopm is enabled and every device is at its lowest
+power state.
+disable The system does not automatically enter the S3 state.
+The system Power Management entries control Power Management of the entire system using the suspend-resume
+feature. When the system is suspended, the complete current state is saved on the disk before power is removed. On
+reboot, the system automatically starts a resume operation and the system is restored to the state it was in prior to
+suspend.
+The system can be configured to do an automatic shutdown (autoshutdown) using the suspend-resume feature by an
+entry of the following form:
+ autoshutdown idle_time start_time finish_time behavior
+idle_time specifies the time in minutes that system must have been idle before it is automatically shutdown. System
+idleness is determined by the inactivity of the system and can be configured as discussed below.
+start_time and finish_time (each in hh:mm) specify the time period during which the system can be automatically
+shutdown. These times are measured from the start of the day (12:00 a.m.). If the finish_time is less than or equal to
+the start_time, the period span from midnight to the finish_time and from the start_time to the following midnight.
+To specify continuous operation, the finish_time can be set equal to the start_time.
+Acceptable behavior values are described as follows:
+shutdown The system is shut down automatically when it has been idle for the number of minutes specified in the
+idle_time value and the time of day falls between the start_time and finish_time values.
+noshutdown The system is never shut down automatically.
+autowakeup If the hardware has the capability to do autowakeup, the system is shut down as if the value were
+shutdown and the system is restarted automatically the next time the time of day equals finish_time.
+default The behavior of the system depends upon its model. Desktop models that fall under the United States Envi<hy>
+ronmental Protection Agency's Energy Star Memorandum of Understanding #2 have automatic shutdown enabled,
+as if behavior field were set to shutdown, and all others do not. See NOTES.
+unconfigured The system does not be shut down automatically. If the system has just been installed or upgraded, the
+value of this field is changed upon the next reboot.
+You can use the following format to configure the system's notion of idleness:
+idleness_parameter value
+Where idleness_parameter can be:
+ttychars If the idleness_parameter is ttychars, the value field is interpreted as the maximum number of tty charac<hy>
+ters that can pass through the ldterm module while still allowing the system to be considered idle. This value de<hy>
+faults to 0 if no entry is provided.
+loadaverage If the idleness_parameter is loadaverage, the (floating point) value field is interpreted as the maxi<hy>
+mum load average that can be seen while still allowing the system to be considered idle. This value defaults to 0.04
+if no entry is provided.
+diskreads If the idleness_parameter is diskreads, the value field is interpreted as the maximum number of disk
+reads that can be perform by the system while still allowing the system to be considered idle. This value defaults to 0
+<beginning of page>
+if no entry is provided.
+nfsreqs If the idleness_parameter is nfsreqs, the value field is interpreted as the maximum number of NFS re<hy>
+quests that can be sent or received by the system while still allowing the system to be considered idle. Null requests,
+access requests, and getattr requests are excluded from this count. This value defaults to 0 if no entry is provided.
+idlecheck If the idleness_parameter is idlecheck, the value must be pathname of a program to be executed to de<hy>
+termine if the system is idle. If autoshutdown is enabled and the console keyboard, mouse, tty, CPU (as indicated
+by load average), network (as measured by NFS requests) and disk (as measured by read activity) have been idle for
+the amount of time specified in the autoshutdown entry specified above, and the time of day falls between the start
+and finish times, then this program is executed to check for other idleness criteria. The value of the idle time speci<hy>
+fied in the above autoshutdown entry is passed to the program in the environment variable PM_IDLETIME. The
+process must terminate with an exit code that represents the number of minutes that the process considers the system
+to have been idle.
+There is no default idlecheck entry.
+When the system is suspended, the current system state is saved on the disk in a statefile. An entry of following form
+can be used to change the location of statefile:
+ statefile pathname
+where pathname identifies a block special file, for example, /dev/dsk/c1t0d0s2, or is the absolute pathname of a lo<hy>
+cal ufs file. If the pathname specifies a block special file, it can be a symbolic link as long as it does not have a file
+system mounted on it. If pathname specifies a local ufs file, it cannot be a symbolic link. If the file does not exist, it
+is created during the suspend operation. All the directory components of the path must already exist.
+The actual size of statefile depends on a variety of factors, including the size of system memory, the number of load<hy>
+able drivers/modules in use, the number and type of processes running, and the amount of user memory that has
+been locked down. It is recommended that statefile be placed on a file system with at least 10 Mbytes of free space.
+In case there is no statefile entry at boot time, an appropriate new entry is automatically created by the system. Ex<hy>
+ample 1 Disabling Automatic Device Power Management
+To disable automatic device Power Management, change the following line in the /etc/power.conf file
+ autopm default
+to read:
+ autopm disable
+Then run pmconfig or reboot. See pmconfig(1M) for more information.
+You can also use dtpower to disable automatic device Power Management. See dtpower(1M) for more information.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUNW<hy>
+pmr _ Interface stability Committed
+pmconfig(1M), powerd(1M), sys-unconfig(1M), uadmin(2), libdevinfo(3LIB), attributes(5), cpr(7), ldterm(7M),
+pm(7D), pm-components(9P), removable-media(9P)
+<beginning of page>
+Writing Device Drivers
+Solaris Common Desktop Environment: User's Guide
+SPARC desktop models first shipped after October 1, 1995 and before July 1, 1999 comply with the United States
+Environmental Protection Agency's Energy Star Memorandum of Understanding #2 guidelines and have autoshut<hy>
+down enabled by default after 30 minutes of system idleness. This is achieved by default keyword of autoshut<hy>
+down entry behave as shutdown for these machines. The user is prompted to confirm this default behavior at system
+installation reboot, or during the first reboot after the system is unconfigured by sys-unconfig(1M).
+SPARC desktop models first shipped after July 1, 1999 comply with the United States Environmental Protection
+Agency's Energy Star Memorandum of Understanding #3 guidelines and have autoshutdown disabled by default,
+with autopm enabled after 30 minutes of idleness. This is achieved by interpreting default keyword of autopm entry
+behavior as enabled for these machines. User is not prompted to confirm this default behavior.
+To determine the version of the EPA's Energy Star Memorandum applicable to your machine, use:
+ prtconf -pv | grep -i energystar
+Absence of a property indicates no Energy Star guidelines are applicable to your machine.
+System Power Management ( suspend-resume) is currently supported only on a limited set of hardware platforms.
+See the Solaris Common Desktop Environment: User's Guide for a complete list of platforms that support system
+Power Management. See uname(2) to programmatically determine if the machine supports suspend-resume.
+Sun X86 desktop models first shipped after July 1, 1999 fall within United States Environmental Protection Agen<hy>
+cy's Energy Star Memorandum of Understanding #3 guidelines and have autopm and autoS3 enabled by default,
+with entry into S3 after 30 minutes of idleness. This is achieved by interpreting the default keyword of the autopm
+and autoS3 behaviors as enabled for these machines. You are not prompted to confirm the default behavior. On all
+other X86 systems, the autopm and autoS3 default keywords are interpreted as disable.

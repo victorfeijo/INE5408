@@ -1,0 +1,339 @@
+<beginning of page>
+cfgadm <-> configuration administration
+/usr/sbin/cfgadm [-f] [-y | -n] [-v] [-o hardware_options]
+ -c function ap_id...
+/usr/sbin/cfgadm [-f] [-y | -n] [-v] [-o hardware_options]
+ -x hardware_function ap_id...
+/usr/sbin/cfgadm [-v] [-a] [-s listing_options]
+ [-o hardware_options] [-l [ap_id | ap_type]]
+/usr/sbin/cfgadm [-v] [-o hardware_options] -t ap_id...
+/usr/sbin/cfgadm [-v] [-o hardware_options] -h
+ [ap_id | ap_type]
+The cfgadm command provides configuration administration operations on dynamically reconfigurable hardware re<hy>
+sources. These operations include displaying status, (-l), initiating testing, (-t), invoking configuration state changes,
+(-c), invoking hardware specific functions, (-x), and obtaining configuration administration help messages (-h). Con<hy>
+figuration administration is performed at attachment points, which are places where system software supports dy<hy>
+namic reconfiguration of hardware resources during continued operation of Solaris.
+Configuration administration makes a distinction between hardware resources that are physically present in the ma<hy>
+chine and hardware resources that are configured and visible to Solaris. The nature of configuration administration
+functions are hardware specific, and are performed by calling hardware specific libraries.
+Configuration administration operates on an attachment point. Hardware resources located at attachment points can
+or can not be physically replaceable during system operation, but are dynamically reconfigurable by way of the con<hy>
+figuration administration interfaces.
+An attachment point defines two unique elements, which are distinct from the hardware resources that exist beyond
+the attachment point. The two elements of an attachment point are a receptacle and an occupant. Physical insertion
+or removal of hardware resources occurs at attachment points and results in a receptacle gaining or losing an occu<hy>
+pant. Configuration administration supports the physical insertion and removal operations as well as other configura<hy>
+tion administration functions at an attachment point.
+Attachment points have associated state and condition information. The configuration administration interfaces pro<hy>
+vide control for transitioning attachment point states. A receptacle can exist in one of three states: empty, discon<hy>
+nected or connected, while an occupant can exist in one of two states: configured or unconfigured.
+A receptacle can provide the empty state, which is the normal state of a receptacle when the attachment point has no
+occupants. A receptacle can also provide the disconnected state if it has the capability of isolating its occupants
+from normal system access. Typically this state is used for various hardware specific testing prior to bringing the oc<hy>
+cupant's resources into full use by the system, or as a step in preparing an occupant for physical removal or reconfig<hy>
+uration. A receptacle in the disconnected state isolates its occupant from the system as much as its hardware allows,
+but can provide access for testing and setup. A receptacle must provide the connected state, which allows normal
+access to hardware resources contained on any occupants. The connected state is the normal state of a receptacle that
+contains an occupant and that is not currently undergoing configuration administration operations.
+The hardware resources contained on an occupant in the unconfigured state are not represented by normal Solaris
+data structures and are thus not available for use by Solaris. Operations allowed on an unconfigured occupant are
+limited to configuration administration operations. The hardware resources of an occupant in the configured state
+are represented by normal Solaris data structures and thus some or all of those hardware resources can be in use by
+Solaris. All occupants provide both the configured and unconfigured states,
+An attachment point can be in one of five conditions: unknown, ok, failing, failed, or unusable. An attachment
+point can enter the system in any condition depending upon results of power-on tests and non-volatile record keep<hy>
+ing.
+An attachment point with an occupant in the configured state is in one of four conditions: unknown, ok, failing, or
+failed. If the condition is not failing or failed an attachment point can change to failing during the course of opera<hy>
+tion if a hardware dependent recoverable error threshold is exceeded. If the condition is not failed an attachment
+point can change to failed during operation as a result of an unrecoverable error.
+An attachment point with an occupant in the unconfigured state can be in any of the defined conditions. The condi<hy>
+tion of an attachment point with an unconfigured occupant can decay from ok to unknown after a machine depen<hy>
+<beginning of page>
+dent time threshold. Initiating a test function changes the attachment point's condition to ok, failing or failed de<hy>
+pending on the outcome of the test. An attachment point that does not provide a test function can leave the attach<hy>
+ment point in the unknown condition. If a test is interrupted, the attachment point's condition can be set to the previ<hy>
+ous condition, unknown or failed. An attachment point in the unknown, ok, failing, or failed conditions can be re-
+tested.
+An attachment point can exist in the unusable condition for a variety of reasons, such as inadequate power or cool<hy>
+ing for the receptacle, an occupant that is unidentifiable, unsupported, incorrectly configured, etc. An attachment
+point in the unusable condition can never be used by the system. It typically remains in this condition until the
+physical cause is remedied.
+An attachment point also maintains busy information that indicates when a state change is in progress or the condi<hy>
+tion is being reevaluated.
+Attachment points are referred to using hardware specific identifiers (ap_ids) that are related to the type and location
+of the attachment points in the system device hierarchy. An ap_id can not be ambiguous, it must identify a single at<hy>
+tachment point. Two types of ap_id specifications are supported: physical and logical. A physical ap_id contains a
+fully specified pathname, while a logical ap_id contains a shorthand notation that identifies an attachment point in a
+more user-friendly way.
+For example, an attachment point representing a system's backplane slot number 7 could have a physical ap_id of
+/devices/central/fhc/sysctrl:slot7 while the logical ap_id could be system:slot7. Another example, the third recep<hy>
+tacle on the second PCI I/O bus on a system could have a logical ap_id of pci2:plug3.
+Attachment points may also be created dynamically. A dynamic attachment point is named relative to a base attach<hy>
+ment point which is present in the system. ap_ids for dynamic attachment points consist of a base component fol<hy>
+lowed by two colons (::) and a dynamic component. The base component is the base attachment point ap_id. The
+dynamic component is hardware specific and generated by the corresponding hardware specific library.
+For example, consider a base attachment point, which represents a SCSI HBA, with the physical ap_id /de<hy>
+vices/sbus@1f,0/SUNW,fas@e,8800000:scsi and logical ap_id c0 . A disk attached to this SCSI HBA could be
+represented by a dynamic attachment point with logical ap_id c0::dsk/c0t0d0 where c0 is the base component and
+dsk/c0t0d0 is the hardware specific dynamic component. Similarly the physical ap_id for this dynamic attachment
+point would be: /devices/sbus@1f,0/SUNW,fas@e,8800000:scsi::dsk/c0t0d0
+An ap_type is a partial form of a logical ap_id that can be ambiguous and not specify a particular attachment point.
+An ap_type is a substring of the portion of the logical ap_id up to but not including the colon (:) separator. For ex<hy>
+ample, an ap_type of pci would show all attachment points whose logical ap_ids begin with pci.
+The use of ap_types is discouraged. The new select sub-option to the -s option provides a more general and flexible
+mechanism for selecting attachment points. See OPTIONS.
+The cfgadm command interacts primarily with hardware dependent functions contained in hardware specific li<hy>
+braries and thus its behavior is hardware dependent.
+For each configuration administration operation a service interruption can be required. Should the completion of the
+function requested require a noticeable service interruption to interactive users, a prompt is output on the standard
+error output for confirmation on the standard input before the function is started. Confirmation can be overridden us<hy>
+ing the -y or -n options to always answer yes or no respectively. Hardware specific options, such as test level, are
+supplied as sub-options using the -o option.
+Operations that change the state of the system configuration are audited by the system log daemon syslogd(1M).
+The arguments for this command conform to the getopt(3C) and getsubopt(3C) syntax convention.
+The following options are supported:
+-a
+Specifies that the -l option must also list dynamic attachment points.
+-cfunction
+Performs the state change function on the attachment point specified by ap_id.
+Specify function as insert, remove, disconnect, connect, configure or unconfigure. These functions cause state
+<beginning of page>
+transitions at the attachment point by calling hardware specific library routines and are defined in the following list.
+insert Performs operations that allows the user to manually insert an occupant or to activate a hardware supplied
+mechanism that performs the physical insertion. insert can have hardware specific side effects that temporarily sus<hy>
+pend activity in portions of the system. In such cases the hardware specific library generates appropriate warning
+messages and informs the user of any special considerations or procedures unique to that hardware. Various hard<hy>
+ware specific errors can cause this function to fail and set the receptacle condition to unusable.
+remove Performs operations that allow the user to manually remove an occupant or to activate a hardware supplied
+mechanism to perform the physical removal. remove can have hardware specific side effects that temporarily sus<hy>
+pend activity in portions of the system. In such cases the hardware specific library generates appropriate warning
+messages and informs the user of any special considerations or procedures unique to that hardware. Various hard<hy>
+ware specific errors can cause this function to fail and set the receptacle condition to unusable.
+disconnect Performs hardware specific operations to put a receptacle in the disconnected state, which can prevent an
+occupant from operating in a normal fashion through the receptacle.
+connect Performs hardware specific operations to put the receptacle in the connected state, which allows an occu<hy>
+pant to operate in a normal fashion through the receptacle.
+configure Performs hardware specific operations that allow an occupant's hardware resources to be usable by So<hy>
+laris. Occupants that are configured are part of the system configuration and are available for manipulation by So<hy>
+laris device manipulation maintenance commands (eg: psradm(1M), mount(1M), ifconfig(1M)).
+unconfigure Performs hardware specific operations that logically remove an occupant's hardware resources from the
+system. The occupant must currently be configured and its hardware resources must not be in use by Solaris.
+State transition functions can fail due to the condition of the attachment point or other hardware dependent consider<hy>
+ations. All state change functions in the direction of adding resources, (insert, connect and configure) are passed
+onto the hardware specific library when the attachment point is in the ok or unknown condition. All other condi<hy>
+tions require the use of the force option to allow these functions to be passed on to the hardware specific library. At<hy>
+tachment point condition does not prevent a hardware specific library being called for related to the removal (re<hy>
+move, disconnect and unconfigure), of hardware resources from the system. Hardware specific libraries can reject
+state change functions if the attachment point is in the unknown condition.
+The condition of an attachment point is not necessarily changed by the state change functions, however errors during
+state change operations can change the attachment point condition. An attempt to override a condition and force a
+state change that would otherwise fail can be made by specifying the force option (-f). Hardware specific safety and
+integrity checks can prevent the force option from having any effect.
+-f
+Forces the specified action to occur. Typically, this is a hardware dependent override of a safety feature. Forcing a
+state change operation can allow use of the hardware resources of occupant that is not in the ok or unknown condi<hy>
+tions, at the discretion of any hardware dependent safety checks.
+-h [ap_id | ap_type ... ]
+Prints out the help message text. If ap_id or ap_type is specified, the help routine of the hardware specific library for
+the attachment point indicated by the argument is called.
+-l [ap_id | ap_type ... ]
+Lists the state and condition of attachment points specified. Attachment points can be filtered by using the -s option
+and select sub-option. Invoking cfgadm without one of the action options is equivalent to -l without an argument.
+The format of the list display is controlled by the -v and -s options. When the -a option is specified attachment
+points are dynamically expanded.
+<beginning of page>
+-n
+Suppress any interactive confirmation and assume that the answer is no. If neither -n or -y is specified, interactive
+confirmation is obtained through the standard error output and the standard input. If either of these standard channels
+does not correspond to a terminal (as determined by isatty(3C)) then the -n option is assumed.
+-ohardware_options
+Supplies hardware specific options to the main command option. The format and content of the hardware option
+string is completely hardware specific. The option string hardware_options conforms to the getsubopt(3C) syntax
+convention.
+-slisting_options
+Supplies listing options to the list (-l) command. listing_options conforms to the getsubopt(3C) syntax convention.
+The sub-options are used to specify the attachment point selection criteria ( select=select_string), the type of match<hy>
+ing desired (match=match_type), order of listing (sort=field_spec), the data that is displayed (cols=field_spec and
+cols2=field_spec), the column delimiter (delim=string) and whether to suppress column headings (noheadings).
+When the select sub-option is specified, only attachment points which match the specified criteria will be listed. The
+select sub-option has the following syntax:
+ cfgadm -s select=attr1(value1):attr2(value2)...
+where an attr is one of ap_id, class or type. ap_id refers to the logical ap_id field, class refers to attachment point
+class and type refers to the type field. value1, value2, etc. are the corresponding values to be matched. The type of
+match can be specified by the match sub-option as follows:
+ cfgadm -s match=match_type,select=attr1(value1)...
+where match_type can be either exact or partial. The default value is exact.
+Arguments to the select sub-option can be quoted to protect them from the shell.
+A field_spec is one or more data-fields concatenated using colon (:), as in data-field:data-field:data-field. A data-
+field is one of ap_id, physid, r_state, o_state, condition, type, busy, status_time, status_time_p, class, and info.
+The ap_id field output is the logical name for the attachment point, while the physid field contains the physical
+name. The r_state field can be empty, disconnected or connected. The o_state field can be configured or uncon<hy>
+figured. The busy field can be either y if the attachment point is busy, or n if it is not. The type and info fields are
+hardware specific. The status_time field provides the time at which either the r_state, o_state, or condition of the
+attachment point last changed. The status_time_p field is a parsable version of the status_time field. If an attach<hy>
+ment point has an associated class, the class field lists the class name. If an attachment point does not have an asso<hy>
+ciated class, the class field lists none.
+The order of the fields in field_spec is significant: For the sort sub-option, the first field given is the primary sort key.
+For the cols and cols2 sub-options, the fields are printed in the order requested. The order of sorting on a data-field
+can be reversed by placing a minus (<mi>) before the data-field name within the field_sec for the sort sub-option. The
+default value for sort is ap_id. The defaults values for cols and cols2 depend on whether the -v option is given:
+Without it cols is ap_id:r_state:o_state:condition and cols2 is not set. With -v cols is ap_id:r_state:o_state:con<hy>
+dition:info and cols2 is status_time:type:busy:physid:. The default value for delim is a single space. The value of
+delim can be a string of arbitrary length. The delimiter cannot include comma (,) character, see getsubopt(3C).
+These listing options can be used to create parsable output. See NOTES.
+-t
+Performs a test of one or more attachment points. The test function is used to re-evaluate the condition of the attach<hy>
+ment point. Without a test level specifier in hardware_options, the fastest test that identifies hard faults is used.
+More comprehensive tests are hardware specific and are selected using the hardware_options.
+The results of the test is used to update the condition of the specified occupant to either ok if no faults are found,
+failing if recoverable faults are found or failed if any unrecoverable faults are found.
+<beginning of page>
+If a test is interrupted, the attachment point's condition can be restored to its previous value or set to unknown if no
+errors were found or failing if only recoverable errors were found or to failed if any unrecoverable errors were
+found. The attachment point should only be set to ok upon normal completion of testing with no errors.
+-v
+Executes in verbose mode. For the -c, -t and -x options outputs a message giving the results of each attempted opera<hy>
+tion. Outputs detailed help information for the -h option. Outputs verbose information for each attachment point for
+the -l option.
+-xhardware_function
+Performs hardware specific functions. Private hardware specific functions can change the state of a receptacle or oc<hy>
+cupant. Attachment point conditions can change as the result of errors encountered during private hardware specific
+functions. The format and content of the hardware_function string is completely hardware specific. The option string
+hardware_function conforms to the getsubopt(3C) syntax convention.
+-y
+Suppresses any interactive confirmation and assume that the answer is yes.
+The required privileges to use this command are hardware dependent. Typically, a default system configuration re<hy>
+stricts all but the list option to the superuser. Example 1 Listing Attachment Points in the Device Tree
+The following example lists all attachment points except dynamic attachment points.
+ example# cfgadm
+  Ap_Id Type Receptacle Occupant Cond
+ system:slot0 cpu/mem connected configured ok
+ system:slot1 sbus-upa connected configured ok
+ system:slot2 cpu/mem connected configured ok
+ system:slot3 unknown connected unconfigured unknown
+ system:slot4 dual-sbus connected configured failing
+ system:slot5 cpu/mem connected configured ok
+ system:slot6 unknown disconnected unconfigured unusable
+ system:slot7 unknown empty unconfigured ok
+ c0 scsi-bus connected configured unknown
+ c1 scsi-bus connected configured unknown
+Example 2 Listing All Configurable Hardware Information
+The following example lists all current configurable hardware information, including those represented by dynamic
+attachment points:
+ example# cfgadm -al
+  Ap_Id Type Receptacle Occupant Cond
+ system:slot0 cpu/mem connected configured ok
+ system:slot1 sbus-upa connected configured ok
+ system:slot2 cpu/mem connected configured ok
+ system:slot3 unknown connected unconfigured unknown
+ system:slot4 dual-sbus connected configured failing
+ system:slot5 cpu/mem connected configured ok
+ system:slot6 unknown disconnected unconfigured unusable
+ system:slot7 unknown empty unconfigured ok
+ c0 scsi-bus connected configured unknown
+ c0::dsk/c0t14d0 disk connected configured unknown
+ c0::dsk/c0t11d0 disk connected configured unknown
+ c0::dsk/c0t8d0 disk connected configured unknown
+ c0::rmt/0 tape connected configured unknown
+<beginning of page>
+ c1 scsi-bus connected configured unknown
+Example 3 Listing Selectively, Based on Attachment Point Attributes
+The following example lists all attachment points whose class begins with scsi, ap_id begins with c and type field
+begins with scsi. The argument to the -s option is quoted to protect it from the shell.
+ example# cfgadm -s "match=partial,select=class(scsi):ap_id(c):type(scsi)"
+ Ap_Id Type Receptacle Occupant Cond
+  c0 scsi-bus connected configured unknown
+  c1 scsi-bus connected configured unknown
+Example 4 Listing Current Configurable Hardware Information in Verbose Mode
+The following example lists current configurable hardware information for ap-type system in verbose mode:
+ example# cfgadm -v -l system
+ Ap_Id Receptacle Occupant Condition Information
+ When Type Busy Phys_Id
+ system:slot1 connected configured ok
+ Apr 4 23:50 sbus-upa n /devices/central/fhc/sysctrl:slot1
+ system:slot3 connected configured ok non-detachable
+ Apr 17 11:20 cpu/mem n /devices/central/fhc/sysctrl:slot3
+ system:slot5 connected configured ok
+ Apr 4 23:50 cpu/mem n /devices/central/fhc/sysctrl:slot5
+ system:slot7 connected configured ok
+ Apr 4 23:50 dual-sbus n /devices/central/fhc/sysctrl:slot7
+The When column represents the status_time field. Example 5 Testing Two Occupants Using the Hardware Spe<hy>
+cific Extended Test
+The following example tests two occupants using the hardware specific extended test:
+ example# cfgadm -v -o extended -t system:slot3 system:slot5
+ Testing attachment point system:slot3 ... ok
+ Testing attachment point system:slot5 ... ok
+Example 6 Configuring an Occupant Using the Force Option
+The following example configures an occupant in the failing state to the system using the force option:
+ example# cfgadm -f -c configure system:slot3
+Example 7 Unconfiguring an Occupant From the System
+The following example unconfigures an occupant from the system:
+ example# cfgadm -c unconfigure system:slot4
+Example 8 Configuring an Occupant at an Attachment Point
+The following example configures an occupant:
+<beginning of page>
+ example# cfgadm -c configure c0::dsk/c0t0d0
+See environ(5) for descriptions of the following environment variables that affect the execution of cfgadm:
+LC_TIME, LC_MESSAGES, NLSPATH and TZ.
+LC_MESSAGES Determines how cfgadm displays column headings and error messages. Listing output data is not
+affected by the setting of this variable.
+LC_TIME Determines how cfgadm displays human readable status changed time (status_time).
+TZ Specifies the timezone used when converting the status changed time. This applies to both the human readable
+(status_time) and parsable (status_time_p) formats.
+The following exit values are returned:
+0 Successful completion.
+1 An error occurred.
+2 Configuration administration not supported on specified target.
+3 Usage error.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu
+cfgadm_fp(1M), cfgadm_ib(1M), cfgadm_pci(1M),cfgadm_sbd(1M), cfgadm_scsi(1M), cfgadm_usb(1M), if<hy>
+config(1M), mount(1M), prtdiag(1M), psradm(1M), syslogd(1M), config_admin(3CFGADM), getopt(3C), get<hy>
+subopt(3C), isatty(3C), attributes(5), environ(5)
+Diagnostic messages appear on the standard error output. Other than options and usage errors, the following are di<hy>
+agnostic messages produced by this utility:
+ cfgadm: Configuration administration not supported onap_id
+ cfgadm: No library found for ap_id
+ cfgadm: ap_idis ambiguous
+ cfgadm: operation: Insufficient privileges
+ cfgadm: Attachment point is busy, try again
+<beginning of page>
+ cfgadm: No attachment points with specified attributes found
+ cfgadm: System is busy, try again
+ cfgadm: operation: Operation requires a service interruption
+ cfgadm: operation: Data error: error_text
+ cfgadm: operation: Hardware specific failure: error_text
+See config_admin(3CFGADM) for additional details regarding error messages.
+Hardware resources enter the unconfigured pool in a hardware specific manner. This can occur at various times such
+as: system initialization or as a result of an unconfigure operation. An occupant that is in the unconfigured state is
+not available for use by the system until specific intervention occurs. This intervention can be manifested as an oper<hy>
+ator initiated command or it can be by way of an automatic configuring mechanism.
+The listing option of the cfgadm command can be used to provide parsable input for another command, for example
+within a shell script. For parsable output, the -s option must be used to select the fields required. The -s option can
+also be used to suppress the column headings. The following fields always produce parsable output: ap_id, physid,
+r_state, o_state, condition, busy status_time_p, class, and type. Parsable output never has white-space characters
+embedded in the field value.
+The following shell script fragment finds the first good unconfigured occupant of type CPU.
+ found=
+ cfgadm -l -s "noheadings,cols=ap_id:r_state:condition:type" | \
+ while read ap_id r_state cond type
+ do
+  if [ "$r_state" = unconfigured -a "$cond" = ok -a "$type" = CPU ]
+  then
+  if [ -z "$found" ]
+  then
+  found=$ap_id
+  fi
+  fi
+ done
+ if [ -n "$found" ]
+ then
+  echo "Found CPU $found"
+ fi
+The format of the parsable time field (status_time_p) is YYYYMMDDhhmmss, giving the year, month, day, hour,
+minute and second in a form suitable for string comparison.
+Reference should be made to the hardware specific documentation for details of System Configuration Administra<hy>
+tion support.

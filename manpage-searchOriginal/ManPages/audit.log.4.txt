@@ -1,0 +1,329 @@
+<beginning of page>
+audit.log <-> audit trail file
+#include <bsm/audit.h>
+#include <bsm/audit_record.h>
+audit.log files are the depository for audit records stored locally or on an on an NFS-mounted audit server. These
+files are kept in directories named in the file audit_control(4) using the dir option. They are named to reflect the
+time they are created and are, when possible, renamed to reflect the time they are closed as well. The name takes the
+form
+yyyymmddhhmmss.not_terminated.hostname
+when open or if the auditd(1M) terminated ungracefully, and the form
+yyyymmddhhmmss.yyyymmddhhmmss.hostname
+when properly closed. yyyy is the year, mm the month, dd day in the month, hh hour in the day, mm minute in the
+hour, and ss second in the minute. All fields are of fixed width.
+Audit data is generated in the binary format described below; the default for Solaris audit is binary format. See au<hy>
+dit_syslog(5) for an alternate data format.
+The audit.log file begins with a standalone file token and typically ends with one also. The beginning file token
+records the pathname of the previous audit file, while the ending file token records the pathname of the next audit
+file. If the file name is NULL the appropriate path was unavailable.
+The audit.log files contains audit records. Each audit record is made up of audit tokens. Each record contains a
+header token followed by various data tokens. Depending on the audit policy in place by auditon(2), optional other
+tokens such as trailers or sequences may be included.
+The tokens are defined as follows:
+The file token consists of:
+ token ID 1 byte
+ seconds of time 4 bytes
+ microseconds of time 4 bytes
+ file name length 2 bytes
+ file pathname N bytes + 1 terminating NULL byte
+The header token consists of:
+ token ID 1 byte
+ record byte count 4 bytes
+ version # 1 byte [2]
+ event type 2 bytes
+ event modifier 2 bytes
+ seconds of time 4 bytes/8 bytes (32-bit/64-bit value)
+ nanoseconds of time 4 bytes/8 bytes (32-bit/64-bit value)
+The expanded header token consists of:
+ token ID 1 byte
+ record byte count 4 bytes
+ version # 1 byte [2]
+ event type 2 bytes
+ event modifier 2 bytes
+ address type/length 1 byte
+ machine address 4 bytes/16 bytes (IPv4/IPv6 address)
+ seconds of time 4 bytes/8 bytes (32/64-bits)
+ nanoseconds of time 4 bytes/8 bytes (32/64-bits)
+<beginning of page>
+The trailer token consists of:
+ token ID 1 byte
+ trailer magic number 2 bytes
+ record byte count 4 bytes
+The arbitrary data token is defined:
+ token ID 1 byte
+ how to print 1 byte
+ basic unit 1 byte
+ unit count 1 byte
+ data items (depends on basic unit)
+The in_addr token consists of:
+ token ID 1 byte
+ IP address type/length 1 byte
+ IP address 4 bytes/16 bytes (IPv4/IPv6 address)
+The expanded in_addr token consists of:
+ token ID 1 byte
+ IP address type/length 4 bytes/16 bytes (IPv4/IPv6 address)
+ IP address 16 bytes
+The ip token consists of:
+ token ID 1 byte
+ version and ihl 1 byte
+ type of service 1 byte
+ length 2 bytes
+ id 2 bytes
+ offset 2 bytes
+ ttl 1 byte
+ protocol 1 byte
+ checksum 2 bytes
+ source address 4 bytes
+ destination address 4 bytes
+The expanded ip token consists of:
+ token ID 1 byte
+ version and ihl 1 byte
+ type of service 1 byte
+ length 2 bytes
+ id 2 bytes
+ offset 2 bytes
+ ttl 1 byte
+ protocol 1 byte
+ checksum 2 bytes
+ address type/type 1 byte
+ source address 4 bytes/16 bytes (IPv4/IPv6 address)
+<beginning of page>
+ address type/length 1 byte
+ destination address 4 bytes/16 bytes (IPv4/IPv6 address)
+The iport token consists of:
+ token ID 1 byte
+ port IP address 2 bytes
+The path token consists of:
+ token ID 1 byte
+ path length 2 bytes
+ path N bytes + 1 terminating NULL byte
+The path_attr token consists of:
+ token ID 1 byte
+ count 4 bytes
+ path count null-terminated string(s)
+The process token consists of:
+ token ID 1 byte
+ audit ID 4 bytes
+ effective user ID 4 bytes
+ effective group ID 4 bytes
+ real user ID 4 bytes
+ real group ID 4 bytes
+ process ID 4 bytes
+ session ID 4 bytes
+ terminal ID 
+  port ID 4 bytes/8 bytes (32-bit/64-bit value)
+  machine address 4 bytes
+The expanded process token consists of:
+ token ID 1 byte
+ audit ID 4 bytes
+ effective user ID 4 bytes
+ effective group ID 4 bytes
+ real user ID 4 bytes
+ real group ID 4 bytes
+ process ID 4 bytes
+ session ID 4 bytes
+ terminal ID 
+  port ID 4 bytes/8 bytes (32-bit/64-bit value)
+  address type/length 1 byte
+  machine address 4 bytes/16 bytes (IPv4/IPv6 address)
+The return token consists of:
+ token ID 1 byte
+ error number 1 byte
+ return value 4 bytes/8 bytes (32-bit/64-bit value)
+<beginning of page>
+The subject token consists of:
+ token ID 1 byte
+ audit ID 4 bytes
+ effective user ID 4 bytes
+ effective group ID 4 bytes
+ real user ID 4 bytes
+ real group ID 4 bytes
+ process ID 4 bytes
+ session ID 4 bytes
+ terminal ID 
+  port ID 4 bytes/8 bytes (32-bit/64-bit value)
+  machine address 4 bytes
+The expanded subject token consists of:
+ token ID 1 byte
+ audit ID 4 bytes
+ effective user ID 4 bytes
+ effective group ID 4 bytes
+ real user ID 4 bytes
+ real group ID 4 bytes
+ process ID 4 bytes
+ session ID 4 bytes
+ terminal ID 
+  port ID 4 bytes/8 bytes (32-bit/64-bit value)
+  address type/length 1 byte
+  machine address 4 bytes/16 bytes (IPv4/IPv6 address)
+The System V IPC token consists of:
+ token ID 1 byte
+ object ID type 1 byte
+ object ID 4 bytes
+The text token consists of:
+ token ID 1 byte
+ text length 2 bytes
+ text N bytes + 1 terminating NULL byte
+The attribute token consists of:
+ token ID 1 byte
+ file access mode 4 bytes
+ owner user ID 4 bytes
+ owner group ID 4 bytes
+ file system ID 4 bytes
+ node ID 8 bytes
+ device 4 bytes/8 bytes (32-bit/64-bit)
+The groups token consists of:
+<beginning of page>
+ token ID 1 byte
+ number groups 2 bytes
+ group list N * 4 bytes
+The System V IPC permission token consists of:
+ token ID 1 byte
+ owner user ID 4 bytes
+ owner group ID 4 bytes
+ creator user ID 4 bytes
+ creator group ID 4 bytes
+ access mode 4 bytes
+ slot sequence # 4 bytes
+ key 4 bytes
+The arg token consists of:
+ token ID 1 byte
+ argument # 1 byte
+ argument value 4 bytes/8 bytes (32-bit/64-bit value)
+ text length 2 bytes
+ text N bytes + 1 terminating NULL byte
+The exec_args token consists of:
+ token ID 1 byte
+ count 4 bytes
+ text count null-terminated string(s)
+The exec_env token consists of:
+ token ID 1 byte
+ count 4 bytes
+ text count null-terminated string(s)
+The exit token consists of:
+ token ID 1 byte
+ status 4 bytes
+ return value 4 bytes
+The socket token consists of:
+ token ID 1 byte
+ socket type 2 bytes
+ remote port 2 bytes
+ remote Internet address 4 bytes
+The expanded socket token consists of:
+ token ID 1 byte
+ socket domain 2 bytes
+<beginning of page>
+ socket type 2 bytes
+ local port 2 bytes
+ address type/length 2 bytes
+ local port 2 bytes
+ local Internet address 4 bytes/16 bytes (IPv4/IPv6 address)
+ remote port 2 bytes
+ remote Internet address 4 bytes/16 bytes (IPv4/IPv6 address)
+The seq token consists of:
+ token ID 1 byte
+ sequence number 4 bytes
+The privilege token consists of:
+ token ID 1 byte
+ text length 2 bytes
+ privilege set name N bytes + 1 terminating NULL byte
+ text length 2 bytes
+ list of privileges N bytes + 1 terminating NULL byte
+The use-of-auth token consists of:
+ token ID 1 byte
+ text length 2 bytes
+ authorization(s) N bytes + 1 terminating NULL byte
+The use-of-privilege token consists of:
+ token ID 1 byte
+ succ/fail 1 byte
+ text length 2 bytes
+ privilege used N bytes + 1 terminating NULL byte
+The command token consists of:
+ token ID 1 byte
+ count of args 2 bytes
+ argument list (count times)
+ text length 2 bytes
+ argument text N bytes + 1 terminating NULL byte
+ count of env strings 2 bytes
+ environment list (count times)
+ text length 2 bytes
+ env. text N bytes + 1 terminating NULL byte
+The ACL token consists of:
+ token ID   1 byte
+ type     4 bytes
+ value    4 bytes
+ file mode    4 bytes
+The ACE token consists of:
+ token ID 1 byte
+ who 4 bytes
+<beginning of page>
+ access_mask 4 bytes
+ flags 2 bytes
+ type 2 bytes
+The zonename token consists of:
+ token ID 1 byte
+ name length 2 bytes
+ name <name length> including terminating NULL byte
+The fmri token consists of:
+ token ID 1 byte
+ fmri length 2 bytes
+ fmri <fmri length> including terminating NULL byte
+The label token consists of:
+ token ID 1 byte
+ label ID 1 byte
+ compartment length 1 byte
+ classification 2 bytes
+ compartment words <compartment length> * 4 bytes
+The xatom token consists of:
+ token ID 1 byte
+ string length 2 bytes
+ atom string string length bytes
+The xclient token consists of:
+ token ID 1 byte
+ client ID 4 bytes
+The xcolormap token consists of:
+ token ID 1 byte
+ XID 4 bytes
+ creator UID 4 bytes
+The xcursor token consists of:
+ token ID 1 byte
+ XID 4 bytes
+ creator UID 4 bytes
+The xfont token consists of:
+ token ID 1 byte
+ XID 4 bytes
+ creator UID 4 bytes
+The xgc token consists of:
+ token ID 1 byte
+ XID 4 bytes
+<beginning of page>
+ creator UID 4 bytes
+The xpixmap token consists of:
+ token ID 1 byte
+ XID 4 bytes
+ creator UID 4 bytes
+The xproperty token consists of:
+ token ID 1 byte
+ XID 4 bytes
+ creator UID 4 bytes
+ string length 2 bytes
+ string string length bytes
+The xselect token consists of:
+ token ID 1 byte
+ property length 2 bytes
+ property string property length bytes
+ prop. type len. 2 bytes
+ prop type prop. type len. bytes
+ data length 2 bytes
+ window data data length bytes
+The xwindow token consists of:
+ token ID 1 byte
+ XID 4 bytes
+ creator UID 4 bytes
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+See below.
+The binary file format is Committed. The binary file contents is Uncommitted.
+audit(1M), auditd(1M), bsmconv(1M), audit(2), auditon(2), au_to(3BSM), audit_control(4), audit_syslog(5)
+Part VII, Solaris Auditing, in System Administration Guide: Security Services
+Each token is generally written using the au_to(3BSM) family of function calls.

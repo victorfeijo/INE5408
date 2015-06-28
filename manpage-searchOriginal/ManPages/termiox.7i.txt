@@ -1,0 +1,143 @@
+<beginning of page>
+termiox <-> extended general terminal interface
+The extended general terminal interface supplements the termio(7I) general terminal interface by adding support for
+asynchronous hardware flow control, isochronous flow control and clock modes, and local implementations of addi<hy>
+tional asynchronous features. Some systems may not support all of these capabilities because of either hardware or
+software limitations. Other systems may not permit certain functions to be disabled. In these cases the appropriate
+bits will be ignored. See <sys/termiox.h> for your system to find out which capabilities are supported.
+Hardware flow control supplements the termio(7I) IXON, IXOFF, and IXANY character flow control. Character
+flow control occurs when one device controls the data transfer of another device by the insertion of control charac<hy>
+ters in the data stream between devices. Hardware flow control occurs when one device controls the data transfer of
+another device using electrical control signals on wires (circuits) of the asynchronous interface. Isochronous hard<hy>
+ware flow control occurs when one device controls the data transfer of another device by asserting or removing the
+transmit clock signals of that device. Character flow control and hardware flow control may be simultaneously set.
+In asynchronous, full duplex applications, the use of the Electronic Industries Association's EIA-232-D Request To
+Send (RTS) and Clear To Send (CTS) circuits is the preferred method of hardware flow control. An interface to
+other hardware flow control methods is included to provide a standard interface to these existing methods.
+The EIA-232-D standard specified only unidirectional hardware flow control - the Data Circuit-terminating Equip<hy>
+ment or Data Communications Equipment (DCE) indicates to the Data Terminal Equipment (DTE) to stop transmit<hy>
+ting data. The termiox interface allows both unidirectional and bidirectional hardware flow control; when bidirec<hy>
+tional flow control is enabled, either the DCE or DTE can indicate to each other to stop transmitting data across the
+interface. Note: It is assumed that the asynchronous port is configured as a DTE. If the connected device is also a
+DTE and not a DCE, then DTE to DTE (for example, terminal or printer connected to computer) hardware flow con<hy>
+trol is possible by using a null modem to interconnect the appropriate data and control circuits.
+Isochronous communication is a variation of asynchronous communication whereby two communicating devices
+may provide transmit and/or receive clock signals to one another. Incoming clock signals can be taken from the baud
+rate generator on the local isochronous port controller, from CCITT V.24 circuit 114, Transmitter Signal Element
+Timing - DCE source (EIA-232-D pin 15), or from CCITT V.24 circuit 115, Receiver Signal Element Timing -
+DCE source (EIA-232-D pin 17). Outgoing clock signals can be sent on CCITT V.24 circuit 113, Transmitter Signal
+Element Timing - DTE source (EIA-232-D pin 24), on CCITT V.24 circuit 128, Receiver Signal Element Timing -
+DTE source (no EIA-232-D pin), or not sent at all.
+In terms of clock modes, traditional asynchronous communication is implemented simply by using the local baud
+rate generator as the incoming transmit and receive clock source and not outputting any clock signals.
+The parameters that control the behavior of devices providing the termiox interface are specified by the termiox
+structure defined in the <sys/termiox.h> header. Several ioctl(2) system calls that fetch or change these parameters
+use this structure:
+ #define NFF 5
+ struct termiox {
+  unsigned short x_hflag; /* hardware flow control modes */
+  unsigned short x_cflag; /* clock modes */
+  unsigned short x_rflag[NFF]; /* reserved modes */
+  unsigned short x_sflag; /* spare local modes */
+ };
+The x_hflag field describes hardware flow control modes:
+tab(); lw(1.28i) lw(1.06i) lw(3.17i) lw(1.28i) lw(1.06i) lw(3.17i) RTSXOFF 0000001T{ Enable RTS hardware flow
+control on input. T} CTSXON 0000002T{ Enable CTS hardware flow control on output. T} DTRXOFF
+0000004T{ Enable DTR hardware flow control on input. T} CDXON 0000010T{ Enable CD hardware flow con<hy>
+trol on output. T} ISXOFF 0000020T{ Enable isochronous hardware flow control on input T}
+The EIA-232-D DTR and CD circuits are used to establish a connection between two systems. The RTS circuit is al<hy>
+so used to establish a connection with a modem. Thus, both DTR and RTS are activated when an asynchronous port
+is opened. If DTR is used for hardware flow control, then RTS must be used for connectivity. If CD is used for hard<hy>
+ware flow control, then CTS must be used for connectivity. Thus, RTS and DTR (or CTS and CD) cannot both be
+used for hardware flow control at the same time. Other mutual exclusions may apply, such as the simultaneous set<hy>
+<beginning of page>
+ting of the termio(7I) HUPCL and the termiox DTRXOFF bits, which use the DTE ready line for different func<hy>
+tions.
+Variations of different hardware flow control methods may be selected by setting the the appropriate bits. For exam<hy>
+ple, bidirectional RTS/CTS flow control is selected by setting both the RTSXOFF and CTSXON bits and bidirec<hy>
+tional DTR/CTS flow control is selected by setting both the DTRXOFF and CTSXON. Modem control or unidirec<hy>
+tional CTS hardware flow control is selected by setting only the CTSXON bit.
+As previously mentioned, it is assumed that the local asynchronous port (for example, computer) is configured as a
+DTE. If the connected device (for example, printer) is also a DTE, it is assumed that the device is connected to the
+computer's asynchronous port using a null modem that swaps control circuits (typically RTS and CTS). The con<hy>
+nected DTE drives RTS and the null modem swaps RTS and CTS so that the remote RTS is received as CTS by the
+local DTE. In the case that CTSXON is set for hardware flow control, printer's lowering of its RTS would cause
+CTS seen by the computer to be lowered. Output to the printer is suspended until the printer's raising of its RTS,
+which would cause CTS seen by the computer to be raised.
+If RTSXOFF is set, the Request To Send (RTS) circuit (line) will be raised, and if the asynchronous port needs to
+have its input stopped, it will lower the Request To Send (RTS) line. If the RTS line is lowered, it is assumed that the
+connected device will stop its output until RTS is raised.
+If CTSXON is set, output will occur only if the Clear To Send (CTS) circuit (line) is raised by the connected device.
+If the CTS line is lowered by the connected device, output is suspended until CTS is raised.
+If DTRXOFF is set, the DTE Ready (DTR) circuit (line) will be raised, and if the asynchronous port needs to have
+its input stopped, it will lower the DTE Ready (DTR) line. If the DTR line is lowered, it is assumed that the connect<hy>
+ed device will stop its output until DTR is raised.
+If CDXON is set, output will occur only if the Received Line Signal Detector (CD) circuit (line) is raised by the
+connected device. If the CD line is lowered by the connected device, output is suspended until CD is raised.
+If ISXOFF is set, and if the isochronous port needs to have its input stopped, it will stop the outgoing clock signal.
+It is assumed that the connected device is using this clock signal to create its output. Transit and receive clock
+sources are programmed using the x_cflag fields. If the port is not programmed for external clock generation, ISX<hy>
+OFF is ignored. Output isochronous flow control is supported by appropriate clock source programming using the
+x_cflag field and enabled at the remote connected device.
+The x_cflag field specifies the system treatment of clock modes.
+tab(); lw(1.5i) lw(.94i) lw(3.06i) lw(1.5i) lw(.94i) lw(3.06i) XMTCLK0000007Transmit clock source: XCI<hy>
+BRG0000000 T{ Get transmit clock from internal baud rate generator. T} XCTSET0000001 T{ Get transmit
+clock from transmitter signal element timing (DCE source) lead, CCITT V.24 circuit 114, EIA-232-D pin 15. T}
+XCRSET0000002 T{ Get transmit clock from receiver signal element timing (DCE source) lead, CCITT V.24 cir<hy>
+cuit 115, EIA-232-D pin 17. T} RCVCLK0000070 Receive clock source: RCIBRG0000000 T{ Get receive clock
+from internal baud rate generator. T} RCTSET0000010 T{ Get receive clock from transmitter signal element tim<hy>
+ing (DCE source) lead, CCITT V.24 circuit 114, EIA-232-D pin 15. T} RCRSET0000020 T{ Get receive clock
+from receiver signal element timing (DCE source) lead, CCITT V.24 circuit 115, EIA-232-D pin 17. T} TSET<hy>
+CLK0000700 T{ Transmitter signal element timing (DTE source) lead, CCITT V.24 circuit 113, EIA-232-D pin
+24, clock source: T} TSETCOFF0000000 TSET clock not provided. TSETCRBRG0000100 T{ Output receive
+baud rate generator on circuit 113. T} TSETCTBRG0000200 T{ Output transmit baud rate generator on circuit
+113 T} TSETCTSET0000300 T{ Output transmitter signal element timing (DCE source) on circuit 113. T}
+TSETCRSET0000400 T{ Output receiver signal element timing (DCE source) on circuit 113. T} RSET<hy>
+CLK0007000 T{ Receiver signal element timing (DTE source) lead, CCITT V.24 circuit 128, no EIA-232-D pin,
+clock source: T} RSETCOFF0000000 RSET clock not provided. RSETCRBRG0001000 T{ Output receive baud
+rate generator on circuit 128. T} RSETCTBRG0002000 T{ Output transmit baud rate generator on circuit 128.
+T} RSETCTSET0003000 T{ Output transmitter signal element timing (DCE source) on circuit 128. T}
+RSETCRSET0004000 T{ Output receiver signal element timing (DCE) on circuit 128. T}
+If the XMTCLK field has a value of XCIBRG the transmit clock is taken from the hardware internal baud rate gen<hy>
+erator, as in normal asynchronous transmission. If XMTCLK = XCTSET the transmit clock is taken from the
+Transmitter Signal Element Timing (DCE source) circuit. If XMTCLK = XCRSET the transmit clock is taken from
+the Receiver Signal Element Timing (DCE source) circuit.
+If the RCVCLK field has a value of RCIBRG the receive clock is taken from the hardware Internal Baud Rate Gen<hy>
+<beginning of page>
+erator, as in normal asynchronous transmission. If RCVCLK = RCTSET the receive clock is taken from the Trans<hy>
+mitter Signal Element Timing (DCE source) circuit. If RCVCLK = RCRSET the receive clock is taken from the
+Receiver Signal Element Timing (DCE source) circuit.
+If the TSETCLK field has a value of TSETCOFF the Transmitter Signal Element Timing (DTE source) circuit is
+not driven. If TSETCLK = TSETCRBRG the Transmitter Signal Element Timing (DTE source) circuit is driven by
+the Receive Baud Rate Generator. If TSETCLK = TSETCTBRG the Transmitter Signal Element Timing (DTE
+source) circuit is driven by the Transmit Baud Rate Generator. If TSETCLK = TSETCTSET the Transmitter Sig<hy>
+nal Element Timing (DTE source) circuit is driven by the Transmitter Signal Element Timing (DCE source). If
+TSETCLK = TSETCRBRG the Transmitter Signal Element Timing (DTE source) circuit is driven by the Receiver
+Signal Element Timing (DCE source).
+If the RSETCLK field has a value of RSETCOFF the Receiver Signal Element Timing (DTE source) circuit is not
+driven. If RSETCLK = RSETCRBRG the Receiver Signal Element Timing (DTE source) circuit is driven by the
+Receive Baud Rate Generator. If RSETCLK = RSETCTBRG the Receiver Signal Element Timing (DTE source)
+circuit is driven by the Transmit Baud Rate Generator. If RSETCLK = RSETCTSET the Receiver Signal Element
+Timing (DTE source) circuit is driven by the Transmitter Signal Element Timing (DCE source). If RSETCLK =
+RSETCRBRG the Receiver Signal Element Timing (DTE source) circuit is driven by the Receiver Signal Element
+Timing (DCE source).
+The x_rflag is reserved for future interface definitions and should not be used by any implementations. The x_sflag
+may be used by local implementations wishing to customize their terminal interface using the termiox ioctl system
+calls.
+The ioctl(2) system calls have the form:
+ ioctl (fildes, command, arg) struct termiox * arg;
+The commands using this form are:
+TCGETX The argument is a pointer to a termiox structure. The current terminal parameters are fetched and stored
+into that structure.
+TCSETX The argument is a pointer to a termiox structure. The current terminal parameters are set from the values
+stored in that structure. The change is immediate.
+TCSETXW The argument is a pointer to a termiox structure. The current terminal parameters are set from the val<hy>
+ues stored in that structure. The change occurs after all characters queued for output have been transmitted. This
+form should be used when changing parameters that will affect output.
+TCSETXF The argument is a pointer to a termiox structure. The current terminal parameters are set from the val<hy>
+ues stored in that structure. The change occurs after all characters queued for output have been transmitted; all char<hy>
+acters queued for input are discarded and then the change occurs.
+/dev/*
+stty(1), ioctl(2), termio(7I)
+The termiox(7I) system call is provided for compatibility with previous releases and its use is discouraged. In<hy>
+stead, the termio(7I) system call is recommended. See termio(7I) for usage information.

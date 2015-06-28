@@ -1,0 +1,277 @@
+<beginning of page>
+th_define <-> create fault injection test harness error specifications
+th_define [-n name -i instance| -P path] [-a acc_types]
+ [-r reg_number] [-l offset [length]]
+ [-c count [failcount]] [-o operator [operand]]
+ [-f acc_chk] [-w max_wait_period [report_interval]]
+or
+th_define [-n name -i instance| -P path]
+ [-a log [acc_types] [-r reg_number] [-l offset [length]]]
+ [-c count [failcount]] [-s collect_time] [-p policy]
+ [-x flags] [-C comment_string]
+ [-e fixup_script [args]]
+or
+th_define [-h]
+The th_define utility provides an interface to the bus_ops fault injection bofi device driver for defining error injec<hy>
+tion specifications (referred to as errdefs). An errdef corresponds to a specification of how to corrupt a device driv<hy>
+er's accesses to its hardware. The command line arguments determine the precise nature of the fault to be injected. If
+the supplied arguments define a consistent errdef, the th_define process will store the errdef with the bofi driver and
+suspend itself until the criteria given by the errdef become satisfied (in practice, this will occur when the access
+counts go to zero).
+You use the th_manage(1M) command with the start option to activate the resulting errdef. The effect of th_man<hy>
+age with the start option is that the bofi driver acts upon the errdef by matching the number of hardware accesses<em>
+specified in count, that are of the type specified in acc_types, made by instance number instance<em>of the driver
+whose name is name, (or by the driver instance specified by path) to the register set (or DMA handle) specified by
+reg_number, that lie within the range offset to offset + length from the beginning of the register set or DMA handle.
+It then applies operator and operand to the next failcount matching accesses.
+If acc_types includes log, th_define runs in automatic test script generation mode, and a set of test scripts (written in
+the Korn shell) is created and placed in a sub-directory of the current directory with the name <driver>.test.<id>
+(for example, glm.test.978177106). A separate, executable script is generated for each access handle that matches
+the logging criteria. The log of accesses is placed at the top of each script as a record of the session. If the current di<hy>
+rectory is not writable, file output is written to standard output. The base name of each test file is the driver name,
+and the extension is a number that discriminates between different access handles. A control script (with the same
+name as the created test directory) is generated that will run all the test scripts sequentially.
+Executing the scripts will install, and then activate, the resulting error definitions. Error definitions are activated se<hy>
+quentially and the driver instance under test is taken offline and brought back online before each test (refer to the -e
+option for more information). By default, logging applies to all PIO accesses, all interrupts, and all DMA accesses
+to and from areas mapped for both reading and writing. You can constrain logging by specifying additional
+acc_types, reg_number, offset and length. Logging will continue for count matching accesses, with an optional time
+limit of collect_time seconds.
+Either the -n or -P option must be provided. The other options are optional. If an option (other than -a) is specified
+multiple times, only the final value for the option is used. If an option is not specified, its associated value is set to an
+appropriate default, which will provide maximal error coverage as described below.
+The following options are available:
+-n name
+Specify the name of the driver to test. (String)
+-i instance
+Test only the specified driver instance (-1 matches all instances of driver). (Numeric)
+-P path
+Specify the full device path of the driver to test. (String)
+<beginning of page>
+-r reg_number
+Test only the given register set or DMA handle (-1 matches all register sets and DMA handles). (Numeric)
+-a acc_types
+Only the specified access types will be matched. Valid values for the acc_types argument are log, pio, pio_r, pio_w,
+dma, dma_r, dma_w and intr. Multiple access types, separated by spaces, can be specified. The default is to match
+all hardware accesses.
+If acc_types is set to log, logging will match all PIO accesses, interrupts and DMA accesses to and from areas
+mapped for both reading and writing. log can be combined with other acc_types, in which case the matching condi<hy>
+tion for logging will be restricted to the specified addional acc_types. Note that dma_r will match only DMA han<hy>
+dles mapped for reading only; dma_w will match only DMA handles mapped for writing only; dma will match only
+DMA handles mapped for both reading and writing.
+-l offset [length]
+Constrain the range of qualifying accesses. The offset and length arguments indicate that any access of the type spec<hy>
+ified with the -a option, to the register set or DMA handle specified with the -r option, lie at least offset bytes into
+the register set or DMA handle and at most offset + length bytes into it. The default for offset is 0. The default for
+length is the maximum value that can be placed in an offset_t C data type (see types.h). Negative values are convert<hy>
+ed into unsigned quantities. Thus, th_define -l 0 -1 is maximal.
+-c count[failcount]
+Wait for count number of matching accesses, then apply an operator and operand (see the -o option) to the next fail<hy>
+count number of matching accesses. If the access type (see the -a option) includes logging, the number of logged ac<hy>
+cesses is given by count + failcount - 1. The -1 is required because the last access coincides with the first faulting ac<hy>
+cess.
+Note that access logging may be combined with error injection if failcount and operator are nonzero and if the ac<hy>
+cess type includes logging and any of the other access types (pio, dma and intr) See the description of access types
+in the definition of the -a option, above.
+When the count and failcount fields reach zero, the status of the errdef is reported to standard output. When all active
+errdefs created by the th_define process complete, the process exits. If acc_types includes log, count determines
+how many accesses to log. If count is not specified, a default value is used. If failcount is set in this mode, it will
+simply increase the number of accesses logged by a further failcount - 1.
+-o operator [operand]
+For qualifying PIO read and write accesses, the value read from or written to the hardware is corrupted according to
+the value of operator:
+EQ operand is returned to the driver.
+OR operand is bitwise ORed with the real value.
+AND operand is bitwise ANDed with the real value.
+XOR operand is bitwise XORed with the real value.
+For PIO write accesses, the following operator is allowed:
+NO Simply ignore the driver's attempt to write to the hardware.
+Note that a driver performs PIO via the ddi_getX(), ddi_putX(), ddi_rep_getX() and ddi_rep_putX() routines
+(where X is 8, 16, 32 or 64). Accesses made using ddi_getX() and ddi_putX() are treated as a single access, whereas
+an access made using the ddi_rep_*(9F) routines are broken down into their respective number of accesses, as given
+<beginning of page>
+by the repcount parameter to these DDI calls. If the access is performed via a DMA handle, operator and value are
+applied to every access that comprises the DMA request. If interference with interrupts has been requested then the
+operator may take any of the following values:
+DELAY After count accesses (see the -c option), delay delivery of the next failcount number of interrupts for oper<hy>
+and number of microseconds.
+LOSE After count number of interrupts, fail to deliver the next failcount number of real interrupts to the driver.
+EXTRA After count number of interrupts, start delivering operand number of extra interrupts for the next failcount
+number of real interrupts.
+The default value for operand and operator is to corrupt the data access by flipping each bit (XOR with -1).
+-f acc_chk
+If the acc_chk parameter is set to 1 or pio, then the driver's calls to ddi_check_acc_handle(9F) return DDI_FAIL<hy>
+URE when the access count goes to 1. If the acc_chk parameter is set to 2 or dma, then the driver's calls to
+ddi_check_dma_handle(9F) return DDI_FAILURE when the access count goes to 1.
+-w max_wait_period [report_interval]
+Constrain the period for which an error definition will remain active. The option applies only to non-logging errdefs.
+If an error definition remains active for max_wait_period seconds, the test will be aborted. If report_interval is set to
+a nonzero value, the current status of the error definition is reported to standard output every report_interval sec<hy>
+onds. The default value is zero. The status of the errdef is reported in parsable format (eight fields, each separated by
+a colon (:) character, the last of which is a string enclosed by double quotes and the remaining seven fields are inte<hy>
+gers):
+ft:mt:ac:fc:chk:ec:s:"message" which are defined as follows:
+ft The UTC time when the fault was injected.
+mt The UTC time when the driver reported the fault.
+ac The number of remaining non-faulting accesses.
+fc The number of remaining faulting accesses.
+chk The value of the acc_chk field of the errdef.
+ec The number of fault reports issued by the driver against this errdef (mt holds the time of the initial report).
+s The severity level reported by the driver.
+"message" Textual reason why the driver has reported a fault.
+-h
+Display the command usage string.
+-s collect_time
+If acc_types is given with the -a option and includes log, the errdef will log accesses for collect_time seconds (the
+<beginning of page>
+default is to log until the log becomes full). Note that, if the errdef specification matches multiple driver handles,
+multiple logging errdefs are registered with the bofi driver and logging terminates when all logs become full or when
+collect_time expires or when the associated errdefs are cleared. The current state of the log can be checked with the
+th_manage(1M) command, using the broadcast parameter. A log can be terminated by running th_manage(1M)
+with the clear_errdefs option or by sending a SIGALRM signal to the th_define process. See alarm(2) for the se<hy>
+mantics of SIGALRM.
+-p policy
+Applicable when the acc_types option includes log. The parameter modifies the policy used for converting from
+logged accesses to errdefs. All policies are inclusive: <bu> Use rare to bias error definitions toward rare accesses (de<hy>
+fault). <bu> Use operator to produce a separate error definition for each operator type (default). <bu> Use common to bias
+error definitions toward common accesses. <bu> Use median to bias error definitions toward median accesses. <bu> Use
+maximal to produce multiple error definitions for duplicate accesses. <bu> Use unbiased to create unbiased error defi<hy>
+nitions. <bu> Use onebyte, twobyte, fourbyte, or eightbyte to select errdefs corresponding to 1, 2, 4 or 8 byte accesses
+(if chosen, the -xr option is enforced in order to ensure that ddi_rep_*() calls are decomposed into multiple single
+accesses). <bu> Use multibyte to create error definitions for multibyte accesses performed using ddi_rep_get*() and
+ddi_rep_put*(). Policies can be combined by adding together these options. See the NOTES section for further in<hy>
+formation.
+-x flags
+Applicable when the acc_types option includes log. The flags parameter modifies the way in which the bofi driver
+logs accesses. It is specified as a string containing any combination of the following letters:
+w Continuous logging (that is, the log will wrap when full).
+t Timestamp each log entry (access times are in seconds).
+r Log repeated I/O as individual accesses (for example, a ddi_rep_get16(9F) call which has a repcount of N is
+logged N times with each transaction logged as size 2 bytes. Without this option, the default logging behavior is to
+log this access once only, with a transaction size of twice the repcount).
+-C comment_string
+Applicable when the acc_types option includes log. It provides a comment string to be placed in any generated test
+scripts. The string must be enclosed in double quotes.
+-e fixup_script [args]
+Applicable when the acc_types option includes log. The output of a logging errdefs is to generate a test script for
+each driver access handle. Use this option to embed a command in the resulting script before the errors are injected.
+The generated test scripts will take an instance offline and bring it back online before injecting errors in order to
+bring the instance into a known fault-free state. The executable fixup_script will be called twice with the set of op<hy>
+tional args<em> once just before the instance is taken offline and again after the instance has been brought online. The
+following variables are passed into the environment of the called executable:
+DRIVER_PATH Identifies the device path of the instance.
+DRIVER_INSTANCE Identifies the instance number of the device.
+DRIVER_UNCONFIGURE Has the value 1 when the instance is about to be taken offline.
+DRIVER_CONFIGURE Has the value 1 when the instance has just been brought online.
+Typically, the executable ensures that the device under test is in a suitable state to be taken offline (unconfigured) or
+in a suitable state for error injection (for example configured, error free and servicing a workload). A minimal script
+for a network driver could be:
+<beginning of page>
+ #!/bin/ksh
+ driver=xyznetdriver
+ ifnum=$driver$DRIVER_INSTANCE
+ if [[ $DRIVER_CONFIGURE = 1 ]]; then
+  ifconfig $ifnum plumb
+  ifconfig $ifnum ...
+  ifworkload start $ifnum
+ elif [[ $DRIVER_UNCONFIGURE = 1 ]]; then
+  ifworkload stop $ifnum
+  ifconfig $ifnum down
+  ifconfig $ifnum unplumb
+ fi
+ exit $?
+The -e option must be the last option on the command line.
+If the -a log option is selected but the -e option is not given, a default script is used. This script repeatedly attempts
+to detach and then re-attach the device instance under test.
+th_define -n foo -i 1 -a log
+Logs all accesses to all handles used by instance 1 of the foo driver while running the default workload (attaching
+and detaching the instance). Then generates a set of test scripts to inject appropriate errdefs while running that de<hy>
+fault workload.
+th_define -n foo -i 1 -a log pio
+Logs PIO accesses to each PIO handle used by instance 1 of the foo driver while running the default workload (at<hy>
+taching and detaching the instance). Then generates a set of test scripts to inject appropriate errdefs while running
+that default workload.
+th_define -n foo -i 1 -p onebyte median -e fixup arg -now
+Logs all accesses to all handles used by instance 1 of the foo driver while running the workload defined in the fixup
+script fixup with arguments arg and -now. Then generates a set of test scripts to inject appropriate errdefs while run<hy>
+ning that workload. The resulting error definitions are requested to focus upon single byte accesses to locations that
+are accessed a median number of times with respect to frequency of access to I/O addresses.
+th_define -n se -l 0x20 1 -a pio_r -o OR 0x4 -c 10 1000
+Simulates a stuck serial chip command by forcing 1000 consecutive read accesses made by any instance of the se
+driver to its command status register, thereby returning status busy.
+th_define -n foo -i 3 -r 1 -a pio_r -c 0 1 -f 1 -o OR 0x100
+Causes 0x100 to be ORed into the next physical I/O read access from any register in register set 1 of instance 3 of
+the foo driver. Subsequent calls in the driver to ddi_check_acc_handle() return DDI_FAILURE.
+th_define -n foo -i 3 -r 1 -a pio_r -c 0 1 -o OR 0x0
+Causes 0x0 to be ORed into the next physical I/O read access from any register in register set 1 of instance 3 of the
+foo driver. This is of course a no-op.
+th_define -n foo -i 3 -r 1 -l 0x8100 1 -a pio_r -c 0 10 -o EQ 0x70003
+Causes the next ten next physical I/O reads from the register at offset 0x8100 in register set 1 of instance 3 of the foo
+driver to return 0x70003.
+th_define -n foo -i 3 -r 1 -l 0x8100 1 -a pio_w -c 100 3 -o AND 0xffffffffffffefff
+The next 100 physical I/O writes to the register at offset 0x8100 in register set 1 of instance 3 of the foo driver take
+<beginning of page>
+place as normal. However, on each of the three subsequent accesses, the 0x1000 bit will be cleared.
+th_define -n foo -i 3 -r 1 -l 0x8100 0x10 -a pio_r -c 0 1 -f 1 -o XOR 7
+Causes the bottom three bits to have their values toggled for the next physical I/O read access to registers with off<hy>
+sets in the range 0x8100 to 0x8110 in register set 1 of instance 3 of the foo driver. Subsequent calls in the driver to
+ddi_check_acc_handle() return DDI_FAILURE.
+th_define -n foo -i 3 -a pio_w -c 0 1 -o NO 0
+Prevents the next physical I/O write access to any register in any register set of instance 3 of the foo driver from go<hy>
+ing out on the bus.
+th_define -n foo -i 3 -l 0 8192 -a dma_r -c 0 1 -o OR 7
+Causes 0x7 to be ORed into each long long in the first 8192 bytes of the next DMA read, using any DMA handle for
+instance 3 of the foo driver.
+th_define -n foo -i 3 -r 2 -l 0 8 -a dma_r -c 0 1 -o OR 0x7070707070707070
+Causes 0x70 to be ORed into each byte of the first long long of the next DMA read, using the DMA handle with se<hy>
+quential allocation number 2 for instance 3 of the foo driver.
+th_define -n foo -i 3 -l 256 256 -a dma_w -c 0 1 -f 2 -o OR 7
+Causes 0x7 to be ORed into each long long in the range from offset 256 to offset 512 of the next DMA write, using
+any DMA handle for instance 3 of the foo driver. Subsequent calls in the driver to ddi_check_dma_handle() return
+DDI_FAILURE.
+th_define -n foo -i 3 -r 0 -l 0 8 -a dma_w -c 100 3 -o AND 0xffffffffffffefff
+The next 100 DMA writes using the DMA handle with sequential allocation number 0 for instance 3 of the foo driv<hy>
+er take place as normal. However, on each of the three subsequent accesses, the 0x1000 bit will be cleared in the first
+long long of the transfer.
+th_define -n foo -i 3 -a intr -c 0 6 -o LOSE 0
+Causes the next six interrupts for instance 3 of the foo driver to be lost.
+th_define -n foo -i 3 -a intr -c 30 1 -o EXTRA 10
+When the thirty-first subsequent interrupt for instance 3 of the foo driver occurs, a further ten interrupts are also gen<hy>
+erated.
+th_define -n foo -i 3 -a intr -c 0 1 -o DELAY 1024
+Causes the next interrupt for instance 3 of the foo driver to be delayed by 1024 microseconds.
+The policy option in the th_define -p syntax determines how a set of logged accesses will be converted into the set
+of error definitions. Each logged access will be matched against the chosen policies to determine whether an error
+definition should be created based on the access.
+Any number of policy options can be combined to modify the generated error definitions.
+These select particular I/O transfer sizes. Specifing a byte policy will exclude other byte policies that have not been
+chosen. If none of the byte type policies is selected, all transfer sizes are treated equally. Otherwise, only those spec<hy>
+ified transfer sizes will be selected.
+onebyte Create errdefs for one byte accesses (ddi_get8())
+twobyte Create errdefs for two byte accesses (ddi_get16())
+fourbyte Create errdefs for four byte accesses (ddi_get32())
+<beginning of page>
+eightbyte Create errdefs for eight byte accesses (ddi_get64())
+multibyte Create errdefs for repeated byte accesses (ddi_rep_get*())
+The frequency of access to a location is determined according to the access type, location and transfer size (for ex<hy>
+ample, a two-byte read access to address A is considered distinct from a four-byte read access to address A). The al<hy>
+gorithm is to count the number of accesses (of a given type and size) to a given location, and find the locations that
+were most and least accessed (let maxa and mina be the number of times these locations were accessed, and mean
+the total number of accesses divided by total number of locations that were accessed). Then a rare access is a loca<hy>
+tion that was accessed less than
+(mean - mina) / 3 + mina
+times. Similarly for the definition of common accesses:
+maxa - (maxa - mean) / 3
+A location whose access patterns lies within these cutoffs is regarded as a location that is accessed with median fre<hy>
+quency.
+rare Create errdefs for locations that are rarely accessed.
+common Create errdefs for locations that are commonly accessed.
+median Create errdefs for locations that are accessed a median frequency.
+If a transaction is duplicated, either a single or multiple errdefs will be written to the test scripts, depending upon the
+following two policies:
+maximal Create multiple errdefs for locations that are repeatedly accessed.
+unbiased Create a single errdef for locations that are repeatedly accessed.
+operators For each location, a default operator and operand is typically applied. For maximal test coverage, this de<hy>
+fault may be modified using the operators policy so that a separate errdef is created for each of the possible corrup<hy>
+tion operators.
+kill(1), th_manage(1M), alarm(2), ddi_check_acc_handle(9F), ddi_check_dma_handle(9F)

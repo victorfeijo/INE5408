@@ -1,0 +1,83 @@
+<beginning of page>
+getprotobyname, getprotobyname_r, getprotobynumber, getprotobynumber_r, getprotoent, getprotoent_r, setpro<hy>
+toent, endprotoent <-> get protocol entry
+cc [ flag ... ] file ... -lsocket -lnsl [ library ... ]
+#include <netdb.h>
+struct protoent *getprotobyname(const char *name);
+struct protoent *getprotobyname_r(const char *name,
+ struct protoent *result, char *buffer,
+ int buflen);
+struct protoent *getprotobynumber(int proto);
+struct protoent *getprotobynumber_r(int proto, struct protoent *result,
+ char *buffer, int buflen);
+struct protoent *getprotoent(void);
+struct protoent *getprotoent_r(struct protoent *result, char *buffer,
+ int buflen);
+int setprotoent(int stayopen);
+int endprotoent(void);
+These functions return a protocol entry. Two types of interfaces are supported: reentrant (getprotobyname_r(), get<hy>
+protobynumber_r(), and getprotoent_r()) and non-reentrant (getprotobyname(), getprotobynumber(), and get<hy>
+protoent()). The reentrant functions can be used in single-threaded applications and are safe for multithreaded appli<hy>
+cations, making them the preferred interfaces.
+The reentrant routines require additional parameters which are used to return results data. result is a pointer to a
+struct protoent structure and will be where the returned results will be stored. buffer is used as storage space for el<hy>
+ements of the returned results. buflen is the size of buffer and should be large enough to contain all returned data. bu<hy>
+flen must be at least 1024 bytes.
+getprotobyname_r(), getprotobynumber_r(), and getprotoent_r() each return a protocol entry.
+The entry may come from one of the following sources: the protocols file (see protocols(4)), the NIS maps ``proto<hy>
+cols.byname'' and ``protocols.bynumber'', and the NIS+ table ``protocols''. The sources and their lookup order are
+specified in the /etc/nsswitch.conf file (see nsswitch.conf(4) for details). Some name services such as NIS will re<hy>
+turn only one name for a host, whereas others such as NIS+ or DNS will return all aliases.
+The getprotobyname_r() and getprotobynumber_r() functions sequentially search from the beginning of the file
+until a matching protocol name or protocol number is found, or until an EOF is encountered.
+getprotobyname() and getprotobynumber() have the same functionality as getprotobyname_r() and getproto<hy>
+bynumber_r() except that a static buffer is used to store returned results. These functions are Unsafe in a multi<hy>
+threaded application.
+getprotoent_r() enumerates protocol entries: successive calls to getprotoent_r() will return either successive proto<hy>
+col entries or NULL. Enumeration might not be supported by some sources. If multiple threads call getprotoent_r(),
+each will retrieve a subset of the protocol database.
+getprotent() has the same functionality as getprotent_r() except that a static buffer is used to store returned results.
+This routine is unsafe in a multithreaded application.
+setprotoent() "rewinds" to the beginning of the enumeration of protocol entries. If the stayopen flag is non-zero, re<hy>
+sources such as open file descriptors are not deallocated after each call to getprotobynumber_r() and getprotoby<hy>
+name_r(). Calls to getprotobyname_r() , The getprotobyname(), getprotobynumber_r(), and getprotobynum<hy>
+ber() functions might leave the enumeration in an indeterminate state, so setprotoent() should be called before the
+first call to getprotoent_r() or getprotoent(). The setprotoent() function has process-wide scope, and ``rewinds''
+the protocol entries for all threads calling getprotoent_r() as well as main-thread calls to getprotoent().
+The endprotoent() function can be called to indicate that protocol processing is complete; the system may then
+close any open protocols file, deallocate storage, and so forth. It is legitimate, but possibly less efficient, to call more
+<beginning of page>
+protocol functions after endprotoent().
+The internal representation of a protocol entry is a protoent structure defined in <netdb.h> with the following mem<hy>
+bers:
+ char *p_name;
+ char **p_aliases;
+ int p_proto;
+The getprotobyname_r(), getprotobyname(), getprotobynumber_r(), and getprotobynumber() functions return
+a pointer to a struct protoent if they successfully locate the requested entry; otherwise they return NULL.
+The getprotoent_r() and getprotoent() functions return a pointer to a struct protoent if they successfully enumer<hy>
+ate an entry; otherwise they return NULL, indicating the end of the enumeration.
+The getprotobyname_r(), getprotobynumber_r(), and getprotoent_r() functions will fail if:
+ERANGE The length of the buffer supplied by the caller is not large enough to store the result.
+/etc/protocols
+/etc/nsswitch.conf
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelSee
+NOTES below.
+Intro(3), nsswitch.conf(4), protocols(4), attributes(5), netdb.h(3HEAD)
+Although getprotobyname_r(), getprotobynumber_r(), and getprotoent_r() are not mentioned by POSIX
+1003.1:2001, they were added to complete the functionality provided by similar thread-safe functions.
+When compiling multithreaded applications, see Intro(3), Notes On Multithread Applications, for information
+about the use of the _REENTRANT flag.
+The getprotobyname_r(), getprotobynumber_r(), and getprotoent_r() functions are reentrant and multithread
+safe. The reentrant interfaces can be used in single-threaded as well as multithreaded applications and are therefore
+the preferred interfaces.
+The getprotobyname(), getprotobyaddr(), and getprotoent() functions use static storage, so returned data must be
+copied if it is to be saved. Because of their use of static storage for returned data, these functions are not safe for
+multithreaded applications.
+The setprotoent() and endprotoent() functions have process-wide scope, and are therefore not safe in multi-thread<hy>
+ed applications.
+Use of getprotoent_r() and getprotoent() is discouraged; enumeration is well-defined for the protocols file and is
+supported (albeit inefficiently) for NIS and NIS+, but in general may not be well-defined. The semantics of enumer<hy>
+ation are discussed in nsswitch.conf(4).
+Only the Internet protocols are currently understood.

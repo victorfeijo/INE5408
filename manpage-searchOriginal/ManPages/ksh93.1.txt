@@ -1,0 +1,1772 @@
+<beginning of page>
+ksh93, rksh93 <-> Korn Shell, a standard and restricted command and programming language
+ksh93 [<+->abcefhikmnoprstuvxBCD] [-R file] [ <+->o option] ...
+ [-] [arg ...]
+rksh93 [<+->abcefhikmnoprstuvxBCD] [-R file] [<+->o option] ...
+ [-] [arg ...]
+ksh93 is a command and programming language that executes commands read from a terminal or a file. rksh93 is a
+restricted version of the command interpreter ksh93. rksh93 is used to set up login names and execution environ<hy>
+ments whose capabilities are more controlled than those of the standard shell.
+See Invocation for the meaning of arguments to the shell.
+A metacharacter is defined as one of the following characters:
+ ; & ( ) | < > NEWLINE SPACE TAB
+A blank is a TAB or a SPACE.
+An identifier is a sequence of letters, digits, or underscores starting with a letter or underscore. Identifiers are used as
+components of variable names.
+A vname is a sequence of one or more identifiers separated by a period (.) and optionally preceded by a period (.).
+vnames are used as function and variable names.
+A word is a sequence of characters from the character set defined by the current locale, excluding non-quoted
+metacharacters.
+A command is a sequence of characters in the syntax of the shell language. The shell reads each command and car<hy>
+ries out the desired action either directly or by invoking separate utilities. A built-in command is a command that is
+carried out by the shell itself without creating a separate process. Some commands are built-in purely for con<hy>
+venience and are not documented in this manual page. Built-ins that cause side effects in the shell environment and
+built-ins that are found before performing a path search (see Execution) are documented in this manual page. For
+historical reasons, some of these built-ins behave differently than other built-ins and are called special built-ins.
+A simple-command is a list of variable assignments (see Variable Assignments) or a sequence of blank-separated
+words which can be preceded by a list of variable assignments. See the Environment section of this manual page.
+The first word specifies the name of the command to be executed. Except as specified in this section, the remaining
+words are passed as arguments to the invoked command. The command name is passed as argument 0. See exec(2).
+The value of a simple-command is its exit status. If it terminates normally, its value is 0-255. If it terminates abnor<hy>
+mally, its value is 256+signum. The name of the signal corresponding to the exit status can be obtained by way of
+the -l option of the kill built-in utility.
+A pipeline is a sequence of one or more commands separated by |. The standard output of each command but the last
+is connected by a pipe(2) to the standard input of the next command. Each command, except possibly the last, is run
+as a separate process. The shell waits for the last command to terminate. The exit status of a pipeline is the exit sta<hy>
+tus of the last command unless the pipefail option is enabled. Each pipeline can be preceded by the reserved word!.
+This causes the exit status of the pipeline to become 0 if the exit status of the last command is non-zero, and 1 if the
+exit status of the last command is 0.
+A list is a sequence of one or more pipelines separated by ;, &, |&, &&, or |, and optionally terminated by ;, &, or
+|&. Of these five symbols, ;, &, and |& have equal precedence, which is lower than that of && and ||. The symbols
+&& and || also have equal precedence.
+A semicolon (;) causes sequential execution of the preceding pipeline. An ampersand (&) causes asynchronous ex<hy>
+ecution of the preceding pipeline, that is, the shell does not wait for that pipeline to finish. The symbol |& causes
+asynchronous execution of the preceding pipeline with a two-way pipe established to the parent shell. The standard
+input and output of the spawned pipeline can be written to and read from by the parent shell by applying the redi<hy>
+rection operators <& and >& with arg p to commands and by using -p option of the built-in commands read and
+print. The symbol && (||) causes the list following it to be executed only if the preceding pipeline returns a zero
+(non-zero) value. One or more NEWLINEs can appear in a list instead of a semicolon, to delimit a command. The
+first item of the first pipeline of a list that is a simple command not beginning with a redirection, and not occurring
+<beginning of page>
+within a while, until, or if list , can be preceded by a semicolon. This semicolon is ignored unless the showme op<hy>
+tion is enabled as described with the set built-in.
+A command is either a simple-command or one of commands in the following list. Unless otherwise stated, the value
+returned by a command is that of the last simple-command executed in the command.
+for vname [ in word ... ] ;do list ;done
+Each time a for command is executed, vname is set to the next word taken from the in word list. If in word ... is
+omitted, the for command executes the do list once for each positional parameter that is set starting from 1. Execu<hy>
+tion ends when there are no more words in the list. See Parameter Expansion.
+(( [expr1] ; [expr2] ; [expr3] )) ;do list ;done
+The arithmetic expression expr1 is evaluated first. The arithmetic expression expr2 is repeatedly evaluated until it
+evaluates to zero and when non-zero, list is executed and the arithmetic expression expr3 evaluated. If any expres<hy>
+sion is omitted, then it behaves as if it evaluated to 1. See Arithmetic Evaluation.
+select vname [ in word ... ] ;do list ;done
+A select command prints on standard error (file descriptor 2) the set of words, each preceded by a number. If in
+word... is omitted, the positional parameters starting from 1 are used instead. See Parameter Expansion. The PS3
+prompt is printed and a line is read from the standard input. If this line consists of the number of one of the listed
+words, then the value of the variable vname is set to the word corresponding to this number. If this line is empty, the
+selection list is printed again. Otherwise the value of the variable vname is set to null. The contents of the line read
+from standard input is saved in the variable REPLY. The list is executed for each selection until a break or EOF is
+encountered. If the REPLY variable is set to null by the execution of list, the selection list is printed before display<hy>
+ing the PS3 prompt for the next selection.
+case word in [ [(] pattern [ | pattern ] ... ) list ;; ] ... esac
+A case command executes the list associated with the first pattern that matches word. The form of the patterns is the
+same as that used for file name generation. See File Name Generation.
+The ;; operator causes execution of case to terminate. If ;& is used in place of ;; the next subsequent list, if any, is
+executed.
+if list ;then list [ ;elif list ;then list ] ... [ ;else list ] ;fi
+The list following if is executed and, if it returns a zero exit status, the list following the first then is executed. Oth<hy>
+erwise, the list following elif is executed, and, if its value is zero, the list following the next then is executed. Failing
+each successive elif list, the else list is executed. If the if list has non-zero exit status and there is no else list, then
+the if command returns a zero exit status.
+while list ;do list ;done
+until list ;do list ;done
+A while command repeatedly executes the while list and, if the exit status of the last command in the list is zero, ex<hy>
+ecutes the do list, otherwise the loop terminates. If no commands in the do list are executed, then the while com<hy>
+mand returns a zero exit status, until can be used in place of while to negate the loop termination test.
+((expression))
+The expression is evaluated using the rules for arithmetic evaluation described in this manual page. If the value of
+the arithmetic expression is non-zero, the exit status is 0. Otherwise the exit status is 1.
+(list;)
+Execute list in a separate environment. If two adjacent open parentheses are needed for nesting, a SPACE must be
+inserted to avoid evaluation as an arithmetic command as described in this section.
+list is simply executed. Unlike the metacharacters, ( and ), { and } are reserved words and must occur at the begin<hy>
+ning of a line or after a ; to be recognized.
+<beginning of page>
+[[ expression ]]
+Evaluates expression and returns a zero exit status when expression is true. See Conditional Expressions for a de<hy>
+scription of expression.
+function varname { list ;}
+varname () { list ;}
+Define a function which is referenced by varname. A function whose varname contains a . is called a discipline
+function and the portion of the varname preceding the last . must refer to an existing variable.
+The body of the function is the list of commands between { and }. A function defined with the function varname
+syntax can also be used as an argument to the . special built-in command to get the equivalent behavior as if the var<hy>
+name() syntax were used to define it. See Functions.
+time [ pipeline ]
+If pipeline is omitted, the user and system time for the current shell and completed child processes is printed on stan<hy>
+dard error. Otherwise, pipeline is executed and the elapsed time as well as the user and system time are printed on
+standard error. The TIMEFORMAT variable can be set to a format string that specifies how the timing information
+should be displayed. See Shell Variables for a description of the TIMEFORMAT variable.
+The following reserved words are recognized as reserved only when they are the first word of a command and are
+not quoted:
+ case
+ do
+ done
+ else
+ elif
+ esac
+ for
+ fi
+ function
+ if
+ select
+ then
+ time
+ until
+ while
+ { }
+ [[ ]]
+ !
+One or more variable assignments can start a simple command or can be arguments to the typeset, export, or read<hy>
+only special built-in commands. The syntax for an assignment is of the form:
+varname=word
+varname[word]=word
+No space is permitted between varname and the = or between = and word.
+varname=(assignlist)
+No space is permitted between varname and the =. An assignlist can be one of the following:
+word ...
+Indexed array assignment.
+[word]=word ...
+Associative array assignment. If prefixed by typeset -a, creates an indexed array instead.
+<beginning of page>
+assignment ...
+Compound variable assignment. This creates a compound variable varname with sub-variables of the form var<hy>
+name.name, where name is the name portion of assignment. The value of varname contains all the assignment ele<hy>
+ments. Additional assignments made to sub-variables of varname are also displayed as part of the value of varname.
+If no assignments are specified, varname is a compound variable allowing subsequence child elements to be defined.
+typeset [options] assignment ...
+Nested variable assignment. Multiple assignments can be specified by separating each of them with a ;. The previous
+value is unset before the assignment.
+In addition, a += can be used in place of the = to signify adding to or appending to the previous value. When += is
+applied to an arithmetic type, word is evaluated as an arithmetic expression and added to the current value. When ap<hy>
+plied to a string variable, the value defined by word is appended to the value. For compound assignments, the previ<hy>
+ous value is not unset and the new values are appended to the current ones provided that the types are compatible.
+A word beginning with # causes that word and all the following characters up to a NEWLINE to be commented, or
+ignored.
+The first word of each command is replaced by the text of an alias if an alias for this word has been defined. An alias
+name consists of any number of characters excluding metacharacters, quoting characters, file expansion characters,
+parameter expansion characters, command substitution characters, and =. The replacement string can contain any
+valid shell script including the metacharacters listed in the Commands section. The first word of each command in
+the replaced text, other than any that are in the process of being replaced, are tested for aliases. If the last character
+of the alias value is a BLANK then the word following the alias is also checked for alias substitution.
+Aliases can be used to redefine built-in commands but cannot be used to redefine the reserved words listed in the
+Commands section. Aliases can be created and listed with the alias command and can be removed with the unalias
+command.
+Aliasing is performed when scripts are read, not while they are executed. For an alias to take effect, the alias defini<hy>
+tion command has to be executed before the command which references the alias is read. The following aliases are
+compiled into the shell but can be unset or redefined:
+ autoload='typeset -fu'
+ command='command '
+ fc=hist
+ float='typeset -lE'
+ functions='typeset -f'
+ hash='alias -t --'
+ history='hist -l'
+ integer='typeset -li'
+ nameref='typeset -n'
+ nohup='nohup '
+ r='hist -s'
+ redirect='command exec'
+ source='command .'
+ stop='kill -s STOP'
+ suspend='kill -s STOP $$'
+ times='{ { time;} 2>&1;}'
+ type='whence -v'
+After alias substitution is performed, each word is checked to see if it begins with an unquoted tilde (~). For tilde
+substitution, word also refers to the word portion of parameter expansion. See Parameter Expansion.
+If it does, the word up to a / is checked to see if it matches a user name in the password database. If a match is found,
+the ~ and the matched login name are replaced by the login directory of the matched user. If no match is found, the
+original text is left unchanged. A ~ by itself, or in front of a /, is replaced by $HOME. A ~ followed by a + or - is re<hy>
+placed by the value of $PWD and $OLDPWD respectively.
+<beginning of page>
+In addition, when expanding a variable assignment, tilde substitution is attempted when the value of the assignment
+begins with a ~, and when a ~ appears after a colon (:). The : also terminates a ~ login name.
+The standard output from a command enclosed in parentheses preceded by a dollar sign ($) or a pair of grave accents
+(``) can be used as part or all of a word. Trailing NEWLINEs are removed. In the second (obsolete) form, the string
+between the quotes is processed for special quoting characters before the command is executed. See Quoting.
+The command substitution $(cat file) can be replaced by the equivalent but faster $(<file). The command substitu<hy>
+tion $(n<#) expands to the current byte offset for file descriptor n.
+An arithmetic expression enclosed in double parentheses preceded by a dollar sign ( $((arithmetic_expression))) is
+replaced by the value of the arithmetic expression within the double parentheses.
+Process substitution is only available on versions of the UNIX operating system that support the /dev/fd directory
+for naming open files.
+Each command argument of the form <(list) or >(list) runs process list asynchronously connected to some file in
+/dev/fd. The name of this file becomes the argument to the command. If the form with > is selected then writing on
+this file provides input for list. If < is used, then the file passed as an argument contains the output of the list process.
+For example,
+ paste <(cut -f1 file1) <(cut -f3 file2) | tee \
+  >(process1) >(process2)
+cuts fields 1 and 3 from the files file1 and file2 respectively, pastes the results together, and sends it to the processes
+process1 and process2. It also displays the results to the standard output. The file, which is passed as an argument to
+the command, is a UNIX pipe(2). Programs that expect to lseek(2) on the file do not work.
+A parameter is a variable, one or more digits, or any of the characters *, @, #, ?, -, $, and !. A variable is denoted by
+a vname. To create a variable whose vname contains a ., a variable whose vname consists of everything before the
+last . must already exist. A variable has a value and zero or more attributes. Variables can be assigned values and at<hy>
+tributes by using the typeset special built-in command. The attributes supported by the shell are described later with
+the typeset special built-in command. Exported variables pass values and attributes to the environment.
+The shell supports both indexed and associative arrays. An element of an array variable is referenced by a subscript.
+A subscript for an indexed array is denoted by an arithmetic expression, (see Arithmetic Evaluation), between a [
+and a ]. Use set -A vname value ... to assign values to an indexed array. The value of all subscripts must be in the
+range of 0 through 1,048,575. Indexed arrays do not need to be declared. Any reference to a variable with a valid
+subscript is legal and an array is created if necessary.
+An associative array is created with the -A option to typeset. A subscript for an associative array is denoted by a
+string enclosed between [ and ].
+Referencing any array without a subscript is equivalent to referencing the array with subscript 0.
+The value of a variable can be assigned by:
+ vname=value [vname=value] ...
+or
+ vname[subscript]=value [vname[subscript]=value] ...
+No space is allowed before or after the =. A nameref is a variable that is a reference to another variable. A nameref is
+created with the -n attribute of typeset. The value of the variable at the time of the typeset command becomes the
+variable that is referenced whenever the nameref variable is used. The name of a nameref cannot contain a dot (.).
+When a variable or function name contains a ., and the portion of the name up to the first . matches the name of a
+nameref, the variable referred to is obtained by replacing the nameref portion with the name of the variable refer<hy>
+enced by the nameref. If a nameref is used as the index of a for loop, a name reference is established for each item in
+<beginning of page>
+the list. A nameref provides a convenient way to refer to the variable inside a function whose name is passed as an
+argument to a function. For example, if the name of a variable is passed as the first argument to a function, the com<hy>
+mand
+  typeset -n var=$1
+inside the function causes references and assignments to var to be references and assignments to the variable whose
+name has been passed to the function. If either of the floating point attributes, -E, or -F, or the integer attribute, -i, is
+set for vname, then the value is subject to arithmetic evaluation as described in this manual page. Positional parame<hy>
+ters, parameters denoted by a number, can be assigned values with the set special built-in command. Parameter $0 is
+set from argument zero when the shell is invoked. The character $ is used to introduce substitutable parameters.
+${parameter}
+The shell reads all the characters from ${ to the matching } as part of the same word even if it contains braces or
+metacharacters. The value, if any, of the parameter is substituted. The braces are required when parameter is fol<hy>
+lowed by a letter, digit, or underscore that is not to be interpreted as part of its name, when the variable name con<hy>
+tains a ., or when a variable is subscripted. If parameter is one or more digits then it is a positional parameter. A po<hy>
+sitional parameter of more than one digit must be enclosed in braces. If parameter is * or @, then all the positional
+parameters, starting with $1, are substituted and separated by a field separator character. If an array vname with sub<hy>
+script * or @ is used, then the value for each of the elements is substituted, separated by the first character of the val<hy>
+ue of IFS.
+${#parameter}
+If parameter is * or @, the number of positional parameters is substituted. Otherwise, the length of the value of the
+parameter is substituted.
+${#vname[*]}
+${#vname[@]}
+The number of elements in the array vname is substituted.
+${!vname}
+Expands to the name of the variable referred to by vname. This is vname except when vname is a name reference.
+${!vname[subscript]}
+Expands to name of the subscript unless subscript is * or @. When subscript is *, the list of array subscripts for
+vname is generated. For a variable that is not an array, the value is 0 if the variable is set. Otherwise it is null. When
+subscript is @, it is the same as $ {vname[*]}, except that when used in double quotes, each array subscript yields a
+separate argument.
+${!prefix*}
+Expands to the names of the variables whose names begin with prefix.
+${parameter:-word}
+If parameter is set and is non-null then substitute its value. Otherwise substitute word.
+word is not evaluated unless it is to be used as the substituted string.
+In the following example, pwd is executed only if d is not set or is NULL:
+ print ${d:-$(pwd)}
+If the colon (: ) is omitted from the expression, the shell only checks whether parameter is set or not.
+<beginning of page>
+${parameter:=word}
+If parameter is not set or is null, set it to word. The value of the parameter is then substituted. Positional parameters
+cannot be assigned to in this way.
+word is not evaluated unless it is to be used as the substituted string.
+In the following example, pwd is executed only if d is not set or is NULL:
+ print ${d:-$(pwd)}
+If the colon (:) is omitted from the expression, the shell only checks whether parameter is set or not.
+${parameter:?word}
+If parameter is set and is non-null, substitute its value. Otherwise, print word and exit from the shell , if the shell is
+not interactive. If word is omitted then a standard message is printed.
+word is not evaluated unless it is to be used as the substituted string.
+In the following example, pwd is executed only if d is not set or is NULL:
+ print ${d:-$(pwd)}
+If the colon (: ) is omitted from the expression, the shell only checks whether parameter is set or not.
+${parameter:+word}
+If parameter is set and is non-null, substitute word. Otherwise substitute nothing.
+word is not evaluated unless it is to be used as the substituted string.
+In the following example, pwd is executed only if d is not set or is NULL:
+ print ${d:-$(pwd)}
+If the colon (:) is omitted from the expression, the shell only checks whether parameter is set or not.
+${parameter:offset:length}
+${parameter:offset}
+Expands to the portion of the value of parameter starting at the character (counting from 0) determined by expand<hy>
+ing offset as an arithmetic expression and consisting of the number of characters determined by the arithmetic ex<hy>
+pression defined by length.
+In the second form, the remainder of the value is used. A negative offset counts backwards from the end of parame<hy>
+ter.
+One or more BLANKs is required in front of a minus sign to prevent the shell from interpreting the operator as :-. If
+parameter is * or @, or is an array name indexed by * or @, then offset and length refer to the array index and num<hy>
+ber of elements respectively. A negative offset is taken relative to one greater than the highest subscript for indexed
+arrays. The order for associative arrays is unspecified.
+${parameter#pattern}
+${parameter##pattern}
+If the shell pattern matches the beginning of the value of parameter, then the value of this expansion is the value of
+the parameter with the matched portion deleted. Otherwise the value of this parameter is substituted. In the first
+form the smallest matching pattern is deleted and in the second form the largest matching pattern is deleted. When
+parameter is @, *, or an array variable with subscript @ or *, the substring operation is applied to each element in
+<beginning of page>
+turn.
+${parameter%pattern}
+${parameter%%pattern}
+If the shell pattern matches the end of the value of parameter, then the value of this expansion is the value of the pa<hy>
+rameter with the matched part deleted. Otherwise substitute the value of parameter. In the first form the smallest
+matching pattern is deleted, and in the second form the largest matching pattern is deleted. When parameter is @, *,
+or an array variable with subscript @ or *, the substring operation is applied to each element in turn.
+${parameter/pattern/string}
+${parameter//pattern/string}
+${parameter/#pattern/string}
+${parameter/%pattern/string}
+Expands parameter and replaces the longest match of pattern with the specified string. Each occurrence of \n in
+string is replaced by the portion of parameter that matches the nth sub-pattern.
+When string is null, the pattern is deleted and the / in front of string can be omitted. When parameter is @, *, or an
+array variable with subscript @ or *, the substitution operation is applied to each element in turn. In this case, the
+string portion of word is re-evaluated for each element.
+In the first form, only the first occurrence of pattern is replaced.
+In the second form, each match for pattern is replaced by the specified string.
+The third form restricts the pattern match to the beginning of the string.
+The fourth form restricts the pattern match to the end of the string.
+The following parameters are automatically set by the shell:
+# The number of positional parameters in decimal.
+- Options supplied to the shell on invocation or by the set command.
+? The decimal value returned by the last executed command.
+$ The process number of this shell.
+_ Initially, the value of _ is the absolute pathname of the shell or script being executed as passed in the environment.
+It is subsequently assigned the last argument of the previous command.
+This parameter is not set for commands which are asynchronous. This parameter is also used to hold the name of the
+matching MAIL file when checking for mail.
+! The process number of the last background command invoked or the most recent job put in the background with
+the bg built-in command.
+.sh.command When processing a DEBUG trap, this variable contains the current command line that is about to run.
+.sh.edchar This variable contains the value of the keyboard character (or sequence of characters if the first character
+is an ESC, ASCII 033) that has been entered when processing a KEYBD trap. If the value is changed as part of the
+trap action, then the new value replaces the key (or key sequence) that caused the trap. See the Key Bindings section
+of this manual page.
+<beginning of page>
+.sh.edcol The character position of the cursor at the time of the most recent KEYBD trap.
+.sh.edmode The value is set to ESC when processing a KEYBD trap while in vi insert mode. Otherwise, .sh.ed<hy>
+mode is null when processing a KEYBD trap. See the vi Editing Mode section of this manual page.
+.sh.edtext The characters in the input buffer at the time of the most recent KEYBD trap. The value is null when not
+processing a KEYBD trap.
+.sh.file The pathname of the file than contains the current command.
+.sh.fun The name of the current function that is being executed.
+.sh.match An indexed array which stores the most recent match and sub-pattern matches after conditional pattern
+matches that match and after variables expansions using the operators #, %, or /. The 0th element stores the com<hy>
+plete match and the ith element stores the ith sub-match. The .sh.match variable is unset when the variable that has
+expanded is assigned a new value.
+.sh.name Set to the name of the variable at the time that a discipline function is invoked.
+.sh.subscript Set to the name subscript of the variable at the time that a discipline function is invoked.
+.sh.subshell The current depth for sub-shells and command substitution.
+.sh.value Set to the value of the variable at the time that the set or append discipline function is invoked.
+.sh.version Set to a value that identifies the version of this shell.
+LINENO The current line number within the script or function being executed.
+OLDPWD The previous working directory set by the cd command.
+OPTARG The value of the last option argument processed by the getopts built-in command.
+OPTIND The index of the last option argument processed by the getopts built-in command.
+PPID The process number of the parent of the shell.
+PWD The present working directory set by the cd command.
+RANDOM Each time this variable is referenced, a random integer, uniformly distributed between 0 and 32767, is
+generated. The sequence of random numbers can be initialized by assigning a numeric value to RANDOM.
+REPLY This variable is set by the select statement and by the read built-in command when no arguments are sup<hy>
+plied.
+SECONDS Each time this variable is referenced, the number of seconds since shell invocation is returned. If this
+variable is assigned a value, then the value returned upon reference is the value that was assigned plus the number of
+<beginning of page>
+seconds since the assignment.
+The following variables are used by the shell:
+CDPATH Defines the search path for the cd command.
+COLUMNS Defines the width of the edit window for the shell edit modes and for printing select lists.
+EDITOR If the VISUAL variable is not set, the value of this variable is checked for the patterns as described with
+VISUAL and the corresponding editing option is turned on.
+See the set command in the Special Command section of this manual page.
+ENV Performs parameter expansion, command substitution, and arithmetic substitution on the value to generate the
+pathname of the script that is executed when the shell is invoked. This file is typically used for alias and function
+definitions. The default value is $HOME/.kshrc.
+See the Invocation section of this manual page.
+ENV is not set by the shell.
+FCEDIT Obsolete name for the default editor name for the hist command. FCEDIT is not used when HISTEDIT
+is set.
+The shell specifies a default value to FCEDIT.
+FIGNORE A pattern that defines the set of file names that is ignored when performing file name matching.
+FPATH The search path for function definitions. The directories in this path are searched for a file with the same
+name as the function or command when a function with the -u attribute is referenced and when a command is not
+found. If an executable file with the name of that command is found, then it is read and executed in the current envi<hy>
+ronment. Unlike PATH, the current directory must be represented explicitly by dot (.) rather than by adjacent colon
+(:) characters or a beginning or ending colon (:).
+HISTCMD The number of the current command in the history file.
+HISTEDIT The name for the default editor name for the hist command.
+HISTFILE If this variable is set when the shell is invoked, the value is the pathname of the file that is used to store
+the command history. See the Command Re-entry section of this manual page.
+HISTSIZE If this variable is set when the shell is invoked, then the number of previously entered commands that
+are accessible by this shell is greater than or equal to this number. The default is 512.
+HOME The default argument (home directory) for the cd command.
+HOME is not set by the shell. HOME is set by login(1).
+IFS Internal field separators, normally SPACE, TAB, and NEWLINE that are used to separate the results of com<hy>
+mand substitution or parameter expansion and to separate fields with the built-in command read. The first character
+of the IFS variable is used to separate arguments for the "$*" substitution. See the Quoting section of this manual
+page.
+<beginning of page>
+Each single occurrence of an IFS character in the string to be split, that is not in the issspace character class, and
+any adjacent characters in IFS that are in the issspace character class, delimit a field. One or more characters in IFS
+that belong to the issspace character class, delimit a field. In addition, if the same issspace character appears consec<hy>
+utively inside IFS, this character is treated as if it were not in the issspace class, so that if IFS consists of two tab
+characters, then two adjacent tab characters delimit a null field.
+The shell specifies a default value to IFS.
+LANG This variable determines the locale category for any category not specifically selected with a variable starting
+with LC_ or LANG.
+LC_ALL This variable overrides the value of the LANG variable and any other LC_ variable.
+LC_COLLATE This variable determines the locale category for character collation information.
+LC_CTYPE This variable determines the locale category for character handling functions. It determines the charac<hy>
+ter classes for pattern matching. See the File Name Generation section of this manual page.
+LC_NUMERIC This variable determines the locale category for the decimal point character.
+LINES If this variable is set, the value is used to determine the column length for printing select lists. Select lists
+prints vertically until about two-thirds of LINES lines are filled.
+MAIL If this variable is set to the name of a mail file and the MAILPATH variable is not set, then the shell informs
+the user of arrival of mail in the specified file.
+MAIL is not set by the shell. On some systems, MAIL is set by login(1).
+MAILCHECK Specifies how often in seconds the shell checks for changes in the modification time of any of the
+files specified by the MAILPATH or MAIL variables. The default value is 600 seconds. When the time has elapsed
+the shell checks before issuing the next prompt.
+The shell specifies a default value to MAILCHECK.
+MAILPATH A colon ( : ) separated list of file names. If this variable is set, then the shell informs the user of any
+modifications to the specified files that have occurred within the last MAILCHECK seconds. Each file name can be
+followed by a ? and a message that is printed. The message undergoes parameter expansion, command substitution,
+and arithmetic substitution with the variable $_ defined as the name of the file that has changed. The default message
+is you have mail in $_.
+PATH The search path for commands. Except in .profile, users cannot change PATH if executing under rksh93.
+See the Execution section of this manual page.
+The shell specifies a default value to PATH.
+PS1 The value of this variable is expanded for parameter expansion, command substitution, and arithmetic substitu<hy>
+tion to define the primary prompt string which by default is $. The character ! in the primary prompt string is re<hy>
+placed by the command number. Two successive occurrences of ! produces a single ! when the prompt string is
+printed. See the Command Re-entry section of this manual page.
+The shell specifies a default value to PS1.
+PS2 Secondary prompt string, by default, >.
+<beginning of page>
+The shell specifies a default value to PS2.
+PS3 Selection prompt string used within a select loop, by default #?.
+The shell specifies a default value to PS3.
+PS4 The value of this variable is expanded for parameter evaluation, command substitution, and arithmetic substitu<hy>
+tion and precedes each line of an execution trace. By default, PS4 is +. When PS4 is unset, the execution trace
+prompt is also + .
+The shell specifies a default value to PS4.
+SHELL The pathname of the shell is kept in the environment. At invocation, if the basename of this variable is rsh,
+rksh, rksh93, or krsh, the shell becomes restricted.
+SHELL is not set by the shell. On some systems, SHELL is set by login(1).
+TIMEFORMAT The value of this parameter is used as a format string specifying how the timing information for
+pipelines prefixed with the time reserved word should be displayed. The % character introduces a format sequence
+that is expanded to a time value or other information.
+The format sequences and their meanings are as follows.
+%%
+A literal %.
+%[p][l]R
+The elapsed time in seconds.
+%[p][l]U
+The number of CPU seconds spent in user mode.
+%[p][l]S
+The number of CPU seconds spent in system mode.
+%P
+The CPU percentage, computed as (U + S) / R.
+The braces denote optional portions. The optional p is a digit specifying the precision, the number of fractional dig<hy>
+its after a decimal point. A value of 0 causes no decimal point or fraction to be output. At most three places after the
+decimal point can be displayed. Values of p greater than 3 are treated as 3. If p is not specified, the value 3 is used.
+The optional l specifies a longer format, including hours if greater than zero, minutes, and seconds of the form HHh<hy>
+MMmSS.FFs. The value of p determines whether or not the fraction is included.
+All other characters are output without change and a trailing NEWLINE is added. If unset, the default value,
+$'0eal%2lR0ser%2lU0ys%2lS', is used. If the value is null, no timing information is displayed.
+TMOUT If set to a value greater than zero, TMOUT is the default time-out value for the read built-in command.
+The select compound command terminates after TMOUT seconds when input is from a terminal. Otherwise, the
+shell terminates if a line is not entered within the prescribed number of seconds while reading from a terminal. The
+shell can be compiled with a maximum bound for this value which cannot be exceeded.
+The shell specifies a default value to TMOUT.
+<beginning of page>
+VISUAL If the value of this variable matches the pattern *[Vv][Ii]*, then the vi option is turned on. See Special
+Commands. If the value matches the pattern *gmacs* , the gmacs option is turned on. If the value matches the pat<hy>
+tern *macs*, then the emacs option is turned on. The value of VISUAL overrides the value of EDITOR.
+After parameter expansion and command substitution, the results of substitutions are scanned for the field separator
+characters (those found in IFS) and split into distinct fields where such characters are found. Explicit null fields (""
+or '') are retained. Implicit null fields, those resulting from parameters that have no values or command substitutions
+with no output, are removed.
+If the braceexpand (-B) option is set, each of the fields resulting from IFS are checked to see if they contain one or
+more of the brace patterns. Valid brace patterns: {*,*}, {l1..l2} , {n1..n2}, {n1..n2%fmt} {n1..n2 ..n3}, or {n1..n2
+..n3%fmt} , where * represents any character, l1,l2 are letters and n1,n2,n3 are signed numbers and fmt is a format
+specified as used by printf. In each case, fields are created by prepending the characters before the { and appending
+the characters after the } to each of the strings generated by the characters between the { and }. The resulting fields
+are checked to see if they have any brace patterns.
+In the first form, a field is created for each string between { and ,, between , and ,, and between , and }. The string
+represented by * can contain embedded matching { and } without quoting. Otherwise, each { and } with * must be
+quoted.
+In the second form, l1 and l2 must both be either upper case or both be lower case characters in the C locale. In this
+case a field is created for each character from l1 through l2.
+In the remaining forms, a field is created for each number starting at n1. This continues until it reaches n2 and incre<hy>
+ments n1 by n3. The cases where n3 is not specified behave as if n3 were 1 if n1<=n2, and -1 otherwise. In forms
+which specify %fmt, any format flags, widths and precisions can be specified and fmt can end in any of the specifiers
+cdiouxX. For example, {a,z}{1..5..3%02d}{b..c}x expands to the 8 fields, a01bx, a01cx, a04bx, a04cx, z01bx,
+z01cx, z04bx, and z4cx.
+Following splitting, each field is scanned for the characters *, ?, (, and [, unless the -f option has been set. If one of
+these characters appears, then the word is regarded as a pattern.
+Each file name component that contains any pattern character is replaced with a lexicographically sorted set of
+names that matches the pattern from that directory. If no file name is found that matches the pattern, then that com<hy>
+ponent of the file name is left unchanged unless the pattern is prefixed with ~(N) in which case it is removed. If FIG<hy>
+NORE is set, then each file name component that matches the pattern defined by the value of FIGNORE is ignored
+when generating the matching file names. The names . and .. are also ignored. If FIGNORE is not set, the character
+. at the start of each file name component is ignored unless the first character of the pattern corresponding to this
+component is the character . itself. For other uses of pattern matching the / and . are not specially treated.
+* Match any string, including the null string. When used for file name expansion, if the globstar option is on, two
+adjacent *s by themselves match all files and zero or more directories and subdirectories. If the two adjacent *s are
+followed by a /, only directories and subdirectories match.
+? Matches any single character.
+[...] Match any one of the enclosed characters. A pair of characters separated by - matches any character lexically
+between the pair, inclusive. If the first character following the opening [ is a !, any character not enclosed is matched.
+A - can be included in the character set by putting it as the first or last character. Within [ and ], character classes can
+be specified with the syntax [:class:] where class is one of the following classes defined in the ANSI-C standard:
+ alnum alpha blank cntrl digit graph
+ lower print punct space upper
+ word xdigit
+word is equivalent to alnum plus the character _. Within [ and ], an equivalence class can be specified with the syn<hy>
+tax [=c=] which matches all characters with the same primary collation weight (as defined by the current locale) as
+the character c. Within [ and ], [.symbol.] matches the collating symbol symbol.
+<beginning of page>
+A pattern-list is a list of one or more patterns separated from each other with an & or |. An & signifies that all pat<hy>
+terns must be matched whereas | requires that only one pattern be matched. Composite patterns can be formed with
+one or more of the following sub-patterns:
+?(pattern-list) Optionally matches any one of the specified patterns.
+*(pattern-list) Matches zero or more occurrences of the specified patterns.
++(pattern-list) Matches one or more occurrences of the specified patterns.
+{n(pattern-list) Matches n occurrences of the specified patterns.
+{m,n(pattern-list) Matches from m to n occurrences of the specified patterns. If m is omitted, 0 is used. If n is omit<hy>
+ted at least m occurrences are matched.
+@(pattern-list) Matches exactly one of the specified patterns.
+!(pattern-list) Matches anything except one of the specified patterns.
+By default, each pattern, or sub-pattern matches the longest string possible consistent with generating the longest
+overall match. If more than one match is possible, the one starting closest to the beginning of the string is chosen.
+However, for each of the compound patterns a - can be inserted in front of the ( to cause the shortest match to the
+specified pattern-list to be used.
+When pattern-list is contained within parentheses, the backslash character \ is treated specially even when inside a
+character class. All ANSI-C character escapes are recognized and match the specified character. In addition the fol<hy>
+lowing escape sequences are recognized:
+\d Matches any character in the digit class.
+\D Matches any character not in the digit class.
+\s Matches any character in the space class.
+\S Matches any character not in the space class.
+\w Matches any character in the word class.
+\W Matches any character not in the word class.
+A pattern of the form %(pattern-pairs) is a sub-pattern that can be used to match nested character expressions. Each
+pattern-pair is a two character sequence which cannot contain & or |. The first pattern-pair specifies the starting and
+ending characters for the match. Each subsequent pattern-pair represents the beginning and ending characters of a
+nested group that is skipped over when counting starting and ending character matches. The behavior is unspecified
+when the first character of a pattern-pair is alphanumeric except for the following:
+D Causes the ending character to terminate the search for this pattern without finding a match.
+E Causes the ending character to be interpreted as an escape character.
+<beginning of page>
+L Causes the ending character to be interpreted as a quote character causing all characters to be ignored when look<hy>
+ing for a match.
+Q Causes the ending character to be interpreted as a quote character causing all characters other than any escape
+character to be ignored when looking for a match.
+%({}Q"E\), matches characters starting at { until the matching } is found not counting any { or } that is inside a dou<hy>
+ble quoted string or preceded by the escape character \. Without the {} this pattern matches any C language string.
+Each sub-pattern in a composite pattern is numbered, starting at 1, by the location of the ( within the pattern. The se<hy>
+quence \n, where n is a single digit and \n comes after the nth. sub-pattern, matches the same string as the sub-pat<hy>
+tern itself.
+A pattern can contain sub-patterns of the form ~(options:pattern-list), where either options or :pattern-list can be
+omitted. Unlike the other compound patterns, these sub-patterns are not counted in the numbered sub-patterns. If op<hy>
+tions is present, it can consist of one or more of the following:
++ Enable the following options. This is the default.
+- Disable the following options.
+E The remainder of the pattern uses extended regular expression syntax like the egrep(1) command.
+F The remainder of the pattern uses fgrep(1) expression syntax.
+g File the longest match (greedy).
+This is the default.
+G The remainder of the pattern uses basic regular expression syntax like the grep(1) command.
+i Treat the match as case insensitive.
+K The remainder of the pattern uses shell pattern syntax.
+This is the default.
+l Left anchor the pattern.
+This is the default for K style patterns.
+N This is ignored. However, when it is the first letter and is used with file name generation, and no matches occur,
+the file pattern expands to the empty string.
+r Right anchor the pattern.
+This is the default for K style patterns.
+If both options and :pattern-list are specified, then the options apply only to pattern-list. Otherwise, these options re<hy>
+main in effect until they are disabled by a subsequent ~(...) or at the end of the sub-pattern containing ~(...).
+Each of the metacharacters listed in the Definitions has a special meaning to the shell.
+<beginning of page>
+g File the longest match (greedy). This is the default.
+i Treat the match as case insensitive.
+If both options and :pattern-list are specified, then the options apply only to pattern-list. Otherwise, the options re<hy>
+main in effect until they are disabled by a subsequent ~(...) or at the end of the sub-pattern containing ~(...).
+Each of the metacharacters listed in the Definitions section of this manual page has a special meaning to the shell
+and causes termination of a word unless quoted. A character can be quoted, that is, made to stand for itself, by pre<hy>
+ceding it with a backslash (\). The pair \NEWLINE is removed. All characters enclosed between a pair of single
+quote marks ('') that is not preceded by a $ are quoted. A single quote cannot appear within the single quotes. A sin<hy>
+gle quoted string preceded by an unquoted $ is processed as an ANSI-C string except for the following:
+\0 Causes the remainder of the string to be ignored.
+\cx Expands to the character CTRL-x.
+\C[.name.] Expands to the collating element name.
+\e Equivalent to the escape character (ASCII 033),
+\E Equivalent to the escape character (ASCII 033),
+Inside double quote marks (""), parameter and command substitution occur and \ quotes the characters \, `, ", and $.
+A $ in front of a double quoted string is ignored in the C or POSIX locale, and might cause the string to be replaced
+by a locale specific string otherwise. The meaning of $* and $@ is identical when not quoted or when used as a vari<hy>
+able assignment value or as a file name. However, when used as a command argument, "$*" is equivalent to
+"$1d$2d...", where d is the first character of the IFS variable, whereas "$@" is equivalent to "$1" "$2" .... Inside
+grave quote marks (``), \fR quotes the characters \, `, and $. If the grave quotes occur within double quotes, then \
+also quotes the character ".
+The special meaning of reserved words or aliases can be removed by quoting any character of the reserved word.
+The recognition of function names or built-in command names cannot be altered by quoting them.
+The shell performs arithmetic evaluation for arithmetic substitution, to evaluate an arithmetic command, to evaluate
+an indexed array subscript, and to evaluate arguments to the built-in commands shift and let. Arithmetic evaluation
+is also performed on argument operands of the built-in command printf that correspond to numeric format specifiers
+in the format operand. See printf(1). Evaluations are performed using double precision floating point arithmetic or
+long double precision floating point for systems that provide this data type. Floating point constants follow the AN<hy>
+SI-C programming language floating point conventions. Integer constants follow the ANSI-C programming lan<hy>
+guage integer constant conventions although only single byte character constants are recognized and character casts
+are not recognized. Constants can be of the form [base#]n where base is a decimal number between two and sixty-
+four representing the arithmetic base and n is a number in that base. The digits greater than 9 are represented by the
+lower case letters, the upper case letters, @, and _ respectively. For bases less than or equal to 36, upper and lower
+case characters can be used interchangeably.
+An arithmetic expression uses the same syntax, precedence, and associativity of expression as the C language. All
+the C language operators that apply to floating point quantities can be used. In addition, the operator ** can be used
+for exponentiation. It has higher precedence than multiplication and is left associative. When the value of an arith<hy>
+metic variable or subexpression can be represented as a long integer, all C language integer arithmetic operations can
+be performed. Variables can be referenced by name within an arithmetic expression without using the parameter ex<hy>
+pansion syntax. When a variable is referenced, its value is evaluated as an arithmetic expression.
+Any of the following math library functions that are in the C math library can be used within an arithmetic expres<hy>
+sion:
+ abs acos acosh asin asinh atan atan2 atanh cbrt
+ copysign cos cosh erf erfc exp exp2 expm1 fabs
+ fdim finite floor fma fmax fmod hypot ilogb
+<beginning of page>
+ int isinf isnan lgamma log log2 logb
+ nearbyint nextafter nexttoward pow remainder
+ rint round sin sinh sqrt tan tanh tgamma trunc
+An internal representation of a variable as a double precision floating point can be specified with the -E [n] or -F [n]
+option of the typeset special built-in command. The -E option causes the expansion of the value to be represented
+using scientific notation when it is expanded. The optional option argument n defines the number of significant fig<hy>
+ures. The -F option causes the expansion to be represented as a floating decimal number when it is expanded. The
+optional option argument n defines the number of places after the decimal point in this case.
+An internal integer representation of a variable can be specified with the -i [n] option of the typeset special built-in
+command. The optional option argument n specifies an arithmetic base to be used when expanding the variable. If
+you do not specify an arithmetic base, base 10 is used.
+Arithmetic evaluation is performed on the value of each assignment to a variable with the -E, -F, or -i option. As<hy>
+signing a floating point number to a variable whose type is an integer causes the fractional part to be truncated.
+When used interactively, the shell prompts with the value of PS1 after expanding it for parameter expansion, com<hy>
+mand substitution, and arithmetic substitution, before reading a command. In addition, each single ! in the prompt is
+replaced by the command number. A !! is required to place ! in the prompt. If at any time a NEWLINE is typed and
+further input is needed to complete a command, then the secondary prompt, that is, the value of PS2, is issued.
+A conditional expression is used with the [[ compound command to test attributes of files and to compare strings.
+Field splitting and file name generation are not performed on the words between [[ and ]].
+Each expression can be constructed from one or more of the following unary or binary expressions:
+-a file True, if file exists.
+This option is the same as -e. This option is obsolete.
+-b file True, if file exists and is a block special file.
+-c file True, if file exists and is a character special file.
+-d file True, if file exists and is a directory.
+-e file True, if file exists.
+-f file True, if file exists and is an ordinary file.
+-g file True, if file exists and it has its setgid bit set.
+-G file True, if file exists and its group matches the effective group id of this process.
+-h file True, if file exists and is a symbolic link.
+-k file True, if file exists and it has its sticky bit set.
+-L file True, if file exists and is a symbolic link.
+-n string True, if length of string is non-zero.
+<beginning of page>
+-N file True, if file exists and the modification time is greater than the last access time.
+-o option True, if option named option is on.
+-o ?option True, if option named option is a valid option name.
+-O file True, if file exists and is owned by the effective user id of this process.
+-p file True, if file exists and is a FIFO special file or a pipe.
+-r file True, if file exists and is readable by current process.
+-s file True, if file exists and has size greater than zero.
+-S file True, if file exists and is a socket.
+-t fildes True, if file descriptor number fildes is open and associated with a terminal device.
+-u file True, if file exists and it has its setuid bit set.
+-w file True, if file exists and is writable by current process.
+-x file True, if file exists and is executable by current process. If file exists and is a directory, then true if the current
+process has permission to search in the directory.
+-z string True, if length of string is zero.
+file1 -ef file2 True, if file1 and file2 exist and refer to the same file.
+file1 -nt file2 True, if file1 exists and file2 does not, or file1 is newer than file2.
+file1 -ot file2 True, if file2 exists and file1 does not, or file1 is older than file2.
+string True, if string is not null.
+string == pattern True, if string matches pattern. Any part of pattern can be quoted to cause it to be matched as a
+string. With a successful match to pattern, the .sh.match array variable contains the match and sub-pattern matches.
+string = pattern Same as ==, but is obsolete.
+string != pattern True, if string does not match pattern. When the string matches the pattern the .sh.match array
+variable contains the match and sub-pattern matches.
+string =~ ere True if string matches the pattern ~(E)ere where ere is an extended regular expression.
+<beginning of page>
+string1 < string2 True, if string1 comes before string2 based on ASCII value of their characters.
+string1 > string2 True, if string1 comes after string2 based on ASCII value of their characters.
+In each of the following expressions, if file is of the form /dev/fd/n, where n is an integer, the test is applied to the
+open file whose descriptor number is n. The following obsolete arithmetic comparisons are supported:
+exp1 -eq exp2 True, if exp1 is equal to exp2.
+exp1 -ge exp2 True, if exp1 is greater than or equal to exp2.
+exp1 -gt exp2 True, if exp1 is greater than exp2.
+exp1 -le exp2 True, if exp1 is less than or equal to exp2.
+exp1 -lt exp2 True, if exp1 is less than exp2.
+exp1 -ne exp2 True, if exp1 is not equal to exp2.
+A compound expression can be constructed from these primitives by using any of the following, listed in decreasing
+order of precedence:
+(expression) True, if expression is true. Used to group expressions.
+! expression True, if expression is false.
+expression1 && expression2 True, if expression1 and expression2 are both true.
+expression1 || expression2 True, if either expression1 or expression2 is true.
+Before a command is executed, its input and output can be redirected using a special notation interpreted by the
+shell. The following can appear anywhere in a simple command or can precede or follow a command and are not
+passed on to the invoked command. Command substitution, parameter expansion, and arithmetic substitution occur
+before word or digit is used except as noted in this section. File name generation occurs only if the shell is interac<hy>
+tive and the pattern matches a single file. Field splitting is not performed.
+In each of the following redirections, if file is of the form /dev/sctp/host/port, /dev/tcp/host/port, or
+/dev/udp/host/port, where host is a hostname or host address, and port is a service specified by name or an integer
+port number, then the redirection attempts to make a tcp, sctp or udp connection to the corresponding socket.
+No intervening space is allowed between the characters of redirection operators.
+<word Use file word as standard input (file descriptor 0).
+>word Use file word as standard output (file descriptor 1). If the file does not exist then it is created. If the file exists,
+and the noclobber option is on, this causes an error. Otherwise, it is truncated to zero length.
+>|word Same as >, except that it overrides the noclobber option.
+<beginning of page>
+>>word Use file word as standard output. If the file exists, then output is appended to it (by first seeking to the end-
+of-file). Otherwise, the file is created.
+<>word Open file word for reading and writing as standard input.
+<<[-]word The shell input is read up to a line that is the same as word after any quoting has been removed, or to an
+end-of-file. No parameter substitution, command substitution, arithmetic substitution or file name generation is per<hy>
+formed on word. The resulting document, called a here-document, becomes the standard input. If any character of
+word is quoted, then no interpretation is placed upon the characters of the document. Otherwise, parameter expan<hy>
+sion, command substitution, and arithmetic substitution occur, \NEWLINE is ignored, and \ must be used to quote
+the characters \, $, `. If - is appended to <<, then all leading tabs are stripped from word and from the document. If #
+is appended to <<, then leading SPACEs and TABs are stripped off the first line of the document and up to an equiv<hy>
+alent indentation is stripped from the remaining lines and from word. A tab stop is assumed to occur at every 8 col<hy>
+umns for the purposes of determining the indentation.
+<<<word A short form of here document in which word becomes the contents of the here-document after any pa<hy>
+rameter expansion, command substitution, and arithmetic substitution occur.
+<&digit The standard input is duplicated from file descriptor digit, and similarly for the standard output using
+>&digit. See dup(2).
+<&digit- The file descriptor specified by digit is moved to standard input. Similarly for the standard output using
+>&digit-.
+<&- The standard input is closed. Similarly for the standard output using >&-.
+<&p The input from the co-process is moved to standard input.
+>&p The output to the co-process is moved to standard output.
+<#((expr)) Evaluate arithmetic expression expr and position file descriptor 0 to the resulting value bytes from the
+start of the file. The variables CUR and EOF evaluate to the current offset and end-of-file offset respectively when
+evaluating expr.
+>#((expr)) The same as <# except applies to file descriptor 1.
+<#pattern Seek forward to the beginning of the next line containing pattern.
+<##pattern The same as <#, except that the portion of the file that is skipped is copied to standard output.
+If one of the redirection operators is preceded by a digit, with no intervening space, then the file descriptor number
+referred to is that specified by the digit (instead of the default 0 or 1). If one of the redirection operators other than
+>&- and the ># and <# forms, is preceded by {varname} with no intervening space, then a file descriptor number >
+10 is selected by the shell and stored in the variable varname. If >&- or the any of the ># and <# forms is preceded
+by {varname} the value of varname defines the file descriptor to close or position. For example:
+ ... 2>&1
+means file descriptor 2 is to be opened for writing as a duplicate of file descriptor 1 and
+ exec [n]<file
+<beginning of page>
+means open file for reading and store the file descriptor number in variable n. The order in which redirections are
+specified is significant. The shell evaluates each redirection in terms of the (file_descriptor, file) association at the
+time of evaluation. For example:
+ ... 1>fname 2>&1
+first associates file descriptor 1 with file fname. It then associates file descriptor 2 with the file associated with file
+descriptor 1, that is, fname. If the order of redirections were reversed, file descriptor 2 would be associated with the
+terminal (assuming file descriptor 1 had been) and then file descriptor 1 would be associated with file fname. If a
+command is followed by & and job control is not active, the default standard input for the command is the empty file
+/dev/null. Otherwise, the environment for the execution of a command contains the file descriptors of the invoking
+shell as modified by input and output specifications.
+The environment is a list of name-value pairs that is passed to an executed program in the same way as a normal ar<hy>
+gument list. See environ(5).
+The names must be identifiers and the values are character strings. The shell interacts with the environment in sever<hy>
+al ways. On invocation, the shell scans the environment and creates a variable for each name found, giving it the cor<hy>
+responding value and attributes and marking it export. Executed commands inherit the environment. If the user
+modifies the values of these variables or creates new ones, using the export or typeset -x commands, they become
+part of the environment. The environment seen by any executed command is thus composed of any name-value pairs
+originally inherited by the shell, whose values can be modified by the current shell, plus any additions which must
+be noted in export or typeset -x commands. The environment for any simple-command or function can be augment<hy>
+ed by prefixing it with one or more variable assignments. A variable assignment argument is a word of the form
+identifier=value. Thus:
+ TERM=450 cmd args
+and
+ (export TERM; TERM=450; cmd args)
+are equivalent (as far as the execution of cmd is concerned except for special built-in commands listed in the Built-
+Ins section, those that are preceded with a dagger. If the obsolete -k option is set, all variable assignment arguments
+are placed in the environment, even if they occur after the command name.
+The following example first prints a=b c and then c:
+ echo a=b c
+ set -k
+ echo a=b c
+This feature is intended for use with scripts written for early versions of the shell and its use in new scripts is strong<hy>
+ly discouraged.
+For historical reasons, there are two ways to define functions, the name() syntax and the function name syntax.
+These are described in the Commands section of this manual page.
+Shell functions are read in and stored internally. Alias names are resolved when the function is read. Functions are
+executed like commands with the arguments passed as positional parameters. See the Execution section of this man<hy>
+ual page for details.
+Functions defined by the function name syntax and called by name execute in the same process as the caller and
+share all files and present working directory with the caller. Traps caught by the caller are reset to their default action
+inside the function. A trap condition that is not caught or ignored by the function causes the function to terminate
+<beginning of page>
+and the condition to be passed on to the caller. A trap on EXIT set inside a function is executed in the environment
+of the caller after the function completes. Ordinarily, variables are shared between the calling program and the func<hy>
+tion. However, the typeset special built-in command used within a function defines local variables whose scope in<hy>
+cludes the current function. They can be passed to functions that they call in the variable assignment list that pre<hy>
+cedes the call or as arguments passed as name references. Errors within functions return control to the caller.
+Functions defined with the name() syntax and functions defined with the function name syntax that are invoked
+with the . special built-in are executed in the caller's environment and share all variables and traps with the caller. Er<hy>
+rors within these function executions cause the script that contains them to abort.
+The special built-in command return is used to return from function calls.
+Function names can be listed with the -f or +f option of the typeset special built-in command. The text of functions,
+when available, is also listed with -f. Functions can be undefined with the -f option of the unset special built-in com<hy>
+mand.
+Ordinarily, functions are unset when the shell executes a shell script. Functions that need to be defined across sepa<hy>
+rate invocations of the shell should be placed in a directory and the FPATH variable should contain the name of this
+directory. They can also be specified in the ENV file.
+Each variable can have zero or more discipline functions associated with it. The shell initially understands the disci<hy>
+pline names get, set, append, and unset but on most systems others can be added at run time via the C program<hy>
+ming interface extension provided by the builtin built-in utility. If the get discipline is defined for a variable, it is in<hy>
+voked whenever the specified variable is referenced. If the variable .sh.value is assigned a value inside the discipline
+function, the referenced variable is evaluated to this value instead. If the set discipline is defined for a variable, it is
+invoked whenever the specified variable is assigned a value. If the append discipline is defined for a variable, it is
+invoked whenever a value is appended to the specified variable. The variable .sh.value is specified the value of the
+variable before invoking the discipline, and the variable is assigned the value of .sh.value after the discipline com<hy>
+pletes. If .sh.value is unset inside the discipline, then that value is unchanged. If the unset discipline is defined for a
+variable, it is invoked whenever the specified variable is unset. The variable is not unset unless it is unset explicitly
+from within this discipline function.
+The variable .sh.name contains the name of the variable for which the discipline function is called, .sh.subscript is
+the subscript of the variable, and .sh.value contains the value being assigned inside the set discipline function. For
+the set discipline, changing .sh.value changes the value that gets assigned.
+If the monitor option of the set command is turned on, an interactive shell associates a job with each pipeline. It
+keeps a table of current jobs, printed by the jobs command, and assigns them small integer numbers. When a job is
+started asynchronously with &, the shell prints a line which looks like:
+ [1] 1234
+indicating that the job which was started asynchronously was job number 1 and had one (top-level) process, whose
+process id was 1234.
+If you are running a job and wish to stop it, CTRL-z sends a STOP signal to the current job. The shell normally dis<hy>
+plays a message that the job has been stopped, and displays another prompt. You can then manipulate the state of
+this job, putting it in the background with the bg command, or run some other commands and then eventually bring
+the job back into the foreground with the foreground command fg. A CTRL-z takes effect immediately and is like an
+interrupt in that pending output and unread input are discarded when it is typed.
+A job being run in the background stops if it tries to read from the terminal. Background jobs are normally allowed
+to produce output, but this can be disabled by giving the command sttytostop. If you set this tty option, then back<hy>
+ground jobs stop when they try to produce output like they do when they try to read input.
+There are several ways to refer to jobs in the shell. A job can be referred to by the process id of any process of the
+job or by one of the following:
+%number The job with the specified number.
+%string Any job whose command line begins with string.
+<beginning of page>
+%?string Any job whose command line contains string.
+%% Current job.
+%+ Equivalent to %%.
+%- Previous job.
+The shell learns immediately whenever a process changes state. It normally informs you whenever a job becomes
+blocked so that no further progress is possible, but only just before it prints a prompt. This is done so that it does not
+otherwise disturb your work. The notify option of the set command causes the shell to print these job change mes<hy>
+sages as soon as they occur.
+When the monitor option is on, each background job that completes triggers any trap set for CHLD.
+When you try to leave the shell while jobs are running or stopped, you are warned that You have stopped(running)
+jobs. You can use the jobs command to see what they are. If you immediately try to exit again, the shell does not
+warn you a second time, and the stopped jobs are terminated. When a login shell receives a HUP signal, it sends a
+HUP signal to each job that has not been disowned with the disown built-in command.
+The INT and QUIT signals for an invoked command are ignored if the command is followed by & and the monitor
+option is not active. Otherwise, signals have the values inherited by the shell from its parent. See the trap built-in
+command.
+Each time a command is read, the substitutions are carried out. If the command name matches one of the ones in the
+Special Built-in Commands section of this manual page, it is executed within the current shell process. Next, the
+command name is checked to see if it matches a user defined function. If it does, the positional parameters are saved
+and then reset to the arguments of the function call. A function is also executed in the current shell process. When
+the function completes or issues a return, the positional parameter list is restored. For functions defined with the
+function name syntax, any trap set on EXIT within the function is executed. The exit value of a function is the val<hy>
+ue of the last command executed. If a command name is not a special built-in command or a user defined function,
+but it is one of the built-in commands, it is executed in the current shell process.
+The shell variable PATH defines the search path for the directory containing the command. Alternative directory
+names are separated by a colon (:). The default path is /bin:/usr/bin:, specifying /bin, /usr/bin, and the current di<hy>
+rectory in that order. The current directory can be specified by two or more adjacent colons, or by a colon at the be<hy>
+ginning or end of the path list. If the command name contains a slash (/), the search path is not used. Otherwise, each
+directory in the path is searched for an executable file of the specified name that is not a directory. If found, and if
+the shell determines that there is a built-in version of a command corresponding to a specified pathname, this built-in
+is invoked in the current process. If found, and this directory is also contained in the value of the FPATH variable,
+then this file is loaded into the current shell environment as if it were the argument to the . command except that only
+preset aliases are expanded, and a function of the specified name is executed as described in this manual page. If not
+found, and the file .paths is found, and this file contains a line of the form FPATH=path where path is an existing
+directory, and this directory contains a file of the specified name, then this file is loaded into the current shell envi<hy>
+ronment as if it were the argument to the . special built-in command and a function of the specified name is execut<hy>
+ed. Otherwise, if found, a process is created and an attempt is made to execute the command using exec(2).
+When an executable is found, the directory where it is found in is searched for a file named .paths. If this file is
+found and it contains a line of the form BUILTIN_LIB=value, the library named by value is searched for as if it
+were an option argument to builtin -f, and if it contains a built-in of the specified name this is executed instead of a
+command by this name. Otherwise, if this file is found and it contains a line of the form name=value in the first or
+second line, then the environment variable name is modified by prepending the directory specified by value to the di<hy>
+rectory list. If value is not an absolute directory, then it specifies a directory relative to the directory that the ex<hy>
+ecutable was found. If the environment variable name does not already exist it is added to the environment list for
+the specified command.
+If the file has execute permission but is not an a.out file, it is assumed to be a file containing shell commands. A sep<hy>
+arate shell is spawned to read it. All non-exported variables are removed in this case. If the shell command file
+doesn't have read permission, and/or if the setuid and setgid bits are set on the file, then the shell executes an agent
+whose job it is to set up the permissions and execute the shell with the shell command file passed down as an open
+file. A parenthesized command is executed in a sub-shell without removing non-exported variables.
+<beginning of page>
+The text of the last HISTSIZE (default 512) commands entered from a terminal device is saved in a history file. The
+file $HOME/.sh_history is used if the HISTFILE variable is not set or if the file it names is not writable. A shell
+can access the commands of all interactive shells which use the same named HISTFILE. The built-in command hist
+is used to list or edit a portion of this file. The portion of the file to be edited or listed can be selected by number or
+by giving the first character or characters of the command. A single command or range of commands can be speci<hy>
+fied. If you do not specify an editor program as an argument to hist then the value of the variable HISTEDIT is
+used. If HISTEDIT is unset, the obsolete variable FCEDIT is used. If FCEDIT is not defined, then /bin/ed is used.
+The edited commands are printed and executed again upon leaving the editor unless you quit without writing. The -s
+option (and in obsolete versions, the editor name -) is used to skip the editing phase and to re-execute the command.
+In this case a substitution parameter of the form old=newcan be used to modify the command before execution. For
+example, with the preset alias r, which is aliased to 'hist -s', typing `r bad=good c' re-executes the most recent
+command which starts with the letter c, replacing the first occurrence of the string bad with the string good.
+Normally, each command line entered from a terminal device is simply typed followed by a NEWLINE (RETURN
+or LINE FEED). If either the emacs, gmacs, or vi option is active, the user can edit the command line. To be in ei<hy>
+ther of these edit modes set the corresponding option. An editing option is automatically selected each time the VIS<hy>
+UAL or EDITOR variable is assigned a value ending in either of these option names.
+The editing features require that the user's terminal accept RETURN as carriage return without line feed and that a
+SPACE must overwrite the current character on the screen.
+Unless the multiline option is on, the editing modes implement a concept where the user is looking through a win<hy>
+dow at the current line. The window width is the value of COLUMNS if it is defined, otherwise 80. If the window
+width is too small to display the prompt and leave at least 8 columns to enter input, the prompt is truncated from the
+left. If the line is longer than the window width minus two, a mark is displayed at the end of the window to notify
+the user. As the cursor moves and reaches the window boundaries the window is centered about the cursor. The mark
+is a > (<, *) if the line extends on the right , left, or both sides of the window.
+The search commands in each edit mode provide access to the history file. Only strings are matched, not patterns, al<hy>
+though a leading ^ in the string restricts the match to begin at the first character in the line.
+Each of the edit modes has an operation to list the files or commands that match a partially entered word. When ap<hy>
+plied to the first word on the line, or the first word after a ;, |, &, or (, and the word does not begin with ~ or contain a
+/, the list of aliases, functions, and executable commands defined by the PATH variable that could match the partial
+word is displayed. Otherwise, the list of files that match the specified word is displayed. If the partially entered word
+does not contain any file expansion characters, a * is appended before generating these lists. After displaying the
+generated list, the input line is redrawn. These operations are called command name listing and file name listing, re<hy>
+spectively. There are additional operations, referred to as command name completion and file name completion,
+which compute the list of matching commands or files, but instead of printing the list, replace the current word with
+a complete or partial match. For file name completion, if the match is unique, a / is appended if the file is a directory
+and a space is appended if the file is not a directory. Otherwise, the longest common prefix for all the matching files
+replaces the word. For command name completion, only the portion of the file names after the last / are used to find
+the longest command prefix. If only a single name matches this prefix, then the word is replaced with the command
+name followed by a space. When using a TAB for completion that does not yield a unique match, a subsequent TAB
+provides a numbered list of matching alternatives. A specific selection can be made by entering the selection number
+followed by a TAB.
+The KEYBD trap can be used to intercept keys as they are typed and change the characters that are actually seen by
+the shell. This trap is executed after each character (or sequence of characters when the first character is ESC) is en<hy>
+tered while reading from a terminal.
+The variable .sh.edchar contains the character or character sequence which generated the trap. Changing the value
+of .sh.edchar in the trap action causes the shell to behave as if the new value were entered from the keyboard rather
+than the original value. The variable .sh.edcol is set to the input column number of the cursor at the time of the in<hy>
+put. The variable .sh.edmode is set to ESC when in vi insert mode and is null otherwise. By prepending ${.sh.edit<hy>
+mode} to a value assigned to .sh.edchar it causes the shell to change to control mode if it is not already in this
+mode.
+This trap is not invoked for characters entered as arguments to editing directives, or while reading input for a charac<hy>
+ter search.
+This mode is entered by enabling either the emacs or gmacs option. The only difference between these two modes is
+the way they handle ^T. To edit, the user moves the cursor to the point needing correction and then inserts or deletes
+characters or words as needed. All the editing commands are control characters or escape sequences. The notation
+for control characters is caret (^) followed by the character.
+<beginning of page>
+For example, ^F is the notation for CTRL/F. This is entered by depressing f while holding down the CTRL (control)
+key. The SHIFT key is not depressed. (The notation ^? indicates the DEL (delete) key.)
+The notation for escape sequences is M- followed by a character. For example, M-f (pronounced Meta f) is entered
+by depressing ESC (ASCII 033) followed by f. M-F is the notation for ESC followed by F.
+All edit commands operate from any place on the line, not just at the beginning. The RETURN or the LINE FEED
+key is not entered after edit commands except when noted.
+^F Move the cursor forward (right) one character.
+M-[C Move the cursor forward (right) one character.
+M-f Move the cursor forward one word. The emacs editor's idea of a word is a string of characters consisting of on<hy>
+ly letters, digits and underscores.
+^B Move the cursor backward (left) one character.
+M-[D Move the cursor backward (left) one character.
+M-b Move the cursor backward one word.
+^A Move the cursor to the beginning of the line.
+M-[H Move the cursor to the beginning of the line.
+^E Move the cursor to the end of the line.
+M-[Y Move the cursor to the end of line.
+^]char Move the cursor forward to the character char on the current line.
+M-^]char Move the cursor backwards to the character char on the current line.
+^X^X Interchange the cursor and the mark.
+erase Delete the previous character. The user-defined erase character is defined by the stty(1) command, and is usu<hy>
+ally ^H or #.
+lnext Removes the next character's editing features. The user-defined literal next character is defined by the stty(1)
+command, or is ^V if not defined.
+^D Delete the current character.
+M-d Delete the current word.
+M-^H MetaBACKSPACE. Delete the previous word.
+<beginning of page>
+M-h Delete the previous word.
+M-^? MetaDEL. Delete the previous word. If your interrupt character is ^? (DEL, the default), this command does
+not work.
+^T Transpose the current character with the previous character, and advance the cursor in emacs mode. Transpose
+two previous characters in gmacs mode.
+^C Capitalize the current character.
+M-c Capitalize the current word.
+M-l Change the current word to lower case.
+^K Delete from the cursor to the end of the line. If preceded by a numerical parameter whose value is less than the
+current cursor position, delete from specified position up to the cursor. If preceded by a numerical parameter whose
+value is greater than the current cursor position, then delete from cursor up to specified cursor position.
+^W Kill from the cursor to the mark.
+M-p Push the region from the cursor to the mark on the stack.
+kill Kill the entire current line. The user-defined kill character is defined by the stty(1) command, usually a ^G or @.
+If two kill characters are entered in succession, all kill characters from then on cause a line feed. This is useful when
+using paper terminals.
+^Y Restore the last item removed from line. Yank the item back to the line.
+^L Line feed and print the current line.
+M-^L Clear the screen.
+^@ Null character. Set mark.
+M-space MetaSPACE. Set the mark.
+^J New line. Execute the current line.
+^M Return. Execute the current line.
+EOF End-of-file character, normally ^D, is processed as an end-of-file only if the current line is null.
+^P Fetch the previous command. Each time ^P is entered the previous command back in time is accessed. Moves
+back one line when it is not on the first line of a multi-line command.
+M-[A Equivalent to ^P.
+<beginning of page>
+M-< Fetch the least recent (oldest) history line.
+M-> Fetch the most recent (youngest) history line.
+^N Fetch the next command line. Each time ^N is entered the next command line forward in time is accessed.
+M-[B Equivalent to ^N.
+^Rstring Reverse search history for a previous command line containing string. If a parameter of zero is specified,
+the search is forward. string is terminated by a RETURN or NEWLINE. If string is preceded by a ^, the matched
+line must begin with string. If string is omitted, then the next command line containing the most recent string is ac<hy>
+cessed. In this case a parameter of zero reverses the direction of the search.
+^O Operate. Execute the current line and fetch the next line relative to current line from the history file.
+M-digits Escape. Define numeric parameter. The digits are taken as a parameter to the next command. The com<hy>
+mands that accept a parameter are: ^F, ^B, ERASE, ^C, ^D, ^K, ^R, ^P, ^N, ^], M-., M-, M-^], M-_, M-=, M-b, M-c,
+M-d, M-f, M-h, M-l, and M-^H.
+M-letter Soft-key. Search the alias list for an alias by the name letter. If an alias of letter is defined, insert its value
+on the input queue. letter must not be one of the metafunctions in this section.
+M-[letter Soft key. Search the alias list for an alias by the name letter. If an alias of this name is defined, insert its
+value on the input queue. This can be used to program function keys on many terminals.
+M-. The last word of the previous command is inserted on the line. If preceded by a numeric parameter, the value of
+this parameter determines which word to insert rather than the last word.
+M-_ Same as M-..
+M-* Attempt filename generation on the current word. As asterisk is appended if the word does not match any file or
+contain any special pattern characters.
+M-ESC Command or file name completion as described in this manual page.
+^ITAB Attempts command or file name completion as described in this manual page. If a partial completion occurs,
+repeating this behaves as if M-= were entered. If no match is found or entered after SPACE, a TAB is inserted.
+M-= If not preceded by a numeric parameter, generates the list of matching commands or file names as described in
+this manual page. Otherwise, the word under the cursor is replaced by the item corresponding to the value of the nu<hy>
+meric parameter from the most recently generated command or file list. If the cursor is not on a word, the word is in<hy>
+serted instead.
+^U Multiply parameter of next command by 4.
+\ Escape the next character. Editing characters, the user's erase, kill and interrupt (normally ^?) characters can be en<hy>
+tered in a command line or in a search string if preceded by a \. The \ removes the next character's editing features, if
+any.
+<beginning of page>
+M-^V Display the version of the shell.
+M-# If the line does not begin with a #, a # is inserted at the beginning of the line and after each NEWLINE, and the
+line is entered. This causes a comment to be inserted in the history file. If the line begins with a #, the # is deleted
+and one # after each NEWLINE is also deleted.
+There are two typing modes. Initially, when you enter a command you are in the input mode. To edit, the user enters
+control mode by typing ESC (033) and moves the cursor to the point needing correction and then inserts or deletes
+characters or words as needed. Most control commands accept an optional repeat count prior to the command.
+When in vi mode on most systems, canonical processing is initially enabled and the command is echoed again if the
+speed is 1200 baud or greater and it contains any control characters or less than one second has elapsed since the
+prompt was printed. The ESC character terminates canonical processing for the remainder of the command and the
+user can then modify the command line. This scheme has the advantages of canonical processing with the type-
+ahead echoing of raw mode.
+If the option viraw is also set, the terminal is always have canonical processing disabled. This mode is implicit for
+systems that do not support two alternate end of line delimiters, and might be helpful for certain terminals.
+By default the editor is in input mode.
+The following input edit commands are supported:
+ERASE User defined erase character as defined by the stty command, usually ^H or #. Delete previous character.
+^W Delete the previous blank separated word. On some systems the viraw option might be required for this to work.
+EOF As the first character of the line causes the shell to terminate unless the ignoreeof option is set. Otherwise this
+character is ignored.
+lnext User defined literal next character as defined by the stty(1) or ^V if not defined. Removes the next character's
+editing features, if any. On some systems the viraw option might be required for this to work.
+\ Escape the next ERASE or KILL character.
+^I TAB Attempts command or file name completion as described in this manual page and returns to input mode. If a
+partial completion occurs, repeating this behaves as if = were entered from control mode. If no match is found or en<hy>
+tered after SPACE, a TAB is inserted.
+The motion edit commands move the cursor.
+The following motion edit commands are supported:
+[count]l Move the cursor forward (right) one character.
+[count][C Move the cursor forward (right) one character.
+[count]w Move the cursor forward one alphanumeric word.
+[count]W Move the cursor to the beginning of the next word that follows a blank.
+[count]e Move the cursor to the end of the word.
+<beginning of page>
+[count]E Move the cursor to the end of the current blank delimited word.
+[count]h Move the cursor backward (left) one character.
+[count][D Move the cursor backward (left) one character.
+[count]b Move the cursor backward one word.
+[count]B Move the cursor to the preceding blank separated word.
+[count]| Move the cursor to column count.
+[count]fc Find the next character c in the current line.
+[count]Fc Find the previous character c in the current line.
+[count]tC Equivalent to f followed by h.
+[count]Tc Equivalent to F followed by l.
+[count]; Repeat count times the last single character find command: f, F, t, or T.
+[count], Reverse the last single character find command count times.
+0 Move the cursor to the start of line.
+^ Move the cursor to start of line.
+[H Move the cursor to the first non-blank character in the line.
+$ Move the cursor to the end of the line.
+[Y Move the cursor to the end of the line.
+% Moves to balancing (, ), {, }, [, or ]. If cursor is not on one of the characters described in this section, the remain<hy>
+der of the line is searched for the first occurrence of one of the characters first.
+The search edit commands access your command history.
+The following search edit commands are supported:
+[count]k Fetch the previous command. Each time k is entered, the previous command back in time is accessed.
+[count]- Fetch the previous command. Each time k is entered, the previous command back in time is accessed.
+Equivalent to k.
+<beginning of page>
+[count][A Fetch the previous command. Each time k is entered, the previous command back in time is accessed.
+Equivalent to k.
+[count]j Fetch the next command. Each time j is entered, the next command forward in time is accessed.
+[count]+ Fetch the next command. Each time j is entered, the next command forward in time is accessed.
+Equivalent to j.
+[count][B Fetch the next command. Each time j is entered, the next command forward in time is accessed.
+Equivalent to j.
+[count]G Fetch command number count. The default is the least recent history command.
+/string Search backward through history for a previous command containing string. string is terminated by a RE<hy>
+TURN or NEWLINE. If string is preceded by a ^, the matched line must begin with string. If string is null, the previ<hy>
+ous string is used.
+?string Search forward through history for a previous command containing string. string is terminated by a RE<hy>
+TURN or NEWLINE. If string is preceded by a ^, the matched line must begin with string. If string is null, the previ<hy>
+ous string is used.
+Same as / except that search is in the forward direction.
+n Search in the backwards direction for the next match of the last pattern to / or ? commands.
+N Search in the forward direction for next match of the last pattern to / or ?.
+The following commands modify the line:
+a Enter input mode and enter text after the current character.
+A Append text to the end of the line. Equivalent to $a.
+[count]cmotion
+c[count]motion Delete current character through the character that motion would move the cursor to and enter input
+mode. If motion is c, the entire line is deleted and input mode entered.
+C Delete the current character through the end of line and enter input mode. Equivalent to c$.
+S Equivalent to cc.
+[count]s Replace characters under the cursor in input mode.
+D[count]dmotion Delete the current character through the end of line. Equivalent to d$.
+<beginning of page>
+d[count]motion Delete current character through the character that motion would move to. If motion is d , the entire
+line is deleted.
+i Enter input mode and insert text before the current character.
+I Insert text before the beginning of the line. Equivalent to 0i.
+[count]P Place the previous text modification before the cursor.
+[count]p Place the previous text modification after the cursor.
+R Enter input mode and replace characters on the screen with characters you type overlay fashion.
+[count]rc Replace the count characters starting at the current cursor position with c, and advance the cursor.
+[count]x Delete current character.
+[count]X Delete preceding character.
+[count]. Repeat the previous text modification command.
+[count]~ Invert the case of the count characters starting at the current cursor position and advance the cursor.
+[count]_ Causes the count word of the previous command to be appended and input mode entered. The last word is
+used if count is omitted.
+* Causes an * to be appended to the current word and file name generation attempted. If no match is found, it rings
+the bell. Otherwise, the word is replaced by the matching pattern and input mode is entered.
+\ Command or file name completion as described in this manual page.
+The following miscellaneous edit commands are supported:
+[count]ymotion
+y[count]motion Yank the current character through the character to which motion would move the cursor. Put the
+yanked characters in the delete buffer. The text and cursor position are unchanged.
+yy Yank the current line.
+Y Yank the current line from the current cursor location to the end of the line. Equivalent to y$.
+u Undo the last text modifying command.
+U Undo all the text modifying commands performed on current line.
+[count]V Return the command :
+ hist -e ${VISUAL:-${EDITOR:-vi}} count
+<beginning of page>
+in the input buffer. If count is omitted, the current line is used.
+^L Line feed and print the current line. This command only works in control mode.
+^J New line. Execute the current line, regardless of mode.
+^M Return. Execute the current line, regardless of mode.
+# If the first character of the command is a # , delete this # and each # that follows a NEWLINE.
+Otherwise, send the line after inserting a # in front of each line in the command.
+This is command is useful for causing the current line to be inserted in the history as a comment and un-commenting
+previously commented commands in the history file.
+[count]= If count is not specified, generate the list of matching commands or file names as described in this manual
+page.
+Otherwise, replace the word at the current cursor location with the count item from the most recently generated com<hy>
+mand or file list. If the cursor is not on a word, it is inserted after the current cursor location.
+@letter Search your alias list for an alias by the name letter. If an alias of this name is defined, insert its value on the
+input queue for processing.
+^V Display version of the shell.
+The following simple-commands are executed in the shell process. Input and output redirection is permitted. Unless
+otherwise indicated, the output is written on file descriptor 1 and the exit status, when there is no syntax error, is 0.
+Except for :, true, false, echo, newgrp, and login, all built-in commands accept -- to indicate the end of options.
+They also interpret the option --man as a request to display the manual page onto standard error and -? as a help re<hy>
+quest which prints a usage message on standard error.
+Commands that are preceded by one or two ++ symbols are special built-in commands and are treated specially in
+the following ways: 1. Variable assignment lists preceding the command remain in effect when the command com<hy>
+pletes. 2. I/O redirections are processed after variable assignments. 3. Errors cause a script that contains them to
+abort. 4. They are not valid function names. 5. Words following a command preceded by ++ that are in the format
+of a variable assignment are expanded with the same rules as a variable assignment. This means that tilde substitu<hy>
+tion is performed after the = sign and field splitting and file name generation are not performed.
++ : [arg ...]
+The command only expands parameters.
++ . name [arg ...]
+If name is a function defined with the function name reserved word syntax, the function is executed in the current
+environment (as if it had been defined with the name() syntax.) Otherwise if name refers to a file, the file is read in
+its entirety and the commands are executed in the current shell environment. The search path specified by PATH is
+used to find the directory containing the file. If any arguments arg are specified, they become the positional parame<hy>
+ters while processing the . command and the original positional parameters are restored upon completion. Otherwise
+the positional parameters are unchanged. The exit status is the exit status of the last command executed.
+++ alias [-ptx] [name[ =value]] ...
+alias with no arguments prints the list of aliases in the form name=value on standard output. The -p option causes
+the word alias to be inserted before each one. When one or more arguments are specified, an alias is defined for each
+<beginning of page>
+name whose value is specified. A trailing space in value causes the next word to be checked for alias substitution.
+The obsolete -t option is used to set and list tracked aliases. The value of a tracked alias is the full pathname corre<hy>
+sponding to the specified name. The value becomes undefined when the value of PATH is reset but the alias remains
+tracked. Without the -t option, for each name in the argument list for which no value is specified, the name and value
+of the alias is printed. The obsolete -x option has no effect. The exit status is non-zero if a name is specified, but no
+value, and no alias has been defined for the name.
+bg [ job...]
+This command is only on systems that support job control. Puts each specified job into the background. The current
+job is put in the background if job is not specified. See the Jobs section of this manual page for a description of the
+format of job.
++ break [n]
+Exit from the enclosing for, while, until, or select loop, if any. If n is specified, then break n levels.
+builtin [-ds ] [-f file] [name ...]
+If name is not specified, and no -f option is specified, the built-ins are printed on standard output. The -s option
+prints only the special built-ins. Otherwise, each name represents the pathname whose basename is the name of the
+built-in. The entry point function name is determined by prepending b to the built-in name. The ISO C/C++ proto<hy>
+type is bmycommand(int argc, char *argv[], void *context) for the built-in command mycommand where argv is an
+array of argc elements and context is an optional pointer to a Shell_t structure as described in <ast/shell.h> Special
+built-ins cannot be bound to a pathname or deleted. The -d option deletes each of the specified built-ins. On systems
+that support dynamic loading, the -f option names a shared library containing the code for built-ins. The shared li<hy>
+brary prefix and/or suffix, which depend on the system, can be omitted. Once a library is loaded, its symbols become
+available for subsequent invocations of builtin. Multiple libraries can be specified with separate invocations of the
+builtin command. Libraries are searched in the reverse order in which they are specified. When a library is loaded, it
+looks for a function in the library whose name is lib_init() and invokes this function with an argument of 0.
+cd [-LP] [arg]
+cd [-LP] old new
+This command has two forms.
+In the first form it changes the current directory to arg. If arg is a -, the directory is changed to the previous directo<hy>
+ry. The shell variable HOME is the default arg. The variable PWD is set to the current directory. The shell variable
+CDPATH defines the search path for the directory containing arg. Alternative directory names are separated by a
+colon (:). The default path is NULL (specifying the current directory). The current directory is specified by a null
+path name, which can appear immediately after the equal sign or between the colon delimiters anywhere else in the
+path list. If arg begins with a /, the search path is not used. Otherwise, each directory in the path is searched for arg.
+The second form of cd substitutes the string new for the string old in the current directory name, PWD, and tries to
+change to this new directory. By default, symbolic link names are treated literally when finding the directory name.
+This is equivalent to the -L option. The -P option causes symbolic links to be resolved when determining the direc<hy>
+tory. The last instance of -L or -P on the command line determines which method is used. The cd command cannot
+be executed by rksh93.
+command [-pvVx] name [arg ...]
+Without the -v or -V options, executes name with the arguments specified by arg.
+The -p option causes a default path to be searched rather than the one defined by the value of PATH. Functions are
+not searched when finding name. In addition, if name refers to a special built-in, none of the special properties asso<hy>
+ciated with the leading daggers are honored. For example, the predefined alias redirect='command exec' prevents a
+script from terminating when an invalid redirection is specified.
+With the -x option, if command execution would result in a failure because there are too many arguments, errno
+E2BIG, the shell invokes command name multiple times with a subset of the arguments on each invocation. Argu<hy>
+ments that occur prior to the first word that expands to multiple arguments and after the last word that expands to
+multiple arguments are passed on each invocation. The exit status is the maximum invocation exit status.
+<beginning of page>
+With the -v option, command is equivalent to the built-in whence command described in this section. The -V option
+causes command to act like whence -v.
++continue [n]
+Resumes the next iteration of the enclosing for, while, until, or select loop. If n is specified, then resume at the nth
+enclosing loop.
+disown [job...]
+Causes the shell not to send a HUP signal to each specified job, or all active jobs if job is omitted, when a login shell
+terminates.
+echo [arg ...]
+When the first arg does not begin with a -, and none of the arguments contain a backslash (\), prints each of its argu<hy>
+ments separated by a SPACE and terminated by a NEWLINE. Otherwise, the behavior of echo is system dependent
+and print or printf described in this section should be used. See echo(1) for usage and description.
++eval [arg ...]
+The arguments are read as input to the shell and the resulting commands are executed.
++exec [-c] [-a name ...] [arg ...]
+If arg is specified, the command specified by the arguments is executed in place of this shell without creating a new
+process. The -c option causes the environment to be cleared before applying variable assignments associated with
+the exec invocation. The -a option causes name rather than the first arg, to become argv[0] for the new process. In<hy>
+put and output arguments can appear and affect the current process. If arg is not specified, the effect of this com<hy>
+mand is to modify file descriptors as prescribed by the input/output redirection list. In this case, any file descriptor
+numbers greater than 2 that are opened with this mechanism are closed when invoking another program.
++exit [n]
+Causes the shell to exit with the exit status specified by n. The value is the least significant 8 bits of the specified sta<hy>
+tus. If n is omitted, then the exit status is that of the last command executed. An end-of-file also causes the shell to
+exit except for a shell which has the ignoreeof option turned on. See set.
+++export [-p] [name[=value]] ...
+If name is not specified, the names and values of each variable with the export attribute are printed with the values
+quoted in a manner that allows them to be re-entered. The -p option causes the word export to be inserted before
+each one. Otherwise, the specified names are marked for automatic export to the environment of subsequently-ex<hy>
+ecuted commands.
+false
+Does nothing, and exits 1. Used with until for infinite loops.
+fg [job ...]
+This command is only on systems that support job control. Each job specified is brought to the foreground and wait<hy>
+ed for in the specified order. Otherwise, the current job is brought into the foreground. See Jobs for a description of
+the format of job.
+getconf [name [pathname]]
+Prints the current value of the configuration parameter specified by name. The configuration parameters are defined
+by the IEEE POSIX 1003.1 and IEEE POSIX 1003.2 standards. See pathconf(2) and sysconf(3C).
+<beginning of page>
+The pathname argument is required for parameters whose value depends on the location in the file system. If no ar<hy>
+guments are specified, getconf prints the names and values of the current configuration parameters. The pathname /
+is used for each of the parameters that requires pathname.
+getopts [ -a name] optstring vname [arg ...]
+Checks arg for legal options. If arg is omitted, the positional parameters are used. An option argument begins with a
++ or a -. An option that does not begin with + or - or the argument -- ends the options. Options beginning with + are
+only recognized when optstring begins with a +. optstring contains the letters that getopts recognizes. If a letter is
+followed by a :, that option is expected to have an argument. The options can be separated from the argument by
+blanks. The option -?causes getopts to generate a usage message on standard error. The -a option can be used to
+specify the name to use for the usage message, which defaults to $0. getopts places the next option letter it finds in<hy>
+side variable vname each time it is invoked. The option letter is prepended with a + when arg begins with a +. The
+index of the next arg is stored in OPTIND. The option argument, if any, gets stored in OPTARG. A leading : in opt<hy>
+string causes getopts to store the letter of an invalid option in OPTARG, and to set vname to ? for an unknown op<hy>
+tion and to: when a required option argument is missing. Otherwise, getopts prints an error message. The exit status
+is non-zero when there are no more options. There is no way to specify any of the options :, +, -, ?, [, and ]. The op<hy>
+tion # can only be specified as the first option.
+hist [ -e ename][-nlr] [ first[last ] ]
+
+hist -s [ old=new ] [ command]
+In the first form, a range of commands from first to last is selected from the last HISTSIZE commands that were
+typed at the terminal. The arguments first and last can be specified as a number or as a string. A string is used to lo<hy>
+cate the most recent command starting with the specified string. A negative number is used as an offset to the current
+command number. If the -l option is selected, the commands are listed on standard output. Otherwise, the editor pro<hy>
+gram ename is invoked on a file containing these keyboard commands. If ename is not supplied, then the value of the
+variable HISTEDIT is used. If HISTEDIT is not set, then FCEDIT (default /bin/ed) is used as the editor. When
+editing is complete, the edited command(s) is executed if the changes have been saved. If last is not specified, then it
+is set to first. If first is not specified, the default is the previous command for editing and -16 for listing. The option
+-r reverses the order of the commands and the option -n suppresses command numbers when listing. In the second
+form, command is interpreted as first described in this section and defaults to the last command executed. The result<hy>
+ing command is executed after the optional substitution old=new is performed.
+jobs -lnp [job ...]
+Lists information about each specified job, or all active jobs if job is omitted. The -l option lists process ids in addi<hy>
+tion to the normal information. The -n option only displays jobs that have stopped or exited since last notified. The
+-p option causes only the process group to be listed. See Jobs for a description of the format of job.
+kill [-s signame] job ...
+kill [-n signum] job ...
+kill -l [sig ...]
+Sends either the TERM (terminate) signal or the specified signal to the specified jobs or processes. Signals are either
+specified by number with the -n option or by name with the -s option (as specified in <signal.h>, stripped of the pre<hy>
+fix `SIG with the exception that SIGCLD is named CHLD). For backward compatibility, the n and s can be omitted
+and the number or name placed immediately after the -. If the signal being sent is TERM (terminate) or HUP (hang
+up), then the job or process is sent a CONT (continue) signal if it is stopped. The argument job can be the process id
+of a process that is not a member of one of the active jobs. See Jobs for a description of the format of job. In the
+third form, kill -l, if sig is not specified, the signal names are listed. Otherwise, for each sig that is a name, the corre<hy>
+sponding signal number is listed. For each sig that is a number, the signal name corresponding to the least significant
+8 bits of sig is listed.
+let [arg ...]
+Each arg is a separate arithmetic expression to be evaluated. See the Arithmetic Evaluation section of this manual
+page for a description of arithmetic expression evaluation. The exit status is 0 if the value of the last expression is
+non-zero, and 1 otherwise.
+<beginning of page>
++newgrp [arg ...]
+Equivalent to exec /bin/newgrp arg ...
+print [-Renprs] [ -u unit] [ -f format ] [ arg ...]
+With no options or with option - or --, each arg is printed on standard output. The -f option causes the arguments to
+be printed as described by printf. In this case, any e, n, r, or R options are ignored. Otherwise, unless the -R or -r,
+are specified, the following escape conventions are applied:
+\a Alert character (ASCII 07)
+\b Backspace character (ASCII 010)
+\c Causes print to end without processing more arguments and not adding a NEWLINE
+\f Form-feed character (ASCII 014)
+\n NEWLINE character (ASCII 012)
+\r RETURN character (ASCII 015)
+\t TAB character (ASCII 011)
+\v Vertical TAB character (ASCII 013)
+\E Escape character (ASCII 033)
+\\ Backslash character \
+\0x Character defined by the 1, 2, or 3-digit octal string specified by x
+The -R option prints all subsequent arguments and options other than -n. The -e causes the escape conventions to be
+applied This is the default behavior. It reverses the effect of an earlier -r. The -p option causes the arguments to be
+written onto the pipe of the process spawned with |& instead of standard output. The -s option causes the arguments
+to be written onto the history file instead of standard output. The -u option can be used to specify a one digit file de<hy>
+scriptor unit number unit on which the output is placed. The default is 1. If the option -n is used, no NEWLINE is
+added to the output.
+printf format[arg ...]
+The arguments arg are printed on standard output in accordance with the ANSI-C formatting rules associated with
+the format string format. If the number of arguments exceeds the number of format specifications, the format string
+is reused to format remaining arguments. The following extensions can also be used: A %b format can be used in<hy>
+stead of %s to cause escape sequences in the corresponding arg to be expanded as described in print. A %B option
+causes each of the arguments to be treated as variable names and the binary value of the variables is printed. This is
+most useful for variables with an attribute of b. A %H format can be used instead of %s to cause characters in arg
+that are special in HTML and XML to be output as their entity name. A %P format can be used instead of %s to
+cause arg to be interpreted as an extended regular expression and be printed as a shell pattern. A %R format can be
+used instead of %s to cause arg to be interpreted as a shell pattern and to be printed as an extended regular expres<hy>
+sion. A %q format can be used instead of %s to cause the resulting string to be quoted in a manner than can be in<hy>
+put again to the shell. A %(date-format)T format can be use to treat an argument as a date/time string and to format
+the date/time according to the date-format as defined for the date(1) command. A %Z format outputs a byte whose
+value is 0. The precision field of the %d format can be followed by a . and the output base. In this case, the # flag
+character causes base# to be prepended. The # flag when used with the d specifier without an output base, causes the
+output to be displayed in thousands units with one of the suffixes k M G T P E to indicate the unit. The # flag when
+<beginning of page>
+used with the i specifier causes the output to be displayed in 1024 with one of the suffixes Ki Mi Gi Ti Pi Ei to indi<hy>
+cate the unit. The = flag has been added to center the output within the specified field width.
+pwd [-LP]
+Outputs the value of the current working directory. The -L option is the default. It prints the logical name of the cur<hy>
+rent directory. If the -P option is specified, all symbolic links are resolved from the name. The last instance of -L or
+-P on the command line determines which method is used.
+read [-Aprs] [-d delim] [ -n n] [[ -N n] [[-t timeout] [-u unit] [vname?prompt] [ vname ... ]
+The shell input mechanism. One line is read and is broken up into fields using the characters in IFS as separators.
+The escape character, \, is used to remove any special meaning for the next character and for line continuation. The
+-d option causes the read to continue to the first character of delim rather than NEWLINE. The -n option causes at
+most n bytes to read rather a full line but returns when reading from a slow device as soon as any characters have
+been read. The -N option causes exactly n to be read unless an end-of-file has been encountered or the read times out
+because of the -t option. In raw mode, -r, the \ character is not treated specially. The first field is assigned to the first
+vname, the second field to the second vname, etc., with leftover fields assigned to the last vname. When vname has
+the binary attribute and -n or -N is specified, the bytes that are read are stored directly into the variable. If the -v is
+specified, then the value of the first vname is used as a default value when reading from a terminal device. The -A
+option causes the variable vname to be unset and each field that is read to be stored in successive elements of the in<hy>
+dexed array vname. The -p option causes the input line to be taken from the input pipe of a process spawned by the
+shell using |&. If the -s option is present, the input is saved as a command in the history file. The option -u can be
+used to specify a one digit file descriptor unit unit to read from. The file descriptor can be opened with the exec spe<hy>
+cial built-in command. The default value of unit n is 0. The option -t is used to specify a time out in seconds when
+reading from a terminal or pipe. If vname is omitted, then REPLY is used as the default vname. An end-of-file with
+the -p option causes cleanup for this process so that another can be spawned. If the first argument contains a ?, the
+remainder of this word is used as a prompt on standard error when the shell is interactive. The exit status is 0 unless
+an end-of-file is encountered or read has timed out.
+++readonly [-p] [ vname[=value]] ...
+If vname is not specified, the names and values of each variable with the read-only attribute is printed with the val<hy>
+ues quoted in a manner that allows them to be input again. The -p option causes the word readonly to be inserted
+before each one. Otherwise, the specified vnames are marked readonly and these names cannot be changed by sub<hy>
+sequent assignment.
++return [n]
+Causes a shell function or script to return to the invoking script with the exit status specified by n. The value is the
+least significant 8 bits of the specified status. If n is omitted, then the return status is that of the last command ex<hy>
+ecuted. If return is invoked while not in a function or a script, then it behaves the same as exit.
++set [ <+->BCGabefhkmnoprstuvx] [<+->o [ option ] ] ... [ <+->A vname] [arg...]
+The set command supports the following options:
+-a
+All subsequent variables that are defined are automatically exported.
+-A
+Array assignment. Unset the variable vname and assign values sequentially from the arg list. If +A is used, the vari<hy>
+able vname is not unset first.
+-b
+Prints job completion messages as soon as a background job changes state rather than waiting for the next prompt.
+<beginning of page>
+-B
+Enable brace pattern field generation. This is the default behavior.
+-C
+Prevents redirection (>) from truncating existing files. Files that are created are opened with the O_EXCL mode.
+Requires >| to truncate a file when turned on.
+-e
+If a command has a non-zero exit status, execute the ERR trap, if set, and exit. This mode is disabled while reading
+profiles.
+-f
+Disables file name generation.
+-G
+Causes the pattern ** by itself to match files and zero or more directories and subdirectories when used for file name
+generation. If followed by a / only directories and subdirectories are matched.
+-h
+Each command becomes a tracked alias when first encountered.
+-k
+Obsolete. All variable assignment arguments are placed in the environment for a command, not just those that pre<hy>
+cede the command name.
+-m
+Background jobs run in a separate process group and a line prints upon completion. The exit status of background
+jobs is reported in a completion message. On systems with job control, this option is turned on automatically for in<hy>
+teractive shells.
+-n
+Read commands and check them for syntax errors, but do not execute them. Ignored for interactive shells.
+-o
+If no option name is supplied, the list of options and their current settings are written to standard output. When in<hy>
+voked with a +, the options are written in a format that can be input again to the shell to restore the settings. This op<hy>
+tion can be repeated to enable or disable multiple options.
+The following argument can be one of the following option names:
+allexport
+Same as -a.
+bgnice
+All background jobs are run at a lower priority. This is the default mode.
+<beginning of page>
+braceexpand
+Same as -B.
+emacs
+Puts you in an emacs style inline editor for command entry.
+errexit
+Same as -e.
+globstar
+Same as -G.
+gmacs
+Puts you in a gmacs style inline editor for command entry.
+ignoreeof
+The shell does not exit on end-of-file. The command exit must be used.
+keyword
+Same as -k.
+markdirs
+All directory names resulting from file name generation have a trailing / appended.
+monitor
+Same as -m.
+multiline
+The built-in editors use multiple lines on the screen for lines that are longer than the width of the screen. This might
+not work for all terminals.
+noclobber
+Same as -C.
+noexec
+Same as -n.
+noglob
+Same as -f.
+nolog
+Do not save function definitions in the history file.
+<beginning of page>
+notify
+Same as -b.
+nounset
+Same as -u.
+pipefail
+A pipeline does not complete until all components of the pipeline have completed, and the return value is the value
+of the last non-zero command to fail or zero if no command has failed.
+privileged
+Same as -p.
+showme
+When enabled, simple commands or pipelines preceded by a a semicolon (;) is displayed as if the xtrace option
+were enabled but is not executed. Otherwise, the leading ; is ignored.
+trackall
+Same as -h.
+verbose
+Same as -v.
+vi
+Puts you in insert mode of a vi style inline editor until you hit the escape character 033. This puts you in control
+mode. A return sends the line.
+viraw
+Each character is processed as it is typed in vi mode.
+xtrace
+Same as -x.
+If no option name is supplied, the current options settings are printed.
+-p
+Disables processing of the $HOME/.profile file and uses the file /etc/suid_profile instead of the ENV file. This
+mode is on whenever the effective uid (gid) is not equal to the real uid (gid). Turning this off causes the effective
+uid and gid to be set to the real uid and gid.
+-r
+Enables the restricted shell. This option cannot be unset once set.
+-s
+Sort the positional parameters lexicographically.
+<beginning of page>
+-t
+Obsolete. Exit after reading and executing one command.
+-u
+Treat unset parameters as an error when substituting.
+-v
+Print shell input lines as they are read.
+-x
+Print commands and their arguments as they are executed.
+--
+Do not change any of the options. This is useful in setting $1 to a value beginning with -. If no arguments follow this
+option then the positional parameters are unset.
+As an obsolete feature, if the first arg is - then the -x and -v options are turned off and the next arg is treated as the
+first argument. Using + rather than - causes these options to be turned off. These options can also be used upon in<hy>
+vocation of the shell. The current set of options can be found in $-. Unless -A is specified, the remaining arguments
+are positional parameters and are assigned, in order, to $1 $2 .... If no arguments are specified, then the names and
+values of all variables are printed on the standard output.
++shift [n]
+The positional parameters from $n+1 ... are renamed $1 ..., the default n is 1. The parameter n can be any arithmetic
+expression that evaluates to a non-negative number less than or equal to $#.
+sleep seconds
+Suspends execution for the number of decimal seconds or fractions of a second specified by seconds.
++trap -p [action] [sig] ...
+The -p option causes the trap action associated with each trap as specified by the arguments to be printed with ap<hy>
+propriate quoting. Otherwise, action is processed as if it were an argument to eval when the shell receives signal(s)
+sig. Each sig can be specified as a number or as the name of the signal. Trap commands are executed in order of sig<hy>
+nal number. Any attempt to set a trap on a signal that was ignored on entry to the current shell is ineffective. If ac<hy>
+tion is omitted and the first sig is a number, or if action is -, then the trap(s) for each sig are reset to their original
+values. If action is the null string then this signal is ignored by the shell and by the commands it invokes. If sig is
+ERR then action is executed whenever a command has a non-zero exit status. If sig is DEBUG then action is ex<hy>
+ecuted before each command. The variable .sh.command contains the contents of the current command line when
+action is running. If sig is 0 or EXIT and the trap statement is executed inside the body of a function defined with
+the function name syntax, then the command action is executed after the function completes. If sig is 0 or EXIT for
+a trap set outside any function then the command action is executed on exit from the shell. If sig is KEYBD, then
+action is executed whenever a key is read while in emacs, gmacs, or vi mode. The trap command with no argu<hy>
+ments prints a list of commands associated with each signal number.
+true
+Does nothing, and exits 0. Used with while for infinite loops.
+++typeset [<+->AHflabnprtux ] [ <+->EFLRZi[n] ] [ vname[=value ] ]
+Sets attributes and values for shell variables and functions. When invoked inside a function defined with the func<hy>
+tion name syntax, a new instance of the variable vname is created, and the variable's value and type are restored
+<beginning of page>
+when the function completes.
+Using + rather than - causes these options to be turned off. If no vname arguments are specified, a list of vnames
+(and optionally the values) of the variables is printed. Using + rather than - keeps the values from being printed.)
+The -p option causes typeset followed by the option letters to be printed before each name rather than the names of
+the options. If any option other than -p is specified, only those variables which have all of the specified options are
+printed. Otherwise, the vnames and attributes of all variables that have attributes are printed.
+The following list of attributes can be specified:
+-a Declares vname to be an indexed array. This is optional unless except for compound variable assignments.
+-A Declares vname to be an associative array. Sub-scripts are strings rather than arithmetic expressions.
+-b The variable can hold any number of bytes of data. The data can be text or binary. The value is represented by the
+base64 encoding of the data. If -Z is also specified, the size in bytes of the data in the buffer is determined by the
+size associated with the -Z. If the base64 string assigned results in more data, it is truncated. Otherwise, it is filled
+with bytes whose value is zero. The printf format %B can be used to output the actual data in this buffer instead of
+the base64 encoding of the data.
+-E Declares vname to be a double precision floating point number. If n is non-zero, it defines the number of signifi<hy>
+cant figures that are used when expanding vname. Otherwise, ten significant figures is used.
+-f The names refer to function names rather than variable names. No assignments can be made and the only other
+valid options are -t, -u, and -x. The -t option turns on execution tracing for this function. The -u option causes this
+function to be marked undefined. The FPATH variable is searched to find the function definition when the function
+is referenced. If no options other than -f is specified, then the function definition is displayed on standard output. If
++f is specified, then a line containing the function name followed by a shell comment containing the line number and
+path name of the file where this function was defined, if any, is displayed.
+The -i attribute cannot be specified with -f.
+-F Declares vname to be a double precision floating point number. If n is non-zero, it defines the number of places
+after the decimal point that are used when expanding vname. Otherwise ten places after the decimal point is used.
+-H This option provides UNIX to hostname file mapping on non-UNIX machines.
+-i Declares vname to be represented internally as integer. The right hand side of an assignment is evaluated as an
+arithmetic expression when assigning to an integer. If n is non-zero, it defines the output arithmetic base, otherwise
+the output base is ten.
+The -i attribute cannot be specified along with -R, -L, -Z, or -f.
+-l All uppercase characters are converted to lowercase. The uppercase option, -u, is turned off.
+-L Left justify and remove leading blanks from value. If n is non-zero, it defines the width of the field, otherwise it
+is determined by the width of the value of first assignment. When the variable is assigned to, it is filled on the right
+with blanks or truncated, if necessary, to fit into the field. The -R option is turned off.
+The -i attribute cannot be specified with -L.
+-n Declares vname to be a reference to the variable whose name is defined by the value of variable vname. This is
+usually used to reference a variable inside a function whose name has been passed as an argument.
+<beginning of page>
+-R Right justify and fill with leading blanks. If n is non-zero, it defines the width of the field, otherwise it is deter<hy>
+mined by the width of the value of first assignment. The field is left filled with blanks or truncated from the end if
+the variable is reassigned. The -L option is turned off.
+The -i attribute cannot be specified with -R.
+-r The specified vnames are marked read-only and these names cannot be changed by subsequent assignment.
+-t Tags the variables. Tags are user definable and have no special meaning to the shell.
+-u All lowercase characters are converted to uppercase. The lowercase option, -l, is turned off.
+-x The specified vnames are marked for automatic export to the environment of subsequently-executed commands.
+Variables whose names contain a . cannot be exported.
+-Z Right justify and fill with leading zeros if the first non-blank character is a digit and the -L option has not been
+set. Remove leading zeros if the -L option is also set. If n is non-zero, it defines the width of the field, otherwise it is
+determined by the width of the value of first assignment.
+The -i attribute cannot be specified with -Z.
+ulimit [-HSacdfmnpstv] [ limit]
+Set or display a resource limit. Many systems do not support one or more of these limits. The limit for a specified re<hy>
+source is set when limit is specified. The value of limit can be a number in the unit specified with each resource, or
+the value unlimited. When more than one resource is specified, then the limit name and unit is printed before the val<hy>
+ue.
+If no option is specified, -f is assumed.
+The following are the available resource limits:
+-a Lists all of the current resource limits.
+-c The number of 512-byte blocks on the size of core dumps.
+-d The number of Kbytes on the size of the data area.
+-f The number of 512-byte blocks on files that can be written by the current process or by child processes (files of
+any size can be read).
+-H Specifies a hard limit for the specified resource.
+A hard limit cannot be increased once it is set.
+If neither the -H nor -S option is specified, the limit applies to both. The current resource limit is printed when limit
+is omitted. In this case, the soft limit is printed unless -H is specified.
+-m The number of Kbytes on the size of physical memory.
+-n The number of file descriptors plus 1.
+<beginning of page>
+-p The number of 512-byte blocks for pipe buffering.
+-s The number of Kbytes on the size of the stack area.
+-S Specifies a soft limit for the specified resource.
+A soft limit can be increased up to the value of the hard limit.
+If neither the -H nor -S option is specified, the limit applies to both. The current resource limit is printed when limit
+is omitted. In this case, the soft limit is printed unless -H is specified.
+-t The number of CPU seconds to be used by each process.
+-v The number of Kbytes for virtual memory.
+umask [-S][mask]
+The user file-creation mask is set to mask. mask can either be an octal number or a symbolic value as described in
+chmod(1).
+If a symbolic value is specified, the new umask value is the complement of the result of applying mask to the com<hy>
+plement of the previous umask value. If mask is omitted, the current value of the mask is printed. The -S option
+causes the mode to be printed as a symbolic value. Otherwise, the mask is printed in octal.
+See umask(2)
++unalias [-a] name
+The aliases specified by the list of names are removed from the alias list. The -a option causes all the aliases to be
+unset.
++unset [-fnv] vname
+The variables specified by the list of vnames are unassigned, i.e., their values and attributes are erased. Read-only
+variables cannot be unset. If the -f option is set, then the names refer to function names. If the -v option is set, then
+the names refer to variable names. The -f option overrides -v. If -n is set and name is a name reference, then name is
+unset rather than the variable that it references. The default is equivalent to -v. Unsetting LINENO, MAILCHECK,
+OPTARG, OPTIND, RANDOM, SECONDS, TMOUT, and _ removes their special meaning even if they are sub<hy>
+sequently assigned to.
+wait [job]
+Wait for the specified job and report its termination status. If job is not specified, then all currently active child pro<hy>
+cesses are waited for. The exit status from this command is that of the last process waited for if job is specified; oth<hy>
+erwise it is zero. See Jobs for a description of the format of job.
+whence [-afpv] name ...
+For each name, indicate how it would be interpreted if used as a command name. The -v option produces a more ver<hy>
+bose report. The -f option skips the search for functions. The -p option does a path search for name even if name is
+an alias, a function, or a reserved word. The -a option is similar to the -v option but causes all interpretations of the
+specified name to be reported.
+If the shell is invoked by exec(2), and the first character of argument zero ($0) is -, then the shell is assumed to be a
+login shell and commands are read from /etc/profile and then from either .profile in the current directory or
+$HOME/.profile, if either file exists. Next, for interactive shells, commands are read first from /etc/ksh.kshrc, and
+then from the file named by performing parameter expansion, command substitution, and arithmetic substitution on
+<beginning of page>
+the value of the environment variable ENV if the file exists. If the -s option is not present and arg and a file by the
+name of arg exists, then it reads and executes this script. Otherwise, if the first arg does not contain a /, a path search
+is performed on the first arg to determine the name of the script to execute. The script arg must have execute permis<hy>
+sion and any setuid and setgid settings are ignored. If the script is not found on the path, arg is processed as if it
+named a built-in command or function.
+Commands are then read as described, and the following options are interpreted by the shell when it is invoked:
+-c If the -c option is present, then commands are read from the first arg. Any remaining arguments become position<hy>
+al parameters starting at 0.
+-D A list of all double quoted strings that are preceded by a $ is printed on standard output and the shell exits. This
+set of strings is subject to language translation when the locale is not C or POSIX. No commands are executed.
+-i If the -i option is present or if the shell input and output are attached to a terminal (as told by tcgetattr(3C), this
+shell is interactive. In this case TERM is ignored (so that kill 0 does not kill an interactive shell) and INTR is
+caught and ignored (so that wait is interruptible). In all cases, QUIT is ignored by the shell.
+-R filename The -R filename option is used to generate a cross reference database that can be used by a separate util<hy>
+ity to find definitions and references for variables and commands.
+-r If the -r option is present, the shell is a restricted shell.
+-s If the -s option is present or if no arguments remain, then commands are read from the standard input. Shell out<hy>
+put, except for the output of the Special Commands listed, is written to file descriptor 2.
+The remaining options and arguments are described under the set command. An optional - as the first argument is ig<hy>
+nored.
+rksh93 is used to set up login names and execution environments whose capabilities are more controlled than those
+of the standard shell.
+The actions of rksh93 are identical to those of ksh93, except that the following are disallowed: <bu> Unsetting the re<hy>
+stricted option <bu> Changing directory. See cd(1). <bu> Setting or unsetting the value or attributes of SHELL, ENV,
+FPATH, or PATH <bu> Specifying path or command names containing /, <bu> Redirecting output (>, >|, <>, and >>). <bu>
+Adding or deleting built-in commands. <bu> Using command -p to invoke a command.
+These restrictions are enforced after .profile and the ENV files are interpreted.
+When a command to be executed is found to be a shell procedure, rksh93 invokes ksh93 to execute it. Thus, it is
+possible to provide to the end-user shell procedures that have access to the full power of the standard shell, while im<hy>
+posing a limited menu of commands. This scheme assumes that the end-user does not have write and execute per<hy>
+missions in the same directory. The net effect of these rules is that the writer of the .profile has complete control
+over user actions, by performing guaranteed setup actions and leaving the user in an appropriate directory (probably
+not the login directory). The system administrator often sets up a directory of commands, for example, /usr/rbin,
+that can be safely invoked by rksh.
+See largefile(5) for the description of the behavior of ksh93 and rksh93 when encountering files greater than or
+equal to 2 Gbyte ( 2^31 bytes).
+The following exit values are returned:
+non-zero
+Returns non-zero when errors, such as syntax errors, are detected by the shell.
+If the shell is being used non-interactively, then execution of the shell file is abandoned unless the error occurs inside
+a sub-shell in which case the sub-shell is abandoned.
+<beginning of page>
+exit status of last command executed
+Returns the exit status of the last command executed.
+Run time errors detected by the shell are reported by printing the command or function name and the error condi<hy>
+tion. If the line number that the error occurred on is greater than one, then the line number is also printed in square
+brackets ([]) after the command or function name.
+See the ksh93 exit command for additional details.
+/etc/profile
+The system initialization file, executed for login shells.
+/etc/ksh.kshrc
+The system wide startup file, executed for interactive shells.
+$HOME/.profile
+The personal initialization file, executed for login shells after /etc/profile.
+$HOME/.kshrc
+Default personal initialization file, executed after /etc/ksh.kshrc, for interactive shells when ENV is not set.
+/etc/suid-profile
+Alternative initialization file, executed instead of the personal initialization file when the real and effective user or
+group id do not match.
+/dev/null
+NULL device.
+David Korn, dgk@research.att.com
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu _ Interface StabilitySee below.
+The scripting interface is Uncommitted. The environment variables, .paths feature, and editing modes are Volatile.
+cat(1), cd(1), chmod(1), cut(1), date(1), egrep(1), echo(1), egrep(1), env(1), fgrep(1), grep(1), login(1), new<hy>
+grp(1), paste(1), printf(1), stty(1), test(1), umask(1), vi(1), dup(2), exec(2), fork(2), ioctl(2), lseek(2), path<hy>
+conf(2), pipe(2), sysconf(3C), ulimit(2), umask(2), rand(3C)tcgetattr(3C), wait(3C), a.out(4), profile(4), at<hy>
+tributes(5), environ(5), largefile(5), standards(5)
+Bolsky, Morris I. and Korn, David G., The New KornShell Command and Programming Language, Prentice Hall,
+1995.
+POSIX-Part 2: Shell and Utilities, IEEE Std 1003.2-1992, ISO/IEC 9945-2, IEEE, 1993.
+ksh93 scripts should choose shell function names outside the namespace used by reserved keywords of the ISO C99,
+C++ and JAVA languages to avoid collisions with future enhancements to ksh93.
+If a command is executed, and then a command with the same name is installed in a directory in the search path be<hy>
+fore the directory where the original command was found, the shell continues to exec the original command. Use the
+<beginning of page>
+-t option of the alias command to correct this situation.
+Some very old shell scripts contain a caret (^) as a synonym for the pipe character (|).
+Using the hist built-in command within a compound command causes the whole command to disappear from the
+history file.
+The built-in command . file reads the whole file before any commands are executed. alias and unalias commands in
+the file do not apply to any commands defined in the file.
+Traps are not processed while a job is waiting for a foreground process. Thus, a trap on CHLD is not executed until
+the foreground job terminates.
+It is a good idea to leave a space after the comma operator in arithmetic expressions to prevent the comma from be<hy>
+ing interpreted as the decimal point character in certain locales.
+There might be some restrictions on creating a .paths file which is portable across other operating systems.
+If the system supports the 64-bit instruction set, /bin/ksh93 executes the 64-bit version of ksh93.

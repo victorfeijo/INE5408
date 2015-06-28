@@ -1,0 +1,84 @@
+<beginning of page>
+pam <-> PAM (Pluggable Authentication Module)
+#include <security/pam_appl.h>
+cc [ flag... ] file ... -lpam [ library ... ]
+The PAM framework, libpam, consists of an interface library and multiple authentication service modules. The
+PAM interface library is the layer implementing the Application Programming Interface ( API ). The authentica<hy>
+tion service modules are a set of dynamically loadable objects invoked by the PAM API to provide a particular type
+of user authentication. PAM gives system administrators the flexibility of choosing any authentication service avail<hy>
+able on the system to perform authentication. This framework also allows new authentication service modules to be
+plugged in and made available without modifying the applications.
+Refer to Solaris Security for Developers Guide for information about providing authentication, account manage<hy>
+ment, session management, and password management through PAM modules.
+The PAM library interface consists of six categories of functions, the names for which all start with the prefix
+pam_.
+The first category contains functions for establishing and terminating an authentication activity, which are
+pam_start(3PAM) and pam_end(3PAM). The functions pam_set_data(3PAM) and pam_get_data(3PAM) main<hy>
+tain module specific data. The functions pam_set_item(3PAM) and pam_get_item(3PAM) maintain state informa<hy>
+tion. pam_strerror(3PAM) is the function that returns error status information.
+The second category contains the functions that authenticate an individual user and set the credentials of the user,
+pam_authenticate(3PAM) and pam_setcred(3PAM).
+The third category of PAM interfaces is account management. The function pam_acct_mgmt(3PAM) checks for
+password aging and access-hour restrictions.
+Category four contains the functions that perform session management after access to the system has been granted.
+See pam_open_session(3PAM) and pam_close_session(3PAM)
+The fifth category consists of the function that changes authentication tokens, pam_chauthtok(3PAM). An authenti<hy>
+cation token is the object used to verify the identity of the user. In UNIX, an authentication token is a user's pass<hy>
+word.
+The sixth category of functions can be used to set values for PAM environment variables. See pam_putenv(3PAM),
+pam_getenv(3PAM), and pam_getenvlist(3PAM).
+The pam_*() interfaces are implemented through the library libpam. For each of the categories listed above, ex<hy>
+cluding categories one and six, dynamically loadable shared modules exist that provides the appropriate service lay<hy>
+er functionality upon demand. The functional entry points in the service layer start with the pam_sm_ prefix. The
+only difference between the pam_sm_*() interfaces and their corresponding pam_ interfaces is that all the
+pam_sm_*() interfaces require extra parameters to pass service<mi>specific options to the shared modules. Refer to
+pam_sm(3PAM) for an overview of the PAM service module APIs.
+A sequence of calls sharing a common set of state information is referred to as an authentication transaction. An au<hy>
+thentication transaction begins with a call to pam_start(). pam_start() allocates space, performs various initializa<hy>
+tion activities, and assigns a PAM authentication handle to be used for subsequent calls to the library.
+After initiating an authentication transaction, applications can invoke pam_authenticate() to authenticate a particu<hy>
+lar user, and pam_acct_mgmt() to perform system entry management. For example, the application may want to de<hy>
+termine if the user's password has expired.
+If the user has been successfully authenticated, the application calls pam_setcred() to set any user credentials asso<hy>
+ciated with the authentication service. Within one authentication transaction (between pam_start() and pam_end()),
+all calls to the PAM interface should be made with the same authentication handle returned by pam_start(). This is
+necessary because certain service modules may store module-specific data in a handle that is intended for use by
+other modules. For example, during the call to pam_authenticate(), service modules may store data in the handle
+that is intended for use by pam_setcred().
+To perform session management, applications call pam_open_session(). Specifically, the system may want to store
+the total time for the session. The function pam_close_session() closes the current session.
+When necessary, applications can call pam_get_item() and pam_set_item() to access and to update specific authen<hy>
+tication information. Such information may include the current username.
+<beginning of page>
+To terminate an authentication transaction, the application simply calls pam_end(), which frees previously allocated
+space used to store authentication information.
+The authentication service in PAM does not communicate directly with the user; instead it relies on the application
+to perform all such interactions. The application passes a pointer to the function, conv(), along with any associated
+application data pointers, through a pam_conv structure to the authentication service when it initiates an authentica<hy>
+tion transaction, via a call to pam_start(). The service will then use the function, conv(), to prompt the user for data,
+output error messages, and display text information. Refer to pam_start(3PAM) for more information.
+The PAM architecture enables authentication by multiple authentication services through stacking. System entry ap<hy>
+plications, such as login(1), stack multiple service modules to authenticate users with multiple authentication ser<hy>
+vices. The order in which authentication service modules are stacked is specified in the configuration file,
+pam.conf(4). A system administrator determines this ordering, and also determines whether the same password can
+be used for all authentication services.
+The authentication library, /usr/lib/libpam.so.1, implements the framework interface. Various authentication ser<hy>
+vices are implemented by their own loadable modules whose paths are specified through the pam.conf(4) file.
+The PAM functions may return one of the following generic values, or one of the values defined in the specific man
+pages:
+PAM_SUCCESS The function returned successfully.
+PAM_OPEN_ERR dlopen() failed when dynamically loading a service module.
+PAM_SYMBOL_ERR Symbol not found.
+PAM_SERVICE_ERR Error in service module.
+PAM_SYSTEM_ERR System error.
+PAM_BUF_ERR Memory buffer error.
+PAM_CONV_ERR Conversation failure.
+PAM_PERM_DENIED Permission denied.
+See attributes(5) for description of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT LevelMT-Safe
+with exceptions
+login(1), pam_authenticate(3PAM), pam_chauthtok(3PAM), pam_open_session(3PAM), pam_set_item(3PAM),
+pam_setcred(3PAM), pam_sm(3PAM), pam_start(3PAM), pam_strerror(3PAM), pam.conf(4), attributes(5)
+Solaris Security for Developers Guide
+The interfaces in libpam() are MT-Safe only if each thread within the multithreaded application uses its own PAM
+handle.

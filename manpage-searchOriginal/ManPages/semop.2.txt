@@ -1,0 +1,98 @@
+<beginning of page>
+semop, semtimedop <-> semaphore operations
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/sem.h>
+int semop(int semid, struct sembuf *sops, size_t nsops);
+int semtimedop(int semid, struct sembuf *sops, size_t nsops,
+ const struct timespec *timeout);
+The semop() function is used to perform atomically an array of semaphore operations on the set of semaphores asso<hy>
+ciated with the semaphore identifier specified by semid. The sops argument is a pointer to the array of semaphore-
+operation structures. The nsops argument is the number of such structures in the array.
+Each sembuf structure contains the following members:
+ short sem_num;  /* semaphore number */
+ short sem_op;  /* semaphore operation */
+ short sem_flg; /* operation flags */
+Each semaphore operation specified by sem_op is performed on the corresponding semaphore specified by semid
+and sem_num. The permission required for a semaphore operation is given as {token}, where token is the type of
+permission needed. The types of permission are interpreted as follows:
+ 00400 READ by user
+ 00200 ALTER by user
+ 00040 READ by group
+ 00020 ALTER by group
+ 00004 READ by others
+ 00002 ALTER by others
+See the Semaphore Operation Permissions section of Intro(2) for more information.
+A process maintains a value, semadj, for each semaphore it modifies. This value contains the cumulative effect of
+operations the process has performed on an individual semaphore with the SEM_UNDO flag set (so that they can be
+undone if the process terminates unexpectedly). The value of semadj can affect the behavior of calls to semop(),
+semtimedop(), exit(), and _exit() (the latter two functions documented on exit(2)), but is otherwise unobservable.
+See below for details.
+The sem_op member specifies one of three semaphore operations: 1. The sem_op member is a negative integer;
+{ALTER} <bu> If semval (see Intro(2)) is greater than or equal to the absolute value of sem_op, the absolute value of
+sem_op is subtracted from semval. Also, if (sem_flg&SEM_UNDO) is true, the absolute value of sem_op is added
+to the calling process's semadj value (see exit(2)) for the specified semaphore. <bu> If semval is less than the absolute
+value of sem_op and (sem_flg&IPC_NOWAIT) is true, semop() returns immediately. <bu> If semval is less than the
+absolute value of sem_op and (sem_flg&IPC_NOWAIT) is false, semop() increments the semncnt associated with
+the specified semaphore and suspends execution of the calling thread until one of the following conditions occur: <bu>
+The value of semval becomes greater than or equal to the absolute value of sem_op. When this occurs, the value of
+semncnt associated with the specified semaphore is decremented, the absolute value of sem_op is subtracted from
+semval and, if (sem_flg&SEM_UNDO) is true, the absolute value of sem_op is added to the calling process's se<hy>
+madj value for the specified semaphore. <bu> The semid for which the calling thread is awaiting action is removed from
+the system (see semctl(2)). When this occurs, errno is set to EIDRM and <mi>1 is returned. <bu> The calling thread re<hy>
+ceives a signal that is to be caught. When this occurs, the value of semncnt associated with the specified semaphore
+is decremented, and the calling thread resumes execution in the manner prescribed in sigaction(2). 2. The sem_op
+member is a positive integer; {ALTER}
+The value of sem_op is added to semval and, if (sem_flg&SEM_UNDO) is true, the value of sem_op is subtracted
+from the calling process's semadj value for the specified semaphore. 3. The sem_op member is 0; {READ} <bu> If
+semval is 0, semop() returns immediately. <bu> If semval is not equal to 0 and (sem_flg&IPC_NOWAIT) is true, se<hy>
+mop() returns immediately. <bu> If semval is not equal to 0 and (sem_flg&IPC_NOWAIT) is false, semop() incre<hy>
+ments the semzcnt associated with the specified semaphore and suspends execution of the calling thread until one of
+the following occurs: <bu> The value of semval becomes 0, at which time the value of semzcnt associated with the
+specified semaphore is set to 0 and all processes waiting on semval to become 0 are awakened. <bu> The semid for
+which the calling thread is awaiting action is removed from the system. When this occurs, errno is set to EIDRM
+<beginning of page>
+and <mi>1 is returned. <bu> The calling thread receives a signal that is to be caught. When this occurs, the value of semzc<hy>
+nt associated with the specified semaphore is decremented, and the calling thread resumes execution in the manner
+prescribed in sigaction(2).
+Upon successful completion, the value of sempid for each semaphore specified in the array pointed to by sops is set
+to the process ID of the calling process.
+The semtimedop() function behaves as semop() except when it must suspend execution of the calling process to
+complete its operation. If semtimedop() must suspend the calling process after the time interval specified in timeout
+expires, or if the timeout expires while the process is suspended, semtimedop() returns with an error. If the time<hy>
+spec structure pointed to by timeout is zero-valued and semtimedop() needs to suspend the calling process to com<hy>
+plete the requested operation(s), it returns immediately with an error. If timeout is the NULL pointer, the behavior of
+semtimedop() is identical to that of semop().
+Upon successful completion, 0 is returned. Otherwise, <mi>1 is returned and errno is set to indicate the error.
+The semop() and semtimedop() functions will fail if:
+E2BIG The nsops argument is greater than the system-imposed maximum. See NOTES.
+EACCES Operation permission is denied to the calling process (see Intro(2)).
+EAGAIN The operation would result in suspension of the calling process but (sem_flg&IPC_NOWAIT) is true.
+EFAULT The sops argument points to an illegal address.
+EFBIG The value of sem_num is less than 0 or greater than or equal to the number of semaphores in the set associ<hy>
+ated with semid.
+EIDRM A semid was removed from the system.
+EINTR A signal was received.
+EINVAL The semid argument is not a valid semaphore identifier, or the number of individual semaphores for which
+the calling process requests a SEM_UNDO operation would exceed the system-imposed limit. Solaris does not im<hy>
+pose a limit on the number of individual semaphores for which the calling process requests a SEM_UNDO opera<hy>
+tion.
+ENOSPC The limit on the number of individual processes requesting a SEM_UNDO operation would be exceeded.
+Solaris does not impose a limit on the number of individual processes requesting an SEM_UNDO operation.
+ERANGE An operation would cause a semval or a semadj value to overflow the system-imposed limit.
+The semtimedop() function will fail if:
+EAGAIN The timeout expired before the requested operation could be completed.
+The semtimedop() function will fail if one of the following is detected:
+EFAULT The timeout argument points to an illegal address.
+EINVAL The timeout argument specified a tv_sec or tv_nsec value less than 0, or a tv_nsec value greater than or
+equal to 1000 million.
+<beginning of page>
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+semop() is Standard.
+ipcs(1), rctladm(1M), Intro(2), exec(2), exit(2), fork(2), semctl(2), semget(2), setrctl(2), sigaction(2), at<hy>
+tributes(5), standards(5)
+The system-imposed maximum on nsops for a semaphore identifier is the minimum enforced value of the
+process.max-sem-ops resource control of the creating process at the time semget(2) was used to allocate the identi<hy>
+fier.
+See rctladm(1M) and setrctl(2) for information about using resource controls.

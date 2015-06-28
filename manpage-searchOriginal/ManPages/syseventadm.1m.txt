@@ -1,0 +1,124 @@
+<beginning of page>
+syseventadm <-> sysevent event specification administration
+syseventadm add [-R rootdir] [-v vendor] [-p publisher]
+ [-c class] [-s subclass] [-u username] path [args]
+syseventadm remove [-R rootdir] [-v vendor] [-p publisher]
+ [-c class] [-s subclass] [-u username] [path [args]]
+syseventadm list [-R rootdir] [-v vendor] [-p publisher]
+ [-c class] [-s subclass] [-u username] [path [args]]
+syseventadm restart
+The syseventadm command is an administrative front-end to add, remove and list sysevent event handlers. You can
+also restart the sysevent daemon by use of the restart command. syseventadm can only be run by root.
+The syseventadm add command adds a handler for a sysevent event specified by at least one of vendor, publisher or
+class. If class is specified, it may be qualified with a sub-class. Only the values specified for vendor, publisher, class
+and sub-class when adding the handler are matched against sysevent events to determine if the specification matches
+the event and the handler should be run. path is the full pathname of the command to be run in response to matching
+events, with optional arguments (args). If username is specified, the command is invoked as user username, other<hy>
+wise as root.
+The syseventadm remove command removes handlers for matching sysevent event specifications. Event specifica<hy>
+tions may be matched by specifying at least one of vendor, publisher, class, username or path. If class is specified, it
+may be qualified with a sub-class. Any of vendor, publisher, class, sub-class, username, path or args not specified
+match the corresponding fields of all events. Handlers for all matching specifications are removed.
+The syseventadm list command lists the handlers for matching sysevent event specifications using the same match
+criteria as the remove command but without the requirement that at least one of vendor, publisher, class, username
+or path be specified. With no match criteria, all specifications are listed. The list command output format is: [ven<hy>
+dor=vendor] [publisher=publisher] [class=class] [subclass=subclass] [username=username] path [args] where each
+of class, sub-class, vendor, publisher and username is listed only if part of the match criteria for the listed specifica<hy>
+tion.
+The syseventadm restart command informs the syseventd daemon to reread the sysevent registry after a change
+has been made by adding or removing one or more sysevent handler specifications.
+The sysevent handling facility provides extensive macro capability for constructing the command line arguments to
+be executed in response to an event. Macro expansion applies only to the command line args specified for an event
+handler, with macros expanded with data from the event itself. Pre-defined macros are provided for the event class,
+subclass, publisher and vendor information. Macros not matching one of the pre-defined macro names cause the at<hy>
+tribute list attached to the event to be searched for an attribute of that name, with the value of the matching attribute
+substituted on the command line.
+Macros are introduced by the $ character, with the macro name being the following token separated by a SPACE or
+TAB character. If the macro name is embedded in text, it may be delineated by ${ and }. A \ before the $ causes
+macro expansion not to occur.
+$class The class string defining the event
+$publisher The publisher string defining the event
+$sequence The sequence number of the event.
+$subclass The subclass string defining the event
+$timestamp The timestamp of the event.
+$vendor The vendor string defining the event
+<beginning of page>
+Macro names other than those pre-defined are compared against the attribute list provided with the event. An at<hy>
+tribute with name matching the macro name causes the value of the attribute to be substituted as ASCII text on the
+generated command line.
+Use of a macro for which no attribute with that name is defined, or for which multiple attributes with that name are
+provided, cause an error and the command is not invoked.
+Attributes with signed data types (DATA_TYPE_INT16, DATA_TYPE_INT32 and DATA_TYPE_INT64) are ex<hy>
+panded as decimal digits.
+Attributes with unsigned data types (DATA_TYPE_BYTE, DATA_TYPE_UINT16, DATA_TYPE_UINT32, DA<hy>
+TA_TYPE_UINT64 and DATA_TYPE_HTTIME) are expanded as hexadecimal digits with a 0x prefix.
+Attributes with string data type (DATA_TYPE_STRING) are expanded with the string data. The data is not quoted.
+If if it desired that the quoted strings be generated on the command line, put quotes around the macro call in the ar<hy>
+guments.
+Array types are expanded with each element expanded as defined for that scalar type, with a space separating each
+element substitution.
+The add, list and remove subcommands support the following options:
+-c class Specify the event class, class.
+-p publisher Specify the event publisher, publisher.
+-R rootdir Specify an alternate root path, rootdir. Note -
+The root file system of any non-global zones must not be referenced with the -R option. Doing so might damage the
+global zone's file system, might compromise the security of the global zone, and might damage the non-global
+zone's file system. See zones(5).
+-s subclass Specify the event subclass, subclass.
+-u username Specify the username (username) to invoke the command.
+-v vendor Specify the vendor (vendor) that defines the event. Events defined by third-party software should specify
+the company's stock symbol as vendor. Sun-defined events use SUNW.
+The add, list and remove subcommands support the following options:
+args Command arguments
+path Full path of command to be run in response to event
+Example 1 Adding an Event Handler
+The following example adds an event handler for an event defined by vendor MYCO ("My Company"), class
+EC_ENV and sub-class ESC_ENV_TEMP. The command to be run is /opt/MYCOenv/bin/ec_env_temp, with ar<hy>
+guments being the class name, sub-class name and pathname derived from the event attributes. The $ characters are
+preceded by a backslash to circumvent shell interpretation. There is no need to restart the service after the change
+since the registry is maintained on $ALTROOT.
+ # syseventadm add -R LTROOT -v MYCO -c EC_ENV -s ESC_ENV_TEMP \
+  /opt/MYCOenv/bin/ec_env_temp \$class \$subclass \$pathname
+<beginning of page>
+Note the caveat on the use of the -R option in the description of that option, above.
+Example 2 Removing an Event Handler
+The following example removes the event handler added in Example 1.
+ # syseventadm remove -R LTROOT -v MYCO -c EC_ENV -s ESC_ENV_TEMP \
+  /opt/MYCOenv/bin/ec_env_temp class} subclass} pathname}
+Note the caveat on the use of the -R option in the description of that option, above.
+Example 3 Listing Event Handlers
+The following example lists all event handlers for events of class EC_ENV, subclass ESC_ENV_TEMP, as defined
+by vendor MYCO:
+ # syseventadm list -v MYCO -c EC_ENV -s ESC_ENV_TEMP \
+  vendor=MYCO class=EC_ENV subclass=ESC_ENV_TEMP \
+  /opt/MYCOenv/bin/ec_env_temp \${class} \${subclass} \${pathname}
+Example 4 Listing Event Handlers
+The following example lists all event handlers defined by vendor VRTS.
+ # syseventadm list -v VRTS
+Example 5 Removing Event Handlers
+The following example removes all event handlers defined by vendor VRTS, and restarts service.
+ # syseventadm remove -v VRTS
+ # syseventadm restart
+Example 6 Listing All Event Handlers Specified to Run a Command
+The following example lists all event handlers specified to run the command /opt/MYCOenv/bin/ec_env_temp:
+ # syseventadm list /opt/MYCOenv/bin/ec_env_temp
+Example 7 Removing Event Handlers and Restarting Service
+The following example removes all event handlers specified to run the command /opt/MYCOenv/bin/ec_env_temp,
+and restarts service:
+ # syseventadm remove /opt/MYCOenv/bin/ec_env_temp
+ # syseventadm restart
+The following exit values are returned:
+0 Successful completion.
+<beginning of page>
+1 No matching event specification found (remove or list commands only).
+2 Incorrect command usage.
+3 Permission denied.
+4 Command failed.
+5 Out of memory.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu
+syseventd(1M), sysevent_post_event(3SYSEVENT), attributes(5), ddi_log_sysevent(9F)
+To avoid upgrade problems, packages delivering a sysevent event handler should install the event handler by running
+syseventadm from the package's postinstall script. The event handler can then be removed by running syseventadm
+from the package's preremove script using the same arguments as when added.

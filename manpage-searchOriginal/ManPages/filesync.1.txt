@@ -1,0 +1,194 @@
+<beginning of page>
+filesync <-> synchronize ordinary, directory or special files
+filesync [-aehmnqvy] [-o src | dst]
+ [-f src | dst | old | new] [-r directory]...
+filesync [-aehmnqvy] -s source-dir -d dest-dir filename...
+The filesync utility synchronizes files between multiple computer systems, typically a server and a portable comput<hy>
+er. filesync synchronizes ordinary, directory or special files. Although intended for use on nomadic systems, filesync
+is useful for backup and file replication on more permanently connected systems.
+If files are synchronized between systems, the corresponding files on each of the systems are identical. Changing a
+file on one or both of the systems causes the files to become different (not synchronized). In order to make the files
+identical again, the differences between the files must be reconciled. See Reconciling and Synchronizing Files for
+specific details about how filesync reconciles and synchronizes files.
+There are two forms of the filesync command. The first form of filesync is invoked without file arguments. This
+form of filesync reconciles differences between the files and systems specified in the $HOME/.packingrules file.
+$HOME/.packingrules is a packing rules list for filesync and cachefspack, and contains a list of files to be kept
+synchronized. See packingrules(4) and cachefspack(1M).
+The second form of filesync copies specific files from a directory on the source system to a directory on the destina<hy>
+tion system. In addition, this form of filesync adds the file or files specified as arguments (filename) to
+$HOME/.packingrules. See -s and -d for information about specifying directories on source and destination sys<hy>
+tems. See OPERANDS for details about specifying file (filename) arguments.
+Multiple filesync commands are cumulative (that is, the specified files are added to the already existing packing
+rules file list). See Multiple filesync Commands.
+filesync synchronizes files between computer systems by performing the following two tasks: 1. filesync examines
+the directories and files specified in the packing rules file on both systems, and determines whether or not they are
+identical. Any file that differs requires reconciliation.
+filesync also maintains a baseline summary in the $HOME/.filesync-base file for all of the files that are being moni<hy>
+tored. This file lists the names, types, and sizes of all files as of the last reconciliation. 2. Based on the information
+contained in the baseline file and the specified options (see Resolving filesync Conflicts), filesync determines
+which of the various copies is the correct one, and makes the corresponding changes to the other system. Once this
+has been done, the two copies are, again, identical (synchronized).
+If a source file has changed and the destination file has not, the changes on the source system are propagated to the
+destination system. If a destination file has changed and the corresponding source file has not, the changes on the
+destination file are propagated to the source system. If both systems have changed (and the files are not still identi<hy>
+cal) a warning message will be printed out, asking the user to resolve the conflict manually. See Resolving filesync
+Conflicts.
+In cases where files on both sides have changed, filesync attempts to determine which version should be chosen. If
+filesync cannot automatically determine which version should be selected, it prints out a warning message and
+leaves the two incompatible versions of the file unreconciled.
+In these cases, you must either resolve the differences manually, or tell filesync how to choose which file should
+win. Use the -o and -f options to tell filesync how to resolve conflicts (see OPTIONS).
+Alternatively, for each conflicting file, you can examine the two versions, determine which one should be kept, and
+manually bring the two versions into agreement (by copying, deleting, or changing the ownership or protection to be
+correct). You can then re-run filesync to see whether or not any other conflicts remain.
+The packing rules file $HOME/.packingrules contains a list of files to be kept synchronized. The syntax of this file
+is described in packingrules(4).
+The $HOME/.packingrules file is automatically created if users invoke filesync with filename arguments. By using
+filesync options, users can augment the packing rules in $HOME/.packingrules.
+Many users choose to create the packing rules file manually and edit it by hand. Users can edit $HOME/.pack<hy>
+ingrules (using any editor) to permanently change the $HOME/.packingrules file, or to gain access to more pow<hy>
+erful options that are not available from the command line (such as IGNORE commands). It is much easier to en<hy>
+ter complex wildcard expressions by editing the $HOME/.packingrules file.
+<beginning of page>
+$HOME/.filesync-base is the filesync baseline summary file. filesync uses the information in $HOME/.filesync-
+base to identify the differences between files during the reconciliation and synchronization process. Users do not
+create or edit the baseline file. It is created automatically by filesync and records the last known state of agreement
+between all of the files being maintained.
+Over a period of time, the set of files you want to keep synchronized can change. It is common, for instance, to want
+to keep files pertaining to only a few active projects on your notebook. If you continue to keep files associated with
+every project you have ever worked on synchronized, your notebook's disk will fill up with old files. Each filesync
+command will waste a lot of time updating files you no longer care about.
+If you delete the files from your notebook, filesync will want to perform the corresponding deletes on the server,
+which would not be what you wanted. Rather, you would like a way to tell filesync to stop synchronizing some of
+the files. There are two ways to do this: 1. Edit $HOME/.packingrules. Delete the rules for the files that you want
+to delete. 2. Delete $HOME/.packingrules. Use the filesync command to specify the files that you want synchro<hy>
+nized.
+Either way works, and you can choose the one that seems easiest to you. For minor changes, it is probably easier to
+just edit $HOME/.packingrules. For major changes it is probably easier to start from scratch.
+Once filesync is no longer synchronizing a set of files, you can delete them from your notebook without having any
+effect on the server.
+When using filesync to keep files synchronized between nomadic machines and a server, store the packing rules and
+baseline files on the nomadic machines, not the server. If, when logged into your notebook, the HOME environment
+variable does not normally point to a directory on your notebook, you can use the FILESYNC environment variable
+to specify an alternate location for the packing rules and baseline files.
+Each nomadic machine should carry its own packing rules and baseline file. Incorrect file synchronization can result
+if a server carries a baseline file and multiple nomadic machines attempt to reconcile against the server's baseline
+file. In this case, a nomadic machine could be using a baseline file that does not accurately describe the state of its
+files. This might result in incorrect reconciliations.
+To safeguard against the dangers associated with a single baseline file being shared by more than two machines,
+filesync adds a default rule to each new packing rules file. This default rule prevents the packing rules and baseline
+files from being copied.
+The following options are supported:
+-a Force the checking of Access Control Lists (ACLs ) and attempt to make them agree for all new and changed
+files. If it is not possible to set the ACL for a particular file, filesync stops ACL synchronization for that file.
+Some file systems do not support ACLs . It is not possible to synchronize ACLs between file systems that support
+ACLs and those that do not; attempting to do so will result in numerous error messages.
+-d dest-dir Specify the directory on the destination system into which filename is to be copied. Use with the -s
+source-dir option and the filename operand. See -s and OPERANDS.
+-e Flag all differences. It may not be possible to resolve all conflicts involving modes and ownership (unless filesync
+is being run with root privileges). If you cannot change the ownership or protections on a file, filesync will normally
+ignore conflicts in ownership and protection. If you specify the -e (everything must agree) flag, however, filesync
+will flag these differences.
+-f src | dst | old | new The -f option tells filesync how to resolve conflicting changes. If a file has been changed on
+both systems, and an -f option has been specified, filesync will retain the changes made on the favored system and
+discard the changes made on the unfavored system.
+Specify -f src to favor the source-system file. Specify -f dst to favor the destination-system file. Specify -f old to fa<hy>
+vor the older version of the file. Specify -f new to favor the newer version of the file.
+It is possible to specify the -f and -o options in combination if they both specify the same preference (src and dst).
+If -f and -o conflict, the -f option is ignored. See the -o option description.
+<beginning of page>
+-h Halt on error. Normally, if filesync encounters a read or write error while copying files, it notes the error and the
+program continues, in an attempt to reconcile other files. If the -h option is specified, filesync will immediately halt
+when one of these errors occurs and will not try to process any more files.
+-m Ensure that both copies of the file have the same modification time. The modification time for newly copied files
+is set to the time of reconciliation by default. File changes are ordered by increasing modification times so that the
+propagated files have the same relative modification time ordering as the original changes. Users should be warned
+that there is usually some time skew between any two systems, and transferring modification times from one system
+to another can occasionally produce strange results.
+There are instances in which using filesync to update some (but not all) files in a directory will confuse the make
+program. If, for instance, filesync is keeping .c files synchronized, but ignoring .o files, a changed .c file may show
+up with a modification time prior to a .o file that was built from a prior version of the .c file.
+-n Do not really make the changes. If the -n option is specified, filesync determines what changes have been made
+to files, and what reconciliations are required and displays this information on the standard output. No changes are
+made to files, including the packing rules file.
+Specifying both the -n and -o options causes filesync to analyze the prevailing system and report the changes that
+have been made on that system. Using -n and -o in combination is useful if your machine is disconnected (and you
+cannot access the server) but you want to know what changes have been made on the local machine. See the -o op<hy>
+tion description.
+-o src | dst The -o option forces a one-way reconciliation, favoring either the source system (src) or destination sys<hy>
+tem (dst).
+Specify -o src to propagate changes only from the source system to the destination system. Changes made on the
+destination system are ignored. filesync aborts if it cannot access a source or destination directory.
+Specify -o dst to propagate changes only from the destination system to the source system. Changes made on the
+source system are ignored. filesync aborts if it cannot access a source or destination directory.
+Specifying -n with the -o option causes filesync to analyze the prevailing system and reports on what changes have
+been made on that system. Using -n and -o in combination is useful if a machine is disconnected (and there is no ac<hy>
+cess to the server), but you want to know what changes have been made on the local machine. See the -n option de<hy>
+scription.
+It is possible to specify the -o and -f options in combination if they both specify the same preference (src or dst). If
+-o and -f options conflict, the -f option will be ignored. See the -f option description.
+-q Suppress the standard filesync messages that describe each reconciliation action as it is performed.
+The standard filesync message describes each reconciliation action in the form of a UNIX shell command (for exam<hy>
+ple, mv, ln, cp, rm, chmod, chown, chgrp, setfacl, and so forth).
+-r directory Limit the reconciliation to directory. Specify multiple directories with multiple -r specifications.
+-s source-dir Specify the directory on the source system from which the filename to be copied is located. Use with
+the -d dest-dir option and the filename operand. See the -d option description and OPERANDS.
+-v Display additional information about each file comparison as it is made on the standard output.
+-y Bypass safety check prompts. Nomadic machines occasionally move between domains, and many of the files on
+which filesync operates are expected to be accessed by NFS. There is a danger that someday filesync will be asked
+to reconcile local changes against the wrong file system or server. This could result in a large number of inappropri<hy>
+ate copies and deletions. To prevent such a mishap, filesync performs a few safety checks prior to reconciliation. If
+large numbers of files are likely to be deleted, or if high level directories have changed their I-node numbers,
+<beginning of page>
+filesync prompts for a confirmation before reconciliation. If you know that this is likely, and do not want to be
+prompted, use the -y (yes) option to automatically confirm these prompts.
+The following operands are supported:
+filename The name of the ordinary file, directory, symbolic link, or special file in the specified source directory
+(source-dir) to be synchronized. Specify multiple files by separating each filename by spaces. Use the filename oper<hy>
+and with the -s and -d options. See OPTIONS.
+If filename is an ordinary file, that ordinary file will be replicated (with the same filename) in the specified destina<hy>
+tion directory (dest-dir).
+If filename is a directory, that directory and all of the files and subdirectories under it will be replicated (recursively)
+in the specified destination directory (dest-dir).
+If filename is a symbolic link, a copy of that symbolic link will be replicated in the specified destination directory
+(dest-dir).
+If filename is a special file, a special file with the same major or minor device numbers will be replicated in the spec<hy>
+ified destination directory. (dest-dir). Only super-users can use filesync to create special files.
+Files created in the destination directory (dest-dir) will have the same owner, group and other permissions as the
+files in the source directory.
+If filename contains escaped shell wildcard characters, the wildcard characters are stored in $HOME/.packingrules
+and evaluated each time filesync is run.
+For example, the following would make sure that the two specified files, currently in $RHOME, were replicated in
+$HOME:
+ filesync -s $RHOME -d $HOME a.c b.c
+The following example would ensure that all of the *.c files in $RHOME were replicated in $HOME, even if
+those files were not created until later.
+ filesync -s $RHOME -d $HOME '*.c'
+If any of the destination files already exist, filesync ensures that they are identical and issues warnings if they are
+not.
+Once files have been copied, the distinction between the source and destination is a relatively arbitrary one (except
+for its use in the -o and -f switches).
+FILESYNC Specifies the default location of the filesync packing rules and baseline files. The default value for this
+variable is $HOME. The suffixes .packingrules and .filesync-base will be appended to form the names of the pack<hy>
+ing rules and baseline files.
+LC_MESSAGES Determines how diagnostic and informative messages are presented. In the "C" locale, the mes<hy>
+sages are presented in the default form found in the program itself (in most cases, U.S. English).
+Normally, if all files are already up-to-date, or if all files were successfully reconciled, filesync will exit with a status
+of 0. However, if either the -n option was specified or any errors occurred, the exit status will be the logical OR of
+the following:
+0 No conflicts, all files up to date.
+1 Some resolvable conflicts.
+<beginning of page>
+2 Some conflicts requiring manual resolution.
+4 Some specified files did not exist.
+8 Insufficient permission for some files.
+16 Errors accessing packing rules or baseline file.
+32 Invalid arguments.
+64 Unable to access either or both of the specified src or dst directories.
+128 Miscellaneous other failures.
+$HOME/.packingrules list of files to be kept synchronized
+$HOME/.filesync-base baseline summary file
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wrcmdc
+cachefspack(1M), packingrules(4), attributes(5)

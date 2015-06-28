@@ -1,0 +1,119 @@
+<beginning of page>
+rpc_svc_calls, svc_dg_enablecache, svc_done, svc_exit, svc_fdset, svc_freeargs, svc_getargs, svc_getreq_common,
+svc_getreq_poll, svc_getreqset, svc_getrpccaller, svc_max_pollfd, svc_pollfd, svc_run, svc_sendreply, svc_get<hy>
+callerucred, svc_fd_negotiate_ucred <-> library routines for RPC servers
+cc [ flag... ] file... -lnsl [ library...]
+#include <rpc/rpc.h>
+int svc_dg_enablecache(SVCXPRT *xprt, const uint_t cache_size);
+int svc_done(SVCXPRT *xprt);
+void svc_exit(void);
+void svc_fd_negotiate_ucred(int fd);
+bool_t svc_freeargs(const SVCXPRT *xprt, const txdrproc_t inproc,
+ caddr_t in);
+bool_t svc_getargs(const SVCXPRT *xprt, const xdrproc_t inproc,
+ caddr_t in);
+int svc_getcallerucred(const SVCXPRT *xprt, ucred_t **ucred);
+void svc_getreq_common(const int fd);
+void svc_getreqset(fd_set *rdfds);
+void svc_getreq_poll(struct pollfd *pfdp, const int pollretval);
+struct netbuf *svc_getrpccaller(const SVCXPRT *xprt);
+void svc_run(void);
+bool_t svc_sendreply(const SVCXPRT *xprt, const xdrproc_t outproc,
+ caddr_t outint svc_max_pollfd;
+fd_set svc_fdset;
+pollfd_t *svc_pollfd;
+These routines are part of the RPC library which allows C language programs to make procedure calls on other ma<hy>
+chines across the network.
+These routines are associated with the server side of the RPC mechanism. Some of them are called by the server
+side dispatch function. Others, such as svc_run(), are called when the server is initiated.
+Because the service transport handle SVCXPRT contains a single data area for decoding arguments and encoding
+results, the structure cannot freely be shared between threads that call functions to decode arguments and encode re<hy>
+sults. When a server is operating in the Automatic or User MT modes, however, a copy of this structure is passed to
+the service dispatch procedure in order to enable concurrent request processing. Under these circumstances, some
+routines which would otherwise be Unsafe, become Safe. These are marked as such. Also marked are routines that
+are Unsafe for multithreaded applications, and are not to be used by such applications. See rpc(3NSL) for the defini<hy>
+tion of the SVCXPRT data structure.
+The svc_dg_enablecache() function allocates a duplicate request cache for the service endpoint xprt, large enough
+to hold cache_size entries. Once enabled, there is no way to disable caching. The function returns 1 if space neces<hy>
+sary for a cache of the given size was successfully allocated, and 0 otherwise. This function is Safe in multithreaded
+applications.
+The svc_done() function frees resources allocated to service a client request directed to the service endpoint xprt.
+This call pertains only to servers executing in the User MT mode. In the User MT mode, service procedures must in<hy>
+voke this call before returning, either after a client request has been serviced, or after an error or abnormal condition
+that prevents a reply from being sent. After svc_done() is invoked, the service endpoint xprt should not be refer<hy>
+enced by the service procedure. Server multithreading modes and parameters can be set using the rpc_control() call.
+This function is Safe in multithreaded applications. It will have no effect if invoked in modes other than the User MT
+mode.
+The svc_exit() function when called by any of the RPC server procedures or otherwise, destroys all services regis<hy>
+<beginning of page>
+tered by the server and causes svc_run() to return. If RPC server activity is to be resumed, services must be reregis<hy>
+tered with the RPC library either through one of the rpc_svc_create(3NSL) functions, or using xprt_regis<hy>
+ter(3NSL). The svc_exit() function has global scope and ends all RPC server activity.
+The svc_freeargs() function macro frees any data allocated by the RPC/XDR system when it decoded the argu<hy>
+ments to a service procedure using svc_getargs(). This routine returns TRUE if the results were successfully freed,
+and FALSE otherwise. This function macro is Safe in multithreaded applications utilizing the Automatic or User
+MT modes.
+The svc_getargs() function macro decodes the arguments of an RPC request associated with the RPC service trans<hy>
+port handle xprt. The parameter in is the address where the arguments will be placed; inproc is the XDR routine
+used to decode the arguments. This routine returns TRUE if decoding succeeds, and FALSE otherwise. This func<hy>
+tion macro is Safe in multithreaded applications utilizing the Automatic or User MT modes.
+The svc_getreq_common() function is called to handle a request on a file descriptor.
+The svc_getreq_poll() function is only of interest if a service implementor does not call svc_run(), but instead im<hy>
+plements custom asynchronous event processing. It is called when poll(2) has determined that an RPC request has
+arrived on some RPC file descriptors; pollretval is the return value from poll(2) and pfdp is the array of pollfd struc<hy>
+tures on which the poll(2) was done. It is assumed to be an array large enough to contain the maximal number of de<hy>
+scriptors allowed. The svc_getreq_poll() function macro is Unsafe in multithreaded applications.
+The svc_getreqset() function is only of interest if a service implementor does not call svc_run(), but instead imple<hy>
+ments custom asynchronous event processing. It is called when select(3C) has determined that an RPC request has
+arrived on some RPC file descriptors; rdfds is the resultant read file descriptor bit mask. The routine returns when all
+file descriptors associated with the value of rdfds have been serviced. This function macro is Unsafe in multithreaded
+applications.
+The svc_getrpccaller() function is the approved way of getting the network address of the caller of a procedure as<hy>
+sociated with the RPC service transport handle xprt. This function macro is Safe in multithreaded applications.
+The svc_run() function never returns. In single-threaded mode, the function waits for RPC requests to arrive. When
+an RPC request arrives, the svc_run() function calls the appropriate service procedure. This procedure is usually
+waiting for the poll(2) library call to return.
+Applications that execute in the Automatic or the User MT mode should invoke the svc_run() function exactly once.
+In the Automatic MT mode, the svc_run() function creates threads to service client requests. In the User MT mode,
+the function provides a framework for service developers to create and manage their own threads for servicing client
+requests.
+The svc_fdset global variable reflects the RPC server's read file descriptor bit mask. This is only of interest if ser<hy>
+vice implementors do not call svc_run(), but rather do their own asynchronous event processing. This variable is
+read-only may change after calls to svc_getreqset() or after any creation routine. Do not pass its address to se<hy>
+lect(3C). Instead, pass the address of a copy. multithreaded applications executing in either the Automatic MT mode
+or the user MT mode should never read this variable. They should use auxiliary threads to do asynchronous event
+processing. The svc_fdset variable is limited to 1024 file descriptors and is considered obsolete. Use of svc_pollfd is
+recommended instead.
+The svc_pollfd global variable points to an array of pollfd_t structures that reflect the RPC server's read file de<hy>
+scriptor array. This is only of interest if service service implementors do not call svc_run() but rather do their own
+asynchronous event processing. This variable is read-only, and it may change after calls to svc_getreg_poll() or any
+creation routines. Do no pass its address to poll(2). Instead, pass the address of a copy. By default, svc_pollfd is lim<hy>
+ited to 1024 entries. Use rpc_control(3NSL) to remove this limitation. multithreaded applications executing in ei<hy>
+ther the Automatic MT mode or the user MT mode should never be read this variable. They should use auxiliary
+threads to do asynchronous event processing.
+The svc_max_pollfd global variable contains the maximum length of the svc_pollfd array. This variable is read-on<hy>
+ly, and it may change after calls to svc_getreg_poll() or any creation routines.
+The svc_sendreply() function is called by an RPC service dispatch routine to send the results of a remote procedure
+call. The xprt parameter is the transport handle of the request. The outproc parameter is the XDR routine used to en<hy>
+code the results. The out parameter is the address of the results. This routine returns TRUE if it succeeds, FALSE
+otherwise. The svc_sendreply() function macro is Safe in multithreaded applications that use the Automatic or the
+User MT mode.
+The svc_fd_negotiate_ucred() function is called by an RPC server to inform the underlying transport that the func<hy>
+<beginning of page>
+tion wishes to receive ucreds for local calls, including those over IP transports.
+The svc_getcallerucred() function attempts to retrieve the ucred_t associated with the caller. The function returns 0
+when successful and -1 when not.
+When successful, the svc_getcallerucred() function stores the pointer to a freshly allocated ucred_t in the memory
+location pointed to by the ucred argument if that memory location contains the null pointer. If the memory location
+is non-null, the function reuses the existing ucred_t. When ucred is no longer needed, a credential allocated by
+svc_getcallerucred() should be freed with ucred_free(3C).
+See attributes(5) for descriptions of attribute types and values.
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelSee be<hy>
+low.
+The svc_fd_negotiate_ucred(), svc_dg_enablecache(), svc_getrpccaller(), and svc_getcallerucred() functions are
+Safe in multithreaded applications. The svc_freeargs(), svc_getargs(), and svc_sendreply() functions are Safe in
+multithreaded applications that use the Automatic or the User MT mode. The svc_getreq_common(), svc_getre<hy>
+qset(), and svc_getreq_poll() functions are Unsafe in multithreaded applications and should be called only from the
+main thread.
+rpcgen(1), poll(2), getpeerucred(3C), rpc(3NSL), rpc_control(3NSL), rpc_svc_create(3NSL),
+rpc_svc_err(3NSL), rpc_svc_reg(3NSL), select(3C), ucred_free(3C), xprt_register(3NSL), attributes(5)

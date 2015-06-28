@@ -1,0 +1,60 @@
+<beginning of page>
+t_sndvudata <-> send a data unit from one or more noncontiguous buffers
+#include <xti.h>
+int t_sndvudata(int fd, struct t_unitdata *unitdata, struct t_iovec *iov,
+ unsigned int iovcount);
+This function is used in connectionless mode to send a data unit to another transport user. The argument fd identi<hy>
+fies the local transport endpoint through which data will be sent, iovcount contains the number of non-contiguous
+udata buffers and is limited to an implementation-defined value given by T_IOV_MAX which is at least 16, and
+unitdata points to a t_unitdata structure containing the following members:
+ struct netbuf addr;
+ struct netbuf opt;
+ struct netbuf udata;
+If the limit on iovcount is exceeded, the function fails with TBADDATA.
+In unitdata, addr specifies the protocol address of the destination user, and opt identifies options that the user
+wants associated with this request. The udata field is not used. The user may choose not to specify what protocol
+options are associated with the transfer by setting the len field of opt to zero. In this case, the provider may use de<hy>
+fault options.
+The data to be sent is identified by iov[0] through iov [iovcount-1].
+Note that the limit on the total number of bytes available in all buffers passed:
+ iov(0).iov_len + . . + iov(iovcount-1).iov_len
+may be constrained by implementation limits. If no other constraint applies, it will be limited by INT_MAX. In
+practice, the availability of memory to an application is likely to impose a lower limit on the amount of data that can
+be sent or received using scatter/gather functions.
+By default, t_sndvudata() operates in synchronous mode and may wait if flow control restrictions prevent the data
+from being accepted by the local transport provider at the time the call is made. However, if O_NONBLOCK is set
+by means of t_open(3NSL) or fcntl(2), t_sndvudata() executes in asynchronous mode and will fail under such
+conditions. The process can arrange to be notified of the clearance of a flow control restriction by means of either
+t_look(3NSL) or the EM interface.
+If the amount of data specified in iov0 through iov [iovcount-1] exceeds the TSDU size as returned in the tsdu field
+of the info argument of t_open(3NSL) or t_getinfo(3NSL), or is zero and sending of zero octets is not supported
+by the underlying transport service, a TBADDATA error is generated. If t_sndvudata() is called before the desti<hy>
+nation user has activated its transport endpoint (see t_bind(3NSL)), the data unit may be discarded.
+If it is not possible for the transport provider to immediately detect the conditions that cause the errors TBADDAD<hy>
+DR and TBADOPT, these errors will alternatively be returned by t_rcvuderr(3NSL). An application must there<hy>
+fore be prepared to receive these errors in both of these ways.
+Upon successful completion, a value of 0 is returned. Otherwise, a value of -1 is returned and t_errno is set to in<hy>
+dicate an error.
+T_IDLE.
+On failure, t_errno is set to one of the following:
+TBADADDR The specified protocol address was in an incorrect format or contained illegal information.
+TBADDATA Illegal amount of data. <bu> A single send was attempted specifying a TSDU greater than that specified in
+the info argument, or a send of a zero byte TSDU is not supported by the provider. <bu> iovcount is greater than
+T_IOV_MAX.
+<beginning of page>
+TBADF The specified file descriptor does not refer to a transport endpoint.
+TBADOPT The specified options were in an incorrect format or contained illegal information.
+TFLOW O_NONBLOCK i was set, but the flow control mechanism prevented the transport provider from accept<hy>
+ing any data at this time.
+TLOOK An asynchronous event has occurred on this transport endpoint.
+TNOTSUPPORT This function is not supported by the underlying transport provider.
+TOUTSTATE The communications endpoint referenced by fd is not in one of the states in which a call to this func<hy>
+tion is valid.
+TPROTO This error indicates that a communication problem has been detected between XTI and the transport
+provider for which there is no other suitable XTI error (t_errno).
+TSYSERR A system error has occurred during execution of this function.
+In the TLI interface definition, no counterpart of this routine was defined.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT LevelSafe
+fcntl(2), t_alloc(3NSL), t_open(3NSL), t_rcvudata(3NSL), t_rcvvudata(3NSL) t_rcvuderr(3NSL), t_snduda<hy>
+ta(3NSL), attributes(5)

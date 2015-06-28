@@ -1,0 +1,55 @@
+<beginning of page>
+t_rcvvudata <-> receive a data unit into one or more noncontiguous buffers
+#include <xti.h>
+int t_rcvvudata(int fd, struct t_unitdata *unitdata, struct t_iovec *iov,
+ unsigned int iovcount, int *flags);
+This function is used in connectionless mode to receive a data unit from another transport user. The argument fd
+identifies the local transport endpoint through which data will be received, unitdata holds information associated
+with the received data unit, iovcount contains the number of non-contiguous udata buffers which is limited to
+T_IOV_MAX, which is an implementation-defined value of at least 16, and flags is set on return to indicate that the
+complete data unit was not received. If the limit on iovcount is exceeded, the function fails with TBADDATA. The
+argument unitdata points to a t_unitdata structure containing the following members:
+ struct netbuf addr;
+ struct netbuf opt;
+ struct netbuf udata;
+The maxlen field of addr and opt must be set before calling this function to indicate the maximum size of the buf<hy>
+fer for each. The udata field of t_unitdata is not used. The iov_len and iov_base fields of "iov0" through iov [iov<hy>
+count-1] must be set before calling t_rcvvudata() to define the buffer where the userdata will be placed. If the
+maxlen field of addr or opt is set to zero then no information is returned in the buf field for this parameter.
+On return from this call, addr specifies the protocol address of the sending user, opt identifies options that were as<hy>
+sociated with this data unit, and iov[0].iov_base through iov [iovcount-1].iov_base contains the user data that was
+received. The return value of t_rcvvudata() is the number of bytes of user data given to the user.
+Note that the limit on the total number of bytes available in all buffers passed:
+ iov(0).iov_len + . . + iov(iovcount-1).iov_len)
+may be constrained by implementation limits. If no other constraint applies, it will be limited by INT_MAX. In
+practice, the availability of memory to an application is likely to impose a lower limit on the amount of data that can
+be sent or received using scatter/gather functions.
+By default, t_rcvvudata() operates in synchronous mode and waits for a data unit to arrive if none is currently
+available. However, if O_NONBLOCK is set by means of t_open(3NSL) or fcntl(2), t_rcvvudata() executes in
+asynchronous mode and fails if no data units are available.
+If the buffers defined in the iov[] array are not large enough to hold the current data unit, the buffers will be filled
+and T_MORE will be set in flags on return to indicate that another t_rcvvudata() should be called to retrieve the
+rest of the data unit. Subsequent calls to t_rcvvudata() will return zero for the length of the address and options,
+until the full data unit has been received.
+On successful completion, t_rcvvudata() returns the number of bytes received. Otherwise, it returns -1 on failure
+and t_errno is set to indicate the error.
+T_IDLE.
+On failure, t_errno is set to one of the following:
+TBADDATA iovcount is greater than T_IOV_MAX.
+TBADF The specified file descriptor does not refer to a transport endpoint.
+TBUFOVFLW The number of bytes allocated for the incoming protocol address or options (maxlen) is greater than
+0 but not sufficient to store the information. The unit data information to be returned in unitdata will be discarded.
+<beginning of page>
+TLOOK An asynchronous event has occurred on this transport endpoint and requires immediate attention.
+TNODATA O_NONBLOCK was set, but no data units are currently available from the transport provider.
+TNOTSUPPORT This function is not supported by the underlying transport provider.
+TOUTSTATE The communications endpoint referenced by fd is not in one of the states in which a call to this func<hy>
+tion is valid.
+TPROTO This error indicates that a communication problem has been detected between XTI and the transport
+provider for which there is no other suitable XTI error (t_errno).
+TSYSERR A system error has occurred during execution of this function.
+In the TLI interface definition, no counterpart of this routine was defined.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT LevelSafe
+fcntl(2), t_alloc(3NSL), t_open(3NSL), t_rcvudata(3NSL), t_rcvuderr(3NSL), t_sndudata(3NSL), t_sndvuda<hy>
+ta(3NSL), attributes(5)

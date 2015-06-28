@@ -1,0 +1,128 @@
+<beginning of page>
+ksslcfg <-> enable and configure SMF instance of Kernel SSL
+ksslcfg create -f pkcs11 -T token_label -C certificate_label
+ [-d softtoken_directory]
+ [-p password_file [-u username]]
+ [-h ca_certchain_file] [-c ciphersuites]
+ [-t ssl_session_cache_timeout]
+ [-z ssl_session_cache_size] [-v] -x proxy_port [host] ssl_port
+ksslcfg create -f pkcs12 -i cert_and_key_pk12file
+ [-p password_file [-u username]]
+ [-c ciphersuites] [-t ssl_session_cache_timeout]
+ [-z ssl_session_cache_size] [-v] -x proxy_port [host] ssl_port
+ksslcfg create -f pem -i cert_and_key_pemfile
+ [-p password_file [-u username]]
+ [-c ciphersuites] [-t ssl_session_cache_timeout]
+ [-z ssl_session_cache_size] [-v] -x proxy_port [host] ssl_port
+ksslcfg delete [-v] [host] ssl_port
+ksslcfg -V
+ksslcfg -?
+ksslcfg manages smf(5) instances for the Kernel SSL proxy module. An SSL-enabled web server can use the ser<hy>
+vices of its Kernel SSL proxy to improve the performance of the HTTPS packets processing. It does so by creating
+an instance of the Kernel SSL service, specifying the SSL proxy port and parameters, and by listening on the proxy
+port.
+The create subcommand creates an instance and enables the service for the given address and SSL port.
+The delete subcommand disables the service for the given address and port, if it is enabled, and deletes the instance
+from the SMF repository.
+ksslcfg can be run as root or by other users assigned to the Network Security profile. See rbac(5) and user_attr(4).
+You must run ksslcfg to configure your Kernel SSL proxy before you start your application.
+ksslcfg allows you to specify an ssl_port operand, described under OPERANDS, and, with the -x option, a
+proxy_port value. When specified for use with the Kernel SSL proxy, these values cannot also be configured for the
+Solaris Network Cache and Acceleration (NCA) feature. See nca(1) for a description of the NCA feature.
+The Fault Managed Resource Identifier (FMRI) for the kernel SSL proxy instances is svc://network/ssl/proxy.
+ksslcfg creates an instance of that service unique to the combination of host and SSL port. Instance FMRIs for par<hy>
+ticular proxy entries can be found with svcs(1) and used for dependencies of other services.
+The following options are supported:
+-c ciphersuites
+Set of ciphers a client is allowed to negotiate in a sorted order. The supported SSL version3 and TLS ciphers are list<hy>
+ed below. Note that the names are case-insensitive.
+ rsa_rc4_128_sha
+ rsa_rc4_128_md5
+ rsa_aes_256_cbc_sha
+ rsa_aes_128_cbc_sha
+ rsa_3des_ede_cbc_sha
+ rsa_des_cbc_sha
+-f key_format
+Uses the certificate/key format specified in key_format. The supported options are pkcs11, pkcs12, and pem.
+<beginning of page>
+-i key_and_certificate_file
+When pkcs12 or pem is specified with the -f option, reads a key and a certificate of the web server from
+key_and_certificate_file. This file can also contain any intermediate CA certificates that form the certificate chain to
+the root CA for the server certificate. These certificates must follow the server certificate in the file and the order
+must be bottom up: lowest level CA certificate followed by the next higher level CA certificate, and so on.
+-C certificate_label
+PKCS#11 can store multiple certificates in single token. This option enables you to specify a single certificate, iden<hy>
+tified by certificate_label. This label must match the CKA_LABEL on the certificate object in the token specified
+by -T. This option is to be used only with -f pkcs11.
+-d softtoken_directory
+This option is applicable only with the pkcs11 key format, when the token label is the Sun Software PKCS#11 soft<hy>
+token. Use this option to override the default location of the PKCS#11 softtoken directory ($HOME/.sunw). See
+pkcs11_softtoken(5).
+-h ca_certchain_file
+When pkcs11 is specified with the -f option, reads a set of intermediate CA certificates that form the certificate chain
+to the root CA for the server certificate (specified with the -C option), from ca_certchain_file. The file must be in
+PEM format.
+-p password_file
+Obtains the password used to encrypt the private key from password_file. When using the pkcs11 option (see -f,
+above), the password is used to authenticate the user to the PKCS #11 token.
+-t ssl_session_cache_timeout
+The timeout value, in seconds, for an SSL session. It corresponds to SSL3SessionTimeout of the Sun ONE web
+server configuration or SSLSessionCacheTimeout of mod_ssl.
+-T token_label
+When pkcs11 is specified with -f, uses the PKCS#11 token specified in token_label. Use cryptoadm list -v to dis<hy>
+play all PKCS#11 tokens available.
+-u username
+The username of the user who owns the password file. If omitted, the system will try to read the password file as
+root.
+-v
+Verbose mode.
+-V
+Displays the version.
+-x proxy_port
+The SSL proxy port. The port number is designated exclusively for clear-text HTTP communication between the
+web server and the kernel SSL proxy module. No external HTTP packets are delivered to this port.
+<beginning of page>
+-z ssl_session_cache_size
+The maximum number of SSL sessions that can be cached. It corresponds to SSLCacheEntries of the Sun ONE
+web server configuration. When this option is not specified, the default is 5000 entries.
+-?
+Displays the usage of the command.
+[host] [ssl_port] The address and the port of the web server for which the kernel SSL entry is created. If host is omit<hy>
+ted, the entry will be used for all requests that arrived at the ssl_port, regardless of the destination address. Both a
+host name and an IP address are acceptable forms for host. ssl_port is required. Typically, this has a value of 443.
+Example 1 Create and Enable a Kernel SSL Instance
+The following command creates and enables a Kernel SSL instance using a certificate and a key in PKCS#11 format.
+ # ksslcfg create -f pkcs11 -T "Sun Software PKCS#11 softtoken" \
+ -C "Server-Cert" -p /some/directory/password -u webservd \
+ -x 8080 www.mysite.com 443
+ % svcs svc:/network/ssl/proxy
+ STATE STIME FMRI
+ online Sep_27 svc:/network/ssl/proxy:kssl-www-mysite-com-443
+Example 2 Create and Enable a Default Instance for All Addresses
+The following command creates and enables a default instance for all addresses from a certicate and key in a
+pkcs#12 file.
+ # ksslcfg create -x 8888 -f pkcs12 -i /some/directory/keypair.p12 \
+  -p /some/directory/password -u webservd 443
+Example 3 Create and Enable an Instance with Specific Cipher Suites
+The following command creates and enables an instance with specific cipher suites.
+ # ksslcfg create -x 8080 -f pem \
+ -i /some/directory/keypair.pem -p /some/directory/password \
+ -c "rsa_rc4_128_md5,rsa_rc4_128_sha" \
+ 209.249.116.195 443
+Example 4 Disable and Delete an Instance
+The following command disables and deletes an instance.
+ # ksslcfg delete www.mysite.com 443
+0 Successful completion.
+>0 An error occurred.
+See attributes(5) for descriptions of the following attributes:
+<beginning of page>
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wksslu _ Interface StabilitySee below.
+Command line options are Evolving; command output is Unstable. The FMRI service name (svc://net<hy>
+work/ssl/proxy) is Unstable, as is the FMRI instance's name format. The utility name is Stable.
+nca(1), svcprop(1), svcs(1), cryptoadm(1M), svcadm(1M), svccfg(1M), user_attr(4), attributes(5), pkcs11_soft<hy>
+token(5), rbac(5), smf(5)
+ksslcfg create without an host argument creates an INADDR_ANY smf instance. ksslcfg delete without an host ar<hy>
+gument deletes only the INADDR_ANY instance. ksslcfg delete needs a host argument to delete any non-INAD<hy>
+DR_ANY instance.
+On a system with zones(5) installed, the ksslcfg command can be used only in the global zone at this time.

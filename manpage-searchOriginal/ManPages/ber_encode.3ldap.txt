@@ -1,0 +1,109 @@
+<beginning of page>
+ber_encode, ber_alloc, ber_printf, ber_put_int, ber_put_ostring, ber_put_string, ber_put_null, ber_put_boolean,
+ber_put_bitstring, ber_start_seq, ber_start_set, ber_put_seq, ber_put_set <-> simplified Basic Encoding Rules library
+encoding functions
+cc[ flag... ] file... -lldap[ library... ]
+#include <lber.h>
+BerElement *ber_alloc();
+ber_printf(BerElement *ber, char **fmt[, arg... ]);
+ber_put_int(BerElement *ber, long num, char tag);
+ber_put_ostring(BerElement *ber, char **str, unsigned long len,
+ char tag);
+ber_put_string(BerElement *ber, char **str, char tag);
+ber_put_null(BerElement *ber, char tag);
+ber_put_boolean(BerElement *ber, int bool, char tag);
+ber_put_bitstring(BerElement *ber, char *str, int blen, char tag);
+ber_start_seq(BerElement *ber, char tag);
+ber_start_set(BerElement *ber, char tag);
+ber_put_seq(BerElement *ber);
+ber_put_set(BerElement *ber);
+These functions provide a subfunction interface to a simplified implementation of the Basic Encoding Rules of
+ASN.1. The version of BER these functions support is the one defined for the LDAP protocol. The encoding rules
+are the same as BER, except that only definite form lengths are used, and bitstrings and octet strings are always en<hy>
+coded in primitive form. In addition, these lightweight BER functions restrict tags and class to fit in a single octet
+(this means the actual tag must be less than 31). When a "tag"is specified in the descriptions below, it refers to the
+tag, class, and primitive or constructed bit in the first octet of the encoding. This man page describes the encoding
+functions in the lber library. See ber_decode(3LDAP) for details on the corresponding decoding functions.
+Normally, the only functions that need be called by an application are ber_alloc(), to allocate a BER element, and
+ber_printf() to do the actual encoding. The other functions are provided for those applications that need more con<hy>
+trol than ber_printf() provides. In general, these functions return the length of the element encoded, or <mi>1 if an er<hy>
+ror occurred.
+The ber_alloc() function is used to allocate a new BER element.
+The ber_printf() function is used to encode a BER element in much the same way that sprintf(3S) works. One
+important difference, though, is that some state information is kept with the ber parameter so that multiple calls can
+be made to ber_printf() to append things to the end of the BER element. Ber_printf() writes to ber, a pointer to a
+BerElement such as returned by ber_alloc(). It interprets and formats its arguments according to the format string
+fmt. The format string can contain the following characters:
+b Boolean. An integer parameter should be supplied. A boolean element is output.
+B Bitstring. A char * pointer to the start of the bitstring is supplied, followed by the number of bits in the bitstring.
+A bitstring element is output.
+i Integer. An integer parameter should be supplied. An integer element is output.
+n Null. No parameter is required. A null element is output.
+<beginning of page>
+o Octet string. A char * is supplied, followed by the length of the string pointed to. An octet string element is out<hy>
+put.
+O Octet string. A struct berval * is supplied. An octet string element is output.
+s Octet string. A null-terminated string is supplied. An octet string element is output, not including the trailing null
+octet.
+t Tag. An int specifying the tag to give the next element is provided. This works across calls.
+v Several octet strings. A null-terminated array of char * is supplied. Note that a construct like '{v}' is required to
+get an actual sequence of octet strings.
+{ Begin sequence. No parameter is required.
+} End sequence. No parameter is required.
+[ Begin set. No parameter is required.
+] End set. No parameter is required.
+The ber_put_int() function writes the integer element num to the BER element ber.
+The ber_put_boolean() function writes the boolean value given by bool to the BER element.
+The ber_put_bitstring() function writes blen bits starting at str as a bitstring value to the given BER element. Note
+that blen is the length in bits of the bitstring.
+The ber_put_ostring() function writes len bytes starting at str to the BER element as an octet string.
+The ber_put_string() function writes the null-terminated string (minus the terminating '') to the BER element as an
+octet string.
+The ber_put_null() function writes a NULL element to the BER element.
+The ber_start_seq() function is used to start a sequence in the BER element. The ber_start_set() function works
+similarly. The end of the sequence or set is marked by the nearest matching call to ber_put_seq() or
+ber_put_set(), respectively.
+The ber_first_element() function is used to return the tag and length of the first element in a set or sequence. It al<hy>
+so returns in cookie a magic cookie parameter that should be passed to subsequent calls to ber_next_element(),
+which returns similar information. Example 1 Assuming the following variable declarations, and that the variables
+have been assigned appropriately, an BER encoding of the following ASN.1 object:
+  AlmostASearchRequest := SEQUENCE {
+  baseObject DistinguishedName,
+  scope ENUMERATED {
+  baseObject (0),
+  singleLevel (1),
+  wholeSubtree (2)
+  },
+  derefAliases ENUMERATED {
+  neverDerefaliases (0),
+  derefInSearching (1),
+  derefFindingBaseObj (2),
+  alwaysDerefAliases (3N)
+  },
+<beginning of page>
+  sizelimit INTEGER (0 .. 65535),
+  timelimit INTEGER (0 .. 65535),
+  attrsOnly BOOLEAN,
+  attributes SEQUENCE OF AttributeType
+  }
+can be achieved like so:
+  int scope, ali, size, time, attrsonly;
+  char *dn, **attrs;
+  /* ... fill in values ... */
+  if ( (ber = ber_alloc()) == NULLBER )
+  /* error */
+  if ( ber_printf( ber, "{siiiib{v}}", dn, scope, ali,
+  size, time, attrsonly, attrs ) == -1 )
+  /* error */
+  else
+  /* success */
+If an error occurs during encoding, ber_alloc() returns NULL; other functions generally return <mi>1.
+See attributes(5) for a description of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsl (32-bit) _ SUNWcslx (64-bit) _ Interface StabilityCommitted
+ber_decode(3LDAP), attributes(5)
+Yeong, W., Howes, T., and Hardcastle-Kille, S., "Lightweight Directory Access Protocol", OSI-DS-26, April 1992.
+Information Processing - Open Systems Interconnection - Model and Notation - Service Definition - Specification of
+Basic Encoding Rules for Abstract Syntax Notation One, International Organization for Standardization, Interna<hy>
+tional Standard 8825.
+The return values for all of these functions are declared in <lber.h>.

@@ -1,0 +1,75 @@
+<beginning of page>
+ufs <-> UFS file system
+#include <sys/param.h>
+#include <sys/types.h>
+#include <sys/fs/ufs_fs.h>
+#include <sys/fs/ufs_inode.h>
+UFS is the default disk-based file system for the Solaris environment. The UFS file system is hierarchical, starting
+with its root directory (/) and continuing downward through a number of directories. The root of a UFS file system is
+inode 2. A UFS file system's root contents replace the contents of the directory upon which it is mounted.
+Subsequent sections of this manpage provide details of the UFS file systems.
+UFS uses state flags to identify the state of the file system. fs_state is FSOKAY - fs_time. fs_time is the timestamp
+that indicates when the last system write occurred. fs_state is updated whenever fs_clean changes. Some fs_clean
+values are:
+FSCLEAN Indicates an undamaged, cleanly unmounted file system.
+FSACTIVE Indicates a mounted file system that has modified data in memory. A mounted file system with this state
+flag indicates that user data or metadata would be lost if power to the system is interrupted.
+FSSTABLE Indicates an idle mounted file system. A mounted file system with this state flag indicates that neither
+user data nor metadata would be lost if power to the system is interrupted.
+FSBAD Indicates that this file system contains inconsistent file system data.
+FSLOG Indicates that the file system has logging enabled. A file system with this flag set is either mounted or un<hy>
+mounted. If a file system has logging enabled, the only flags that it can have are FSLOG or FSBAD. A non-logging
+file system can have FSACTIVE, FSSTABLE, or FSCLEAN.
+It is not necessary to run the fsck command on unmounted file systems with a state of FSCLEAN, FSSTABLE, or
+FSLOG. mount(2) returns ENOSPC if an attempt is made to mount a UFS file system with a state of FSACTIVE
+for read/write access.
+As an additional safeguard, fs_clean should be trusted only if fs_state contains a value equal to FSOKAY - fs_time,
+where FSOKAY is a constant integer defined in the /usr/include/sys/fs/ufs_fs.h file. Otherwise, fs_clean is treated
+as though it contains the value of FSACTIVE.
+Extended Fundamental Types (EFT) provide 32-bit user ID (UID), group ID (GID), and device numbers.
+If a UID or GID contains an extended value, the short variable (ic_suid, ic_sgid) contains the value 65535 and the
+corresponding UID or GID is in ic_uid or ic_gid. Because numbers for block and character devices are stored in the
+first direct block pointer of the inode (ic_db[0]) and the disk block addresses are already 32 bit values, no special en<hy>
+coding exists for device numbers (unlike UID or GID fields).
+A multiterabyte file system enables creation of a UFS file system up to approximately 16 terabytes of usable space,
+minus approximately one percent overhead. A sparse file can have a logical size of one terabyte. However, the actual
+amount of data that can be stored in a file is approximately one percent less than one terabyte because of file system
+overhead.
+On-disk format changes for a multiterabyte UFS file system include: <bu> The magic number in the superblock changes
+from FS_MAGIC to MTB_UFS_MAGIC. For more information, see the /usr/include/sys/fs/ufs_fs file. <bu> The
+fs_logbno unit is a sector for UFS that is less than 1 terabyte in size and fragments for a multiterabyte UFS file sys<hy>
+tem.
+UFS logging bundles the multiple metadata changes that comprise a complete UFS operation into a transaction. Sets
+of transactions are recorded in an on-disk log and are applied to the actual UFS file system's metadata.
+<beginning of page>
+UFS logging provides two advantages: 1. A file system that is consistent with the transaction log eliminates the
+need to run fsck after a system crash or an unclean shutdown. 2. UFS logging often provides a significant perfor<hy>
+mance improvement. This is because a file system with logging enabled converts multiple updates to the same data
+into single updates, thereby reducing the number of overhead disk operations.
+The UFS log is allocated from free blocks on the file system and is sized at approximately 1 Mbyte per 1 Gbyte of
+file system, up to 256 Mbytes. The log size may be larger (up to a maximum of 512 Mbytes), depending upon the
+number of cylinder groups present in the file system. The log is continually flushed as it fills up. The log is also
+flushed when the file system is unmounted or as a result of a lockfs(1M) command.
+You can mount a UFS file system in various ways using syntax similar to the following: 1. Use mount from the
+command line:
+ # mount -F ufs /dev/dsk/c0t0d0s7 /export/home
+2. Include an entry in the /etc/vfstab file to mount the file system at boot time:
+ /dev/dsk/c0t0d0s7 /dev/rdsk/c0t0d0s7 /export/home ufs 2 yes -
+For more information on mounting UFS file systems, see mount_ufs(1M).
+See attributes(5) for a description of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stabili<hy>
+tyUncommitted
+df(1M), fsck(1M), fsck_ufs(1M), fstyp(1M), lockfs(1M), mkfs_ufs(1M), newfs(1M), ufsdump(1M), ufsre<hy>
+store(1M), tunefs(1M), mount(2), attributes(5)
+Writing Device Drivers
+For information about internal UFS structures, see newfs(1M) and mkfs_ufs(1M). For information about the ufs<hy>
+dump and ufsrestore commands, see ufsdump(1M), ufsrestore(1M), and /usr/include/protocols/dumprestore.h.
+If you experience difficulty in allocating space on the ufs filesystem, it may be due to framentation. Fragmentation
+can occur when you do not have sufficient free blocks to satisfy an allocation request even though df(1M) indicates
+that enough free space is available. (This may occur because df only uses the available fragment count to calculate
+available space, but the file system requires contiguous sets of fragments for most allocations). If you suspect that
+you have exhausted contiguous fragments on your file system, you can use the fstyp(1M) utility with the -v option.
+In the fstyp output, look at the nbfree (number of blocks free) and nffree (number of fragments free) fields. On
+unmounted filesystems, you can use fsck(1M) and observe the last line of output, which reports, among other
+items, the number of fragments and the degree of fragmentation. To correct a fragmentation problem, run ufs<hy>
+dump(1M) and ufsrestore(1M) on the ufs filesystem.

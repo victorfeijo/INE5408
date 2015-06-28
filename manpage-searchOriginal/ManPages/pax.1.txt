@@ -1,0 +1,811 @@
+<beginning of page>
+pax <-> portable archive interchange
+pax [-cdnv] [-H | -L] [-f archive] [-o options]...
+ [-s replstr]... [pattern]...
+pax -r [-cdiknuv@/] [-H | -L] [-f archive] [-o options]...
+ [-p string]... [-s replstr]... [pattern]...
+pax -w [-dituvX@/] [-H | -L] [-b blocksize] [-a]
+ [-f archive] [-o options]... [-s replstr]...
+ [-x format] [file]...
+pax -r -w [-diklntuvX@/] [-H | -L] [-o options]...
+ [-p string]... [-s replstr]... [file]... directory
+pax reads, writes, and writes lists of the members of archive files and copies directory hierarchies. A variety of ar<hy>
+chive formats are supported. See the -x format option.
+The action to be taken depends on the presence of the -r and -w options. The four combinations of -r and -w are re<hy>
+ferred to as the four modes of operation: list, read, write, and copy modes, corresponding respectively to the four
+forms shown in the SYNOPSIS.
+list In list mode, that is, when neither -r nor -w are specified, pax writes the names of the members of the archive
+file read from the standard input, with path names matching the specified patterns, to standard output. If a named file
+has extended attributes, the extended attributes are also listed. If a named file is of type directory, the file hierarchy
+rooted at that file is listed as well.
+read In read mode, that is, when -r is specified, but -w is not, pax extracts the members of the archive file read from
+the standard input, with path names matching the specified patterns. If an extracted file is of type directory, the file
+hierarchy rooted at that file is extracted as well. The extracted files are created performing path name resolution with
+the directory in which pax was invoked as the current working directory.
+If an attempt is made to extract a directory when the directory already exists, this is not considered an error. If an at<hy>
+tempt is made to extract a FIFO when the FIFO already exists, this is not considered an error.
+The ownership, access and modification times, and file mode of the restored files are discussed under the -p option.
+write In write mode, that is, when -w is specified, but -r is not, pax writes the contents of the file operands to the
+standard output in an archive format. If no file operands are specified, a list of files to copy, one per line, are read
+from the standard input. A file of type directory includes all of the files in the file hierarchy rooted at the file.
+copy In copy mode, that is, when both -r and -w are specified, pax copies the file operands to the destination direc<hy>
+tory.
+If no file operands are specified, a list of files to copy, one per line, are read from the standard input. A file of type di<hy>
+rectory includes all of the files in the file hierarchy rooted at the file.
+The effect of the copy is as if the copied files were written to an archive file and then subsequently extracted, except
+that there can be hard links between the original and the copied files. If the destination directory is a subdirectory of
+one of the files to be copied, the results are unspecified. It is an error if directory does not exist, is not writable by the
+user, or is not a directory.
+In read or copy modes, if intermediate directories are necessary to extract an archive member, pax performs actions
+equivalent to the mkdir(2) function, called with the following arguments: <bu> The intermediate directory used as the
+path argument. <bu> The octal value of 777 or rwx (read, write, and execute permissions) as the mode argument (see
+chmod(1)).
+If any specified pattern or file operands are not matched by at least one file or archive member, pax writes a diagnos<hy>
+tic message to standard error for each one that did not match and exits with a non-zero exit status.
+The supported archive formats are automatically detected on input. The default output archive format is tar(1).
+<beginning of page>
+A single archive can span multiple files. pax determines what file to read or write as the next file.
+If the selected archive format supports the specification of linked files, it is an error if these files cannot be linked
+when the archive is extracted, except if the files to be linked are symbolic links and the system is not capable of
+making hard links to symbolic links. In that case, separate copies of the symbolic link are created instead. Any of the
+various names in the archive that represent a file can be used to select the file for extraction. For archive formats that
+do not store file contents with each name that causes a hard link, if the file that contains the data is not extracted dur<hy>
+ing this pax session, either the data is restored from the original file, or a diagnostic message is displayed with the
+name of a file that can be used to extract the data. In traversing directories, pax detects infinite loops, that is, enter<hy>
+ing a previously visited directory that is an ancestor of the last file visited. When it detects an infinite loop, pax
+writes a diagnostic message to standard error and terminates.
+The following options are supported:
+-a Appends files to the end of the archive. This option does not work for some archive devices, such as 1/4-inch
+streaming tapes and 8mm tapes.
+-b blocksize Blocks the output at a positive decimal integer number of bytes per write to the archive file. Devices and
+archive formats can impose restrictions on blocking. Blocking is automatically determined on input. Portable appli<hy>
+cations must not specify a blocksize value larger than 32256. Default blocking when creating archives depends on
+the archive format. See the -x option below.
+-c Matches all file or archive members except those specified by the pattern or file operands.
+-d Causes files of type directory being copied or archived or archive members of type directory being extracted or
+listed to match only the file or archive member itself and not the file hierarchy rooted at the file.
+-f archive Specifies the path name of the input or output archive, overriding the default standard input (in list or read
+modes) or standard output (write mode).
+-H If a symbolic link referencing a file of type directory is specified on the command line, pax archives the file hier<hy>
+archy rooted in the file referenced by the link, using the name of the link as the root of the file hierarchy. Otherwise,
+if a symbolic link referencing a file of any other file type which pax can normally archive is specified on the com<hy>
+mand line, then pax archives the file referenced by the link, using the name of the link. The default behavior is to ar<hy>
+chive the symbolic link itself.
+-i Interactively renames files or archive members. For each archive member matching a pattern operand or file
+matching a file operand, a prompt is written to the file /dev/tty. The prompt contains the name of the file or archive
+member. A line is then read from /dev/tty. If this line is blank, the file or archive member is skipped. If this line con<hy>
+sists of a single period, the file or archive member is processed with no modification to its name. Otherwise, its name
+is replaced with the contents of the line. pax immediately exits with a non-zero exit status if end-of-file is encoun<hy>
+tered when reading a response or if /dev/tty cannot be opened for reading and writing.
+The results of extracting a hard link to a file that has been renamed during extraction are unspecified.
+-k Prevents the overwriting of existing files.
+-l Links files. In copy mode, hard links are made between the source and destination file hierarchies whenever possi<hy>
+ble. If specified in conjunction with -H or -L, when a symbolic link is encountered, the hard link created in the desti<hy>
+nation file hierarchy is to the file referenced by the symbolic link. If specified when neither -H nor -L is specified,
+when a symbolic link is encountered, the implementation creates a hard link to the symbolic link in the source file
+hierarchy or copies the symbolic link to the destination.
+-L If a symbolic link referencing a file of type directory is specified on the command line or encountered during the
+traversal of a file hierarchy, pax archives the file hierarchy rooted in the file referenced by the link, using the name of
+the link as the root of the file hierarchy. Otherwise, if a symbolic link referencing a file of any other file type which
+pax can normally archive is specified on the command line or encountered during the traversal of a file hierarchy,
+<beginning of page>
+pax archives the file referenced by the link, using the name of the link. The default behavior is to archive the sym<hy>
+bolic link itself.
+-n Selects the first archive member that matches each pattern operand. No more than one archive member is
+matched for each pattern, although members of type directory still match the file hierarchy rooted at that file.
+-o options Provides information to the implementation to modify the algorithm for extracting or writing files. The
+value of options consists of one or more comma-separated keywords of the form:
+ keyword[[:]=value][,keyword[[:]=value], ...]
+Some keywords apply only to certain file formats, as indicated with each description. Use of keywords that are inap<hy>
+plicable to the file format being processed produces undefined results.
+Keywords in the options argument must be a string that would be a valid portable filename.
+Keywords are not expected to be filenames, merely to follow the same character composition rules as portable file<hy>
+names.
+Keywords can be preceded with white space. The value field consists of zero or more characters. Within value, the
+application precedes any literal comma with a backslash, which is ignored, but preserves the comma as part of value.
+A comma as the final character, or a comma followed solely by white space as the final characters, in options is ig<hy>
+nored. Multiple -o options can be specified. If keywords given to these multiple -o options conflict, the keywords
+and values appearing later in command line sequence take precedence and the earlier ones are silently ignored. The
+following keyword values of options are supported for the file formats as indicated:
+delete=pattern
+This keyword is applicable only to the -x pax format. When used in write or copy mode, pax omits from extended
+header records that it produces any keywords matching the string pattern. When used in read or list mode, pax ig<hy>
+nores any keywords matching the string pattern in the extended header records. In both cases, matching is performed
+using the pattern matching notation. For example:
+ -o delete=security.*
+would suppress security-related information.
+When multiple -o delete=pattern options are specified, the patterns are additive. All keywords matching the speci<hy>
+fied string patterns are omitted from extended header records that pax produces.
+exthdr.name=string
+This keyword is applicable only to the -x pax format. This keyword allows user control over the name that is written
+into the ustar header blocks for the extended header. The name is the contents of string, after the following charac<hy>
+ter substitutions have been made:
+%d The directory name of the file, equivalent to the result of the dirname utility on the translated path name.
+%f The filename of the file, equivalent to the result of the basename utility on the translated path name.
+%p The process ID of the pax process.
+%% A '%' character.
+Any other '%' characters in string produce undefined results.
+If no -o exthdr.name=string is specified, pax uses the following default value:
+ %d/PaxHeaders.%p/%f
+<beginning of page>
+globexthdr.name=string
+This keyword is applicable only to the -x pax format. When used in write or copy mode with the appropriate op<hy>
+tions, pax creates global extended header records with ustar header blocks that are treated as regular files by previ<hy>
+ous versions of pax. This keyword allows user control over the name that is written into the ustar header blocks for
+global extended header records. The name is the contents of string, after the following character substitutions have
+been made:
+%n An integer that represents the sequence number of the global extended header record in the archive, starting at 1.
+%p The process ID of the pax process.
+%% A '%' character.
+Any other '%' characters in string produce undefined results.
+If no -o globexthdr.name=string is specified, pax uses the following default value:
+ $TMPDIR/GlobalHead.%p.%n
+where $TMPDIR represents the value of the TMPDIR environment variable. If TMPDIR is not set, pax uses /tmp.
+invalid=action
+This keyword is applicable only to the -x pax format. This keyword allows user control over the action pax takes up<hy>
+on encountering values in an extended header record that, in read or copy mode, are invalid in the destination hierar<hy>
+chy or, in list mode , cannot be written in the codeset and current locale of the implementation. The following are in<hy>
+valid values that are recognized by pax: <bu> In read or copy mode, a filename or link name that contains character en<hy>
+codings invalid in the destination hierarchy. For example, the name can contain embedded NULs. <bu> In read or copy
+mode, a filename or link name that is longer than the maximum allowed in the destination hierarchy, for either a path
+name component or the entire path name. <bu> In list mode, any character string value (filename, link name, user name,
+and so on) that cannot be written in the codeset and current locale of the implementation. The following mutually-
+exclusive values of the action argument are supported:
+bypass In read or copy mode, pax bypasses the file, causing no change to the destination hierarchy. In list mode,
+pax writes all requested valid values for the file, but its method for writing invalid values is unspecified.
+rename In read or copy mode, pax acts as if the -i option were in effect for each file with invalid filename or link
+name values, allowing the user to provide a replacement name interactively. In list mode, pax behaves identically to
+the bypass action.
+UTF-8 pax uses the actual UTF-8 encoding for the name when it is used in read, copy, or list mode and a filename,
+link name, owner name, or any other field in an extended header record cannot be translated from the pax UTF-8
+codeset format to the codeset and current locale of the implementation.
+write In read or copy mode, pax writes the file, translating the name, regardless of whether this can overwrite an
+existing file with a valid name. In list mode, pax behaves identically to the bypass action.
+If no -o invalid= option is specified, pax acts as if -o invalid=bypass were specified. Any overwriting of existing
+files that can be allowed by the -o invalid= actions are subject to permission (-p) and modification time (-u) restric<hy>
+tions, and are suppressed if the -k option is also specified.
+linkdata
+This keyword is applicable only to the -x pax format. In write mode, pax writes the contents of a file to the archive
+even when that file is merely a hard link to a file whose contents have already been written to the archive.
+<beginning of page>
+listopt=format
+This keyword specifies the output format of the table of contents produced when the -v option is specified in list
+mode. (See List Mode Format Specifications below.) To avoid ambiguity, the listopt=format is the only or final
+keyword=value pair in an -o option-argument. All characters in the remainder of the option-argument are considered
+to be part of the format string. When multiple -o listopt=format options are specified, the format strings are consid<hy>
+ered to be a single, concatenated string, evaluated in command line order.
+times
+This keyword is applicable only to the -x pax and -x xustar formats. When used in write or copy mode, pax in<hy>
+cludes atime and mtime extended header records for each file.
+In addition to these keywords, if the -x pax format is specified, any of the keywords and values, including imple<hy>
+mentation extensions, can be used in -o option-arguments, in either of two modes:
+keyword=value When used in write or copy mode, these keyword/value pairs are included at the beginning of the
+archive as typeflag g global extended header records. When used in read or list mode, these keyword/value pairs act
+as if they had been at the beginning of the archive as typeflag g global extended header records.
+keyword:=value When used in write or copy mode, these keyword/value pairs are included as records at the begin<hy>
+ning of a typeflag x extended header for each file. This is equivalent to the equal-sign form except that it creates no
+typeflag g global extended header records. When used in read or list mode, these keyword/value pairs act as if they
+were included as records at the end of each extended header. Thus, they override any global or file-specific extended
+header record keywords of the same names. For example, in the command:
+ pax -r -o "
+ gname:=mygroup,
+ " <archive
+the group name is forced to a new value for all files read from the archive.
+-p string Specifies one or more file characteristic options (privileges). The string option-argument must be a string
+specifying file characteristics to be retained or discarded on extraction. The string consists of the specification char<hy>
+acters a, e, m, o, and p. Multiple characteristics can be concatenated within the same string and multiple -p options
+can be specified. The meaning of the specification characters is as follows:
+a Does not preserve file access times.
+e Preserves the user ID, group ID, file mode bits, access time, and modification time.
+m Does not preserve file modification times.
+o Preserves the user ID and group ID.
+p Preserves the file mode bits.
+In the preceding list, preserve indicates that an attribute stored in the archive is given to the extracted file, subject to
+the permissions of the invoking process. Otherwise, the attribute is determined as part of the normal file creation ac<hy>
+tion. The access and modification times of the file is preserved unless otherwise specified with the -p option or not
+stored in the archive. All attributes that are not preserved are determined as part of the normal file creation action.
+If neither the e nor the o specification character is specified, or the user ID and group ID are not preserved for any
+reason, pax does not set the setuid and setgid bits of the file mode.
+If the preservation of any of these items fails for any reason, pax writes a diagnostic message to standard error. Fail<hy>
+<beginning of page>
+ure to preserve these items affects the final exit status, but does not cause the extracted file to be deleted.
+If file-characteristic letters in any of the string option-arguments are duplicated or conflict with each other, the ones
+given last take precedence. For example, if -p eme is specified, file modification times are preserved.
+-r Reads an archive file from standard input.
+-s replstr Modifies file or archive member names named by pattern or file operands according to the substitution ex<hy>
+pression replstr, which is based on the ed(1) s (substitution) utility, using the regular expression syntax of regex(5).
+The concepts of ``address'' and ``line'' are meaningless in the context of the pax command, and must not be sup<hy>
+plied. The format is:
+ -s /old/new/ [gp]
+where, as in ed, old is a basic regular expression and new can contain an ampersand (&), a \n backreference, where n
+is a digit, or subexpression matching. The old string is also permitted to contain newlines.
+Any non-null character can be used as a delimiter (/ shown here). Multiple -s expressions can be specified. The ex<hy>
+pressions are applied in the order specified, terminating with the first successful substitution. The optional trailing g
+is as defined in the ed command. The optional trailing p causes successful substitutions to be written to standard er<hy>
+ror. File or archive member names that substitute to the empty string are ignored when reading and writing archives.
+-t When reading files from the file system, and if the user has the permissions required by utime() to do so, sets the
+access time of each file read to the access time that it had before being read by pax.
+-u Ignores files that are older (having a less recent file modification time) than a pre-existing file or archive member
+with the same name.
+read mode An archive member with the same name as a file in the file system is extracted if the archive member is
+newer than the file.
+write mode An archive file member with the same name as a file in the file system is superseded if the file is newer
+than the archive member. If option -a is also specified, this is accomplished by appending to the archive. Otherwise,
+it is unspecified whether this is accomplished by actual replacement in the archive or by appending to the archive.
+copy mode The file in the destination hierarchy is replaced by the file in the source hierarchy or by a link to the file
+in the source hierarchy if the file in the source hierarchy is newer.
+-v In list mode, produces a verbose table of contents (see Standard Output). Otherwise, writes archive member
+path names and extended attributes to standard error (see Standard Error).
+-w Writes files to the standard output in the specified archive format.
+-x format Specifies the output archive format. The pax utility recognizes the following formats:
+cpio The extended cpio(1) interchange format. See IEEE Std 1003.1-2001. The default blocksize for this format for
+character special archive files is 5120. Implementations support all blocksize values less than or equal to 32256 that
+are multiples of 512.
+This archive format allows files with UIDs and GIDs up to 262143 to be stored in the archive. Files with UIDs and
+GIDs greater than this value are archived with the UID and GID of 60001.
+pax The pax interchange format. See IEEE Std 1003.1-2001. The default blocksize for this format for character spe<hy>
+cial archive files is 5120. Implementations support all blocksize values less than or equal to 32256 that are multiples
+<beginning of page>
+of 512.
+Similar to ustar. Also allows archiving and extracting files whose size is greater than 8GB; whose UID, GID, dev<hy>
+major, or devminor values are greater than 2097151; whose path (including filename) is greater than 255 characters;
+or whose linkname is greater than 100 characters.
+ustar The extended tar(1) interchange format. See the IEEE 1003.1(1990) specifications. The default blocksize for
+this format for character special archive files is 10240. Implementations support all blocksize values less than or
+equal to 32256 that are multiples of 512.
+This archive format allows files with UIDs and GIDs up to 2097151 to be stored in the archive. Files with UIDs and
+GIDs greater than this value are archived with the UID and GID of 60001.
+xustar Similar to ustar. Also allows archiving and extracting files whose size is greater than 8GB; whose UID,
+GID, devmajor, or devminor values are greater than 2097151; whose path (including filename) is greater than 255
+characters; or whose linkname is greater than 100 characters. This option should not be used if the archive is to be
+extracted by an archiver that cannot handle the larger values.
+Any attempt to append to an archive file in a format different from the existing archive format causes pax to exit im<hy>
+mediately with a non-zero exit status.
+In copy mode, if no -x format is specified, pax behaves as if -x pax were specified.
+-X When traversing the file hierarchy specified by a path name, pax does not descend into directories that have a dif<hy>
+ferent device ID (st_dev, see stat(2)).
+-@ Includes extended attributes in the archive. pax does not place extended attributes in the archive by default.
+When traversing the file hierarchy specified by a path name, pax descends into the attribute directory for any file
+with extended attributes. Extended attributes go into the archive as special files.
+When this flag is used during file extraction, any extended attributes associated with a file being extracted are also
+extracted. Extended attribute files can only be extracted from an archive as part of a normal file extract. Attempts to
+explicitly extract attribute records are ignored.
+-/ Includes extended system attributes in the archive. pax does not place extended system attributes in the archive by
+default.
+When traversing the file hierarchy specified by a path name, pax descends into the attribute directory for any file
+with extended attributes. Extended attributes go into the archive as special files. When this flag is used during file ex<hy>
+traction, any extended attributes associated with a file being extracted are also extracted. Extended attribute files can
+only be extracted from an archive as part of a normal file extract. Attempts to explicitly extract attribute records are
+ignored.
+Specifying more than one of the mutually-exclusive options -H and -L is not considered an error. The last option
+specified determines the behavior of the utility.
+The options that operate on the names of files or archive members (-c, -i, -n, -s, -u and -v) interact as follows.
+In read mode, the archive members are selected based on the user-specified pattern operands as modified by the -c,
+-n and -u options. Then, any -s and -i options modify, in that order, the names of the selected files. The -v option
+writes names resulting from these modifications.
+In write mode, the files are selected based on the user-specified path names as modified by the -n and -u options.
+Then, any -s and -i options modify, in that order, the names of these selected files. The -v option writes names result<hy>
+ing from these modifications.
+If both the -u and -n options are specified, pax does not consider a file selected unless it is newer than the file to
+which it is compared.
+<beginning of page>
+In list mode with the -o listopt=format option, the format argument is applied for each selected file. pax appends a
+NEWLINE to the listopt output for each selected file. The format argument is used as the format string with the fol<hy>
+lowing exceptions. (See printf(1) for the first five exceptions.) 1. A SPACE character in the format string, in any
+context other than a flag of a conversion specification, is treated as an ordinary character that is copied to the output.
+2. A ' ' character in the format string is treated as a ' ' character, not as a SPACE. 3. In addition to the escape se<hy>
+quences described in the formats(5) manual page, (\\, \a, \b, \f, \n, \r, \t, \v), \ddd, where ddd is a one-, two-, or
+three-digit octal number, is written as a byte with the numeric value specified by the octal number. 4. Output from
+the d or u conversion specifiers is not preceded or followed with BLANKs not specified by the format operand. 5.
+Output from the o conversion specifier is not preceded with zeros that are not specified by the format operand. 6.
+The sequence (keyword) can occur before a format conversion specifier. The conversion argument is defined by the
+value of keyword. The following keywords are supported (see IEEE Std 1003.1-2001): <bu> Any of the Field Name en<hy>
+tries in ustar Header Block and Octet-Oriented cpio Archive Entry. The implementation supports the cpio
+keywords without the leading c_ in addition to the form required by Values for cpio c_ mode Field. <bu> Any keyword
+defined for the extended header in pax Extended Header. <bu> Any keyword provided as an implementation-defined
+extension within the extended header defined in pax Extended Header. For example, the sequence "%(charset)s"
+is the string value of the name of the character set in the extended header.
+The result of the keyword conversion argument is the value from the applicable header field or extended header,
+without any trailing NULs.
+All keyword values used as conversion arguments are translated from the UTF -8 encoding to the character set ap<hy>
+propriate for the local file system, user database, and so on, as applicable. 7. An additional conversion specifier
+character, T, is used to specify time formats. The T conversion specifier character can be preceded by the sequence
+(keyword=subformat), where subformat is a date format as defined by date operands. The default keyword is mtime
+and the default subformat is:
+ %b %e %H:%M %Y
+8. An additional conversion specifier character, M, is used to specify the file mode string as defined in ls Standard
+Output. If (keyword) is omitted, the mode keyword is used. For example, %.1M writes the single character corre<hy>
+sponding to the entry type field of the ls -l command. 9. An additional conversion specifier character, D, is used to
+specify the device for block or special files, if applicable, in an implementation-defined format. If not applicable, and
+(keyword) is specified, then this conversion is equivalent to %(keyword)u. If not applicable, and (keyword) is omit<hy>
+ted, then this conversion is equivalent to SPACE. 10. An additional conversion specifier character, F, is used to
+specify a path name. The F conversion character can be preceded by a sequence of comma-separated keywords:
+ (keyword[,keyword] ... )
+The values for all the keywords that are non-null are concatenated, each separated by a '/'. The default is (path) if
+the keyword path is defined. Otherwise, the default is (prefix,name). 11. An additional conversion specifier charac<hy>
+ter, L, is used to specify a symbolic link expansion. If the current file is a symbolic link, then %L expands to:
+ "%s -> %s", value of keyword, contents of link
+Otherwise, the %L conversion specification is the equivalent of %F.
+The following operands are supported:
+directory The destination directory path name for copy mode.
+file A path name of a file to be copied or archived.
+pattern A pattern matching one or more path names of archive members. A pattern must conform to the pattern
+matching notation found on the fnmatch(5) manual page. The default, if no pattern is specified, is to select all mem<hy>
+bers in the archive.
+Output formats are discussed below:
+In write mode, if -f is not specified, the standard output is the archive formatted according to one of the formats de<hy>
+scribed below. See -x format for a list of supported formats.
+<beginning of page>
+In list mode, when the -o listopt=format option has been specified, the selected archive members are written to stan<hy>
+dard output using the format described above under List Mode Format Specifications. In list mode without the -o
+listopt=format option, the table of contents of the selected archive members are written to standard output using the
+following format:
+ "%s\n", pathname
+If the -v option is specified in list mode, the table of contents of the selected archive members are written to standard
+output using the following formats: <bu> For path names representing hard links to previous members of the archive:
+ "%s == %s\n", <ls -l listing, linkname
+<bu> For all other path names:
+ "%s\n", <ls -l listing>
+where <ls -l listing> is the format specified by the ls command with the -l option. When writing path names in this
+format, it is unspecified what is written for fields for which the underlying archive format does not have the correct
+information, although the correct number of blank-character-separated fields is written.
+In list mode, standard output is not buffered more than a line at a time.
+If -v is specified in read, write or copy modes, pax writes the path names it processes to the standard error output
+using the following format:
+ "%s\n", pathname
+These path names are written as soon as processing is begun on the file or archive member, and are flushed to stan<hy>
+dard error. The trailing NEWLINE character, which is not buffered, is written when the file has been read or written.
+If the -s option is specified, and the replacement string has a trailing p, substitutions are written to standard error in
+the following format:
+ "%s >> %s\n", <original pathname>, <new pathname>
+In all operating modes of pax, optional messages of unspecified format concerning the input archive format and vol<hy>
+ume number, the number of files, blocks, volumes, and media parts as well as other diagnostic messages can be writ<hy>
+ten to standard error.
+In all formats, for both standard output and standard error, it is unspecified how non-printable characters in path
+names or link names are written.
+When pax is in read mode or list mode, using the -x pax archive format, and a file name, link name, owner name, or
+any other field in an extended header record cannot be translated from the pax UTF-8 codeset format to the codeset
+and current locale of the implementation, pax writes a diagnostic message to standard error, processes the file as de<hy>
+scribed for the -o invalid=option, and then processes the next file in the archive.
+In read mode, the extracted output files are of the archived file type. In copy mode, the copied output files are the
+type of the file being copied . In either mode, existing files in the destination hierarchy are overwritten only when all
+permission (-p), modification time (-u), and invalid-value (-o invalid=) tests allow it. In write mode, the output file
+named by the -f option-argument is a file formatted according to one of the specifications in IEEE Std 1003.1-2001.
+If pax cannot create a file or a link when reading an archive, or cannot find a file when writing an archive, or cannot
+preserve the user ID, group ID, or file mode when the -p option is specified, a diagnostic message is written to stan<hy>
+dard error and a non-zero exit status is returned, but processing continues. In the case where pax cannot create a link
+to a file, pax does not, by default, create a second copy of the file.
+<beginning of page>
+If the extraction of a file from an archive is prematurely terminated by a signal or error, pax can have only partially
+extracted the file or, if the -n option was not specified, can have extracted a file of the same name as that specified by
+the user, but which is not the file the user wanted. Additionally, the file modes of extracted directories can have addi<hy>
+tional bits from the read, write, execute mask set as well as incorrect modification and access times.
+The -p (privileges) option was invented to reconcile differences between historical tar(1) and cpio(1) implementa<hy>
+tions. In particular, the two utilities use -m in diametrically opposed ways. The -p option also provides a consistent
+means of extending the ways in which future file attributes can be addressed, such as for enhanced security systems
+or high-performance files. Although it can seem complex, there are really two modes that are most commonly used:
+-p e Preserve everything. This would be used by the historical superuser, someone with all the appropriate privileges,
+to preserve all aspects of the files as they are recorded in the archive. The e flag is the sum of o and p, and other im<hy>
+plementation-dependent attributes.
+-p p Preserve the file mode bits. This would be used by the user with regular privileges who wished to preserve as<hy>
+pects of the file other than the ownership. The file times are preserved by default, but two other flags are offered to
+disable these and use the time of extraction.
+The one path name per line format of standard input precludes path names containing newlines. Although such path
+names violate the portable filename guidelines, they can exist and their presence can inhibit usage of pax within
+shell scripts. This problem is inherited from historical archive programs. The problem can be avoided by listing file
+name arguments on the command line instead of on standard input.
+It is almost certain that appropriate privileges are required for pax to accomplish parts of this. Specifically, creating
+files of type block special or character special, restoring file access times unless the files are owned by the user (the
+-t option), or preserving file owner, group, and mode (the -p option) all probably require appropriate privileges.
+In read mode, implementations are permitted to overwrite files when the archive has multiple members with the
+same name. This can fail if permissions on the first version of the file do not permit it to be overwritten.
+When using the -x xustar and -x -pax archive formats, if the underlying file system reports that the file being
+archived contains holes, the Solaris pax utility records the presence of holes in an extended header record when the
+file is archived. If this extended header record is associated with a file in the archive, those holes are recreated when<hy>
+ever that file is extracted from the archive. See the SEEK_DATA and SEEK_HOLE whence values in lseek(2). In
+all other cases, any NUL (\0) characters found in the archive is written to the file when it is extracted.
+See largefile(5) for the description of the behavior of pax when encountering files greater than or equal to 2 Gbyte (
+2^31 bytes).
+In write mode, the standard input is used only if no file operands are specified. It is a text file containing a list of
+path names, one per line, without leading or trailing blanks. In list and read modes, if -f is not specified, the stan<hy>
+dard input is an archive file. Otherwise, the standard input is not used.
+The input file named by the archive option-argument, or standard input when the archive is read from there, is a file
+formatted according to one of the formats described below. See Extended Description. The file /dev/tty is used to
+write prompts and read responses. Example 1 Copying the Contents of the Current Directory
+The following command:
+ example% pax -w -f /dev/rmt/1m .
+copies the contents of the current directory to tape drive 1, medium density. This assumes historical System V device
+naming procedures. The historical BSD device name would be /dev/rmt9.
+Example 2 Copying the Directory Hierarchy
+The following commands:
+ example% mkdir newdir
+ example% pax -rw olddir newdir
+<beginning of page>
+copy the olddir directory hierarchy to newdir.
+Example 3 Reading an Archive Extracted Relative to the Current Directory
+The following command:
+ example% pax -r -s ',^//*usr//*,,' -f a.pax
+reads the archive a.pax, with all files rooted in /usr in the archive extracted relative to the current directory.
+Example 4 Overriding the Default Output Description
+Using the option:
+ -o listopt="%M %(atime)T %(size)D %(name)s"
+overrides the default output description in Standard Output and instead writes:
+ -rw-rw- - - Jan 12 15:53 2003 1492 /usr/foo/bar
+Using the options:
+ -o listopt='%L\t%(size)D\n%.7' \
+ -o listopt='(name)s\n%(atime)T\n%T'
+overrides the default output description in standard output and instead writes:
+ usr/foo/bar -> /tmp 1492
+ /usr/foo
+ Jan 12 15:53 1991
+ Jan 31 15:53 2003
+See environ(5) for descriptions of the following environment variables that affect the execution of pax: LANG,
+LC_ALL, LC_CTYPE, LC_MESSAGES, LC_TIME, and NLSPATH.
+LC_COLLATE Determine the locale for the behaviour of ranges, equivalence classes, and multi-character collating
+elements used in the pattern matching expressions for the pattern operand, the basic regular expression for the -s op<hy>
+tion, and the extended regular expression defined for the yesexpr locale keyword in the LC_MESSAGES category.
+TMPDIR Determine the path name that provides part of the default global extended header record file, as described
+for the -o globexthdr= keyword as described in the OPTIONS section.
+TZ Determine the timezone used to calculate date and time strings when the -v option is specified. If TZ is unset or
+null, an unspecified default timezone is used.
+<beginning of page>
+The following exit values are returned:
+0 All files were processed successfully.
+>0 An error occurred.
+A pax archive tape or file produced in the -xpax format contains a series of blocks. The physical layout of the ar<hy>
+chive is identical to the ustar format described in ustar Interchange Format. Each file archived is represented by
+the following sequence: <bu> An optional header block with extended header records. This header block is of the form
+27403 with a typeflag value of x or g. The extended header records is included as the data for this header block. <bu> A
+header block that describes the file. Any fields in the preceding optional extended header overrides the associated
+fields in this header block for this file. <bu> Zero or more blocks that contain the contents of the file.
+At the end of the archive file there are two 512-byte blocks filled with binary zeroes, interpreted as an end-of-archive
+indicator.
+The following is a schematic of an example archive with global extended header records and two actual files in pax
+format archive. In the example, the second file in the archive has no extended header preceding it, presumably be<hy>
+cause it has no need for extended attributes.
+tab(); cw(2.67i) cw(2.83i) lw(2.67i) lw(2.83i) DescriptionBlock Global Extended Headerustar Header [typeflag=g]
+Global Extended Header Data File 1: Extended Header is includedustar Header [typeflag=x] Extended Header Data
+[typeflag=0] ustar Header Data for File 1 File 2: No Extended Header is includedustar Header [typeflag=0] Data for
+File2 End of Archive IndicatorBlock of binary zeros Block of binary zeros
+The pax header block is identical to the ustar header block described in ustar Interchange Format except that two
+additional typeflag values are defined:
+g Represents global extended header records for the following files in the archive. The format of these extended
+header records are as described in pax Extended Header. Each value affects all subsequent files that do not override
+that value in their own extended header record and until another global extended header record is reached that pro<hy>
+vides another value for the same field. The typeflag g global headers should not be used with interchange media that
+could suffer partial data loss in transporting the archive.
+x Represents extended header records for the following file in the archive (which has its own ustar header block).
+The format of these extended header records is as described in pax Extended Header.
+For both of these types, the size field is the size of the extended header records in octets. The other fields in the head<hy>
+er block are not meaningful to this version of pax. However, if this archive is read by pax conforming to a previous
+version of ISO POSIX-2:1993 Standard, the header block fields are used to create a regular file that contains the ex<hy>
+tended header records as data. Therefore, header block field values should be selected to provide reasonable file ac<hy>
+cess to this regular file.
+A further difference from the ustar header block is that data blocks for files of typeflag 1 (the digit one) (hard link)
+might be included, which means that the size field can be greater than zero. Archives created by pax -o linkdata in<hy>
+cludes these data blocks with the hard links.
+A pax extended header contains values that are inappropriate for the ustar header block because of limitations in
+that format: fields requiring a character encoding other than that described in the ISO/IEC 646: 1991 standard, fields
+representing file attributes not described in the ustar header, and fields whose format or length do not fit the require<hy>
+ments of the ustar header. The values in an extended header add attributes to the specified file or files or override
+values in the specified header blocks, as indicated in the following list of keywords. See the description of the type<hy>
+flag g header block.
+An extended header consists of one or more records, each constructed as follows:
+ "%d %s=%s\n", length, keyword, value
+<beginning of page>
+The extended header records are encoded according to the ISO/IEC 10646-1: 2000 standard (UTF-8). length,
+BLANK, equals sign (=), and NEWLINE are limited to the portable character set, as encoded in UTF-8. keyword
+and value can be any UTF-8 characters. length is the decimal length of the extended header record in octets, includ<hy>
+ing the trailing NEWLINE.
+keyword is one of the entries from the following list or a keyword provided as an implementation extension.
+Keywords consisting entirely of lowercase letters, digits, and periods are reserved for future standardization. A
+keyword does not include an equals sign.
+In the following list, the notation of file(s) or block(s) are used to acknowledge that a keyword affects the specified
+single file after a typeflag x extended header, but possibly multiple files after typeflag g. Any requirements in the list
+for pax to include a record when in write or copy mode applies only when such a record has not already been pro<hy>
+vided through the use of the -o option. When used in copy mode, pax behaves as if an archive had been created with
+applicable extended header records and then extracted.
+atime The file access time for the specified files, equivalent to the value of the st_atime member of the stat structure
+for a file, as described by the stat(2) function. The access time (atime) is restored if the process has the appropriate
+privilege required to do so. The format of the value is as described in pax Extended Header File Times.
+charset The name of the character set used to encode the data in the specified files. The entries in the following table
+are defined to refer to known standards; additional names can be agreed on between the originator and recipient.
+tab(); lw(2.75i) lw(2.75i) lw(2.75i) lw(2.75i) valueFormal Standard ISO-IR 646 1990ISO/IEC646:1990 ISO-IR
+8859 1 1998ISO/IEC8859-1:1998 ISO-IR 8859 2 1999ISO/IEC 8859-2:1999 ISO-IR 8859 3 1999ISO/IEC
+8859-3:1999 ISO-IR 8859 4 1999ISO/IEC8859-4:1998 ISO-IR 8859 5 1999ISO/IEC8859-5-1999 ISO-IR 8859 6
+1999ISO/IEC8859-6-1999 ISO-IR 8859 7 1987ISO/IEC8859-7:1987 ISO-IR 8859 8 1999ISO/IEC8859-8:1999
+ISO-IR 8859 9 1999ISO/IEC8859-9:1999 ISO-IR 8859 10 1998ISO/IEC8859-10:1999 ISO-IR 8859 13
+1998ISO/IEC8859-13:1998 ISO-IR 8859 14 1998ISO/IEC8859-14:1998 ISO-IR 8859 15
+1999ISO/IEC8859-15:1999 ISO-IR 10646 2000ISO/IEC 10646:2000 ISO-IR 10646 2000 UTF-8ISO/IEC
+10646,UTF-8 encoding BINARYNone
+The encoding is included in an extended header for information only; when pax is used as described in IEEE Std
+1003.1-200x, it does not translate the file data into any other encoding. The BINARY entry indicates unencoded bi<hy>
+nary data. When used in write or copy mode, it is implementation-defined whether pax includes a charset extended
+header record for a file.
+comment A series of characters used as a comment. All characters in the value field are ignored by pax.
+gid The group ID of the group that owns the file, expressed as a decimal number using digits from the ISO/IEC 646:
+1991 standard. This record overrides the gid field in the specified header blocks. When used in write or copy mode,
+pax includes a gid extended header record for each file whose group ID is greater than 2097151 (octal 7777777).
+gname The group of the files, formatted as a group name in the group database. This record overrides the gid and
+gname fields in the specified header blocks, and any gid extended header record. When used in read, copy, or list
+mode, pax translates the name from the UTF-8 encoding in the header record to the character set appropriate for the
+group database on the receiving system. If any of the UTF-8 characters cannot be translated, and if the -o in<hy>
+valid=UTF-8 option is not specified, the results are implementation-defined. When used in write or copy mode, pax
+includes a gname extended header record for each file whose group name cannot be represented entirely with the let<hy>
+ters and digits of the portable character set.
+linkpath The pathname of a link being created to another file, of any type, previously archived. This record over<hy>
+rides the linkname field in the specified ustar header blocks. The specified ustar header block determines the type of
+link created. If typeflag of the specified header block is 1, it is a hard link. If typeflag is 2, it is a symbolic link and
+the linkpath value is the contents of the symbolic link. pax translates the name of the link (contents of the symbolic
+link) from the UTF-8 encoding to the character set appropriate for the local file system. When used in write or copy
+mode, pax includes a linkpath extended header record for each link whose pathname cannot be represented entirely
+with the members of the portable character set other than NULL.
+<beginning of page>
+mtime The pathname of a link being created to another file, of any type, previously archived. This record overrides
+the linkname field in the specified ustar header blocks. The specified ustar header block determines the type of link
+created. If typeflag of the specified header block is 1, it is a hard link. If typeflag is 2, it is a symbolic link and the
+linkpath value is the contents of the symbolic link. pax translates the name of the link (contents of the symbolic
+link) from the UTF-8 encoding to the character set appropriate for the local file system. When used in write or copy
+mode, pax includes a linkpath extended header record for each link whose pathname cannot be represented entirely
+with the members of the portable character set other than NULL.
+path The pathname of the specified files. This record overrides the name and prefix fields in the specified header
+blocks. pax translates the pathname of the file from the UTF-8 encoding to the character set appropriate for the local
+file system. When used in write or copy mode, pax includes a path extended header record for each file whose path<hy>
+name cannot be represented entirely with the members of the portable character set other than NULL.
+realtime.any The keywords prefixed by realtime are reserved for future standardization.
+security.any The keywords prefixed by security are reserved for future standardization.
+size The size of the file in octets, expressed as a decimal number using digits from the ISO/IEC 646: 1991 standard.
+This record overrides the size field in the specified header blocks. When used in write or copy mode, pax includes a
+size extended header record for each file with a size value greater than 8589934591 (octal 77777777777).
+uid The user ID of the file owner, expressed as a decimal number using digits from the ISO/IEC 646:1991 standard.
+This record overrides the uid field in the following header block(s). When used in write or copy mode, pax includes
+a uid extended header record for each file whose owner ID is greater than 2097151 (octal 7777777).
+uname The owner of the specified files, formatted as a user name in the user database. This record overrides the uid
+and uname fields in the specified header blocks, and any uid extended header record. When used in read, copy, or list
+mode, pax translates the name from the UTF-8 encoding in the header record to the character set appropriate for the
+user database on the receiving system. If any of the UTF-8 characters cannot be translated, and if the -o invalid=
+UTF-8 option is not specified, the results are implementation-defined. When used in write or copy mode, pax in<hy>
+cludes a uname extended header record for each file whose user name cannot be represented entirely with the letters
+and digits of the portable character set.
+If the value field is zero length, it deletes any header block field, previously entered extended header value, or global
+extended header value of the same name.
+If a keyword in an extended header record (or in an -o option-argument) overrides or deletes a corresponding field in
+the ustar header block, pax ignores the contents of that header block field.
+Unlike the ustar header block fields, NULLs does not delimit values; all characters within the value field are consid<hy>
+ered data for the field.
+This section describes the precedence in which the various header records and fields and command line options are
+selected to apply to a file in the archive. When pax is used in read or list modes, it determines a file attribute in the
+following sequence: 1. If -o delete=keyword-prefix is used, the affected attributes is determined from step 7, if appli<hy>
+cable, or ignored otherwise. 2. If -o keyword:= is used, the affected attributes is ignored. 3. If -o keyword:=value
+is used, the affected attribute is assigned the value. 4. If there is a typeflag x extended header record, the affected at<hy>
+tribute is assigned the value. When extended header records conflict, the last one given in the header takes prece<hy>
+dence. 5. If -o keyword=value is used, the affected attribute is assigned the value. 6. If there is a typeflag g global
+extended header record, the affected attribute is assigned the value. When global extended header records conflict,
+the last one given in the global header takes precedence. 7. Otherwise, the attribute is determined from the ustar
+header block.
+pax writes an mtime record for each file in write or copy modes if the file's modification time cannot be represented
+exactly in the ustar header logical record described in ustar Interchange Format. This can occur if the time is out of
+ustar range, or if the file system of the underlying implementation supports non-integer time granularities and the
+time is not an integer. All of these time records are formatted as a decimal representation of the time in seconds
+since the Epoch. If a period (.) decimal point character is present, the digits to the right of the point represents the
+<beginning of page>
+units of a sub-second timing granularity, where the first digit is tenths of a second and each subsequent digit is a
+tenth of the previous digit. In read or copy mode, pax truncates the time of a file to the greatest value that is not
+greater than the input header file time. In write or copy mode, pax outputs a time exactly if it can be represented ex<hy>
+actly as a decimal number, and otherwise generates only enough digits so that the same time is recovered if the file is
+extracted on a system whose underlying implementation supports the same time granularity.
+A ustar archive tape or file contains a series of logical records. Each logical record is a fixed-size logical record of
+512 octets. Although this format can be thought of as being stored on 9-track industry-standard 12.7mm (0.5 in)
+magnetic tape, other types of transportable media are not excluded. Each file archived is represented by a header log<hy>
+ical record that describes the file, followed by zero or more logical records that give the contents of the file. At the
+end of the archive file there are two 512-octet logical records filled with binary zeros, interpreted as an end-of-ar<hy>
+chive indicator.
+The logical records can be grouped for physical I/O operations, as described under the -bblocksize and -x ustar op<hy>
+tions. Each group of logical records can be written with a single operation equivalent to the write(2) function. On
+magnetic tape, the result of this write is a single tape physical block. The last physical block always is the full size,
+so logical records after the two zero logical records can contain undefined data.
+The header logical record is structured as shown in the following table. All lengths and offsets are in decimal.
+Table 1 ustar Header Block
+tab(); cw(1.83i) cw(1.83i) cw(1.83i) lw(1.83i) lw(1.83i) lw(1.83i) Field NameOctet OffsetLength (in Octets)
+name0100 mode1008 uid1088 gid1168 size12412 mtime13612 chksum1488 typeflag1561 linkname157100 mag<hy>
+ic2576 version2632 uname26532 gname29732 devmajor3298 devminor3378 prefix345155
+All characters in the header logical record is represented in the coded character set of the ISO/IEC 646: 1991 stan<hy>
+dard. For maximum portability between implementations, names should be selected from characters represented by
+the portable filename character set as octets with the most significant bit zero. If an implementation supports the use
+of characters outside of slash and the portable filename character set in names for files, users, and groups, one or
+more implementation-defined encodings of these characters are provided for interchange purposes.
+pax never creates filenames on the local system that cannot be accessed using the procedures described in IEEE Std
+1003.1-200x. If a filename is found on the medium that would create an invalid filename, it is implementation-de<hy>
+fined whether the data from the file is stored on the file hierarchy and under what name it is stored. pax can choose
+to ignore these files as long as it produces an error indicating that the file is being ignored. Each field within the
+header logical record is contiguous; that is, there is no padding used.
+Each field within the header logical record is contiguous. There is no padding used. Each character on the archive
+medium is stored contiguously.
+The fields magic, uname and gname are character strings, each of which is terminated by a NULL character. The
+fields name, linkname, and prefix are NULL-terminated character strings except when all characters in the array con<hy>
+tain non-NULL characters including the last character. The version field is two octets containing the characters 00
+(zero-zero) The typeflag contains a single character. All other fields are leading zero-filled octal numbers using digits
+from the ISO/IEC 646:1991 standard IRV. Each numeric field is terminated by one or more SPACE of NULL char<hy>
+acters.
+Each character on the archive medium is stored contiguously. The fields magic, uname, and gname are character
+strings each terminated by a NULL character.
+name, linkname, and prefix are NULL-terminated character strings except when all characters in the array contain
+non-NULL characters including the last character. The version field is two octets containing the characters 00 (zero-
+zero). The typeflag contains a single character. All other fields are leading zero-filled octal numbers using digits from
+the ISO/IEC 646: 1991 standard IRV. Each numeric field is terminated by one or more spaces or NULL characters.
+The name and the prefix fields produce the pathname of the file. A new pathname is formed, if prefix is not an empty
+string (its first character is not NULL), by concatenating prefix (up to the first NULL character), a slash character,
+and name; otherwise, name is used alone. In either case, name is terminated at the first NULL character. If prefix be<hy>
+gins with a NULL character, it is ignored. In this manner, pathnames of at most 256 characters can be supported. If a
+pathname does not fit in the space provided, pax notifies the user of the error, and does not store any part of the file-
+header or data-on the medium.
+The linkname field does not use the prefix to produce a pathname. As such, a linkname is limited to 100 characters. If
+the name does not fit in the space provided, pax notifies the user of the error, and does not attempt to store the link
+<beginning of page>
+on the medium. The mode field provides 12 bits encoded in the ISO/IEC 646: 1991 standard octal digit representa<hy>
+tion. The encoded bits represent the following values in the ustar mode field:
+tab(); lw(.57i) lw(1.64i) lw(3.29i) lw(.57i) lw(1.64i) lw(3.29i) Bit ValueIEE Std 1003.1-2001 BitDescription
+04000S_ISUIDSet UID on execution 02000S_ISGIDSet GID on exectution 01000reservedReserved for future stan<hy>
+dardization 00400S_IRUSRRead permission for file owner class 00200S_IWUSRWrite permission for file owner
+class 00100S_IXUSRT{ Execute/search permission for file owner class T} 00040S_IRGRPRead permission for file
+group class 00020S_IWGRPWrite permission for file group class 00010S_IXGRPT{ Execute/search permission for
+file group class T} 00004S_IROTHRead permission for file other class 00002S_IWOTHWrite permission for file
+other class 00001S_IXOTHT{ Execute/search permission for file other class T}
+When appropriate privilege is required to set one of these mode bits, and the user restoring the files from the archive
+does not have the appropriate privilege, the mode bits for which the user does not have appropriate privilege are ig<hy>
+nored. Some of the mode bits in the archive format are not mentioned elsewhere in volume IEEE Std 1003.1-200x. If
+the implementation does not support those bits, they can be ignored.
+The uid and gid fields are the user and group ID of the owner and group of the file, respectively.
+The size field is the size of the file in octets. If the typeflag field is set to specify a file to be of type 1 (a link) or 2 (a
+symbolic link), the size field is specified as zero. If the typeflag field is set to specify a file of type 5 (directory), the
+size field is interpreted as described under the definition of that record type. No data logical records are stored for
+types 1, 2, or 5. If the typeflag field is set to 3 (character special file), 4 (block special file), or 6 (FIFO), the meaning
+of the size field is unspecified by volume IEEE Std 1003.1-200x, and no data logical records is stored on the medi<hy>
+um. Additionally, for type 6, the size field is ignored when reading. If the typeflag field is set to any other value, the
+number of logical records written following the header is (size+511)/512, ignoring any fraction in the result of the
+division.
+The mtime field is the modification time of the file at the time it was archived. It is the ISO/IEC 646: 1991 standard
+representation of the octal value of the modification time obtained from the stat() function.
+The chksum field is the ISO/IEC 646: 1991 standard IRV representation of the octal value of the simple sum of all
+octets in the header logical record. Each octet in the header is treated as an unsigned value. These values are added
+to an unsigned integer, initialized to zero, the precision of which is not less than 17 bits. When calculating the check<hy>
+sum, the chksum field is treated as if it were all spaces.
+The typeflag field specifies the type of file archived. If a particular implementation does not recognize the type, or
+the user does not have appropriate privilege to create that type, the file is extracted as if it were a regular file if the
+file type is defined to have a meaning for the size field that could cause data logical records to be written on the
+medium. If conversion to a regular file occurs, pax produces an error indicating that the conversion took place. All
+of the typeflag fields are coded in the ISO/IEC 646: 1991 standard IRV:
+0 Represents a regular file. For backward compatibility, a typeflag value of binary zero ('\0') should be recognized as
+meaning a regular file when extracting files from the archive. Archives written with this version of the archive file
+format create regular files with a typeflag value of the ISO/IEC 646: 1991 standard IRV '0'.
+1 Represents a file linked to another file, of any type, previously archived. Such files are identified by each file hav<hy>
+ing the same device and file serial number. The linked-to name is specified in the linkname field with a NULL-char<hy>
+acter terminator if it is less than 100 octets in length.
+2 Represents a symbolic link. The contents of the symbolic link are stored in the linkname field.
+3,4 Represents character special files and block special files respectively. In this case the devmajor and devminor
+fields contain information defining the device, the format of which is unspecified by volume IEEE Std 1003.1-200x.
+Implementations can map the device specifications to their own local specification or can ignore the entry.
+5 Specifies a directory or subdirectory. On systems where disk allocation is performed on a directory basis, the size
+field contain the maximum number of octets (which can be rounded to the nearest disk block allocation unit) that the
+directory can hold. A size field of zero indicates no such limiting. Systems that do not support limiting in this man<hy>
+ner should ignore the size field.
+<beginning of page>
+6 Specifies a FIFO special file. The archiving of a FIFO file archives the existence of this file and not its contents.
+7 Reserved to represent a file to which an implementation has associated some high- performance attribute. Imple<hy>
+mentations without such extensions should treat this file as a regular file (type 0).
+A-Z The letters A through Z inclusive are reserved for custom implementations. All other values are reserved for fu<hy>
+ture versions of IEEE Std 1003.1-200x.
+SUN.devmajor A Solaris extension to pax extended header keywords. Specifies the major device number of the file.
+When used in write or copy mode and the xustar or pax format (see -x format) was specified, pax includes a
+SUN.devmajor extended header record for each file whose major device number is too large to fit in 8 octets.
+SUN.devminor A Solaris extension to pax extended header keywords. Specifies the minor device number of the
+file.
+When used in write or copy mode and the xustar or pax format (see -x format) is specified, pax includes a SUN.de<hy>
+vminor extended header record for each file whose minor device number is too large to fit in 8 octets.
+SUN.holesdata A Solaris extension to pax extended header keywords. Specifies the data and hole pairs for a sparse
+file.
+In write or copy modes and when the xustar or pax format (see -x format) is specified, pax includes a SUN.holes<hy>
+date extended header record if the underlying file system supports the detection of files with holes (see fpath<hy>
+conf(2)) and reports that there is at least one hole in the file being archived. value consists of two or more consecu<hy>
+tive entries of the following form:
+ SPACEdata_offsetSPACEhole_offset
+where the data and hole offsets are the long values returned by passing SEEK_DATA and SEEK_HOLE to
+lseek(2), respectively. For example, the following entry is an example of the SUN.holesdata entry in the extended
+header for a file with data offsets at bytes 0, 24576, and 49152, and hole offsets at bytes 8192, 32768, and 49159: 49
+SUN.holesdata= 0 8192 24576 32768 49152 49159:
+ 49 SUN.holesdata= 0 8192 24576 32768 49152 49159
+When extracting a file from an archive in read or copy modes, if a SUN.holesdata = pair is found in the extended
+header for the file, then the file is restored with the holes identified using this data. For example, for the SUN.holes<hy>
+data provided in the example above, bytes from 0 to 8192 are restored as data, a hole is created up to the next data
+position (24576), bytes 24576 to 32768 is restored as data, and so forth.
+X A Solaris custom typeflag implementation which specifies an xustar format (see -x format) extended header. The
+typeflag 'x' extended header is treated as a ustar typeflag 'x' extended header.
+E A Solaris custom typeflag implementation which specifies an extended attributes header. See fsattr(5).
+Attempts to archive a socket using ustar interchange format produce a diagnostic message. Handling of other file
+types is implementation-defined.
+The magic field is the specification that this archive was output in this archive format. If this field contains ustar (the
+five characters from the ISO/IEC 646: 1991 standard IRV shown followed by NULL), the uname and gname fields
+contain the ISO/IEC 646: 1991 standard IRV representation of the owner and group of the file, respectively (truncat<hy>
+ed to fit, if necessary). When the file is restored by a privileged, protection-preserving version of the utility, the user
+and group databases are scanned for these names. If found, the user and group IDs contained within these files are
+<beginning of page>
+used rather than the values contained within the uid and gid fields.
+The octet-oriented cpio archive format are a series of entries, each comprising a header that describes the file, name
+of the file, and contents of the file.
+An archive can be recorded as a series of fixed-size blocks of octets. This blocking is be used only to make physical
+I/O more efficient. The last group of blocks are always at the full size.
+For the octet-oriented cpio archive format, the individual entry information are in the order indicated and described
+by the following table: Octet-Oriented cpio Archive Entry. See the cpio.h header for additional details.
+tab(); lw(1.83i) lw(1.83i) lw(1.83i) lw(1.83i) lw(1.83i) lw(1.83i) Header Field NameLength (in Octets)Interpreted as
+c_magic6Octal number c_dev6Octal number c_ino6Octal number c_mode6Octal number c_uid6Octal number
+c_gid6Octal number c_nlink6Octal number c_rdev6Octal number c_mtime11Octal number c_namesize6Octal num<hy>
+ber c_filesize11Octal number
+tab(); lw(1.83i) lw(1.83i) lw(1.83i) lw(1.83i) lw(1.83i) lw(1.83i) Filename Field NameLengthInterpreted as
+c_namec_namesizePathname string
+tab(); lw(1.83i) lw(1.83i) lw(1.83i) lw(1.83i) lw(1.83i) lw(1.83i) Filename Field NameLengthInterpreted as c_file<hy>
+datac_filesizeData
+For each file in the archive, a header as defined previously written. The information in the header fields is written as
+streams of the ISO/IEC 646: 1991 standard characters interpreted as octal numbers. The octal numbers are extended
+to the necessary length by appending the ISO/IEC 646: 1991 standard IRV zeros at the most-significant-digit end of
+the number. The result is written to the most-significant digit of the stream of octets first. The fields are interpreted
+as follows:
+c_magic Identifies the archive as being a transportable archive by containing the identifying value "070707".
+c_dev,c_ino Contains values that uniquely identify the file within the archive (that is, no files contain the same pair
+of c_dev and c_ino values unless they are links to the same file). The values are determined in an unspecified man<hy>
+ner.
+c_mode Contains the file type and access permissions as defined in the following table.
+Directories, FIFOs, symbolic links, and regular files are supported on a system conforming to volume IEEE Std
+1003.1-200x; additional values defined previously are reserved for compatibility with existing systems. Additional
+file types can be supported. Such files should not be written to archives intended to be transported to other systems.
+tab(); lw(1.83i) lw(1.83i) lw(1.83i) lw(1.83i) lw(1.83i) lw(1.83i) File Permissions NameValueIndicates
+C_IRUSR000400by owner C_IWUSR000200by owner C_IXUSR000100by owner C_IRGRP000040by group
+CW_IWFGP000020by group CW_IXGRP000010by group CW_IROTH000004by others
+CW_IWOTH000002by others CW_IXOTH000001by others CW_ISUID004000Set uid W_ISGID002000Set gid
+W_ISVTX001000Reserved
+tab(); lw(1.83i) lw(1.83i) lw(1.83i) lw(1.83i) lw(1.83i) lw(1.83i) File Type NameValueIndicates C_IS<hy>
+DIR040000Directory C_ISFIFO010000FIFO C_ISREG0100000Regular file C_ISLNK0120000Symbolic link
+C_ISBLK060000Block special file C_ISCHR020000Character special file C_ISSOCK0140000Socket
+C_ISCTG0110000Reserved
+<beginning of page>
+c_uid Contains the user ID of the owner.
+c_gid Contains the group ID of the group
+c_nlink Contains a number greater than or equal to the number of links in the archive referencing the file. If the -a
+option is used to append to a cpio archive, pax does need not to account for the files in the existing part of the ar<hy>
+chive when calculating the c_nlink values for the appended part of the archive. It does also need not alter the c_nlink
+values in the existing part of the archive if additional files with the same c_dev and c-ino values are appended to the
+archive.
+c_rdev Contains implementation-defined information for character or block special files.
+c_mtime Contains the latest time of modification of the file at the time the archive was created.
+c_namesize Contains the length of the pathname, including the terminating NULL character.
+c_filesize Contains the length of the file in octets. This is the length of the data section following the header struc<hy>
+ture.
+The c_name field contains the pathname of the file. The length of this field in octets is the value of c_namesize. If a
+filename is found on the medium that would create an invalid pathname, it is implementation-defined whether the
+data from the file is stored on the file hierarchy and under what name it is stored. All characters are represented in
+the ISO/IEC 646: 1991 standard IRV. For maximum portability between implementations, names should be selected
+from characters represented by the portable filename character set as octets with the most significant bit zero. If an
+implementation supports the use of characters outside the portable filename character set in names for files, users,
+and groups, one or more implementation-defined encodings of these characters are provided for interchange purpos<hy>
+es.pax does not create filenames on the local system that cannot be accessed by way of the procedures described in
+volume IEEE Std 1003.1-200x. If a filename is found on the medium that would create an invalid filename, it is im<hy>
+plementation-defined whether the data from the file is stored on the local file system and under what name it is
+stored. pax can choose to ignore these files as long as it produces an error indicating that the file is being ignored.
+Following c_name, there is c_filesize octets of data. Interpretation of such data occurs in a manner dependent on the
+file. If c_filesize is zero, no data is contained in c_filedata . When restoring from an archive: <bu> If the user does not
+have the appropriate privilege to create a file of the specified type, pax ignores the entry and writes an error message
+to standard error. <bu> Only regular files have data to be restored. Presuming a regular file meets any selection criteria
+that might be imposed on the format-reading utility by the user, such data is restored. <bu> If a user does not have ap<hy>
+propriate privilege to set a particular mode flag, the flag is ignored. Some of the mode flags in the archive format are
+not mentioned in volume IEEE Std 1003.1-200x. If the implementation does not support those flags, they can be ig<hy>
+nored.
+FIFO special files, directories, and the trailer are recorded with c_filesize equal to zero. For other special files, c_file<hy>
+size is unspecified in volume IEEE Std 1003.1-200x. The header for the next file entry in the archive are written di<hy>
+rectly after the last octet of the file entry preceding it. A header denoting the filename trailer indicates the end of the
+archive; the contents of octets in the last block of the archive following such a header are undefined.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu _ Interface StabilityCommitted _ StandardSee standards(5).
+chmod(1), cpio(1), ed(1), printf(1), tar(1), mkdir(2), lseek(2), stat(2), write(2), archives.h(3HEAD), at<hy>
+tributes(5), environ(5), fnmatch(5), formats(5)fsattr(5), largefile(5), regex(5), standards(5)
+<beginning of page>
+IEEE Std 1003.1-200x, ISO/IEC 646: 1991, ISO POSIX-2:1993 Standard

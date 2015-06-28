@@ -1,0 +1,61 @@
+<beginning of page>
+insq <-> insert a message into a queue
+#include <sys/stream.h>
+int insq(queue_t *q, mblk_t *emp, mblk_t *nmp);
+Architecture independent level 1 (DDI/DKI).
+q Pointer to the queue containing message emp.
+emp Enqueued message before which the new message is to be inserted. mblk_t is an instance of the msgb(9S)
+structure.
+nmp Message to be inserted.
+The insq() function inserts a message into a queue. The message to be inserted, nmp, is placed in q immediately be<hy>
+fore the message emp. If emp is NULL, the new message is placed at the end of the queue. The queue class of the
+new message is ignored. All flow control parameters are updated. The service procedure is enabled unless
+QNOENB is set.
+The insq() function returns 1 on success, and 0 on failure.
+The insq() function can be called from user, interrupt, or kernel context.
+This routine illustrates the steps a transport provider may take to place expedited data ahead of normal data on a
+queue (assume all M_DATA messages are converted into M_PROTO T_DATA_REQ messages). Normal T_DA<hy>
+TA_REQ messages are just placed on the end of the queue (line 16). However, expedited T_EXDATA_REQ mes<hy>
+sages are inserted before any normal messages already on the queue (line 25). If there are no normal messages on
+the queue, bp will be NULL and we fall out of the for loop (line 21). insq acts like putq(9F) in this case.
+  1 #include <sys/stream.h>
+  2 #include <sys/tihdr.h>
+  3
+  4 static int
+  5 xxxwput(queue_t *q, mblk_t *mp)
+  6 {
+  7 union T_primitives *tp;
+  8 mblk_t *bp;
+  9 union T_primitives *ntp;
+ 10
+ 11 switch (mp->b_datap->db_type) {
+ 12 case M_PROTO:
+ 13 tp = (union T_primitives *)mp->b_rptr;
+ 14 switch (tp->type) {
+ 15 case T_DATA_REQ:
+ 16 putq(q, mp);
+ 17 break;
+ 18
+ 19 case T_EXDATA_REQ:
+ 20 /* Insert code here to protect queue and message block */
+ 21 for (bp = q->q_first; bp; bp = bp->b_next) {
+ 22 if (bp->b_datap->db_type == M_PROTO) {
+ 23 ntp = (union T_primitives *)bp->b_rptr;
+ 24 if (ntp->type != T_EXDATA_REQ)
+ 25 break;
+ 26 }
+ 27 }
+ 28 (void)insq(q, bp, mp);
+ 29 /* End of region that must be protected */
+ 30 break;
+  . . .
+<beginning of page>
+ 31 }
+ 32 }
+ 33 }
+When using insq(), you must ensure that the queue and the message block is not modified by another thread at the
+same time. You can achieve this either by using STREAMS functions or by implementing your own locking.
+putq(9F), rmvq(9F), msgb(9S)
+Writing Device Drivers
+STREAMS Programming Guide
+If emp is non-NULL, it must point to a message on q or a system panic could result.

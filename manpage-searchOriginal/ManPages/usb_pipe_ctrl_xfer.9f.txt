@@ -1,0 +1,181 @@
+<beginning of page>
+usb_pipe_ctrl_xfer, usb_pipe_ctrl_xfer_wait <-> USB control pipe transfer functions
+#include <sys/usb/usba.h>
+int usb_pipe_ctrl_xfer(usb_pipe_handle_t pipe_handle,
+ usb_ctrl_req_t *request, usb_flags_t flags);
+int usb_pipe_ctrl_xfer_wait(usb_pipe_handle_t pipe_handle,
+ usb_ctrl_setup_t *setup, mblk_t **data,
+ usb_cr_t * completion_reason, usb_cb_flags_t *cb_flags,
+ usb_flags_t flags);
+Solaris DDI specific (Solaris DDI)
+For usb_pipe_ctrl_xfer():
+pipe_handle Control pipe handle on which request is made.
+request Pointer to control transfer request.
+flags USB_FLAGS_SLEEP is the only flag recognized. Wait for all pending request callbacks to complete.
+For usb_pipe_ctrl_xfer_wait():
+pipe_handle Control pipe handle on which request is made.
+setup Pointer to setup parameters. (See below.)
+data Pointer to mblk containing data bytes to transfer with command. Ignored if NULL.
+completion_reason Returns overall completion status. Ignored if NULL. Please see usb_callback_flags(9S) for
+more information.
+callback_flags Returns flags set either during autoclearing or some other callback, which indicate recovery handling
+done in callback. Ignored if NULL.
+flags No flags are recognized. Reserved for future expansion.
+The usb_pipe_ctrl_xfer() function requests the USBA framework to perform a transfer through a USB control pipe.
+The request is passed to the host controller driver (HCD), which performs the necessary transactions to complete the
+request. Requests are synchronous when USB_FLAGS_SLEEP is specified in flags; calls for synchronous requests
+do not return until their transaction is completed. Asynchronous requests (made without specifying the
+USB_FLAGS_SLEEP flag) notifies the caller of their completion via a callback function.
+The usb_pipe_ctrl_xfer_wait() function is a wrapper around usb_pipe_ctrl_xfer() that performs allocation and
+deallocation of all required data structures, and a synchronous control-pipe transfer. It takes a usb_ctrl_setup_t con<hy>
+taining most usb setup parameters as an argument:
+  uchar_t bmRequestType /* characteristics of request. */
+  /* (See USB 2.0 spec, section 9.3). */
+  /* Combine one direction of: */
+  /* USB_DEV_REQ_HOST_TO_DEV */
+  /* USB_DEV_REQ_DEV_TO_HOST */
+  /* with one request type of: */
+  /* USB_DEV_REQ_TYPE_STANDARD */
+  /* USB_DEV_REQ_TYPE_CLASS */
+<beginning of page>
+  /* USB_DEV_REQ_TYPE_VENDOR */
+  /* with one recipient type of: */
+  /* USB_DEV_REQ_RCPT_DEV */
+  /* USB_DEV_REQ_RCPT_IF */
+  /* USB_DEV_REQ_RCPT_EP */
+  /* USB_DEV_REQ_RCPT_OTHER. */
+  uchar_t bRequest /* request or command. */
+  /* (See USB 2.0 spec, section */
+  /* 9.3 for standard commands.) */
+  uint16_t wValue /* value which varies according to */
+  /* the command (bRequest). */
+  uint16_t wIndex /* value which varies according to */
+  /* the command, typically used to */
+  /* pass an index or offset. */
+  uint16_t wLength /* number of data bytes to transfer */
+  /* with command, if any. Same as */
+  /* size of mblk "data" below. */
+  usb_req_attrs_t attrs; /* required request attributes */
+Please see usb_request_attributes(9S), or refer to Section 5.5 of the USB 2.0 specification for more information on
+these parameters. (The USB 2.0 specification is available at www.usb.org.)
+Mblks for data are allocated optionally when a request is allocated via usb_alloc_ctrl_req(9F) by passing a positive
+value for the len argument. Control requests passing or receiving no supplemental data need not allocate an mblk.
+For usb_pipe_ctrl_xfer():
+USB_SUCCESS Transfer was successful.
+USB_INVALID_ARGS Request is NULL.
+USB_INVALID_CONTEXT Called from interrupt context with the USB_FLAGS_SLEEP flag set.
+USB_INVALID_REQUEST The request has been freed or otherwise invalidated.
+A set of conflicting attributes were specified. See usb_request_attributes(9S).
+The normal and/or exception callback is NULL and USB_FLAGS_SLEEP is not set.
+Data space not provided to a control request while ctrl_wLength is nonzero.
+USB_INVALID_PIPE Pipe handle is NULL or invalid.
+Pipe is closing or closed.
+USB_NO_RESOURCES Memory, descriptors or other resources unavailable.
+USB_HC_HARDWARE_ERROR Host controller is in error state.
+USB_FAILURE An asynchronous transfer failed or an internal error occurred.
+The pipe is in an unsuitable state (error, busy, not ready).
+<beginning of page>
+Additional status information may be available in the ctrl_completion_reason and ctrl_cb_flags fields of the request.
+Please see usb_callback_flags(9S) and usb_completion_reason(9S) for more information.
+For usb_pipe_ctrl_xfer_wait():
+USB_SUCCESS Request was successful.
+USB_INVALID_CONTEXT Called from interrupt context.
+USB_INVALID_ARGS dip is NULL.
+Any error code returned by usb_pipe_ctrl_xfer().
+Additional status information may be available in the ctrl_completion_reason and ctrl_cb_flags fields of the request.
+Please see usb_callback_flags(9S) and usb_completion_reason(9S) for more information.
+The usb_pipe_ctrl_xfer() function may be called from kernel or user context without regard to arguments and from
+the interrupt context only when the USB_FLAGS_SLEEP flag is clear.
+The usb_pipe_ctrl_xfer_wait() function may be called from kernel or user context.
+  /* Allocate, initialize and issue a synchronous control request. */
+  usb_ctrl_req_t ctrl_req;
+  void control_pipe_exception_callback(
+  usb_pipe_handle_t, usb_ctrl_req_t*);
+  ctrl_req = usb_alloc_ctrl_req(dip, 0, USB_FLAGS_SLEEP);
+  ctrl_req->ctrl_bmRequestType = USB_DEV_REQ_HOST_TO_DEV |
+  USB_DEV_REQ_TYPE_CLASS | USB_DEV_REQ_RCPT_OTHER;
+  ctrl_req->ctrl_bRequest = (uint8_t)USB_PRINTER_SOFT_RESET;
+  ctrl_req->ctrl_exc_cb = control_pipe_exception_callback;
+  ...
+  ...
+  if ((rval = usb_pipe_ctrl_xfer(pipe, ctrl_req, USB_FLAGS_SLEEP))
+  != USB_SUCCESS) {
+  cmn_err (CE_WARN, "%s%d: Error issuing USB cmd.",
+  ddi_driver_name(dip), ddi_get_instance(dip));
+  }
+  -------
+  /*
+  * Allocate, initialize and issue an asynchronous control request to
+  * read a configuration descriptor.
+  */
+  usb_ctrl_req_t *ctrl_req;
+  void control_pipe_normal_callback(
+  usb_pipe_handle_t, usb_ctrl_req_t*);
+  void control_pipe_exception_callback(
+  usb_pipe_handle_t, usb_ctrl_req_t*);
+  struct buf *bp = ...;
+  ctrl_req =
+  usb_alloc_ctrl_req(dip, sizeof(usb_cfg_descr_t), USB_FLAGS_SLEEP);
+  ctrl_req->ctrl_bmRequestType = USB_DEV_REQ_DEV_TO_HOST |
+  USB_DEV_REQ_TYPE_STANDARD | USB_DEV_REQ_RCPT_DEV;
+<beginning of page>
+  ctrl_req->ctrl_wLength = sizeof(usb_cfg_descr_t);
+  ctrl_req->ctrl_wValue = USB_DESCR_TYPE_SETUP_CFG | 0;
+  ctrl_req->ctrl_bRequest = (uint8_t)USB_REQ_GET_DESCR;
+  ctrl_req->ctrl_cb = control_pipe_normal_callback;
+  ctrl_req->ctrl_exc_cb = control_pipe_exception_callback;
+  /* Make buf struct available to callback handler. */
+  ctrl_req->ctrl_client_private = (usb_opaque_t)bp;
+  ...
+  ...
+  if ((rval = usb_pipe_ctrl_xfer(pipe, ctrl_req, USB_FLAGS_NOSLEEP))
+  != USB_SUCCESS) {
+  cmn_err (CE_WARN, "%s%d: Error issuing USB cmd.",
+  ddi_driver_name(dip), ddi_get_instance(dip));
+  }
+  -------
+  /* Call usb_pipe_ctrl_xfer_wait() to get device status. */
+  mblk_t *data;
+  usb_cr_t completion_reason;
+  usb_cb_flags_t callback_flags;
+  usb_ctrl_setup_t setup_params = {
+  USB_DEV_REQ_DEV_TO_HOST | /* bmRequestType */
+  USB_DEV_REQ_TYPE_STANDARD | USB_DEV_REQ_RCPT_DEV,
+  USB_REQ_GET_STATUS, /* bRequest */
+  0, /* wValue */
+  0, /* wIndex */
+  USB_GET_STATUS_LEN, /* wLength */
+  0 /* attributes. */
+  };
+  if (usb_pipe_ctrl_xfer_wait(
+  pipe,
+  &setup_params,
+  &data,
+  &compleetion_reason,
+  &callback_flags,
+  0) != USB_SUCCESS) {
+  cmn_err (CE_WARN,
+  "%s%d: USB get status command failed: "
+  "reason=%d callback_flags=0x%x",
+  ddi_driver_name(dip), ddi_get_instance(dip),
+  completion_reason, callback_flags);
+  return (EIO);
+  }
+  /* Check data length. Should be USB_GET_STATUS_LEN (2 bytes). */
+  length_returned = data->b_wptr - data->b_rptr;
+  if (length_returned != USB_GET_STATUS_LEN) {
+  cmn_err (CE_WARN,
+  "%s%d: USB get status command returned %d bytes of data.",
+  ddi_driver_name(dip), ddi_get_instance(dip), length_returned);
+  return (EIO);
+  }
+  /* Retrieve data in endian neutral way. */
+  status = (*(data->b_rptr + 1) << 8) | *(data->b_rptr);
+See attributes(5) for descriptions of the following attributes:
+<beginning of page>
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ ArchitecturePCI-
+based systems _ Interface stabilityCommitted _ AvailabilitySUNWusb
+attributes(5), usb_alloc_request(9F), usb_get_cfg(9F), usb_get_status(9F). usb_pipe_bulk_xfer(9F),
+usb_pipe_intr_xfer(9F), usb_pipe_isoc_xfer(9F), usb_pipe_open(9F), usb_pipe_reset(9F),
+usb_pipe_get_state(9F), usb_bulk_request(9S), usb_callback_flags(9S), usb_ctrl_request(9S), usb_comple<hy>
+tion_reason(9S), usb_intr_request(9S), usb_isoc_request(9S)

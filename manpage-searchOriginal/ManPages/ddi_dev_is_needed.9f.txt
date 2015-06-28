@@ -1,0 +1,62 @@
+<beginning of page>
+ddi_dev_is_needed <-> inform the system that a device's component is required
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+int ddi_dev_is_needed(dev_info_t *dip, int component, int level);
+Solaris DDI specific (Solaris DDI)
+dip Pointer to the device's dev_info structure.
+component Component of the driver which is needed.
+level Power level at which the component is needed.
+The ddi_dev_is_needed() function is obsolete and will be removed in a future release. It is recommended that de<hy>
+vice drivers use pm_raise_power(9F) and pm_lower_power(9F).
+The ddi_dev_is_needed() function informs the system that a device component is needed at the specified power lev<hy>
+el. The level argument must be non-zero.
+This function sets a component to the required level and sets all devices which depend on this to their normal power
+levels.
+The state of the device should be examined before each physical access. The ddi_dev_is_needed() function should
+be called to set a component to the required power level if the operation to be performed requires the component to
+be at a power level other than its current level.
+The ddi_dev_is_needed() function might cause re-entry of the driver. Deadlock may result if driver locks are held
+across the call to ddi_dev_is_needed().
+The ddi_dev_is_needed() function returns:
+DDI_SUCCESS Power successfully set to the requested level.
+DDI_FAILURE An error occurred.
+Example 1 disk driver code
+A hypothetical disk driver might include this code:
+  static int
+ xxdisk_spun_down(struct xxstate *xsp)
+ {
+   return (xsp->power_level[DISK_COMPONENT] < POWER_SPUN_UP);
+ }
+ static int
+ xxdisk_strategy(struct buf *bp)
+ {
+ ...
+  mutex_enter(&xxstate_lock);
+  /*
+  * Since we have to drop the mutex, we have to do this in a loop
+  * in case we get preempted and the device gets taken away from
+  * us again
+  */
+  while (device_spun_down(sp)) {
+<beginning of page>
+   mutex_exit(&xxstate_lock);
+   if (ddi_dev_is_needed(xsp->mydip,
+    XXDISK_COMPONENT, XXPOWER_SPUN_UP) != DDI_SUCCESS) {
+     bioerror(bp,EIO);
+     biodone(bp);
+   return (0);
+  }
+   mutex_enter(&xxstate_lock);
+  }
+  xsp->device_busy++;
+  mutex_exit(&xxstate_lock);
+ ...
+ }
+This function can be called from user or kernel context.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Obsolete
+pm(7D), pm-components(9P), attach(9E), detach(9E), power(9E), pm_busy_component(9F), pm_idle_compo<hy>
+nent(9F)
+Writing Device Drivers

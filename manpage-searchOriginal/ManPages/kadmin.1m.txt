@@ -1,0 +1,441 @@
+<beginning of page>
+kadmin, kadmin.local <-> Kerberos database administration program
+/usr/sbin/kadmin [-r realm] [-p principal] [-q query]
+ [-s admin_server [:port]] [ [-c credential_cache]
+ | [-k [-t keytab]] | [-w password]] [-x db_args]...
+/usr/sbin/kadmin.local [-r realm] [-p principal]
+ [-q query] [-d dbname] [-e "enc:salt..."] [-m] [-D]
+kadmin and kadmin.local are interactive command-line interfaces to the Kerberos V5 administration system. They
+provide for the maintenance of Kerberos principals, policies, and service key tables (keytabs). kadmin and kad<hy>
+min.local provide identical functionality; the difference is that kadmin.local can run only on the master KDC and
+does not use Kerberos authentication.
+Except as explicitly noted otherwise, this man page uses kadmin to refer to both versions.
+By default, both versions of kadmin attempt to determine your user name and perform operations on behalf of your
+"username/admin" instance. Operations performed are subject to privileges granted or denied to this user instance by
+the Kerberos ACL file (see kadm5.acl(4)). You may perform administration as another user instance by using the -p
+option.
+The remote version, kadmin, uses Kerberos authentication and an encrypted RPC to operate securely from any<hy>
+where on the network. It normally prompts for a password and authenticates the user to the Kerberos administration
+server, kadmind, whose service principal is kadmin/fqdn. Some options specific to the remote version permit the
+password prompt to be bypassed. The -c option searches the named credentials cache for a valid ticket for the kad<hy>
+min/fqdn service and uses it to authenticate the user to the Kerberos admin server without a password. The -k option
+searches a keytab for a credential to authenticate to the kadmin/fqdn service, and again no password is collected. If
+kadmin has collected a password, it requests a kadmin/fqdn Kerberos service ticket from the KDC, and uses that
+service ticket to interact with kadmind.
+The local version, kadmin.local, must be run with an effective UID of root, and normally uses a key from the
+/var/krb5/.k5.realm stash file (see kdb5_util(1M)) to decrypt information from the database rather than prompting
+for a password. The -m option will bypass the .k5.realm stash file and prompt for the master password.
+The following options are supported:
+-c credentials_cache
+Search credentials_cache for a service ticket for the kadmin/fqdn service; it can be acquired with the kinit(1) pro<hy>
+gram. If this option is not specified, kadmin requests a new service ticket from the KDC, and stores it in its own
+temporary credentials cache.
+-d dbname
+Specify a non-standard database name. [Local only]
+-D
+Turn on debug mode. [Local only]
+-e "enc:salt ..."
+Specify a different encryption type and/or key salt. [Local only]
+-k [-t keytab]
+Use the default keytab (-k) or a specific keytab (-t keytab) to decrypt the KDC response instead of prompting for a
+password. In this case, the default principal will be host/hostname. This is primarily used for keytab maintenance.
+-m
+Accept the database master password from the keyboard rather than using the /var/krb5/.k5.realm stash file. [Local
+only]
+<beginning of page>
+-p principal
+Authenticate principal to the kadmin/fqdn service. Otherwise, kadmin will append /admin to the primary principal
+name of the default credentials cache, the value of the USER environment variable, or the username as obtained
+with getpwuid, in that order of preference.
+-q query
+Pass query directly to kadmin, which will perform query and then exit. This can be useful for writing scripts.
+-r realm
+Use realm as the default database realm.
+-s admin_server[:port]
+Administer the specified admin server at the specified port number (port). This can be useful in administering a
+realm not known to your client.
+-w password
+Use password instead of prompting for one. Note that placing the password for a Kerberos principal with adminis<hy>
+tration access into a shell script can be dangerous if unauthorized users gain read access to the script or can read ar<hy>
+guments of this command through ps(1).
+-x db_args
+Pass database-specific arguments to kadmin. Supported arguments are for LDAP and the Berkeley-db2 plug-in.
+These arguments are:
+binddn=binddn
+LDAP simple bind DN for authorization on the directory server. Overrides the ldap_kadmind_dn parameter setting
+in krb5.conf(4).
+bindpwd=bindpwd
+Bind password.
+dbname=name
+For the Berkeley-db2 plug-in, specifies a name for the Kerberos database.
+nconns=num
+Maximum number of server connections.
+port=num
+Directory server connection port.
+list_requests
+Lists all the commands available for kadmin. Aliased by lr and ?.
+get_privs
+Lists the current Kerberos administration privileges (ACLs) for the principal that is currently running kadmin. The
+privileges are based on the /etc/krb5/kadm5.acl file on the master KDC. Aliased by getprivs.
+<beginning of page>
+add_principal [options] newprinc
+Creates a new principal, newprinc, prompting twice for a password. If the -policy option is not specified and a policy
+named default exists, then the default policy is assigned to the principal; note that the assignment of the default
+policy occurs automatically only when a principal is first created, so the default policy must already exist for the as<hy>
+signment to occur. The automatic assignment of the default policy can be suppressed with the -clearpolicy option.
+This command requires the add privilege. Aliased by addprinc and ank. The options are:
+-expire expdate
+Expiration date of the principal. See the Time Formats section for the valid absolute time formats that you can
+specify for expdate.
+-pwexpire pwexpdate
+Password expiration date. See the Time Formats section for the valid absolute time formats that you can specify for
+pwexpdate.
+-maxlife maxlife
+Maximum ticket life for the principal. See the Time Formats section for the valid time duration formats that you
+can specify for maxlife.
+-maxrenewlife maxrenewlife
+Maximum renewable life of tickets for the principal. See the Time Formats section for the valid time duration for<hy>
+mats that you can specify for maxrenewlife.
+-kvno kvno
+Explicitly set the key version number.
+-policy policy
+Policy used by the principal. If both the -policy and -clearpolicy options are not specified, the default policy is used
+if it exists; otherwise, the principal will have no policy. Also note that the password and principal name must be dif<hy>
+ferent when you add a new principal with a specific policy or the default policy.
+-clearpolicy
+-clearpolicy prevents the default policy from being assigned when -policy is not specified. This option has no effect
+if the default policy does not exist.
+{-|+}allow_postdated
+-allow_postdated prohibits the principal from obtaining postdated tickets. (Sets the KRB5_KDB_DISAL<hy>
+LOW_POSTDATED flag.) +allow_postdated clears this flag.
+{-|+}allow_forwardable
+-allow_forwardable prohibits the principal from obtaining forwardable tickets. (Sets the KRB5_KDB_DISAL<hy>
+LOW_FORWARDABLE flag.) +allow_forwardable clears this flag.
+{-|+}allow_renewable
+-allow_renewable prohibits the principal from obtaining renewable tickets. (Sets the KRB5_KDB_DISAL<hy>
+LOW_RENEWABLE flag.) +allow_renewable clears this flag.
+<beginning of page>
+{-|+}allow_proxiable
+-allow_proxiable prohibits the principal from obtaining proxiable tickets. (Sets the KRB5_KDB_DISAL<hy>
+LOW_PROXIABLE flag.) +allow_proxiable clears this flag.
+{-|+}allow_dup_skey
+-allow_dup_skey disables user-to-user authentication for the principal by prohibiting this principal from obtaining a
+session key for another user. (Sets the KRB5_KDB_DISALLOW_DUP_SKEY flag.) +allow_dup_skey clears this
+flag.
+{-|+}requires_preauth
++requires_preauth requires the principal to preauthenticate before being allowed to kinit. (Sets the
+KRB5_KDB_REQUIRES_PRE_AUTH flag.) -requires_preauth clears this flag.
+{-|+}requires_hwauth
++requires_hwauth requires the principal to preauthenticate using a hardware device before being allowed to kinit.
+(Sets the KRB5_KDB_REQUIRES_HW_AUTH flag.) -requires_hwauth clears this flag.
+{-|+}allow_svr
+-allow_svr prohibits the issuance of service tickets for the principal. (Sets the KRB5_KDB_DISALLOW_SVR
+flag.) +allow_svr clears this flag.
+{-|+}allow_tgs_req
+-allow_tgs_req specifies that a Ticket-Granting Service (TGS) request for a service ticket for the principal is not
+permitted. This option is useless for most things. +allow_tgs_req clears this flag. The default is +allow_tgs_req. In
+effect, -allow_tgs_req sets the KRB5_KDB_DISALLOW_TGT_BASED flag on the principal in the database.
+{-|+}allow_tix
+-allow_tix forbids the issuance of any tickets for the principal. +allow_tix clears this flag. The default is +allow_tix.
+In effect, -allow_tix sets the KRB5_KDB_DISALLOW_ALL_TIX flag on the principal in the database.
+{-|+}needchange
++needchange sets a flag in attributes field to force a password change; -needchange clears it. The default is -need<hy>
+change. In effect, +needchange sets the KRB5_KDB_REQUIRES_PWCHANGE flag on the principal in the
+database.
+{-|+}password_changing_service
++password_changing_service sets a flag in the attributes field marking this as a password change service principal
+(useless for most things). -password_changing_service clears the flag. This flag intentionally has a long name. The
+default is -password_changing_service. In effect, +password_changing_service sets the
+KRB5_KDB_PWCHANGE_SERVICE flag on the principal in the database.
+-randkey
+Sets the key of the principal to a random value.
+-pw password
+Sets the key of the principal to the specified string and does not prompt for a password. Note that using this option in
+a shell script can be dangerous if unauthorized users gain read access to the script.
+<beginning of page>
+-e "enc:salt ..."
+Override the list of enctype:salttype pairs given in kdc.conf(4) for setting the key of the principal. The quotes are
+necessary if there are multiple enctype:salttype pairs. One key for each similar enctype and same salttype will be
+created and the first one listed will be used. For example, in a list of two similar enctypes with the same salt, "des-
+cbc-crc:normal des-cbc-md5:normal", one key will be created and it will be of type des-cbc-crc:normal.
+Example:
+ kadmin: addprinc tlyu/admin
+ WARNING: no policy specified for "tlyu/admin@ACME.COM";
+ defaulting to no policy.
+ Enter password for principal tlyu/admin@ACME.COM:
+ Re-enter password for principal tlyu/admin@ACME.COM:
+ Principal "tlyu/admin@ACME.COM" created.
+ kadmin:
+Errors:
+KADM5_AUTH_ADD (requires add privilege)
+KADM5_BAD_MASK (should not happen)
+KADM5_DUP (principal exists already)
+KADM5_UNK_POLICY (policy does not exist)
+KADM5_PASS_Q_* (password quality violations)
+delete_principal [-force] principal
+Deletes the specified principal from the database. This command prompts for deletion, unless the -force option is
+given. This command requires the delete privilege. Aliased by delprinc.
+Example:
+ kadmin: delprinc mwm_user
+ Are you sure you want to delete the principal
+ "mwm_user@ACME.COM"? (yes/no): yes
+ Principal "mwm_user@ACME.COM" deleted.
+ Make sure that you have removed this principal from
+ all kadmind ACLs before reusing.
+ kadmin:
+Errors:
+KADM5_AUTH_DELETE (requires delete privilege)
+KADM5_UNK_PRINC (principal does not exist)
+modify_principal [options] principal
+Modifies the specified principal, changing the fields as specified. The options are as above for add_principal, except
+that password changing is forbidden by this command. In addition, the option -clearpolicy will clear the current pol<hy>
+icy of a principal. This command requires the modify privilege. Aliased by modprinc.
+<beginning of page>
+Errors:
+KADM5_AUTH_MODIFY (requires modify privilege)
+KADM5_UNK_PRINC (principal does not exist)
+KADM5_UNK_POLICY (policy does not exist)
+KADM5_BAD_MASK (should not happen)
+change_password [options] principal
+Changes the password of principal. Prompts for a new password if neither -randkey or -pw is specified. Requires
+the changepw privilege, or that the principal that is running the program to be the same as the one changed. Aliased
+by cpw. The following options are available:
+-randkey
+Sets the key of the principal to a random value.
+-pw password
+Sets the password to the specified string. Not recommended.
+-e "enc:salt ..."
+Override the list of enctype:salttype pairs given in kdc.conf(4) for setting the key of the principal. The quotes are
+necessary if there are multiple enctype:salttype pairs. For each key, the first matching similar enctype and same salt<hy>
+type in the list will be used to set the new key(s).
+-keepold
+Keeps the previous kvno's keys around. There is no easy way to delete the old keys, and this flag is usually not nec<hy>
+essary except perhaps for TGS keys as it will allow existing valid TGTs to continue to work.
+Example:
+ kadmin: cpw systest
+ Enter password for principal systest@ACME.COM:
+ Re-enter password for principal systest@ACME.COM:
+ Password for systest@ACME.COM changed.
+ kadmin:
+Errors:
+KADM5_AUTH_MODIFY (requires the modify privilege)
+KADM5_UNK_PRINC (principal does not exist)
+KADM5_PASS_Q_* (password policy violation errors)
+KADM5_PASS_REUSE (password is in principal's password history)
+KADM5_PASS_TOOSOON (current password minimum life not expired)
+get_principal [-terse] principal
+Gets the attributes of principal. Requires the inquire privilege, or that the principal that is running the program to be
+<beginning of page>
+the same as the one being listed. With the -terse option, outputs fields as quoted tab-separated strings. Aliased by
+getprinc.
+Examples:
+ kadmin: getprinc tlyu/admin
+ Principal: tlyu/admin@ACME.COM
+ Expiration date: [never]
+ Last password change: Thu Jan 03 12:17:46 CET 2008
+ Password expiration date: [none]
+ Maximum ticket life: 24855 days 03:14:07
+ Maximum renewable life: 24855 days 03:14:07
+ Last modified: Thu Jan 03 12:17:46 CET 2008 (root/admin@ACME.COM)
+ Last successful authentication: [never]
+ Last failed authentication: [never]
+ Failed password attempts: 0
+ Number of keys: 5
+ Key: vno 2, AES-256 CTS mode with 96-bit SHA-1 HMAC, no salt
+ Key: vno 2, AES-128 CTS mode with 96-bit SHA-1 HMAC, no salt
+ Key: vno 2, Triple DES cbc mode with HMAC/sha1, no salt
+ Key: vno 2, ArcFour with HMAC/md5, no salt
+ Key: vno 2, DES cbc mode with RSA-MD5, no salt
+ Attributes: REQUIRES_PRE_AUTH
+ Policy: [none]
+ kadmin: getprinc -terse tlyu/admin
+ "tlyu/admin@ACME.COM" 0 1199359066 0 2147483647
+ "root/admin@ACME.COM" 1199359066 128 2 0 "[none]" 21474836
+ 47 0 0 0 5 1 2 18 0 1 2
+ 17 0 1 2 16 0 1 2 23 0 12
+  3 0
+ kadmin:
+Errors:
+KADM5_AUTH_GET (requires the get [inquire] privilege)
+KADM5_UNK_PRINC (principal does not exist)
+list_principals [expression]
+Retrieves all or some principal names. expression is a shell-style glob expression that can contain the wild-card char<hy>
+acters ?, *, and []'s. All principal names matching the expression are printed. If no expression is provided, all princi<hy>
+pal names are printed. If the expression does not contain an "@" character, an "@" character followed by the local
+realm is appended to the expression. Requires the list privilege. Aliased by listprincs, get_principals, and get<hy>
+princs.
+Examples:
+ kadmin: listprincs test*
+ test3@ACME.COM
+ test2@ACME.COM
+ test1@ACME.COM
+ testuser@ACME.COM
+ kadmin:
+<beginning of page>
+add_policy [options] policy
+Adds the named policy to the policy database. Requires the add privilege. Aliased by addpol. The following options
+are available:
+-maxlife maxlife
+sets the maximum lifetime of a password. See the Time Formats section for the valid time duration formats that you
+can specify for maxlife.
+-minlife minlife
+sets the minimum lifetime of a password. See the Time Formats section for the valid time duration formats that you
+can specify for minlife.
+-minlength length
+sets the minimum length of a password.
+-minclasses number
+sets the minimum number of character classes allowed in a password. The valid values are:
+1
+only letters (himom)
+2
+both letters and numbers (hi2mom)
+3
+letters, numbers, and punctuation (hi2mom!)
+-history number
+sets the number of past keys kept for a principal.
+Errors:
+KADM5_AUTH_ADD (requires the add privilege)
+KADM5_DUP (policy already exists)
+delete_policy [-force] policy
+Deletes the named policy. Unless the -force option is specified, prompts for confirmation before deletion. The com<hy>
+mand will fail if the policy is in use by any principals. Requires the delete privilege. Aliased by delpol.
+Example:
+ kadmin: del_policy guests
+ Are you sure you want to delete the
+ policy "guests"? (yes/no): yes
+ Policy "guests" deleted.
+ kadmin:
+<beginning of page>
+Errors:
+KADM5_AUTH_DELETE (requires the delete privilege)
+KADM5_UNK_POLICY (policy does not exist)
+KADM5_POLICY_REF (reference count on policy is not zero)
+modify_policy [options] policy
+Modifies the named policy. Options are as above for add_policy. Requires the modify privilege. Aliased by mod<hy>
+pol.
+Errors:
+KADM5_AUTH_MODIFY (requires the modify privilege)
+KADM5_UNK_POLICY (policy does not exist)
+get_policy [-terse] policy
+Displays the values of the named policy. Requires the inquire privilege. With the -terse flag, outputs the fields as
+quoted strings separated by tabs. Aliased by getpol.
+Examples:
+ kadmin: get_policy admin
+ Policy: admin
+ Maximum password life: 180 days 00:00:00
+ Minimum password life: 00:00:00
+ Minimum password length: 6
+ Minimum number of password character classes: 2
+ Number of old keys kept: 5
+ Reference count: 17
+ kadmin: get_policy -terse
+ admin admin 15552000 0 6 2 5 17
+ kadmin:
+Errors:
+KADM5_AUTH_GET (requires the get privilege)
+KADM5_UNK_POLICY (policy does not exist)
+list_policies [expression]
+Retrieves all or some policy names. expression is a shell-style glob expression that can contain the wild-card charac<hy>
+ters ?, *, and []'s. All policy names matching the expression are printed. If no expression is provided, all existing
+policy names are printed. Requires the list privilege. Aliased by listpols, get_policies, and getpols.
+Examples:
+ kadmin: listpols
+ test-pol dict-only once-a-min test-pol-nopw
+ kadmin: listpols t*
+ test-pol test-pol-nopw kadmin:
+<beginning of page>
+ktadd [-k keytab] [-q] [-e enctype:salt]
+Adds a principal or all principals matching princ-exp to a keytab, randomizing each principal's key in the process.
+ktadd requires the inquire and changepw privileges. An entry for each of the principal's unique encryption types is
+added, ignoring multiple keys with the same encryption type but different salt types. If the -k argument is not speci<hy>
+fied, the default keytab file, /etc/krb5/krb5.keytab, is used.
+The "-e enctype:salt" option overrides the list of enctypes given in krb5.conf(4), in the permitted_enctypes parame<hy>
+ter. If "-e enctype:salt" is not used and permitted_enctypes is not defined in krb5.conf(4), a key for each enctype
+supported by the system on which kadmin is run will be created and added to the keytab. Restricting the enctypes
+of keys in the keytab is useful when the system for which keys are being created does not support the same set of
+enctypes as the KDC. Note that ktadd modifies the enctype of the keys in the principal database as well.
+If the -q option is specified, less status information is displayed. Aliased by xst. The -glob option requires the list
+privilege. Also, note that if you use -glob to create a keytab, you need to remove /etc/krb5/kadm5.keytab and cre<hy>
+ate it again if you want to use -p */admin with kadmin.
+princ-exp
+princ-exp follows the same rules described for the list_principals command.
+Example:
+ kadmin: ktadd -k /tmp/new-keytab nfs/chicago
+ Entry for principal nfs/chicago with kvno 2,
+ encryption type DES-CBC-CRC added to keytab
+ WRFILE:/tmp/new-keytab.
+ kadmin:
+ktremove [-k keytab] [-q] principal [kvno | all | old]
+Removes entries for the specified principal from a keytab. Requires no privileges, since this does not require data<hy>
+base access. If all is specified, all entries for that principal are removed; if old is specified, all entries for that princi<hy>
+pal except those with the highest kvno are removed. Otherwise, the value specified is parsed as an integer, and all en<hy>
+tries whose kvno match that integer are removed. If the -k argument is not specified, the default keytab file,
+/etc/krb5/krb5.keytab, is used. If the -q option is specified, less status information is displayed. Aliased by ktrem.
+Example:
+ kadmin: ktremove -k /tmp/new-keytab nfs/chicago
+ Entry for principal nfs/chicago with kvno 2
+ removed from keytab
+ WRFILE:/tmp/new-keytab.
+ kadmin:
+quit
+Quits kadmin. Aliased by exit and q.
+Various commands in kadmin can take a variety of time formats, specifying time durations or absolute times. The
+kadmin option variables maxrenewlife, maxlife, and minlife are time durations, whereas expdate and pwexpdate are
+absolute times.
+<beginning of page>
+Examples:
+ kadmin: modprinc -expire "12/31 7pm" jdb
+ kadmin: modprinc -maxrenewlife "2 fortnight" jdb
+ kadmin: modprinc -pwexpire "this sunday" jdb
+ kadmin: modprinc -expire never jdb
+ kadmin: modprinc -maxlife "7:00:00pm tomorrow" jdb
+Note that times which do not have the "ago" specifier default to being absolute times, unless they appear in a field
+where a duration is expected. In that case, the time specifier will be interpreted as relative. Specifying "ago" in a du<hy>
+ration can result in unexpected behavior.
+The following time formats and units can be combined to specify a time. The time and date format examples are
+based on the date and time of July 2, 1999, 1:35:30 p.m.
+tab() box; lw(2.75i) lw(2.75i) lw(2.75i) lw(2.75i) Time FormatExamples hh[:mm][:ss][am/pm/a.m./p.m.]1p.m.,
+1:35, 1:35:30pm
+tab(); lw(2.75i) lw(2.75i) lw(2.75i) lw(2.75i) VariableDescription hhT{ hour (12-hour clock, leading zero permit<hy>
+ted but not required) T} mmminutes ssseconds
+tab() box; lw(2.75i) lw(2.75i) lw(2.75i) lw(2.75i) Date FormatExamples mm/dd[/yy]07/02, 07/02/99 yyyy-mm-
+dd1999-07-02 dd-month-yyyy02-July-1999 month [,yyyy]Jul 02, July 02,1999 dd month[ yyyy]02 JULY, 02 july
+1999
+tab(); lw(2.75i) lw(2.75i) lw(2.75i) lw(2.75i) Variable Description ddday mmmonth yyT{ year within century
+(00-38 is 2000 to 2038; 70-99 is 1970 to 1999) T} yyyyyear including century monthlocale's full or abbreviated
+month name
+tab() box; lw(2.75i) lw(2.75i) lw(2.75i) lw(2.75i) Time UnitsExamples [+|- #] year"-2 year" [+|- #] month"2
+months" [+|- #] fortnight [+|- #] week [+|- #] day [+|- #] hour [+|- #] minute [+|- #] min [+|- #] second [+|- #] sec to<hy>
+morrow yesterday today now this"this year" last"last saturday" next"next month" sunday monday tuesday wednes<hy>
+day thursday friday saturday never
+You can also use the following time modifiers: first, second, third, fourth, fifth, sixth, seventh, eighth, ninth,
+tenth, eleventh, twelfth, and ago.
+See environ(5) for descriptions of the following environment variables that affect the execution of kadmin:
+PAGER
+The command to use as a filter for paging output. This can also be used to specify options. The default is more(1).
+/var/krb5/principal
+Kerberos principal database.
+<beginning of page>
+/var/krb5/principal.ulog
+The update log file for incremental propagation.
+/var/krb5/principal.kadm5
+Kerberos administrative database. Contains policy information.
+/var/krb5/principal.kadm5.lock
+Lock file for the Kerberos administrative database. This file works backwards from most other lock files (that is,
+kadmin will exit with an error if this file does not exist).
+/var/krb5/kadm5.dict
+Dictionary of strings explicitly disallowed as passwords.
+/etc/krb5/kadm5.acl
+List of principals and their kadmin administrative privileges.
+/etc/krb5/kadm5.keytab
+Keytab for kadmind principals: kadmin/fqdn, changepw/fqdn, and kadmin/changepw.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wkdcu _ Interface StabilityCommitted
+kpasswd(1), more(1), gkadmin(1M), kadmind(1M), kdb5_util(1M), kdb5_ldap_util(1M), kproplog(1M),
+kadm5.acl(4), kdc.conf(4), krb5.conf(4), attributes(5), environ(5), kerberos(5), krb5envvar(5)
+The kadmin program was originally written by Tom Yu at MIT, as an interface to the OpenVision Kerberos admin<hy>
+istration program.
+The kadmin command is currently incompatible with the MIT kadmind daemon interface, so you cannot use this
+command to administer an MIT-based Kerberos database. However, clients running the Solaris implementation of
+Kerberos can still use an MIT-based KDC.

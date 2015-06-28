@@ -1,0 +1,114 @@
+<beginning of page>
+ddi_log_sysevent <-> log system event for drivers
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+int ddi_log_sysevent(dev_info_t *dip, char *vendor,
+ char *class, char *subclass, nvlist_t *attr_list,
+ sysevent_id_t *eidp, int sleep_flag);
+Solaris DDI specific (Solaris DDI).
+dip A pointer to the dev_info node for this driver.
+vendor A pointer to a string defining the vendor. Third-party drivers should use their company's stock symbol (or
+similarly enduring identifier). Sun-supplied drivers should use DDI_VENDOR_SUNW.
+class A pointer to a string defining the event class.
+subclass A pointer to a string defining the event subclass.
+attr_list A pointer to an nvlist_t, listing the name-value attributes associated with the event or NULL if there are no
+such attributes for this event.
+eidp The address of a sysevent_id_t structure in which the event's sequence number and timestamp are returned if
+the event is successfully queued. May be NULL if this information is not of interest. See below for the definition of
+sysevent_id_t.
+sleep_flag Indicates how a caller wants to handle the possibility of resources not being available. If sleep_flag is
+DDI_NOSLEEP, the caller does not care if the allocation fails or the queue is full and can handle a failure appropri<hy>
+ately. If sleep_flag is DDI_SLEEP, the caller wishes to have the allocation and queuing routines wait for resources
+to become available.
+The ddi_log_sysevent() function causes a system event, of the specified class and subclass, to be generated on be<hy>
+half of the driver and queued for delivery to syseventd, the user-land sysevent daemon.
+The publisher string for the event is constructed using the vendor name and driver name, with the format:
+ "<vendor>:kern:<driver-name>"
+The two fields of eidp, eid_seq and eid_ts, are sufficient to uniquely identify an event.
+The structure members of sysevent_id_t are:
+  uint64_t eid_seq; /* sysevent sequence number */
+  hrtime_t eid_ts; /* sysevent timestamp */
+The ddi_log_sysevent() function returns:
+DDI_SUCCESS The event has been queued for delivery successfully.
+DDI_ENOMEM There is not enough memory to queue the system event at this time. DDI_ENOMEM cannot be
+returned when sleep_flag is DDI_SLEEP.
+<beginning of page>
+DDI_EBUSY The system event queue is full at this time. DDI_EBUSY cannot be returned when sleep_flag is
+DDI_SLEEP.
+DDI_ETRANSPORT The syseventd daemon is not responding and events cannot be queued or delivered at this
+time. DDI_ETRANSPORT can be returned even when sleep_flag is DDI_SLEEP.
+DDI_ECONTEXT sleep_flag is DDI_SLEEP and the driver is running in interrupt context.
+ddi_log_sysevent supports the following data types:
+ DATA_TYPE_BYTE
+ DATA_TYPE_INT16
+ DATA_TYPE_UINT16
+ DATA_TYPE_INT32
+ DATA_TYPE_UINT32
+ DATA_TYPE_INT64
+ DATA_TYPE_UINT64
+ DATA_TYPE_STRING
+ DATA_TYPE_BYTE_ARRAY
+ DATA_TYPE_INT16_ARRAY
+ DATA_TYPE_UINT16_ARRAY
+ DATA_TYPE_INT32_ARRAY
+ DATA_TYPE_UINT32_ARRAY
+ DATA_TYPE_INT64_ARRAY
+ DATA_TYPE_UINT64_ARRAY
+The ddi_log_sysevent() function can be called from user, interrupt, or kernel context, except when sleep_flag is
+DDI_SLEEP, in which case it cannot be called from interrupt context. Example 1 Logging System Event with No
+Attributes
+  if (ddi_log_sysevent(dip, DDI_VENDOR_SUNW, "class", "subclass",
+  NULL, NULL, DDI_SLEEP) != DDI_SUCCESS) {
+  cmn_err(CE_WARN, "error logging system event\n");
+  }
+Example 2 Logging System Event with Two Name/Value Attributes, an Integer and a String
+ nvlist_t *attr_list;
+ sysevent_id_t eid;
+ if (nvlist_alloc(&attr_list, NV_UNIQUE_NAME_TYPE, KM_SLEEP) == 0)
+ {
+  err = nvlist_add_uint32(attr_list, int_name, int_value);
+  if (err == 0)
+  err = nvlist_add_string(attr_list, str_name, str_value);
+  if (err == 0)
+  err = ddi_log_sysevent(dip, DDI_VENDOR_SUNW,
+  "class", "subclass", attr_list, &eid, DDI_SLEEP);
+  if (err != DDI_SUCCESS)
+  cmn_err(CE_WARN, "error logging system event\n");
+  nvlist_free(attr_list);
+  }
+Example 3 Use Timeout to Handle nvlist and System Event Resource Allocation Failures
+Since no blocking calls are made, this example would be useable from a driver needing to generate an event from in<hy>
+terrupt context.
+ static int
+  xx_se_timeout_handler(xx_state_t *xx)
+  {
+  xx->xx_timeoutid = (xx_generate_event(xx) ?
+<beginning of page>
+  timeout(xx_se_timeout_handler, xx, 4) : 0);
+  }
+  static int
+  xx_generate_event(xx_state_t *xx)
+  {
+  int err;
+  err = nvlist_alloc(&xx->xx_ev_attrlist, NV_UNIQUE_NAME_TYPE, 0);
+  if (err != 0)
+  return (1);
+  err = nvlist_add_uint32(&xx->xx_ev_attrlist,
+  xx->xx_ev_name, xx->xx_ev_value);
+  if (err != 0) {
+  nvlist_free(xx->xx_ev_attrlist);
+  return(1);
+  }
+  err = ddi_log_sysevent(xx->xx_dip, DDI_VENDOR_SUNW,
+  xx->xx_ev_class, xx->xx_ev_sbclass,
+  xx->xx_ev_attrlist, NULL, DDI_NOSLEEP);
+  nvlist_free(xx->xx_ev_attrlist);
+  if (err == DDI_SUCCESS || err == DDI_ETRANSPORT) {
+  if (err == DDI_ETRANSPORT)
+  cmn_err(CE_WARN, "cannot log system event\n");
+  return (0);
+  }
+  return (1);
+  }
+syseventd(1M), attributes(5), nvlist_add_boolean(9F), nvlist_alloc(9F)
+Writing Device Drivers

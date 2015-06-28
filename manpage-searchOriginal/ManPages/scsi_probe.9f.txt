@@ -1,0 +1,56 @@
+<beginning of page>
+scsi_probe <-> utility for probing a scsi device
+#include <sys/scsi/scsi.h>
+int scsi_probe(struct scsi_device *devp, int (*waitfunc);
+Solaris DDI specific (Solaris DDI).
+devp Pointer to a scsi_device(9S) structure
+waitfunc NULL_FUNC or SLEEP_FUNC
+scsi_probe() determines whether a target/lun is present and sets up the scsi_device structure with inquiry data.
+scsi_probe() uses the SCSI Inquiry command to test if the device exists. It can retry the Inquiry command as appro<hy>
+priate. If scsi_probe() is successful, it will allocate space for the scsi_inquiry structure and assign the address to the
+sd_inq member of the scsi_device(9S) structure. scsi_probe() will then fill in this scsi_inquiry(9S) structure and re<hy>
+turn SCSIPROBE_EXISTS. If scsi_probe() is unsuccessful, it returns SCSIPROBE_NOMEM in spite of callback
+set to SLEEP_FUNC.
+scsi_unprobe(9F) is used to undo the effect of scsi_probe().
+If the target is a non-CCS device, SCSIPROBE_NONCCS will be returned.
+waitfunc indicates what the allocator routines should do when resources are not available; the valid values are:
+NULL_FUNC Do not wait for resources. Return SCSIPROBE_NOMEM or SCSIPROBE_FAILURE
+SLEEP_FUNC Wait indefinitely for resources.
+scsi_probe() returns:
+SCSIPROBE_BUSY Device exists but is currently busy.
+SCSIPROBE_EXISTS Device exists and inquiry data is valid.
+SCSIPROBE_FAILURE Polled command failure.
+SCSIPROBE_NOMEM No space available for structures.
+SCSIPROBE_NOMEM_CB No space available for structures but callback request has been queued.
+SCSIPROBE_NONCCS Device exists but inquiry data is not valid.
+SCSIPROBE_NORESP Device does not respond to an INQUIRY.
+scsi_probe() is normally called from the target driver's probe(9E) or attach(9E) routine. In any case, this routine
+should not be called from interrupt context, because it can sleep waiting for memory to be allocated. Example 1
+Using scsi_probe()
+  switch (scsi_probe(devp, NULL_FUNC)) {
+  default:
+  case SCSIPROBE_NORESP:
+<beginning of page>
+  case SCSIPROBE_NONCCS:
+  case SCSIPROBE_NOMEM:
+  case SCSIPROBE_FAILURE:
+  case SCSIPROBE_BUSY:
+  break;
+  case SCSIPROBE_EXISTS:
+  switch (devp->sd_inq->inq_dtype) {
+  case DTYPE_DIRECT:
+  rval = DDI_PROBE_SUCCESS;
+  break;
+  case DTYPE_RODIRECT:
+  rval = DDI_PROBE_SUCCESS;
+  break;
+  case DTYPE_NOTPRESENT:
+  default:
+  break;
+  }
+  }
+  scsi_unprobe(devp);
+attach(9E), probe(9E), scsi_slave(9F), scsi_unprobe(9F), scsi_unslave(9F), scsi_device(9S), scsi_inquiry(9S)
+ANSI Small Computer System Interface-2 (SCSI-2)
+Writing Device Drivers
+A waitfunc function other than NULL_FUNC or SLEEP_FUNC is not supported and may have unexpected results.

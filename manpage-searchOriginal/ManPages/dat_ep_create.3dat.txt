@@ -1,0 +1,94 @@
+<beginning of page>
+dat_ep_create <-> create an instance of an Endpoint
+cc [ flag... ] file... -ldat [ library... ]
+#include <dat/udat.h>
+DAT_RETURN
+ dat_ep_create (
+ IN DAT_IA_HANDLE ia_handle,
+ IN DAT_PZ_HANDLE pz_handle,
+ IN DAT_EVD_HANDLE recv_evd_handle,
+ IN DAT_EVD_HANDLE request_evd_handle,
+ IN DAT_EVD_HANDLE connect_evd_handle,
+ IN DAT_EP_ATTR *ep_attributes,
+ OUT DAT_EP_HANDLE *ep_handle
+ )
+ia_handle Handle for an open instance of the IA to which the created Endpoint belongs.
+pz_handle Handle for an instance of the Protection Zone.
+recv_evd_handle Handle for the Event Dispatcher where events for completions of incoming (receive) DTOs are re<hy>
+ported. DAT_HANDLE_NULL specifies that the Consumer is not interested in events for completions of receives.
+request_evd_handle Handle for the Event Dispatcher where events for completions of outgoing (Send, RDMA
+Write, RDMA Read, and RMR Bind) DTOs are reported. DAT_HANDLE_NULL specifies that the Consumer is
+not interested in events for completions of requests.
+connect_evd_handle Handle for the Event Dispatcher where Connection events are reported. DAT_HAN<hy>
+DLE_NULL specifies that the Consumer is not interested in connection events for now.
+ep_attributes Pointer to a structure that contains Consumer-requested Endpoint attributes. Can be NULL.
+ep_handle Handle for the created instance of an Endpoint.
+The dat_ep_create() function creates an instance of an Endpoint that is provided to the Consumer as ep_handle.
+The value of ep_handle is not defined if the DAT_RETURN is not DAT_SUCCESS.
+The Endpoint is created in the Unconnected state.
+Protection Zone pz_handle allows Consumers to control what local memory the Endpoint can access for DTOs and
+what memory remote RDMA operations can access over the connection of a created Endpoint. Only memory re<hy>
+ferred to by LMRs and RMRs that match the Endpoint Protection Zone can be accessed by the Endpoint.
+The recv_evd_handle and request_evd_handle parameters are Event Dispatcher instances where the Consumer col<hy>
+lects completion notifications of DTOs. Completions of Receive DTOs are reported in recv_evd_handle Event Dis<hy>
+patcher, and completions of Send, RDMA Read, and RDMA Write DTOs are reported in request_evd_handle Event
+Dispatcher. All completion notifications of RMR bindings are reported to a Consumer in request_evd_handle Event
+Dispatcher.
+All Connection events for the connected Endpoint are reported to the Consumer through connect_evd_handle Event
+Dispatcher.
+The ep_attributes parameter specifies the initial attributes of the created Endpoint. If the Consumer specifies NULL,
+the Provider fills it with its default Endpoint attributes. The Consumer might not be able to do any posts to the End<hy>
+point or use the Endpoint in connection establishment until certain Endpoint attributes are set. Maximum Message
+Size and Maximum Recv DTOs are examples of such attributes.
+DAT_SUCCESS The operation was successful.
+<beginning of page>
+DAT_INSUFFICIENT_RESOURCES The operation failed due to resource limitations.
+DAT_INVALID_HANDLE Invalid DAT handle.
+DAT_INVALID_PARAMETER Invalid parameter. One of the requested EP parameters or attributes was invalid or
+a combination of attributes or parameters is invalid.
+DAT_MODEL_NOT_SUPPORTED The requested Provider Model was not supported.
+The Consumer creates an Endpoint prior to the establishment of a connection. The created Endpoint is in
+DAT_EP_STATE_UNCONNECTED. Consumers can do the following: 1. Request a connection on the Endpoint
+through dat_ep_connect(3DAT) or dat_ep_dup_connect(3DAT) for the active side of the connection model. 2.
+Associate the Endpoint with the Pending Connection Request that does not have an associated local Endpoint for ac<hy>
+cepting the Pending Connection Request for the passive/server side of the connection model. 3. Create a Reserved
+Service Point with the Endpoint for the passive/server side of the connection model. Upon arrival of a Connection
+Request on the Service Point, the Consumer accepts the Pending Connection Request that has the Endpoint associat<hy>
+ed with it
+The Consumer cannot specify a request_evd_handle (recv_evd_handle) with Request Completion Flags (Recv Com<hy>
+pletion Flags) that do not match the other Endpoint Completion Flags for the DTO/RMR completion streams that
+use the same EVD. If request_evd_handle (recv_evd_handle) is used for an EVD that is fed by any event stream oth<hy>
+er than DTO or RMR completion event streams, only DAT_COMPLETION_THRESHOLD is valid for Re<hy>
+quest/Recv Completion Flags for the Endpoint completion streams that use that EVD. If request_evd_handle
+(recv_evd_handle) is used for request (recv) completions of an Endpoint whose associated Request (Recv) Comple<hy>
+tion Flag attribute is DAT_COMPLETION_UNSIGNALLED_FLAG, the Request Completion Flags and Recv
+Completion Flags for all Endpoint completion streams that use the EVD must specify the same. Analogously, if
+recv_evd_handle is used for recv completions of an Endpoint whose associated Recv Completion Flags attribute is
+DAT_COMPLETION_SOLICITED_WAIT, the Recv Completion Flags for all Endpoint Recv completion
+streams that use the same EVD must specify the same Recv Completion Flags attribute value and the EVD cannot
+be used for any other event stream types.
+If EP is created with NULL attributes, Provider can fill them with its own default values. The Consumer should not
+rely on the Provider-filled attribute defaults, especially for portable applications. The Consumer cannot do any oper<hy>
+ations on the created Endpoint except for dat_ep_query(3DAT), dat_ep_get_status(3DAT), dat_ep_modi<hy>
+fy(3DAT), and dat_ep_free(3DAT), depending on the values that the Provider picks.
+The Provider is encouraged to pick up reasonable defaults because unreasonable values might restrict Consumers to
+the dat_ep_query(), dat_ep_get_status(), dat_ep_modify(), and dat_ep_free() operations. The Consumer should
+check what values the Provider picked up for the attributes. It is especially important to make sure that the number
+of posted operations is not too large to avoid EVD overflow. Depending on the values picked up by the Provider, the
+Consumer might not be able to do any RDMA operations; it might only be able to send or receive messages of very
+small sizes, or it might not be able to have more than one segment in a buffer. Before doing any operations, except
+the ones listed above, the Consumer can configure the Endpoint using dat_ep_modify() to the attributes they want.
+One reason the Consumer might still want to create an Endpoint with Null attributes is for the Passive side of the
+connection establishment, where the Consumer sets up Endpoint attributes based on the connection request of the re<hy>
+mote side.
+Consumers might want to create Endpoints with NULL attributes if Endpoint properties are negotiated as part the
+Consumer connection establishment protocol.
+Consumers that create Endpoints with Provider default attributes should always verify that the Provider default at<hy>
+tributes meet their application's requirements with regard to the number of request/receive DTOs that can be posted,
+maximum message sizes, maximum request/receive IOV sizes, and maximum RDMA sizes.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Standard: uDAPL, 1.1, 1.2 _ MT-LevelSafe
+<beginning of page>
+dat_ep_connect(3DAT), dat_ep_dup_connect(3DAT), dat_ep_free(3DAT), dat_ep_get_status(3DAT),
+dat_ep_modify(3DAT), dat_ep_query(3DAT), libdat(3LIB), attributes(5)

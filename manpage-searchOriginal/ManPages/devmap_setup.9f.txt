@@ -1,0 +1,50 @@
+<beginning of page>
+devmap_setup, ddi_devmap_segmap <-> set up a user mapping to device memory using the devmap framework
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+int devmap_setup(dev_t dev, offset_t off, ddi_as_handle_t as,
+ caddr_t *addrp, size_tlen, uint_t prot, uint_t maxprot,
+ uint_t flags, cred_t *cred);
+int ddi_devmap_segmap(dev_t dev, off_t off, ddi_as_handle_t as,
+ caddr_t *addrp, off_tlen, uint_t prot, uint_t maxprot,
+ uint_t flags, cred_t *cred);
+Solaris DDI specific (Solaris DDI).
+dev Device whose memory is to be mapped.
+off User offset within the logical device memory at which the mapping begins.
+as An opaque data structure that describes the address space into which the device memory should be mapped.
+addrp Pointer to the starting address in the address space into which the device memory should be mapped.
+len Length (in bytes) of the memory to be mapped.
+prot A bit field that specifies the protections. Some possible settings combinations are:
+PROT_READ Read access is desired.
+PROT_WRITE Write access is desired.
+PROT_EXEC Execute access is desired.
+PROT_USER User-level access is desired (the mapping is being done as a result of a mmap(2) system call).
+PROT_ALL All access is desired.
+maxprot Maximum protection flag possible for attempted mapping; the PROT_WRITE bit may be masked out if
+the user opened the special file read-only.
+flags Flags indicating type of mapping. The following flags can be specified:
+MAP_PRIVATE Changes are private.
+MAP_SHARED Changes should be shared.
+MAP_FIXED The user specified an address in *addrp rather than letting the system choose an address.
+<beginning of page>
+cred Pointer to the user credential structure.
+devmap_setup() and ddi_devmap_segmap() allow device drivers to use the devmap framework to set up user map<hy>
+pings to device memory. The devmap framework provides several advantages over the default device mapping
+framework that is used by ddi_segmap(9F) or ddi_segmap_setup(9F). Device drivers should use the devmap
+framework, if the driver wants to: <bu> use an optimal MMU pagesize to minimize address translations, <bu> conserve ker<hy>
+nel resources, <bu> receive callbacks to manage events on the mapping, <bu> export kernel memory to applications, <bu> set up
+device contexts for the user mapping if the device requires context switching, <bu> assign device access attributes to the
+user mapping, or <bu> change the maximum protection for the mapping.
+devmap_setup() must be called in the segmap(9E) entry point to establish the mapping for the application. ddi_de<hy>
+vmap_segmap() can be called in, or be used as, the segmap(9E) entry point. The differences between devmap_set<hy>
+up() and ddi_devmap_segmap() are in the data type used for off and len.
+When setting up the mapping, devmap_setup() and ddi_devmap_segmap() call the devmap(9E) entry point to
+validate the range to be mapped. The devmap(9E) entry point also translates the logical offset (as seen by the appli<hy>
+cation) to the corresponding physical offset within the device address space. If the driver does not provide its own
+devmap(9E) entry point, EINVAL will be returned to the mmap(2) system call.
+0 Successful completion.
+Non-zero An error occurred. The return value of devmap_setup() and ddi_devmap_segmap() should be used di<hy>
+rectly in the segmap(9E) entry point.
+devmap_setup() and ddi_devmap_segmap() can be called from user or kernel context only.
+mmap(2), devmap(9E), segmap(9E), ddi_segmap(9F), ddi_segmap_setup(9F), cb_ops(9S)
+Writing Device Drivers

@@ -1,0 +1,234 @@
+<beginning of page>
+passwd <-> change login password and password attributes
+passwd [-r files | -r ldap | -r nis | -r nisplus] [name]
+passwd [-r files] [-egh] [name]
+passwd [-r files] -s [-a]
+passwd [-r files] -s [name]
+passwd [-r files] [-d | -l | -u | -N] [-f] [-n min]
+ [-w warn] [-x max] name
+passwd -r ldap [-egh] [name]
+passwd [-r ldap ] -s [-a]
+passwd [-r ldap ] -s [name]
+passwd -r ldap [-d | -l | -u | -N] [-f] [-n min] [-w warn] [-x max] name
+passwd -r nis [-egh] [name]
+passwd -r nisplus [-egh] [-D domainname] [name]
+passwd -r nisplus -s [-a]
+passwd -r nisplus [-D domainname] -s [name]
+passwd -r nisplus [-l | -u | -N] [-f] [-n min] [-w warn]
+ [-x max] [-D domainname] name
+The passwd command changes the password or lists password attributes associated with the user's login name. Ad<hy>
+ditionally, privileged users can use passwd to install or change passwords and attributes associated with any login
+name.
+When used to change a password, passwd prompts everyone for their old password, if any. It then prompts for the
+new password twice. When the old password is entered, passwd checks to see if it has aged sufficiently. If aging is
+insufficient, passwd terminates; see pwconv(1M), nistbladm(1), and shadow(4) for additional information.
+The pwconv command creates and updates /etc/shadow with information from /etc/passwd. pwconv relies on a
+special value of x in the password field of /etc/passwd. This value of xindicates that the password for the user is al<hy>
+ready in /etc/shadow and should not be modified.
+If aging is sufficient, a check is made to ensure that the new password meets construction requirements. When the
+new password is entered a second time, the two copies of the new password are compared. If the two copies are not
+identical, the cycle of prompting for the new password is repeated for, at most, two more times.
+Passwords must be constructed to meet the following requirements: <bu> Each password must have PASSLENGTH
+characters, where PASSLENGTH is defined in /etc/default/passwd and is set to 6. Setting PASSLENGTH to more
+than eight characters requires configuring policy.conf(4) with an algorithm that supports greater than eight charac<hy>
+ters. <bu> Each password must meet the configured complexity constraints specified in /etc/default/passwd. <bu> Each
+password must not be a member of the configured dictionary as specified in /etc/default/passwd. <bu> For accounts in
+name services which support password history checking, if prior password history is defined, new passwords must
+not be contained in the prior password history.
+If all requirements are met, by default, the passwd command consults /etc/nsswitch.conf to determine in which
+repositories to perform password update. It searches the passwd and passwd_compat entries. The sources (reposito<hy>
+ries) associated with these entries are updated. However, the password update configurations supported are limited to
+the following cases. Failure to comply with the configurations prevents users from logging onto the system. The
+password update configurations are: <bu> passwd: files <bu> passwd: files ldap <bu> passwd: files nis <bu> passwd: files nisplus <bu>
+passwd: compat (==> files nis) <bu> passwd: compat (==> files ldap)
+passwd_compat: ldap <bu> passwd: compat (==> files nisplus)
+passwd_compat: nisplus
+<beginning of page>
+You can add the ad keyword to any of the passwd configurations in the above list. However, you cannot use the
+passwd command to change the password of an Active Directory (AD) user. If the ad keyword is found in the pass<hy>
+wd entry during a password update operation, it is ignored. To update the password of an AD user, use the kpass<hy>
+wd(1) command.
+Network administrators, who own the NIS+ password table, can change any password attributes. The administrator
+configured for updating LDAP shadow information can also change any password attributes. See ldapclient(1M).
+When a user has a password stored in one of the name services as well as a local files entry, the passwd command
+updates both. It is possible to have different passwords in the name service and local files entry. Use passwd -r to
+change a specific password repository.
+In the files case, super-users (for instance, real and effective uid equal to 0, see id(1M) and su(1M)) can change any
+password. Hence, passwd does not prompt privileged users for the old password. Privileged users are not forced to
+comply with password aging and password construction requirements. A privileged user can create a null password
+by entering a carriage return in response to the prompt for a new password. (This differs from passwd -d because the
+password prompt is still displayed.) If NIS is in effect, superuser on the root master can change any password with<hy>
+out being prompted for the old NIS passwd, and is not forced to comply with password construction requirements.
+If LDAP is in effect, superuser on any Native LDAP client system can change any password without being prompted
+for the old LDAP passwd, and is not forced to comply with password construction requirements.
+Normally, passwd entered with no arguments changes the password of the current user. When a user logs in and
+then invokes su(1M) to become superuser or another user, passwd changes the original user's password, not the
+password of the superuser or the new user.
+Any user can use the -s option to show password attributes for his or her own login name, provided they are using
+the -r nisplus argument. Otherwise, the -s argument is restricted to the superuser.
+The format of the display is:
+ name status mm/dd/yy min max warn
+or, if password aging information is not present,
+ name status
+where
+name The login ID of the user.
+status The password status of name.
+The status field can take the following values:
+LK This account is locked account. See Security.
+NL This account is a no login account. See Security.
+NP This account has no password and is therefore open without authentication.
+PS This account has a password.
+mm/dd/yy The date password was last changed for name. All password aging dates are determined using Greenwich
+Mean Time (Universal Time) and therefore can differ by as much as a day in other time zones.
+<beginning of page>
+min The minimum number of days required between password changes for name. MINWEEKS is found in /etc/de<hy>
+fault/passwd and is set to NULL.
+max The maximum number of days the password is valid for name. MAXWEEKS is found in /etc/default/passwd
+and is set to NULL.
+warn The number of days relative to max before the password expires and the name are warned.
+passwd uses pam(3PAM) for password change. It calls PAM with a service name passwd and uses service module
+type auth for authentication and password for password change.
+Locking an account (-l option) does not allow its use for password based login or delayed execution (such as at(1),
+batch(1), or cron(1M)). The -N option can be used to disallow password based login, while continuing to allow de<hy>
+layed execution.
+The following options are supported:
+-a Shows password attributes for all entries. Use only with the -s option. name must not be provided. For the nisplus
+repository, this shows only the entries in the NIS+ password table in the local domain that the invoker is authorized
+to read. For the files and ldap repositories, this is restricted to the superuser.
+-D domainname Consults the passwd.org_dir table in domainname. If this option is not specified, the default do<hy>
+mainname returned by nis_local_directory(3NSL) are used. This domain name is the same as that returned by do<hy>
+mainname(1M).
+-e Changes the login shell. For the files repository, this only works for the superuser. Normal users can change the
+ldap, nis, or nisplus repositories. The choice of shell is limited by the requirements of getusershell(3C). If the user
+currently has a shell that is not allowed by getusershell, only root can change it.
+-g Changes the gecos (finger) information. For the files repository, this only works for the superuser. Normal users
+can change the ldap, nis, or nisplus repositories.
+-h Changes the home directory.
+-r Specifies the repository to which an operation is applied. The supported repositories are files, ldap, nis, or nis<hy>
+plus.
+-s name Shows password attributes for the login name. For the nisplus repository, this works for everyone. However
+for the files and ldap repositories, this only works for the superuser. It does not work at all for the nis repository
+which does not support password aging.
+The output of this option, and only this option is Stable and parsable. The format is username followed by white
+space followed by one of the following codes.
+New codes might be added in the future so code that parses this must be flexible in the face of unknown codes.
+While all existing codes are two characters in length that might not always be the case.
+The following are the current status codes:
+LK Account is locked for UNIX authenitcation. passwd -l was run or the authentication failed RETRIES times.
+NL The account is a no login account. passwd -N has been run.
+<beginning of page>
+NP Account has no password. passwd -d was run.
+PS The account probably has a valid password.
+UN The data in the password field is unknown. It is not a recognizable hashed password or any of the above entries.
+See crypt(3C) for valid password hashes.
+Only a privileged user can use the following options:
+-d Deletes password for name and unlocks the account. The login name is not prompted for password. It is only ap<hy>
+plicable to the files and ldap repositories.
+If the login(1) option PASSREQ=YES is configured, the account is not able to login. PASSREQ=YES is the deliv<hy>
+ered default.
+-f Forces the user to change password at the next login by expiring the password for name.
+-l Locks password entry for name. See the -d or -u option for unlocking the account.
+-N Makes the password entry for name a value that cannot be used for login, but does not lock the account. See the
+-d option for removing the value, or to set a password to allow logins.
+-n min Sets minimum field for name. The min field contains the minimum number of days between password
+changes for name. If min is greater than max, the user can not change the password. Always use this option with the
+-x option, unless max is set to <mi>1 (aging turned off). In that case, min need not be set.
+-u Unlocks a locked password for entry name. See the -d option for removing the locked password, or to set a pass<hy>
+word to allow logins.
+-w warn Sets warn field for name. The warn field contains the number of days before the password expires and the
+user is warned. This option is not valid if password aging is disabled.
+-x max Sets maximum field for name. The max field contains the number of days that the password is valid for
+name. The aging for name is turned off immediately if max is set to <mi>1.
+The following operand is supported:
+name User login name.
+If any of the LC_* variables, that is, LC_CTYPE, LC_MESSAGES, LC_TIME, LC_COLLATE, LC_NUMER<hy>
+IC, and LC_MONETARY (see environ(5)), are not set in the environment, the operational behavior of passwd for
+each corresponding locale category is determined by the value of the LANG environment variable. If LC_ALL is
+set, its contents are used to override both the LANG and the other LC_* variables. If none of the above variables is
+set in the environment, the C (U.S. style) locale determines how passwd behaves.
+LC_CTYPE Determines how passwd handles characters. When LC_CTYPE is set to a valid value, passwd can
+display and handle text and filenames containing valid characters for that locale. passwd can display and handle Ex<hy>
+tended Unix Code (EUC) characters where any individual character can be 1, 2, or 3 bytes wide. passwd can also
+handle EUC characters of 1, 2, or more column widths. In the C locale, only characters from ISO 8859-1 are valid.
+LC_MESSAGES Determines how diagnostic and informative messages are presented. This includes the language
+and style of the messages, and the correct form of affirmative and negative responses. In the C locale, the messages
+<beginning of page>
+are presented in the default form found in the program itself (in most cases, U.S. English).
+The passwd command exits with one of the following values:
+0 Success.
+1 Permission denied.
+2 Invalid combination of options.
+3 Unexpected failure. Password file unchanged.
+4 Unexpected failure. Password file(s) missing.
+5 Password file(s) busy. Try again later.
+6 Invalid argument to option.
+7 Aging option is disabled.
+8 No memory.
+9 System error.
+10 Account expired.
+/etc/default/passwd Default values can be set for the following flags in /etc/default/passwd. For example:
+MAXWEEKS=26
+DICTIONDBDIR The directory where the generated dictionary databases reside. Defaults to /var/passwd.
+If neither DICTIONLIST nor DICTIONDBDIR is specified, the system does not perform a dictionary check.
+DICTIONLIST DICTIONLIST can contain list of comma separated dictionary files such as DICTIONLIST=file1,
+file2, file3. Each dictionary file contains multiple lines and each line consists of a word and a NEWLINE character
+(similar to /usr/share/lib/dict/words.) You must specify full pathnames. The words from these files are merged into
+a database that is used to determine whether a password is based on a dictionary word.
+If neither DICTIONLIST nor DICTIONDBDIR is specified, the system does not perform a dictionary check.
+To pre-build the dictionary database, see mkpwdict(1M).
+HISTORY Maximum number of prior password history to keep for a user. Setting the HISTORY value to zero (0),
+or removing the flag, causes the prior password history of all users to be discarded at the next password change by
+any user. The default is not to define the HISTORY flag. The maximum value is 26. Currently, this functionality is
+enforced only for user accounts defined in the files name service (local passwd(4)/shadow(4)).
+MAXREPEATS Maximum number of allowable consecutive repeating characters. If MAXREPEATS is not set or
+is zero (0), the default is no checks
+<beginning of page>
+MAXWEEKS Maximum time period that password is valid.
+MINALPHA Minimum number of alpha character required. If MINALPHA is not set, the default is 2.
+MINDIFF Minimum differences required between an old and a new password. If MINDIFF is not set, the default is
+3.
+MINDIGIT Minimum number of digits required. If MINDIGIT is not set or is set to zero (0), the default is no
+checks. You cannot be specify MINDIGIT if MINNONALPHA is also specified.
+MINLOWER Minimum number of lower case letters required. If not set or zero (0), the default is no checks.
+MINNONALPHA Minimum number of non-alpha (including numeric and special) required. If MINNONALPHA
+is not set, the default is 1. You cannot specify MINNONALPHA if MINDIGIT or MINSPECIAL is also speci<hy>
+fied.
+MINWEEKS Minimum time period before the password can be changed.
+MINSPECIAL Minimum number of special (non-alpha and non-digit) characters required. If MINSPECIAL is not
+set or is zero (0), the default is no checks. You cannot specify MINSPECIAL if you also specify MINNONAL<hy>
+PHA.
+MINUPPER Minimum number of upper case letters required. If MINUPPER is not set or is zero (0), the default is
+no checks.
+NAMECHECK Enable/disable checking or the login name. The default is to do login name checking. A case insen<hy>
+sitive value of no disables this feature.
+PASSLENGTH Minimum length of password, in characters.
+WARNWEEKS Time period until warning of date of password's ensuing expiration.
+WHITESPACE Determine if white space characters are allowed in passwords. Valid values are YES and NO. If
+WHITESPACE is not set or is set to YES, white space characters are allowed.
+/etc/oshadow Temporary file used by passwd, passmgmt and pwconv to update the real shadow file.
+/etc/passwd Password file.
+/etc/shadow Shadow password file.
+/etc/shells Shell database.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+<beginning of page>
+Wcsu _ CSIEnabled _ Interface StabilitySee below.
+The human readable output is Uncommitted. The options are Committed.
+at(1), batch(1), finger(1), kpasswd(1), login(1), nistbladm(1), cron(1M), domainname(1M), eeprom(1M),
+id(1M), ldapclient(1M), mkpwdict(1M), passmgmt(1M), pwconv(1M), su(1M), useradd(1M), userdel(1M),
+usermod(1M), crypt(3C), getpwnam(3C), getspnam(3C), getusershell(3C), nis_local_directory(3NSL),
+pam(3PAM), loginlog(4), nsswitch.conf(4), pam.conf(4), passwd(4), policy.conf(4), shadow(4), shells(4), at<hy>
+tributes(5), environ(5), pam_authtok_check(5), pam_authtok_get(5), pam_authtok_store(5), pam_dhkeys(5),
+pam_ldap(5), pam_unix_account(5), pam_unix_auth(5), pam_unix_session(5)
+The pam_unix(5) module is no longer supported. Similar functionality is provided by pam_unix_account(5),
+pam_unix_auth(5), pam_unix_session(5), pam_authtok_check(5), pam_authtok_get(5), pam_auth<hy>
+tok_store(5), pam_dhkeys(5), and pam_passwd_auth(5).
+The nispasswd and ypasswd commands are wrappers around passwd. Use of nispasswd and ypasswd is discour<hy>
+aged. Use passwd -r repository_name instead.
+NIS+ might not be supported in future releases of the Solaris operating system. Tools to aid the migration from
+NIS+ to LDAP are available in the current Solaris release. For more information, visit http://www.sun.com/directo<hy>
+ry/nisplus/transition.html.
+Changing a password in the files and ldap repositories clears the failed login count.
+Changing a password reactivates an account deactivated for inactivity for the length of the inactivity period.
+Input terminal processing might interpret some key sequences and not pass them to the passwd command.
+An account with no password, status code NP, might not be able to login. See the login(1) PASSREQ option.

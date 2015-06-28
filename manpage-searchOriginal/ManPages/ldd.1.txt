@@ -1,0 +1,168 @@
+<beginning of page>
+ldd <-> list dynamic dependencies of executable files or shared objects
+ldd [-d | -r] [-c] [-e envar] [-f] [-i] [-L] [-l] [-p] [-s]
+ [-U | -u] [-v] [-w] filename...
+The ldd utility lists the dynamic dependencies of executable files or shared objects. ldd uses the runtime linker,
+ld.so.1, to generate the diagnostics. The runtime linker takes the object being inspected and prepares the object as
+would occur in a running process. By default, ldd triggers the loading of any lazy dependencies.
+ldd lists the path names of all shared objects that would be loaded when filename is loaded. ldd expects the shared
+objects that are being inspected to have execute permission. If a shared object does not have execute permission, ldd
+issues a warning before attempting to process the file.
+ldd processes its input one file at a time. For each file, ldd performs one of the following: <bu> Lists the object depen<hy>
+dencies if the dependencies exist. <bu> Succeeds quietly if dependencies do not exist. <bu> Prints an error message if pro<hy>
+cessing fails.
+The dynamic objects that are inspected by ldd are not executed. Therefore, ldd does not list any shared objects ex<hy>
+plicitly attached using dlopen(3C). To display all the objects in use by a process, or a core file, use pldd(1).
+ldd can also check the compatibility of filename with the shared objects filename uses. With the following options,
+ldd prints warnings for any unresolved symbol references that would occur when filename is loaded.
+-d Check immediate references.
+-r Check both immediate references and lazy references.
+Only one of the options -d or -r can be specified during any single invocation of ldd.
+immediate references are typically to data items used by the executable or shared object code. immediate refer<hy>
+ences are also pointers to functions, and even calls to functions made from a position dependent shared object. lazy
+references are typically calls to global functions made from a position independent shared object, or calls to exter<hy>
+nal functions made from an executable. For more information on these types of reference, see When Relocations Are
+Performed in the Linker and Libraries Guide. Object loading can also be affected by relocation processing. See
+Lazy Loading under USAGE for more details.
+Some unresolved symbol references are not reported by default. These unresolved references can be reported with
+the following options. These options are only useful when combined with either the -d or the -r options.
+-p Expose any unresolved symbol errors to explicit parent and external references.
+-w Expose any unresolved weak symbol references.
+A shared object can make reference to symbols that should be supplied by the caller of the shared object. These ref<hy>
+erences can be explicitly classified when the shared object is created, as being available from a parent, or simply as
+being external. See the -M mapfile option of ld(1), and the PARENT and EXTERN symbol definition keywords.
+When examining a dynamic executable, a parent or external reference that can not be resolved is flagged as an er<hy>
+ror. However by default, when examining a shared object, a parent or external reference that can not be resolved is
+not flagged as an error. The -p option, when used with either the -d or -r options, causes any unresolved parent or
+external reference to be flagged as a relocation error.
+Symbols that are used by relocations may be defined as weak references. By default, if a weak symbol reference can
+not be resolved, the relocation is ignored and a zero written to the relocation offset. The -w option, when used with
+either the -d or the -r options, causes any unresolved relocation against a weak symbol reference to be flagged as a
+relocation error.
+ldd can also check dependency use. With each of the following options, ldd prints warnings for any unreferenced, or
+unused dependencies that are loaded when filename is loaded. Only when a symbol reference is bound to a depen<hy>
+dency, is that dependency deemed used. These options are therefore only useful when symbol references are being
+checked. If the -r option is not in effect, the -d option is enabled.
+A dependency that is defined by an object but is not bound to from that object is an unreferenced dependency. A de<hy>
+<beginning of page>
+pendency that is not bound to by any other object when filename is loaded is an unused object.
+Dependencies can be located in default system locations, or in locations that must be specified by search paths.
+Search paths may be specified globally, such as the environment variable LD_LIBRARY_PATH. Search paths can
+also be defined in dynamic objects as runpaths. See the -R option to ld(1). Search paths that are not used to satisfy
+any dependencies cause unnecessary file system processing.
+-U Displays any unreferenced, or unused dependencies. If an unreferenced dependency is not bound to by other ob<hy>
+jects loaded with filename, the dependency is also flagged as unused. Cyclic dependencies that are not bound to from
+objects outside of the cycle are also deemed unreferenced.
+This option also displays any unused search paths.
+-u Displays any unused objects.
+Only one of the options -U or -u can be specified during any single invocation of ldd, although -U is a superset of
+-u. Objects that are found to be unreferenced, or unused when using the -r option, should be removed as dependen<hy>
+cies. These objects provide no references, but result in unnecessary overhead when filename is loaded. When using
+the -d option, any objects that are found to be unreferenced, or unused are not immediately required when filename
+is loaded. These objects are candidates for lazy loading. See Lazy Loading under USAGE for more details.
+The removal of unused dependencies reduces runtime-linking overhead. The removal of unreferenced dependencies
+reduces runtime-linking overhead to a lesser degree. However, the removal of unreferenced dependencies guards
+against a dependency being unused when combined with different objects, or as the other object dependencies
+evolve.
+The removal of unused search paths can reduce the work required to locate dependencies. This can be significant
+when accessing files from a file server over a network. Note, a search path can be encoded within an object to satisfy
+the requirements of dlopen(3C). This search path might not be required to obtain the dependencies of this object,
+and hence will look unused to ldd.
+The following additional options are supported:
+-c Disables any configuration file use. Configuration files can be employed to alter default search paths, and provide
+alternative object dependencies. See crle(1).
+-e envar Sets the environment variable envar.
+This option is useful for experimenting with environment variables that are recognized by the runtime linker that can
+adversely affect ldd, for example, LD_PRELOAD.
+This option is also useful for extracting additional information solely from the object under inspection, for example,
+LD_DEBUG. See ld.so.1(1) and lari(1).
+-f Forces ldd to check for an executable file that is not secure. When ldd is invoked by a superuser, by default ldd
+does not process any executable that is not secure. An executable is not considered secure if the interpreter that the
+executable specifies does not reside under /lib, /usr/lib or /etc/lib. An executable is also not considered secure if the
+interpreter cannot be determined. See Security under USAGE.
+-i Displays the order of execution of initialization sections. The order that is discovered can be affected by use of the
+-d or -r options. See Initialization Order under USAGE.
+-L Enables lazy loading. Lazy loading is the default mode of operation when the object under inspection is loaded as
+part of a process. In this case, any lazy dependencies, or filters, are only loaded into the process when reference is
+made to a symbol that is defined within the lazy object. The -d or -r options, together with the -L option, can be
+used to inspect the dependencies, and their order of loading as would occur in a running process.
+-l Forces the immediate processing of any filters so that all filtees, and their dependencies, are listed. The immediate
+processing of filters is now the default mode of operation for ldd. However, under this default any auxiliary filtees
+<beginning of page>
+that cannot be found are silently ignored. Under the -l option, missing auxiliary filtees generate an error message.
+-s Displays the search path used to locate shared object dependencies.
+-v Displays all dependency relationships incurred when processing filename. This option also displays any depen<hy>
+dency version requirements. See pvs(1).
+A superuser should use the -f option only if the executable to be examined is known to be trustworthy. The use of -f
+on an untrustworthy executable while superuser can compromise system security. If an executables trustworthyness
+is unknown, a superuser should temporarily become a regular user. Then invoke ldd as this regular user.
+Untrustworthy objects can be safely examined with dump(1) and with mdb(1), as long as the :r subcommand is not
+used. In addition, a non-superuser can use either the :r subcommand of mdb, or truss(1) to examine an untrustwor<hy>
+thy executable without too much risk of compromise. To minimize risk when using ldd, adb :r, or truss on an un<hy>
+trustworthy executable, use the UID "nobody".
+Lazy loading can be applied directly by specified lazy dependencies. See the -z lazyload option of ld(1). Lazy load<hy>
+ing can also be applied indirectly through filters. See the -f option and -F option of ld(1). Objects that employ lazy
+loading techniques can experience variations in ldd output due to the options used. If an object expresses all its de<hy>
+pendencies as lazy, the default operation of ldd lists all dependencies in the order in which the dependencies are
+recorded in that object:
+ example% ldd main
+  libelf.so.1 => /lib/libelf.so.1
+  libnsl.so.1 => /lib/libnsl.so.1
+  libc.so.1 => /lib/libc.so.1
+The lazy loading behavior that occurs when this object is used at runtime can be enabled using the -L option. In this
+mode, lazy dependencies are loaded when reference is made to a symbol that is defined within the lazy object.
+Therefore, combining the -L option with use of the -d and -r options reveals the dependencies that are needed to sat<hy>
+isfy the immediate, and lazy references respectively:
+ example% ldd -L main
+ example% ldd -d main
+  libc.so.1 =>  /lib/libc.so.1
+ example% ldd -r main
+  libc.so.1 =>  /lib/libc.so.1
+  libelf.so.1 => /lib/libelf.so.1
+Notice that in this example, the order of the dependencies that are listed is not the same as displayed from ldd with
+no options. Even with the -r option, the lazy reference to dependencies might not occur in the same order as would
+occur in a running program.
+Observing lazy loading can also reveal objects that are not required to satisfy any references. These objects, in this
+example, libnsl.so.1, are candidates for removal from the link-line used to build the object being inspected.
+Objects that do not explicitly define their required dependencies might observe variations in the initialization section
+order displayed by ldd due to the options used. For example, a simple application might reveal:
+ example% ldd -i main
+  libA.so.1 =>./libA.so.1
+  libc.so.1 => /lib/libc.so.1
+  libB.so.1 => ./libB.so.1
+  init object=./libB.so.1
+  init object=./libA.so.1
+  init object=/lib/libc.so.1
+<beginning of page>
+whereas, when relocations are applied, the initialization section order is:
+ example% ldd -ir main
+  .........
+  init object=/lib/libc.so.1
+  init object=./libB.so.1
+  init object=./libA.so.1
+In this case, libB.so.1 makes reference to a function in /usr/lib/libc.so.1. However, libB.so.1 has no explicit depen<hy>
+dency on this library. Only after a relocation is discovered is a dependency then established. This implicit dependen<hy>
+cy affects the initialization section order.
+Typically, the initialization section order established when an application is executed, is equivalent to ldd with the -d
+option. The optimum order can be obtained if all objects fully define their dependencies. Use of the ld(1) options
+-zdefs and -zignore when building dynamic objects is recommended.
+Cyclic dependencies can result when one or more dynamic objects reference each other. Cyclic dependencies should
+be avoided, as a unique initialization sort order for these dependencies can not be established.
+Users that prefer a more static analysis of object files can inspect dependencies using tools such as dump(1) and elf<hy>
+dump(1).
+/usr/lib/lddstub Fake 32-bit executable loaded to check the dependencies of shared objects.
+/usr/lib/64/lddstub Fake 64-bit executable loaded to check the dependencies of shared objects.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Availability<hy>
+SUNWtoo
+crle(1), dump(1), elfdump(1), lari(1), ld(1), ld.so.1(1), mdb(1), pldd(1), pvs(1), truss(1), dlopen(3C), at<hy>
+tributes(5)
+Linker and Libraries Guide
+ldd prints the record of shared object path names to stdout. The optional list of symbol resolution problems is print<hy>
+ed to stderr. If filename is not an executable file or a shared object, or if filename cannot be opened for reading, a
+non-zero exit status is returned.
+Use of the -d or -r option with shared objects can give misleading results. ldd does a worst case analysis of the
+shared objects. However, in practice, the symbols reported as unresolved might be resolved by the executable file
+referencing the shared object. The runtime linkers preloading mechanism can be employed to add dependencies to
+the object being inspected. See LD_PRELOAD.
+ldd uses the same algorithm as the runtime linker to locate shared objects.

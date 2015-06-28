@@ -1,0 +1,56 @@
+<beginning of page>
+tran_setup_pkt, tran_teardown_pkt, tran_pkt_constructor, tran_pkt_destructor <-> SCSI HBA packet allocation and
+deallocation
+#include <sys/scsi/scsi.h>
+struct scsi_pkt *prefix_tran_setup_pkt(struct scsi_pkt *pkt,
+ int (*callback) (caddr_t), caddr_t arg);
+void prefix_tran_teardown_pkt(struct scsi_pkt *pkt);
+int prefix_tran_pkt_constructor(struct scsi_pkt *pkt,
+ scsi_hba_tran_t *tranp, int kmflags);
+void prefix_tran_pkt_destructor(struct scsi_pkt *pkt,
+ struct scsi_hba_tran_t *tranp);
+Solaris architecture specific (Solaris DDI).
+pkt Pointer to the scsi_pkt(9S) structure.
+flags Flags for associating DMA resources with the packet.
+callback Pointer to either NULL_FUNC or SLEEP_FUNC.
+arg Always NULL.
+kmflags Either KM_SLEEP or KM_NOSLEEP.
+The tran_setup_pkt() and tran_destroy_pkt() vectors in the scsi_hba_tran(9S) structure are alternatives to the
+tran_init_pkt() and tran_destroy_pkt() entry points. They are initialized during the HBA driver's attach(9E) and
+they are used when a target driver calls scsi_init_pkt(9F) and scsi_destroy_pkt(9F).
+The tran_setup_pkt() vector is the entry point into the HBA which is used to initialize HBA specific information in
+a scsi_pkt structure on behalf of a SCSI target driver. All fields documented in scsi_pkt(9S) are initialized.
+If the HBA driver chose not to preallocate memory for pkt_cdbp and/or pkt_scbp, it must allocate the requested
+memory at this time and point pkt_cdbp and pkt_scbp to the allocated memory.
+An HBA driver which provides a tran_setup_pkt entry point inspects the pkt_numcookies and pkt_cookies fields
+at tran_start time to set up the transfer. If pkt_numcookies is zero, there are no DMA resources associated with
+this packet. If pkt_numcookies is not zero, it indicates the number of DMA cookies that pkt_cookies points to.
+The pkt_tgtlen field contains the length of the packet private area pointed to by pkt_private, allocated on behalf of
+the SCSI target driver.
+The pkt_scblen field contains the length of the SCSI status completion block pointed to by pkt_scbp. If the status
+length is greater than or equal to sizeof (struct scsi_arq_status) and the auto_rqsensecapability has been set, auto<hy>
+matic request sense (ARS) is enabled for this packet. If the status lengthislessthansizeof (struct scsi_arq_status),
+automatic request sense should be disabled for this pkt if the HBA driver is capable of disabling ARQ on a per-
+packet basis.
+The pkt_cdblen field contains the length of the SCSI command descriptor block.
+The callback argument indicates what the allocator routines should do when resources are not available:
+NULL_FUNC Do not wait for resources. Return a NULL pointer.
+SLEEP_FUNC Wait indefinitely for resources.
+<beginning of page>
+The tran_teardown_pkt() is the entry point into the HBA that must free all of the resources that were allocated to
+the scsi_pkt(9S) structure during tran_setup_pkt().
+When using tran_pkt_setup() and tran_pkt_teardown(), tran_pkt_constructor() and tran_pkt_destructor() are
+additional optional entry points that perform the actions of a constructor and destructor. The constructor is called af<hy>
+ter the following fields in the scsi_pkt structure have been initialized: <bu> pkt_address <bu> pkt_ha_private <bu> pkt_cdbp <bu>
+pkt_private <bu> pkt_scbp <bu> pkt_cdblen <bu> pkt_tgtlen <bu> pkt_scblen
+Allocating and freeing a DMA handle are examples of something that could be done in the constructor and destruc<hy>
+tor. See kmem_cache_create(9F) for additional restrictions on what actions can be performed in a constructor and
+destructor.
+HBA drivers that implement tran_setup_pkt() must signal scsi_pkt(9S) completion by calling sc<hy>
+si_hba_pkt_comp(9F). Direct use of the scsi_pkt pkt_comp field is not permitted and results in undefined behavior.
+tran_setup_pkt() must return zero on success, and -1 on failure.
+attach(9E), tran_sync_pkt(9E), bioerror(9F), ddi_dma_buf_bind_handle(9F), kmem_cache_create(9F), sc<hy>
+si_alloc_consistent_buf(9F), scsi_destroy_pkt(9F), scsi_hba_attach(9F), scsi_hba_pkt_alloc(9F), sc<hy>
+si_hba_pkt_comp(9F), scsi_hba_pkt_free(9F), scsi_init_pkt(9F), buf(9S), scsi_address(9S), scsi_hba_tran(9S),
+scsi_pkt(9S)
+Writing Device Drivers

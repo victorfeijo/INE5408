@@ -1,0 +1,204 @@
+<beginning of page>
+esp <-> ESP SCSI Host Bus Adapter Driver
+esp@sbus-slot,80000
+The esp Host Bus Adapter driver is a SCSA compliant nexus driver that supports the Emulex family of esp SCSI
+chips (esp100, esp100A, esp236, fas101, fas236).
+The esp driver supports the standard functions provided by the SCSA interface. The driver supports tagged and un<hy>
+tagged queuing, fast SCSI (on FAS esp's only), almost unlimited transfer size (using a moving DVMA window ap<hy>
+proach), and auto request sense; but it does not support linked commands.
+The esp driver can be configured by defining properties in esp.conf which override the global SCSI settings. Sup<hy>
+ported properties are: scsi-options, target<n>-scsi-options, scsi-reset-delay, scsi-watchdog-tick, scsi-tag-age-lim<hy>
+it, scsi-initiator-id.
+target<n>-scsi-options overrides the scsi-options property value for target<n>. <n> can vary from 0 to 7.
+Refer to scsi_hba_attach(9F) for details. Example 1 A sample of esp configuration file.
+Create a file /kernel/drv/esp.conf and add this line:
+ scsi-options=0x78;
+This will disable tagged queuing, fast SCSI, and Wide mode for all esp instances. To disable an option for one spe<hy>
+cific esp (refer to driver.conf(4)):
+ name="esp"
+ parent="/iommu@f,e0000000/sbus@f,e0001000/espdma@f,400000"
+  reg=0xf,0x800000,0x40
+  target1-scsi-options=0x58
+  scsi-options=0x178 scsi-initiator-id=6;
+Note that the default initiator ID in OBP is 7 and that the change to ID 6 will occur at attach time. It may be prefer<hy>
+able to change the initiator ID in OBP.
+The above would set scsi-options for target 1 to 0x58 and for all other targets on this SCSI bus to 0x178. The
+physical pathname of the parent can be determined using the /devices tree or following the link of the logical device
+name:
+ example# ls -l /dev/rdsk/c0t3d0s0
+ lrwxrwxrwx 1 root root 88 Aug 22 13:29 /dev/rdsk/c0t3d0s0 ->
+ ../../devices/iommu@f,e0000000/sbus@f,e0001000/espdma@f,400000/
+  esp@f,800000/sd@3,0:a,raw
+The register property values can be determined from prtconf(1M) output (-v option):
+  esp, instance #0
+  ....
+    Register Specifications:
+  Bus Type=0xf, Address=0x800000, Size=40
+To set scsi-options more specifically per target:
+ target1-scsi-options=0x78;
+<beginning of page>
+ device-type-scsi-options-list =
+  "SEAGATE ST32550W", "seagate-scsi-options" ;
+ seagate-scsi-options = 0x58;
+ scsi-options=0x3f8;
+The above would set scsi-options for target 1 to 0x78 and for all other targets on this SCSI bus to 0x378 except for
+one specific disk type which will have scsi-options set to 0x58.
+scsi-options specified per target ID has the highest precedence, followed by scsi-options per device type. To get the
+inquiry string run probe-scsi or probe-scsi-all command at the ok prompt before booting the system.
+Global, for example. for all esp instances, scsi-options per bus has the lowest precedence.
+The system needs to be rebooted before the specified scsi-options take effect.
+/kernel/drv/esp ELF Kernel Module
+/kernel/drv/esp.conf Configuration file
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ ArchitectureSBus-
+based systems with esp-based _ SCSI port and SSHA, SBE/S, FSBE/S, _ T{ and DSBE/S SBus SCSI Host Adapter
+options T}
+prtconf(1M), driver.conf(4), attributes(5), fas(7D), scsi_abort(9F), scsi_hba_attach(9F), scsi_ifgetcap(9F), sc<hy>
+si_reset(9F), scsi_sync_pkt(9F), scsi_transport(9F), scsi_device(9S), scsi_extended_sense(9S), scsi_inquiry(9S),
+scsi_pkt(9S)
+Writing Device Drivers
+OpenBoot Command Reference
+ANSI Small Computer System Interface-2 (SCSI-2)
+ESP Technical Manuals, QLogic Corp.
+The messages described below are some that may appear on the system console, as well as being logged.
+The first four messages may be displayed while the esp driver is trying to attach; these messages mean that the esp
+driver was unable to attach. All of these messages are preceded by "esp%d", where "%d" is the instance number of
+the esp controller.
+Device in slave-only slot
+The SBus device has been placed in a slave-only slot and will not be accessible; move to non-slave-only SBus slot.
+Device is using a hilevel intr
+The device was configured with an interrupt level that cannot be used with this esp driver. Check the SBus device.
+Unable to map registers
+Driver was unable to map device registers; check for bad hardware. Driver did not attach to device; SCSI devices
+will be inaccessible.
+<beginning of page>
+Cannot find dma controller
+Driver was unable to locate a dma controller. This is an auto-configuration error.
+Disabled TQ since disconnects are disabled
+Tagged queuing was disabled because disconnects were disabled in scsi-options.
+Bad clock frequency- setting 20mhz, asynchronous mode
+Check for bad hardware.
+Sync pkt failed
+Syncing a SCSI packet failed. Refer to scsi_sync_pkt(9F).
+Slot %x: All tags in use!!!
+The driver could not allocate another tag number. The target devices do not properly support tagged queuing.
+Target %d.%d cannot alloc tag queue\n
+The driver could not allocate space for tag queue.
+Gross error in esp status (%x)
+The driver experienced severe SCSI bus problems. Check cables and terminator.
+Spurious interrupt
+The driver received an interrupt while the hardware was not interrupting.
+Lost state in phasemanage
+The driver is confused about the state of the SCSI bus.
+Unrecoverable DMA error during selection
+The DMA controller experienced host SBus problems. Check for bad hardware.
+Bad sequence step (0x%x) in selection
+The esp hardware reported a bad sequence step. Check for bad hardware.
+Undetermined selection failure
+The selection of a target failed unexpectedly. Check for bad hardware.
+>2 reselection IDs on the bus
+Two targets selected simultaneously, which is illegal. Check for bad hardware.
+Reconnect: unexpected bus free
+A reconnect by a target failed. Check for bad hardware.
+<beginning of page>
+Timeout on receiving tag msg
+Suspect target f/w failure in tagged queue handling.
+Parity error in tag msg
+A parity error was detected in a tag message. Suspect SCSI bus problems.
+Botched tag
+The target supplied bad tag messages. Suspect target f/w failure in tagged queue handling.
+Parity error in reconnect msg's
+The reconnect failed because of parity errors.
+Target <n> didn't disconnect after sending <message>
+The target unexpectedly did not disconnect after sending <message>.
+No support for multiple segs
+The esp driver can only transfer contiguous data.
+No dma window?
+Moving the DVMA window failed unexpectedly.
+No dma window on <type> operation
+Moving the DVMA window failed unexpectedly.
+Cannot set new dma window
+Moving the DVMA window failed unexpectedly.
+Unable to set new window at <address> for <type> operation
+Moving the DVMA window failed unexpectedly.
+Illegal dma boundary? %x
+An attempt was made to cross a boundary that the driver could not handle.
+Unwanted data out/in for Target <n>
+The target went into an unexpected phase.
+Spurious <name> phase from target <n>
+The target went into an unexpected phase.
+SCSI bus DATA IN phase parity error
+The driver detected parity errors on the SCSI bus.
+<beginning of page>
+SCSI bus MESSAGE IN phase parity error
+The driver detected parity errors on the SCSI bus.
+SCSI bus STATUS phase parity error
+The driver detected parity errors on the SCSI bus.
+Premature end of extended message
+An extended SCSI bus message did not complete. Suspect a target f/w problem.
+Premature end of input message
+A multibyte input message was truncated. Suspect a target f/w problem.
+Input message botch
+The driver is confused about messages coming from the target.
+Extended message <n> is too long
+The extended message sent by the target is longer than expected.
+<name> message <n> from Target <m> garbled
+Target <m> sent message <name> of value <n> which the driver did not understand.
+Target <n> rejects our message <name>
+Target <n> rejected a message sent by the driver.
+Rejecting message <name> from Target <n>
+The driver rejected a message received from target <n>
+Cmd dma error
+The driver was unable to send out command bytes.
+Target <n> refused message resend
+The target did not accept a message resend.
+Two-byte message <name> <value> rejected
+The driver does not accept this two-byte message.
+Unexpected selection attempt
+An attempt was made to select this host adapter by another initiator.
+Polled cmd failed (target busy)
+A polled command failed because the target did not complete outstanding commands within a reasonable time.
+<beginning of page>
+Polled cmd failed
+A polled command failed because of timeouts or bus errors.
+Disconnected command timeout for Target <id>.<lun>
+A timeout occurred while target/lun was disconnected. This is usually a target f/w problem. For tagged queuing tar<hy>
+gets, <n> commands were outstanding when the timeout was detected.
+Disconnected tagged cmds (<n>) timeout for Target <id>.<lun>
+A timeout occurred while target/lun was disconnected. This is usually a target f/w problem. For tagged queuing tar<hy>
+gets, <n> commands were outstanding when the timeout was detected.
+Connected command timeout for Target <id>.<lun>
+This is usually a SCSI bus problem. Check cables and termination.
+Target <id>.<lun> reverting to async. mode
+A data transfer hang was detected. The driver attempts to eliminate this problem by reducing the data transfer rate.
+Target <id>.<lun> reducing sync. transfer rate
+A data transfer hang was detected. The driver attempts to eliminate this problem by reducing the data transfer rate.
+Reverting to slow SCSI cable mode
+A data transfer hang was detected. The driver attempts to eliminate this problem by reducing the data transfer rate.
+Reset SCSI bus failed
+An attempt to reset the SCSI bus failed.
+External SCSI bus reset
+Another initiator reset the SCSI bus.
+The esp hardware does not support Wide SCSI mode. Only FAS-type esp's support fast SCSI (10 MB/sec).
+The esp driver exports properties indicating per target the negotiated transfer speed (target<n>-sync-speed) and
+whether tagged queuing has been enabled (target<n>-TQ). The sync-speed property value is the data transfer rate
+in KB/sec. The target-TQ property has no value. The existence of the property indicates that tagged queuing has
+been enabled. Refer to prtconf(1M) (verbose option) for viewing the esp properties.
+  dma, instance #3
+  Register Specifications:
+  Bus Type=0x2, Address=0x81000, Size=10
+  esp, instance #3
+  Driver software properties:
+  name <target3-TQ> length <0> <mi> <no
+ value>.
+  name <target3-sync-speed> length <4>
+  value <0x00002710>.
+  name <scsi-options> length <4>
+  value <0x000003f8>.
+  name <scsi-watchdog-tick> length <4>
+  value <0x0000000a>.
+  name <scsi-tag-age-limit> length <4>
+  value <0x00000008>.
+  name <scsi-reset-delay> length <4>
+<beginning of page>
+  value <0x00000bb8>.

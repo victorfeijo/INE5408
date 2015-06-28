@@ -1,0 +1,681 @@
+<beginning of page>
+zonecfg <-> set up zone configuration
+zonecfg -z zonename
+zonecfg -z zonename subcommand
+zonecfg -z zonename -f command_file
+zonecfg help
+The zonecfg utility creates and modifies the configuration of a zone. Zone configuration consists of a number of re<hy>
+sources and properties.
+To simplify the user interface, zonecfg uses the concept of a scope. The default scope is global.
+The following synopsis of the zonecfg command is for interactive usage:
+ zonecfg -z zonename subcommand
+Parameters changed through zonecfg do not affect a running zone. The zone must be rebooted for the changes to
+take effect.
+In addition to creating and modifying a zone, the zonecfg utility can also be used to persistently specify the resource
+management settings for the global zone.
+In the following text, "rctl" is used as an abbreviation for "resource control". See resource_controls(5).
+Every zone is configured with an associated brand. The brand determines the user-level environment used within the
+zone, as well as various behaviors for the zone when it is installed, boots, or is shutdown. Once a zone has been in<hy>
+stalled the brand cannot be changed. The default brand is determined by the installed distribution in the global zone.
+Some brands do not support all of the zonecfg properties and resources. See the brand-specific man page for more
+details on each brand. For an overview of brands, see the brands(5) man page.
+The following resource types are supported:
+attr
+Generic attribute.
+capped-cpu
+Limits for CPU usage.
+capped-memory
+Limits for physical, swap, and locked memory.
+dataset
+ZFS dataset.
+dedicated-cpu
+Subset of the system's processors dedicated to this zone while it is running.
+device
+Device.
+<beginning of page>
+fs
+file-system
+inherit-pkg-dir
+Directory inherited from the global zone. Used for sparse root zones (see the discussion of "Sparse and Whole Root
+Non-Global Zones," below). Software packages whose contents have been transferred into that directory are inherit<hy>
+ed in read-only mode by the non-global zone and the non-global zone's packaging database is updated to reflect
+those packages. Such resources are not modifiable or removable once a zone has been installed with zoneadm.
+net
+Network interface.
+rctl
+Resource control.
+In the administration of zones, it is useful to distinguish between the global zone and non-global zones. Within non-
+global zones, there are two zone root file system models: sparse and whole root. The sparse root zone model opti<hy>
+mizes the sharing of objects. The whole root zone model provides the maximum configurability. Note that not all
+brands support the sparse zone model.
+Non-global zones that have inherit-pkg-dir resources are called sparse root zones.
+The sparse root zone model optimizes the sharing of objects in the following ways: <bu> Only a subset of the packages
+installed in the global zone are installed directly into the non-global zone. <bu> Read-only loopback file systems, identi<hy>
+fied as inherit-pkg-dir resources, are used to gain access to other files.
+In this model, all packages appear to be installed in the non-global zone. Packages that do not deliver content into
+read-only loopback mount file systems are fully installed. There is no need to install content delivered into read-only
+loopback mounted file systems since that content is inherited (and visible) from the global zone. <bu> As a general
+guideline, a zone requires about 100 megabytes of free disk space per zone when the global zone has been installed
+with all of the standard Solaris packages. <bu> By default, any additional packages installed in the global zone also pop<hy>
+ulate the non-global zones. The amount of disk space required might be increased accordingly, depending on
+whether the additional packages deliver files that reside in the inherit-pkg-dir resource space.
+An additional 40 megabytes of RAM per zone are suggested, but not required on a machine with sufficient swap
+space.
+A sparse zone inherits the following directories:
+ /lib
+ /platform
+ /sbin
+ /usr
+Although zonecfg allows you to remove one of these as an inherited directory, you should not do so. You should ei<hy>
+ther follow the whole-root model or the sparse model; a subset of the sparse model is not tested and you might en<hy>
+counter unexpected problems.
+Adding an additional inherit-pkg-dir directory, such as /opt, to a sparse root zone is acceptable.
+The whole root zone model provides the maximum configurability. All of the required and any selected optional So<hy>
+laris packages are installed into the private file systems of the zone. The advantages of this model include the capa<hy>
+bility for global administrators to customize their zones file system layout. This would be done, for example, to add
+arbitrary unbundled or third-party packages.
+The disk requirements for this model are determined by the disk space used by the packages currently installed in
+the global zone. Note -
+<beginning of page>
+If you create a sparse root zone that contains the following inherit-pkg-dir directories, you must remove these di<hy>
+rectories from the non-global zone's configuration before the zone is installed to have a whole root zone: <bu> /lib <bu>
+/platform <bu> /sbin <bu> /usr
+Each resource type has one or more properties. There are also some global properties, that is, properties of the con<hy>
+figuration as a whole, rather than of some particular resource.
+The following properties are supported:
+(global)
+zonename
+(global)
+zonepath
+(global)
+autoboot
+(global)
+bootargs
+(global)
+pool
+(global)
+limitpriv
+(global)
+brand
+(global)
+cpu-shares
+(global)
+hostid
+(global)
+max-lwps
+(global)
+max-msg-ids
+(global)
+max-sem-ids
+<beginning of page>
+(global)
+max-shm-ids
+(global)
+max-shm-memory
+(global)
+scheduling-class
+fs
+dir, special, raw, type, options
+inherit-pkg-dir
+dir
+net
+address, physical, defrouter
+device
+match
+rctl
+name, value
+attr
+name, type, value
+dataset
+name
+dedicated-cpu
+ncpus, importance
+capped-memory
+physical, swap, locked
+capped-cpu
+ncpus
+As for the property values which are paired with these names, they are either simple, complex, or lists. The type al<hy>
+lowed is property-specific. Simple values are strings, optionally enclosed within quotation marks. Complex values
+have the syntax:
+ (<name>=<value>,<name>=<value>,...)
+<beginning of page>
+where each <value> is simple, and the <name> strings are unique within a given property. Lists have the syntax:
+ [<value>,...]
+where each <value> is either simple or complex. A list of a single value (either simple or complex) is equivalent to
+specifying that value without the list syntax. That is, "foo" is equivalent to "[foo]". A list can be empty (denoted by
+"[]").
+In interpreting property values, zonecfg accepts regular expressions as specified in fnmatch(5). See EXAMPLES.
+The property types are described as follows:
+global: zonename
+The name of the zone.
+global: zonepath
+Path to zone's file system.
+global: autoboot
+Boolean indicating that a zone should be booted automatically at system boot. Note that if the zones service is dis<hy>
+abled, the zone will not autoboot, regardless of the setting of this property. You enable the zones service with a sv<hy>
+cadm command, such as:
+ # svcadm enable svc:/system/zones:default
+Replace enable with disable to disable the zones service. See svcadm(1M).
+global: bootargs
+Arguments (options) to be passed to the zone bootup, unless options are supplied to the "zoneadm boot" command,
+in which case those take precedence. The valid arguments are described in zoneadm(1M).
+global: pool
+Name of the resource pool that this zone must be bound to when booted. This property is incompatible with the ded<hy>
+icated-cpu resource.
+global: limitpriv
+The maximum set of privileges any process in this zone can obtain. The property should consist of a comma-separat<hy>
+ed privilege set specification as described in priv_str_to_set(3C). Privileges can be excluded from the resulting set
+by preceding their names with a dash (-) or an exclamation point (!). The special privilege string "zone" is not sup<hy>
+ported in this context. If the special string "default" occurs as the first token in the property, it expands into a safe set
+of privileges that preserve the resource and security isolation described in zones(5). A missing or empty property is
+equivalent to this same set of safe privileges.
+The system administrator must take extreme care when configuring privileges for a zone. Some privileges cannot be
+excluded through this mechanism as they are required in order to boot a zone. In addition, there are certain privileges
+which cannot be given to a zone as doing so would allow processes inside a zone to unduly affect processes in other
+zones. zoneadm(1M) indicates when an invalid privilege has been added or removed from a zone's privilege set
+when an attempt is made to either "boot" or "ready" the zone.
+See privileges(5) for a description of privileges. The command "ppriv -l" (see ppriv(1)) produces a list of all So<hy>
+laris privileges. You can specify privileges as they are displayed by ppriv. In privileges(5), privileges are listed in
+the form PRIV_privilege_name. For example, the privilege sys_time, as you would specify it in this property, is list<hy>
+ed in privileges(5) as PRIV_SYS_TIME.
+<beginning of page>
+global: brand
+The zone's brand type.
+global: ip-type
+A zone can either share the IP instance with the global zone, which is the default, or have its own exclusive instance
+of IP.
+This property takes the values shared and exclusive.
+global: hostid
+A zone can emulate a 32-bit host identifier to ease system consolidation. A zone's hostid property is empty by de<hy>
+fault, meaning that the zone does not emulate a host identifier. Zone host identifiers must be hexadecimal values be<hy>
+tween 0 and FFFFFFFE. A 0x or 0X prefix is optional. Both uppercase and lowercase hexadecimal digits are accept<hy>
+able.
+fs: dir, special, raw, type, options
+Values needed to determine how, where, and so forth to mount file systems. See mount(1M), mount(2), fsck(1M),
+and vfstab(4).
+inherit-pkg-dir: dir
+The directory path.
+net: address, physical, defrouter
+The network address and physical interface name of the network interface. The network address is one of: <bu> a valid
+IPv4 address, optionally followed by "/" and a prefix length; <bu> a valid IPv6 address, which must be followed by "/"
+and a prefix length; <bu> a host name which resolves to an IPv4 address. Note that host names that resolve to IPv6 ad<hy>
+dresses are not supported.
+The physical interface name is the network interface name.
+The default router is specified similarly to the network address except that it must not be followed by a / (slash) and
+a network prefix length.
+A zone can be configured to be either exclusive-IP or shared-IP. For a shared-IP zone, you must set both the physical
+and address properties; setting the default router is optional. The interface specified in the physical property must be
+plumbed in the global zone prior to booting the non-global zone. However, if the interface is not used by the global
+zone, it should be configured down in the global zone, and the default router for the interface should be specified
+here.
+For an exclusive-IP zone, the physical property must be set and the address and default router properties cannot be
+set.
+device: match
+Device name to match.
+rctl: name, value
+The name and priv/limit/action triple of a resource control. See prctl(1) and rctladm(1M). The preferred way to set
+rctl values is to use the global property name associated with a specific rctl.
+attr: name, type, value
+The name, type and value of a generic attribute. The type must be one of int, uint, boolean or string, and the value
+must be of that type. uint means unsigned , that is, a non-negative integer.
+<beginning of page>
+dataset: name
+The name of a ZFS dataset to be accessed from within the zone. See zfs(1M).
+global: cpu-shares
+The number of Fair Share Scheduler (FSS) shares to allocate to this zone. This property is incompatible with the
+dedicated-cpu resource. This property is the preferred way to set the zone.cpu-shares rctl.
+global: max-lwps
+The maximum number of LWPs simultaneously available to this zone. This property is the preferred way to set the
+zone.max-lwps rctl.
+global: max-msg-ids
+The maximum number of message queue IDs allowed for this zone. This property is the preferred way to set the
+zone.max-msg-ids rctl.
+global: max-sem-ids
+The maximum number of semaphore IDs allowed for this zone. This property is the preferred way to set the
+zone.max-sem-ids rctl.
+global: max-shm-ids
+The maximum number of shared memory IDs allowed for this zone. This property is the preferred way to set the
+zone.max-shm-ids rctl.
+global: max-shm-memory
+The maximum amount of shared memory allowed for this zone. This property is the preferred way to set the
+zone.max-shm-memory rctl. A scale (K, M, G, T) can be applied to the value for this number (for example, 1M is
+one megabyte).
+global: scheduling-class
+Specifies the scheduling class used for processes running in a zone. When this property is not specified, the schedul<hy>
+ing class is established as follows: <bu> If the cpu-shares property or equivalent rctl is set, the scheduling class FSS is
+used. <bu> If neither cpu-shares nor the equivalent rctl is set and the zone's pool property references a pool that has a
+default scheduling class, that class is used. <bu> Under any other conditions, the system default scheduling class is used.
+dedicated-cpu: ncpus, importance
+The number of CPUs that should be assigned for this zone's exclusive use. The zone will create a pool and processor
+set when it boots. See pooladm(1M) and poolcfg(1M) for more information on resource pools. The ncpu property
+can specify a single value or a range (for example, 1-4) of processors. The importance property is optional; if set, it
+will specify the pset.importance value for use by poold(1M). If this resource is used, there must be enough free
+processors to allocate to this zone when it boots or the zone will not boot. The processors assigned to this zone will
+not be available for the use of the global zone or other zones. This resource is incompatible with both the pool and
+cpu-shares properties. Only a single instance of this resource can be added to the zone.
+capped-memory: physical, swap, locked
+The caps on the memory that can be used by this zone. A scale (K, M, G, T) can be applied to the value for each of
+these numbers (for example, 1M is one megabyte). Each of these properties is optional but at least one property must
+be set when adding this resource. Only a single instance of this resource can be added to the zone. The physical
+property sets the max-rss for this zone. This will be enforced by rcapd(1M) running in the global zone. The swap
+property is the preferred way to set the zone.max-swap rctl. The locked property is the preferred way to set the
+<beginning of page>
+zone.max-locked-memory rctl.
+capped-cpu: ncpus
+Sets a limit on the amount of CPU time that can be used by a zone. The unit used translates to the percentage of a
+single CPU that can be used by all user threads in a zone, expressed as a fraction (for example, .75) or a mixed num<hy>
+ber (whole number and fraction, for example, 1.25). An ncpu value of 1 means 100% of a CPU, a value of 1.25
+means 125%, .75 mean 75%, and so forth. When projects within a capped zone have their own caps, the minimum
+value takes precedence.
+The capped-cpu property is an alias for zone.cpu-cap resource control and is related to the zone.cpu-cap resource
+control. See resource_controls(5).
+The following table summarizes resources, property-names, and types:
+ resource property-name type
+ (global) zonename simple
+ (global) zonepath simple
+ (global) autoboot simple
+ (global) bootargs simple
+ (global) pool simple
+ (global) limitpriv simple
+ (global) brand simple
+ (global) ip-type simple
+ (global) hostid simple
+ (global) cpu-shares simple
+ (global) max-lwps simple
+ (global) max-msg-ids simple
+ (global) max-sem-ids simple
+ (global) max-shm-ids simple
+ (global) max-shm-memory simple
+ (global) scheduling-class simple
+ fs dir simple
+  special simple
+  raw simple
+  type simple
+  options list of simple
+ inherit-pkg-dir dir simple
+ net address simple
+  physical simple
+ device match simple
+ rctl name simple
+  value list of complex
+ attr name simple
+  type simple
+  value simple
+ dataset name simple
+ dedicated-cpu ncpus simple or range
+  importance simple
+ capped-memory physical simple with scale
+  swap simple with scale
+  locked simple with scale
+ capped-cpu ncpus simple
+To further specify things, the breakdown of the complex property "value" of the "rctl" resource type, it consists of
+three name/value pairs, the names being "priv", "limit" and "action", each of which takes a simple value. The "name"
+property of an "attr" resource is syntactically restricted in a fashion similar but not identical to zone names: it must
+begin with an alphanumeric, and can contain alphanumerics plus the hyphen (-), underscore (_), and dot (.) charac<hy>
+ters. Attribute names beginning with "zone" are reserved for use by the system. Finally, the "autoboot" global prop<hy>
+erty must have a value of "true" or "false".
+<beginning of page>
+Using the kernel statistics (kstat(3KSTAT)) module caps, the system maintains information for all capped projects
+and zones. You can access this information by reading kernel statistics (kstat(3KSTAT)), specifying caps as the
+kstat module name. The following command displays kernel statistics for all active CPU caps:
+ # kstat caps::'/cpucaps/'
+A kstat(1M) command running in a zone displays only CPU caps relevant for that zone and for projects in that zone.
+See EXAMPLES.
+The following are cap-related arguments for use with kstat(1M):
+caps
+The kstat module.
+project_caps or zone_caps
+kstat class, for use with the kstat -c option.
+cpucaps_project_id or cpucaps_zone_id
+kstat name, for use with the kstat -n option. id is the project or zone identifier.
+The following fields are displayed in response to a kstat(1M) command requesting statistics for all CPU caps.
+module
+In this usage of kstat, this field will have the value caps.
+name
+As described above, cpucaps_project_id or cpucaps_zone_id
+above_sec
+Total time, in seconds, spent above the cap.
+below_sec
+Total time, in seconds, spent below the cap.
+maxusage
+Maximum observed CPU usage.
+nwait
+Number of threads on cap wait queue.
+usage
+Current aggregated CPU usage for all threads belonging to a capped project or zone, in terms of a percentage of a
+single CPU.
+value
+The cap value, in terms of a percentage of a single CPU.
+<beginning of page>
+zonename
+Name of the zone for which statistics are displayed.
+See EXAMPLES for sample output from a kstat command.
+The following options are supported:
+-f command_file
+Specify the name of zonecfg command file. command_file is a text file of zonecfg subcommands, one per line.
+-z zonename
+Specify the name of a zone. Zone names are case sensitive. Zone names must begin with an alphanumeric character
+and can contain alphanumeric characters, the underscore (_) the hyphen (-), and the dot (.). The name global and all
+names beginning with SUNW are reserved and cannot be used.
+You can use the add and select subcommands to select a specific resource, at which point the scope changes to that
+resource. The end and cancel subcommands are used to complete the resource specification, at which time the scope
+is reverted back to global. Certain subcommands, such as add, remove and set, have different semantics in each
+scope.
+zonecfg supports a semicolon-separated list of subcommands. For example:
+ # zonecfg -z myzone "add net; set physical=myvnic; end"
+Subcommands which can result in destructive actions or loss of work have an -F option to force the action. If input
+is from a terminal device, the user is prompted when appropriate if such a command is given without the -F option
+otherwise, if such a command is given without the -F option, the action is disallowed, with a diagnostic message
+written to standard error.
+The following subcommands are supported:
+add resource-type (global scope)
+add property-name property-value (resource scope)
+In the global scope, begin the specification for a given resource type. The scope is changed to that resource type.
+In the resource scope, add a property of the given name with the given value. The syntax for property values varies
+with different property types. In general, it is a simple value or a list of simple values enclosed in square brackets,
+separated by commas ([foo,bar,baz]). See PROPERTIES.
+cancel
+End the resource specification and reset scope to global. Abandons any partially specified resources. cancel is only
+applicable in the resource scope.
+clear property-name
+Clear the value for the property.
+commit
+Commit the current configuration from memory to stable storage. The configuration must be committed to be used
+by zoneadm. Until the in-memory configuration is committed, you can remove changes with the revert subcom<hy>
+mand. The commit operation is attempted automatically upon completion of a zonecfg session. Since a configura<hy>
+tion must be correct to be committed, this operation automatically does a verify.
+<beginning of page>
+create [-F] [ -a path |-b | -t template]
+Create an in-memory configuration for the specified zone. Use create to begin to configure a new zone. See commit
+for saving this to stable storage.
+If you are overwriting an existing configuration, specify the -F option to force the action. Specify the -t template op<hy>
+tion to create a configuration identical to template, where template is the name of a configured zone.
+Use the -a path option to facilitate configuring a detached zone on a new host. The path parameter is the zonepath
+location of a detached zone that has been moved on to this new host. Once the detached zone is configured, it should
+be installed using the "zoneadm attach" command (see zoneadm(1M)). All validation of the new zone happens
+during the attach process, not during zone configuration.
+Use the -b option to create a blank configuration. Without arguments, create applies the Sun default settings.
+delete [-F]
+Delete the specified configuration from memory and stable storage. This action is instantaneous, no commit is neces<hy>
+sary. A deleted configuration cannot be reverted.
+Specify the -F option to force the action.
+end
+End the resource specification. This subcommand is only applicable in the resource scope. zonecfg checks to make
+sure the current resource is completely specified. If so, it is added to the in-memory configuration (see commit for
+saving this to stable storage) and the scope reverts to global. If the specification is incomplete, it issues an appropri<hy>
+ate error message.
+export [-f output-file]
+Print configuration to standard output. Use the -f option to print the configuration to output-file. This option pro<hy>
+duces output in a form suitable for use in a command file.
+help [usage] [subcommand] [syntax] [command-name]
+Print general help or help about given topic.
+info zonename | zonepath | autoboot | brand | pool | limitpriv
+info [resource-type [property-name=property-value]*]
+Display information about the current configuration. If resource-type is specified, displays only information about
+resources of the relevant type. If any property-name value pairs are specified, displays only information about re<hy>
+sources meeting the given criteria. In the resource scope, any arguments are ignored, and info displays information
+about the resource which is currently being added or modified.
+remove resource-type{property-name=property-value}(global scope)
+In the global scope, removes the specified resource. The [] syntax means 0 or more of whatever is inside the square
+braces. If you want only to remove a single instance of the resource, you must specify enough property name-value
+pairs for the resource to be uniquely identified. If no property name-value pairs are specified, all instances will be re<hy>
+moved. If there is more than one pair is specified, a confirmation is required, unless you use the -F option.
+select resource-type {property-name=property-value}
+Select the resource of the given type which matches the given property-name property-value pair criteria, for modifi<hy>
+cation. This subcommand is applicable only in the global scope. The scope is changed to that resource type. The {}
+syntax means 1 or more of whatever is inside the curly braces. You must specify enough property -name property-
+value pairs for the resource to be uniquely identified.
+<beginning of page>
+set property-name=property-value
+Set a given property name to the given value. Some properties (for example, zonename and zonepath) are global
+while others are resource-specific. This subcommand is applicable in both the global and resource scopes.
+verify
+Verify the current configuration for correctness: <bu> All resources have all of their required properties specified. <bu> A
+zonepath is specified.
+revert [-F]
+Revert the configuration back to the last committed state. The -F option can be used to force the action.
+exit [-F]
+Exit the zonecfg session. A commit is automatically attempted if needed. You can also use an EOF character to exit
+zonecfg. The -F option can be used to force the action.
+Example 1 Creating the Environment for a New Zone
+In the following example, zonecfg creates the environment for a new zone. /usr/local is loopback mounted from the
+global zone into /opt/local. /opt/sfw is loopback mounted from the global zone, three logical network interfaces are
+added, and a limit on the number of fair-share scheduler (FSS) CPU shares for a zone is set using the rctl resource
+type. The example also shows how to select a given resource for modification.
+ example# zonecfg -z myzone3
+ my-zone3: No such zone configured
+ Use 'create' to begin configuring a new zone.
+ zonecfg:myzone3> create
+ zonecfg:myzone3> set zonepath=/export/home/my-zone3
+ zonecfg:myzone3> set autoboot=true
+ zonecfg:myzone3> add fs
+ zonecfg:myzone3:fs> set dir=/usr/local
+ zonecfg:myzone3:fs> set special=/opt/local
+ zonecfg:myzone3:fs> set type=lofs
+ zonecfg:myzone3:fs> add options [ro,nodevices]
+ zonecfg:myzone3:fs> end
+ zonecfg:myzone3> add fs
+ zonecfg:myzone3:fs> set dir=/mnt
+ zonecfg:myzone3:fs> set special=/dev/dsk/c0t0d0s7
+ zonecfg:myzone3:fs> set raw=/dev/rdsk/c0t0d0s7
+ zonecfg:myzone3:fs> set type=ufs
+ zonecfg:myzone3:fs> end
+ zonecfg:myzone3> add inherit-pkg-dir
+ zonecfg:myzone3:inherit-pkg-dir> set dir=/opt/sfw
+ zonecfg:myzone3:inherit-pkg-dir> end
+ zonecfg:myzone3> add net
+ zonecfg:myzone3:net> set address=192.168.0.1/24
+ zonecfg:myzone3:net> set physical=eri0
+ zonecfg:myzone3:net> end
+ zonecfg:myzone3> add net
+ zonecfg:myzone3:net> set address=192.168.1.2/24
+ zonecfg:myzone3:net> set physical=eri0
+ zonecfg:myzone3:net> end
+ zonecfg:myzone3> add net
+ zonecfg:myzone3:net> set address=192.168.2.3/24
+ zonecfg:myzone3:net> set physical=eri0
+ zonecfg:myzone3:net> end
+ zonecfg:my-zone3> set cpu-shares=5
+ zonecfg:my-zone3> add capped-memory
+ zonecfg:my-zone3:capped-memory> set physical=50m
+ zonecfg:my-zone3:capped-memory> set swap=100m
+ zonecfg:my-zone3:capped-memory> end
+<beginning of page>
+ zonecfg:myzone3> exit
+Example 2 Creating a Non-Native Zone
+The following example creates a new Linux zone:
+ example# zonecfg -z lxzone
+ lxzone: No such zone configured
+ Use 'create' to begin configuring a new zone
+ zonecfg:lxzone> create -t SUNWlx
+ zonecfg:lxzone> set zonepath=/export/zones/lxzone
+ zonecfg:lxzone> set autoboot=true
+ zonecfg:lxzone> exit
+Example 3 Creating an Exclusive-IP Zone
+The following example creates a zone that is granted exclusive access to bge1 and bge33000 and that is isolated at
+the IP layer from the other zones configured on the system.
+The IP addresses and routing is configured inside the new zone using sysidtool(1M).
+ example# zonecfg -z excl
+ excl: No such zone configured
+ Use 'create' to begin configuring a new zone
+ zonecfg:excl> create
+ zonecfg:excl> set zonepath=/export/zones/excl
+ zonecfg:excl> set ip-type=exclusive
+ zonecfg:excl> add net
+ zonecfg:excl:net> set physical=bge1
+ zonecfg:excl:net> end
+ zonecfg:excl> add net
+ zonecfg:excl:net> set physical=bge33000
+ zonecfg:excl:net> end
+ zonecfg:excl> exit
+Example 4 Associating a Zone with a Resource Pool
+The following example shows how to associate an existing zone with an existing resource pool:
+ example# zonecfg -z myzone
+ zonecfg:myzone> set pool=mypool
+ zonecfg:myzone> exit
+For more information about resource pools, see pooladm(1M) and poolcfg(1M).
+Example 5 Changing the Name of a Zone
+The following example shows how to change the name of an existing zone:
+ example# zonecfg -z myzone
+ zonecfg:myzone> set zonename=myzone2
+ zonecfg:myzone2> exit
+Example 6 Changing the Privilege Set of a Zone
+<beginning of page>
+The following example shows how to change the set of privileges an existing zone's processes will be limited to the
+next time the zone is booted. In this particular case, the privilege set will be the standard safe set of privileges a zone
+normally has along with the privilege to change the system date and time:
+ example# zonecfg -z myzone
+ zonecfg:myzone> set limitpriv="default,sys_time"
+ zonecfg:myzone2> exit
+Example 7 Setting the zone.cpu-shares Property for the Global Zone
+The following command sets the zone.cpu-shares property for the global zone:
+ example# zonecfg -z global
+ zonecfg:global> set cpu-shares=5
+ zonecfg:global> exit
+Example 8 Using Pattern Matching
+The following commands illustrate zonecfg support for pattern matching. In the zone flexlm, enter:
+ zonecfg:flexlm> add device
+ zonecfg:flexlm:device> set match="/dev/cua/a00[2-5]"
+ zonecfg:flexlm:device> end
+In the global zone, enter:
+ global# ls /dev/cua
+ a a000 a001 a002 a003 a004 a005 a006 a007 b
+In the zone flexlm, enter:
+ flexlm# ls /dev/cua
+ a002 a003 a004 a005
+Example 9 Setting a Cap for a Zone to Three CPUs
+The following sequence uses the zonecfg command to set the CPU cap for a zone to three CPUs.
+ zonecfg:myzone> add capped-cpu
+ zonecfg:myzone>capped-cpu> set ncpus=3
+ zonecfg:myzone>capped-cpu>capped-cpu> end
+The preceding sequence, which uses the capped-cpu property, is equivalent to the following sequence, which makes
+use of the zone.cpu-cap resource control.
+ zonecfg:myzone> add rctl
+ zonecfg:myzone:rctl> set name=zone.cpu-cap
+ zonecfg:myzone:rctl> add value (priv=privileged,limit=300,action=none)
+ zonecfg:myzone:rctl> end
+<beginning of page>
+Example 10 Using kstat to Monitor CPU Caps
+The following command displays information about all CPU caps.
+ # kstat -n /cpucaps/
+ module: caps instance: 0
+ name: cpucaps_project_0 class: project_caps
+  above_sec 0
+  below_sec 2157
+  crtime 821.048183159
+  maxusage 2
+  nwait 0
+  snaptime 235885.637253027
+  usage 0
+  value 18446743151372347932
+  zonename global
+ module: caps instance: 0
+ name: cpucaps_project_1 class: project_caps
+  above_sec 0
+  below_sec 0
+  crtime 225339.192787265
+  maxusage 5
+  nwait 0
+  snaptime 235885.637591677
+  usage 5
+  value 18446743151372347932
+  zonename global
+ module: caps instance: 0
+ name: cpucaps_project_201 class: project_caps
+  above_sec 0
+  below_sec 235105
+  crtime 780.37961782
+  maxusage 100
+  nwait 0
+  snaptime 235885.637789687
+  usage 43
+  value 100
+  zonename global
+ module: caps instance: 0
+ name: cpucaps_project_202 class: project_caps
+  above_sec 0
+  below_sec 235094
+  crtime 791.72983782
+  maxusage 100
+  nwait 0
+  snaptime 235885.637967512
+  usage 48
+  value 100
+  zonename global
+ module: caps instance: 0
+ name: cpucaps_project_203 class: project_caps
+  above_sec 0
+  below_sec 235034
+  crtime 852.104401481
+  maxusage 75
+  nwait 0
+  snaptime 235885.638144304
+  usage 47
+  value 100
+  zonename global
+<beginning of page>
+ module: caps instance: 0
+ name: cpucaps_project_86710 class: project_caps
+  above_sec 22
+  below_sec 235166
+  crtime 698.441717859
+  maxusage 101
+  nwait 0
+  snaptime 235885.638319871
+  usage 54
+  value 100
+  zonename global
+ module: caps instance: 0
+ name: cpucaps_zone_0 class: zone_caps
+  above_sec 100733
+  below_sec 134332
+  crtime 821.048177123
+  maxusage 207
+  nwait 2
+  snaptime 235885.638497731
+  usage 199
+  value 200
+  zonename global
+ module: caps instance: 1
+ name: cpucaps_project_0 class: project_caps
+  above_sec 0
+  below_sec 0
+  crtime 225360.256448422
+  maxusage 7
+  nwait 0
+  snaptime 235885.638714404
+  usage 7
+  value 18446743151372347932
+  zonename test_001
+ module: caps instance: 1
+ name: cpucaps_zone_1 class: zone_caps
+  above_sec 2
+  below_sec 10524
+  crtime 225360.256440278
+  maxusage 106
+  nwait 0
+  snaptime 235885.638896443
+  usage 7
+  value 100
+  zonename test_001
+Example 11 Displaying CPU Caps for a Specific Zone or Project
+Using the kstat -c and -i options, you can display CPU caps for a specific zone or project, as below. The first com<hy>
+mand produces a display for a specific project, the second for the same project within zone 1.
+ # kstat -c project_caps
+ # kstat -c project_caps -i 1
+The following exit values are returned:
+0
+Successful completion.
+<beginning of page>
+1
+An error occurred.
+2
+Invalid usage.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wzoneu _ Interface StabilityVolatile
+ppriv(1), prctl(1), zlogin(1), kstat(1M), mount(1M), pooladm(1M), poolcfg(1M), poold(1M), rcapd(1M), rct<hy>
+ladm(1M), svcadm(1M), sysidtool(1M), zfs(1M), zoneadm(1M), priv_str_to_set(3C), kstat(3KSTAT), vfstab(4),
+attributes(5), brands(5), fnmatch(5), lx(5), privileges(5), resource_controls(5), zones(5)
+System Administration Guide: Solaris Containers-Resource Management, and Solaris Zones
+All character data used by zonecfg must be in US-ASCII encoding.

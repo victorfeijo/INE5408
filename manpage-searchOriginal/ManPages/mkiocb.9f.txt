@@ -1,0 +1,90 @@
+<beginning of page>
+mkiocb <-> allocates a STREAMS ioctl block for M_IOCTL messages in the kernel.
+#include <sys/stream.h>
+mblk_t *mkiocb(uint_t command);
+Solaris DDI specific (Solaris DDI).
+command ioctl command for the ioc_cmd field.
+STREAMS modules or drivers might need to issue an ioctl to a lower module or driver. The mkiocb() function tries
+to allocate (using allocb(9F)) a STREAMS M_IOCTL message block (iocblk(9S)). Buffer allocation fails only
+when the system is out of memory. If no buffer is available, the qbufcall(9F) function can help a module recover
+from an allocation failure.
+The mkiocb function returns a mblk_t structure which is large enough to hold any of the ioctl messages
+(iocblk(9S), copyreq(9S) or copyresp(9S)), and has the following special properties:
+b_wptr Set to b_rptr + sizeof(struct iocblk).
+b_cont Set to NULL..
+b_datap->db_type Set to M_IOCTL.
+The fields in the iocblk structure are initialized as follows:
+ioc_cmd Set to the command value passed in.
+ioc_id Set to a unique identifier.
+ioc_cr Set to point to a credential structure encoding the maximum system privilege and which does not need to be
+freed in any fashion.
+ioc_count Set to 0.
+ioc_rval Set to 0.
+ioc_error Set to 0.
+ioc_flags Set to IOC_NATIVE to reflect that this is native to the running kernel.
+Upon success, the mkiocb() function returns a pointer to the allocated mblk_t of type M_IOCTL.
+On failure, it returns a null pointer.
+The mkiocb() function can be called from user, interrupt, or kernel context. Example 1 M_IOCTL Allocation
+The first example shows an M_IOCTL allocation with the ioctl command TEST_CMD. If the iocblk(9S) cannot be
+allocated, NULL is returned, indicating an allocation failure (line 5). In line 11, the putnext(9F) function is used to
+send the message downstream.
+ 1 test_function(queue_t *q, test_info_t *testinfo)
+<beginning of page>
+  2 {
+  3 mblk_t *mp;
+  4
+  5 if ((mp = mkiocb(TEST_CMD)) == NULL)
+  6 return (0);
+  7
+  8 /* save off ioctl ID value */
+  9 testinfo->xx_iocid = ((struct iocblk *)mp->b_rptr)->ioc_id;
+ 10
+ 11 putnext(q, mp); /* send message downstream */
+ 12 return (1);
+ 13 }
+Example 2 The ioctl ID Value
+During the read service routine, the ioctl ID value for M_IOCACK or M_IOCNAK should equal the ioctl that was
+previously sent by this module before processing.
+  1 test_lrsrv(queue_t *q)
+  2 {
+  3 ...
+  4
+  5 switch (DB_TYPE(mp)) {
+  6 case M_IOCACK:
+  7 case M_IOCNAK:
+  8 /* Does this match the ioctl that this module sent */
+  9 ioc = (struct iocblk*)mp->b_rptr;
+ 10 if (ioc->ioc_id == testinfo->xx_iocid) {
+ 11 /* matches, so process the message */
+ 12 ...
+ 13 freemsg(mp);
+ 14 }
+ 15 break;
+ 16 }
+ 17 ...
+ 18 }
+Example 3 An iocblk Allocation Which Fails
+The next example shows an iocblk allocation which fails. Since the open routine is in user context, the caller may
+block using qbufcall(9F) until memory is available.
+ 1 test_open(queue_t *q, dev_t devp, int oflag, int sflag,
+  cred_t *credp)
+  2 {
+  3 while ((mp = mkiocb(TEST_IOCTL)) == NULL) {
+  4 int id;
+  5
+  6 id = qbufcall(q, sizeof (union ioctypes), BPRI_HI,
+  7 dummy_callback, 0);
+  8 /* Handle interrupts */
+  9 if (!qwait_sig(q)) {
+ 10 qunbufcall(q, id);
+ 11 return (EINTR);
+ 12 }
+ 13 }
+ 14 putnext(q, mp);
+ 15 }
+allocb(9F), putnext(9F), qbufcall(9F), qwait_sig(9F), copyreq(9S), copyresp(9S), iocblk(9S)
+Writing Device Drivers
+<beginning of page>
+STREAMS Programming Guide
+It is the module's responsibility to remember the ID value of the M_IOCTL that was allocated. This will ensure
+proper cleanup and ID matching when the M_IOCACK or M_IOCNAK is received.

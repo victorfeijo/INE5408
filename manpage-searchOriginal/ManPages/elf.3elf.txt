@@ -1,0 +1,169 @@
+<beginning of page>
+elf <-> object file access library
+cc [ flag ... ] file ... -lelf [ library ... ]
+#include <libelf.h>
+Functions in the ELF access library let a program manipulate ELF (Executable and Linking Format) object files, ar<hy>
+chive files, and archive members. The header provides type and function declarations for all library services.
+Programs communicate with many of the higher-level routines using an ELF descriptor. That is, when the program
+starts working with a file, elf_begin(3ELF) creates an ELF descriptor through which the program manipulates the
+structures and information in the file. These ELF descriptors can be used both to read and to write files. After the
+program establishes an ELF descriptor for a file, it may then obtain section descriptors to manipulate the sections of
+the file (see elf_getscn(3ELF)). Sections hold the bulk of an object file's real information, such as text, data, the
+symbol table, and so on. A section descriptor ``belongs'' to a particular ELF descriptor, just as a section belongs to a
+file. Finally, data descriptors are available through section descriptors, allowing the program to manipulate the infor<hy>
+mation associated with a section. A data descriptor ``belongs'' to a section descriptor.
+Descriptors provide private handles to a file and its pieces. In other words, a data descriptor is associated with one
+section descriptor, which is associated with one ELF descriptor, which is associated with one file. Although descrip<hy>
+tors are private, they give access to data that may be shared. Consider programs that combine input files, using in<hy>
+coming data to create or update another file. Such a program might get data descriptors for an input and an output
+section. It then could update the output descriptor to reuse the input descriptor's data. That is, the descriptors are dis<hy>
+tinct, but they could share the associated data bytes. This sharing avoids the space overhead for duplicate buffers and
+the performance overhead for copying data unnecessarily.
+ELF provides a framework in which to define a family of object files, supporting multiple processors and architec<hy>
+tures. An important distinction among object files is the class, or capacity, of the file. The 32-bit class supports archi<hy>
+tectures in which a 32-bit object can represent addresses, file sizes, and so on, as in the following:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) NamePurpose _ Elf32_AddrUnsigned address _ Elf32_HalfUn<hy>
+signed medium integer _ Elf32_OffUnsigned file offset _ Elf32_SwordSigned large integer _ Elf32_WordUn<hy>
+signed large integer _ unsigned charUnsigned small integer
+The 64<mi>bit class works the same as the 32<mi>bit class, substituting 64 for 32 as necessary. Other classes will be de<hy>
+fined as necessary, to support larger (or smaller) machines. Some library services deal only with data objects for a
+specific class, while others are class-independent. To make this distinction clear, library function names reflect their
+status, as described below.
+Conceptually, two parallel sets of objects support cross compilation environments. One set corresponds to file con<hy>
+tents, while the other set corresponds to the native memory image of the program manipulating the file. Type defini<hy>
+tions supplied by the headers work on the native machine, which may have different data encodings (size, byte order,
+and so on) than the target machine. Although native memory objects should be at least as big as the file objects (to
+avoid information loss), they may be bigger if that is more natural for the host machine.
+Translation facilities exist to convert between file and memory representations. Some library routines convert data
+automatically, while others leave conversion as the program's responsibility. Either way, programs that create object
+files must write file-typed objects to those files; programs that read object files must take a similar view. See
+elf32_xlatetof(3ELF) and elf32_fsize(3ELF) for more information.
+Programs may translate data explicitly, taking full control over the object file layout and semantics. If the program
+prefers not to have and exercise complete control, the library provides a higher-level interface that hides many object
+file details. elf_begin() and related functions let a program deal with the native memory types, converting between
+memory objects and their file equivalents automatically when reading or writing an object file.
+Object file versions allow ELF to adapt to new requirements. Three independent versions can be important to a pro<hy>
+gram. First, an application program knows about a particular version by virtue of being compiled with certain head<hy>
+ers. Second, the access library similarly is compiled with header files that control what versions it understands.
+Third, an ELF object file holds a value identifying its version, determined by the ELF version known by the file's
+creator. Ideally, all three versions would be the same, but they may differ.
+If a program's version is newer than the access library, the program might use information unknown to the library.
+Translation routines might not work properly, leading to undefined behavior. This condition merits installing a new
+library.
+<beginning of page>
+The library's version might be newer than the program's and the file's. The library understands old versions, thus
+avoiding compatibility problems in this case.
+Finally, a file's version might be newer than either the program or the library understands. The program might or
+might not be able to process the file properly, depending on whether the file has extra information and whether that
+information can be safely ignored. Again, the safe alternative is to install a new library that understands the file's
+version.
+To accommodate these differences, a program must use elf_version(3ELF) to pass its version to the library, thus es<hy>
+tablishing the working version for the process. Using this, the library accepts data from and presents data to the pro<hy>
+gram in the proper representations. When the library reads object files, it uses each file's version to interpret the data.
+When writing files or converting memory types to the file equivalents, the library uses the program's working ver<hy>
+sion for the file data.
+As mentioned above, elf_begin() and related routines provide a higher-level interface to ELF files, performing input
+and output on behalf of the application program. These routines assume a program can hold entire files in memory,
+without explicitly using temporary files. When reading a file, the library routines bring the data into memory and
+perform subsequent operations on the memory copy. Programs that wish to read or write large object files with this
+model must execute on a machine with a large process virtual address space. If the underlying operating system lim<hy>
+its the number of open files, a program can use elf_cntl(3ELF) to retrieve all necessary data from the file, allowing
+the program to close the file descriptor and reuse it.
+Although the elf_begin() interfaces are convenient and efficient for many programs, they might be inappropriate for
+some. In those cases, an application may invoke the elf32_xlatetom(3ELF) or elf32_xlatetof(3ELF) data translation
+routines directly. These routines perform no input or output, leaving that as the application's responsibility. By as<hy>
+suming a larger share of the job, an application controls its input and output model.
+Names associated with the library take several forms.
+elf_name These class-independent names perform some service, name, for the program.
+elf32_name Service names with an embedded class, 32 here, indicate they work only for the designated class of
+files.
+Elf_Type Data types can be class-independent as well, distinguished by Type.
+Elf32_Type Class-dependent data types have an embedded class name, 32 here.
+ELF_C_CMD Several functions take commands that control their actions. These values are members of the
+Elf_Cmd enumeration; they range from zero through ELF_C_NUM<mi>1.
+ELF_F_FLAG Several functions take flags that control library status and/or actions. Flags are bits that may be com<hy>
+bined.
+ELF32_FSZ_TYPE These constants give the file sizes in bytes of the basic ELF types for the 32-bit class of files.
+See elf32_fsize() for more information.
+ELF_K_KIND The function elf_kind() identifies the KIND of file associated with an ELF descriptor. These values
+are members of the Elf_Kind enumeration; they range from zero through ELF_K_NUM<mi>1.
+ELF_T_TYPE When a service function, such as elf32_xlatetom() or elf32_xlatetof(), deals with multiple types,
+names of this form specify the desired TYPE. Thus, for example, ELF_T_EHDR is directly related to Elf32_Ehdr.
+These values are members of the Elf_Type enumeration; they range from zero through ELF_T_NUM<mi>1.
+Example 1 An interpretation of elf file.
+The basic interpretation of an ELF file consists of:
+<beginning of page>
+<bu> opening an ELF object file <bu> obtaining an ELF descriptor <bu> analyzing the file using the descriptor.
+The following example opens the file, obtains the ELF descriptor, and prints out the names of each section in the
+file.
+ #include<fcntl.h>
+ #include<stdio.h>
+ #include<libelf.h>
+ #include<stdlib.h>
+ #include<string.h>
+ static void failure(void);
+ void
+ main(int argc, char ** argv)
+ {
+  Elf32_Shdr * shdr;
+  Elf32_Ehdr * ehdr;
+  Elf * elf;
+  Elf_Scn * scn;
+  Elf_Data * data;
+  int fd;
+  unsigned int cnt;
+  /* Open the input file */
+  if ((fd = open(argv[1], O_RDONLY)) == -1)
+  exit(1);
+  /* Obtain the ELF descriptor */
+  (void) elf_version(EV_CURRENT);
+  if ((elf = elf_begin(fd, ELF_C_READ, NULL)) == NULL)
+  failure();
+  /* Obtain the .shstrtab data buffer */
+  if (((ehdr = elf32_getehdr(elf)) == NULL) ||
+  ((scn = elf_getscn(elf, ehdr->e_shstrndx)) == NULL) ||
+  ((data = elf_getdata(scn, NULL)) == NULL))
+  failure();
+  /* Traverse input filename, printing each section */
+  for (cnt = 1, scn = NULL; scn = elf_nextscn(elf, scn); cnt++) {
+  if ((shdr = elf32_getshdr(scn)) == NULL)
+  failure();
+  (void) printf("[%d] %s\n", cnt,
+  (char *)data->d_buf + shdr->sh_name);
+  }
+ } /* end main */
+ static void
+ failure()
+ {
+  (void) fprintf(stderr, "%s\n", elf_errmsg(elf_errno()));
+  exit(1);
+ }
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stabili<hy>
+tyStable _ MT-LevelMT-Safe
+ar.h(3HEAD), elf32_checksum(3ELF), elf32_fsize(3ELF), elf32_getshdr(3ELF), elf32_xlatetof(3ELF), elf_be<hy>
+gin(3ELF), elf_cntl(3ELF), elf_errmsg(3ELF), elf_fill(3ELF), elf_getarhdr(3ELF), elf_getarsym(3ELF), elf_get<hy>
+<beginning of page>
+base(3ELF), elf_getdata(3ELF), elf_getident(3ELF), elf_getscn(3ELF), elf_hash(3ELF), elf_kind(3ELF),
+elf_memory(3ELF), elf_rawfile(3ELF), elf_strptr(3ELF), elf_update(3ELF), elf_version(3ELF), gelf(3ELF), li<hy>
+belf(3LIB), attributes(5), lfcompile(5)
+ANSI C Programmer's Guide
+a.out(4)
+Information in the ELF headers is separated into common parts and processor-specific parts. A program can make a
+processor's information available by including the appropriate header: <sys/elf_NAME.h> where NAME matches the
+processor name as used in the ELF file header.
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) NameProcessor _ M32AT&T WE 32100 _ SPARCSPARC _
+386Intel 80386, 80486, Pentium
+Other processors will be added to the table as necessary.
+To illustrate, a program could use the following code to ``see'' the processor-specific information for the SPARC
+based system.
+ #include <libelf.h>
+ #include <sys/elf_SPARC.h>
+Without the <sys/elf_SPARC.h> definition, only the common ELF information would be visible.
+A program could use the following code to ``see'' the processor-specific information for the Intel 80386:
+ #include <libelf.h>
+ #include <sys/elf_386.h>
+Without the <sys/elf_386.h> definition, only the common ELF information would be visible.
+Although reading the objects is rather straightforward, writing/updating them can corrupt the shared offsets among
+sections. Upon creation, relationships are established among the sections that must be maintained even if the object's
+size is changed.

@@ -1,0 +1,78 @@
+<beginning of page>
+ddi_dev_report_fault <-> Report a hardware failure
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+void ddi_dev_report_fault (dev_info_t *dip,
+ ddi_fault_impact_t impact, ddi_fault_location_t location,
+ const char *message );
+Solaris DDI specific (Solaris DDI)
+dip Pointer to the driver's dev_info structure to which the fault report relates. (Normally the caller's own dev_info
+pointer).
+impact One of a set of enumerated values indicating the impact of the fault on the device's ability to provide normal
+service.
+location One of a set of enumerated values indicating the location of the fault, relative to the hardware controlled by
+the driver specified by dip.
+message Text of the message describing the fault being reported.
+This function provides a standardized mechanism through which device drivers can report hardware faults. Use of
+this reporting mechanism enables systems equipped with a fault management system to respond to faults discovered
+by a driver. On a suitably equipped system, this might include automatic failover to an alternative device and/or
+scheduling replacement of the faulty hardware.
+The driver must indicate the impact of the fault being reported on its ability to provide service by passing one of the
+following values for the impact parameter:
+DDI_SERVICE_LOST Indicates a total loss of service. The driver is unable to implement the normal functions of
+its hardware.
+DDI_SERVICE_DEGRADED The driver is unable to provide normal service, but can provide a partial or degrad<hy>
+ed level of service. The driver may have to make repeated attempts to perform an operation before it succeeds, or it
+may be running at less than its configured speed. A driver may use this value to indicate that an alternative device
+should be used if available, but that it can continue operation if no alternative exists.
+DDI_SERVICE_UNAFFECTED The service provided by the device is currently unaffected by the reported fault.
+This value may be used to report recovered errors for predictive failure analysis.
+DDI_SERVICE_RESTORED The driver has resumed normal service, following a previous report that service was
+lost or degraded. This message implies that any previously reported fault condition no longer exists.
+The location parameter should be one of the following values:
+DDI_DATAPATH_FAULT The fault lies in the datapath between the driver and the device. The device may be un<hy>
+plugged, or a problem may exist in the bus on which the device resides. This value is appropriate if the device is not
+responding to accesses, (for example, the device may not be present) or if a call to ddi_check_acc_handle(9F) re<hy>
+turns DDI_FAILURE.
+DDI_DEVICE_FAULT The fault lies in the device controlled by the driver. This value is appropriate if the device
+returns an error from a selftest function, or if the driver is able to determine that device is present and accessible, but
+is not functioning correctly.
+<beginning of page>
+DDI_EXTERNAL_FAULT The fault is external to the device. For example, an Ethernet driver would use this val<hy>
+ue when reporting a cable fault.
+If a device returns detectably bad data during normal operation (an "impossible" value in a register or DMA status
+area, for example), the driver should check the associated handle using ddi_check_acc_handle(9F) or
+ddi_check_dma_handle(9F) before reporting the fault. If the fault is associated with the handle, the driver should
+specify DDI_DATAPATH_FAULT rather than DDI_DEVICE_FAULT. As a consequence of this call, the device's
+state may be updated to reflect the level of service currently available. See ddi_get_devstate(9F).
+Note that if a driver calls ddi_get_devstate(9F) and discovers that its device is down, a fault should not be reported-
+the device is down as the result of a fault that has already been reported. Additionally, a driver should avoid incur<hy>
+ring or reporting additional faults when the device is already known to be unusable. The ddi_dev_report_fault()
+call should only be used to report hardware (device) problems and should not be used to report purely software prob<hy>
+lems such as memory (or other resource) exhaustion.
+An Ethernet driver receives an error interrupt from its device if various fault conditions occur. The driver must read
+an error status register to determine the nature of the fault, and report it appropriately:
+ static int
+ xx_error_intr(xx_soft_state *ssp)
+ {
+  ...
+  error_status = ddi_get32(ssp->handle, &ssp->regs->xx_err_status);
+  if (ddi_check_acc_handle(ssp->handle) != DDI_SUCCESS) {
+  ddi_dev_report_fault(ssp->dip, DDI_SERVICE_LOST,
+  DDI_DATAPATH_FAULT, "register access fault");
+  return DDI_INTR_UNCLAIMED;
+  }
+  if (ssp->error_status & XX_CABLE_FAULT) {
+  ddi_dev_report_fault(ssp->dip, DDI_SERVICE_LOST,
+  DDI_EXTERNAL_FAULT, "cable fault")
+  return DDI_INTR_CLAIMED;
+  }
+  if (ssp->error_status & XX_JABBER) {
+  ddi_dev_report_fault(ssp->dip, DDI_SERVICE_DEGRADED,
+  DDI_EXTERNAL_FAULT, "jabbering detected")
+  return DDI_INTR_CLAIMED;
+  }
+  ...
+ }
+The ddi_dev_report_fault() function may be called from user, kernel, or interrupt context.
+ddi_check_acc_handle(9F), ddi_check_dma_handle(9F), ddi_get_devstate(9F)

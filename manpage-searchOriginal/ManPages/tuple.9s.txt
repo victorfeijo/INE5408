@@ -1,0 +1,72 @@
+<beginning of page>
+tuple <-> card information structure (CIS) access structure
+#include <sys/pccard.h>
+Solaris DDI Specific (Solaris DDI)
+The tuple_t structure is the basic data structure provided by card services to manage PC card information. A PC
+card provides identification and configuration information through its card information structure (CIS). A PC card
+driver accesses a PC card's CIS through various card services functions.
+The CIS information allows PC cards to be self-identifying: the CIS provides information to the system so that it
+can identify the proper PC card driver for the PC card, and provides configuration information so that the driver can
+allocate appropriate resources to configure the PC card for proper operation in the system.
+The CIS information is contained on the PC card in a linked list of tuple data structures called a CIS chain. Each tu<hy>
+ple has a one-byte type and a one-byte link, an offset to the next tuple in the list. A PC card can have one or more
+CIS chains.
+A multi-function PC card that complies with the PC Card 95 MultiFunction Metaformat specification will have one
+or more global CIS chains that collectively are referred to as the global CIS. These PC Cards will also have one or
+more per-function CIS chains. Each per-function collection of CIS chains is referred to as a function-specific CIS.
+To examine a PC card's CIS, first a PC card driver must locate the desired tuple by calling csx_GetFirstTuple(9F).
+Once the first tuple is located, subsequent tuples may be located by calling csx_GetNextTuple(9F). See csx_Get<hy>
+FirstTuple(9F). The linked list of tuples may be inspected one by one, or the driver may narrow the search by re<hy>
+questing only tuples of a particular type.
+Once a tuple has been located, the PC card driver may inspect the tuple data. The most convenient way to do this for
+standard tuples is by calling one of the number of tuple-parsing utility functions; for custom tuples, the driver may
+get access to the raw tuple data by calling csx_GetTupleData(9F).
+Solaris PC card drivers do not need to be concerned with which CIS chain a tuple appears in. On a multi-function
+PC card, the client will get the tuples from the global CIS followed by the tuples in the function-specific CIS. The
+caller will not get any tuples from a function-specific CIS that does not belong to the caller's function.
+The structure members of tuple_t are:
+ uint32_t Socket; /* socket number */
+ uint32_t Attributes; /* tuple attributes */
+ cisdata_t DesiredTuple; /* tuple to search for */
+ cisdata_t TupleOffset; /* tuple data offset */
+ cisdata_t TupleDataMax; /* max tuple data size */
+ cisdata_t TupleDataLen; /* actual tuple data length */
+ cisdata_t TupleData[CIS_MAX_TUPLE_DATA_LEN];
+  /* body tuple data */
+ cisdata_t TupleCode; /* tuple type code */
+ cisdata_t TupleLink; /* tuple link */
+The fields are defined as follows:
+Socket Not used in Solaris, but for portability with other card services implementations, it should be set to the logi<hy>
+cal socket number.
+Attributes This field is bit-mapped. The following bits are defined:
+TUPLE_RETURN_LINK
+Return link tuples if set.
+TUPLE_RETURN_IGNORED_TUPLES
+Return ignored tuples if set. Ignored tuples are those tuples in a multi-function PC card's global CIS chain that are
+duplicates of the same tuples in a function-specific CIS chain.
+<beginning of page>
+TUPLE_RETURN_NAME
+Return tuple name string using the csx_ParseTuple(9F) function if set.
+DesiredTuple This field is the requested tuple type code to be returned when calling csx_GetFirstTuple(9F) or
+csx_GetNextTuple(9F). RETURN_FIRST_TUPLE is used to return the first tuple regardless of tuple type. RE<hy>
+TURN_NEXT_TUPLE is used to return the next tuple regardless of tuple type.
+TupleOffset This field allows partial tuple information to be retrieved, starting at the specified offset within the tu<hy>
+ple. This field must only be set before calling csx_GetTupleData(9F).
+TupleDataMax This field is the size of the tuple data buffer that card services uses to return raw tuple data from
+csx_GetTupleData(9F). It can be larger than the number of bytes in the tuple data body. Card services ignores any
+value placed here by the client.
+TupleDataLen This field is the actual size of the tuple data body. It represents the number of tuple data body bytes
+returned by csx_GetTupleData(9F).
+TupleData This field is an array of bytes containing the raw tuple data body contents returned by csx_GetTupleDa<hy>
+ta(9F).
+TupleCode This field is the tuple type code and is returned by csx_GetFirstTuple(9F) or csx_GetNextTuple(9F)
+when a tuple matching the DesiredTuple field is returned.
+TupleLink This field is the tuple link, the offset to the next tuple, and is returned by csx_GetFirstTuple(9F) or
+csx_GetNextTuple(9F) when a tuple matching the DesiredTuple field is returned.
+csx_GetFirstTuple(9F), csx_GetTupleData(9F), csx_ParseTuple(9F), csx_Parse_CISTPL_BATTERY(9F),
+csx_Parse_CISTPL_BYTEORDER(9F), csx_Parse_CISTPL_CFTABLE_ENTRY(9F), csx_Parse_CIST<hy>
+PL_CONFIG(9F), csx_Parse_CISTPL_DATE(9F), csx_Parse_CISTPL_DEVICE(9F), csx_Parse_CIST<hy>
+PL_FUNCE(9F), csx_Parse_CISTPL_FUNCID(9F), csx_Parse_CISTPL_JEDEC_C(9F), csx_Parse_CIST<hy>
+PL_MANFID(9F), csx_Parse_CISTPL_SPCL(9F), csx_Parse_CISTPL_VERS_1(9F), csx_Parse_CIST<hy>
+PL_VERS_2(9F)
+PC Card 95 Standard, PCMCIA/JEIDA

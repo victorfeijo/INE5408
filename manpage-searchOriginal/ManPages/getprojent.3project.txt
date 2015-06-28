@@ -1,0 +1,110 @@
+<beginning of page>
+getprojent, getprojbyname, getprojbyid, getdefaultproj, inproj, getprojidbyname, setprojent, endprojent, fgetprojent
+<-> project database entry operations
+cc [ flag... ] file... <mi>lproject [ library... ]
+#include <project.h>
+struct project *getprojent(struct project *proj, void *buffer,
+ size_t bufsize);
+struct project *getprojbyname(const char *name,
+ struct project *proj, void *buffer, size_t bufsize);
+struct project *getprojbyid(projid_t projid,
+ struct project *proj, void *buffer, size_t bufsize);
+struct project *getdefaultproj(const char *username,
+ struct project *proj, void *buffer, size_t bufsize);
+int inproj(const char *username, const char *projname,
+ void *buffer, size_t bufsize);
+projid_t getprojidbyname(const char *name);
+void setprojent(void);
+void endprojent(void);
+struct project *fgetprojent(FILE *f, struct project *proj,
+ void *buffer, size_t bufsize);
+These functions are used to obtain entries describing user projects. Entries can come from any of the sources for a
+project specified in the /etc/nsswitch.conf file (see nsswitch.conf(4)).
+The setprojent(), getprojent(), and endprojent() functions are used to enumerate project entries from the database.
+The setprojent() function effectively rewinds the project database to allow repeated searches. It sets (or resets) the
+enumeration to the beginning of the set of project entries. This function should be called before the first call to get<hy>
+projent().
+The getprojent() function returns a pointer to a structure containing the broken-out fields of an entry in the project
+database. When first called, getprojent() returns a pointer to a project structure containing the first project structure
+in the project database. Successive calls can be used to read the entire database.
+The endprojent() function closes the project database and deallocates resources when processing is complete. It is
+permissible, though possibly less efficient, for the process to call more project functions after calling endprojent().
+The getprojbyname() function searches the project database for an entry with the project name specified by the
+character string name.
+The getprojbyid() function searches the project database for an entry with the (numeric) project ID specified by
+projid.
+The getdefaultproj() function first looks up the project key word in the user_attr database used to define user at<hy>
+tributes in restricted Solaris environments. If the database is available and the keyword is present, the function looks
+up the named project, returning NULL if it cannot be found or if the user is not a member of the named project. If
+absent, the function looks for a match in the project database for the special project user.username. If no match is
+found, or if the user is excluded from project user.username, the function looks at the default group entry of the
+passwd database for the user, and looks for a match in the project database for the special name group.groupname,
+where groupname is the default group associated with the password entry corresponding to the given username. If
+no match is found, or if the user is excluded from project group.groupname, the function returns NULL. A special
+project entry called 'default' can be looked up and used as a last resort, unless the user is excluded from project 'de<hy>
+fault'. On successful lookup, this function returns a pointer to the valid project structure. By convention, the user
+must have a default project defined on a system to be able to log on to that system.
+The inproj() function checks if the user specified by username is able to use the project specified by projname. This
+function returns 1 if the user belongs to the list of project's users, if there is a project's group that contains the speci<hy>
+<beginning of page>
+fied user, if project is a user's default project, or if project's user or group list contains "*" wildcard. In all other cas<hy>
+es it returns 0.
+The getprojidbyname() function searches the project database for an entry with the project name specified by the
+character string name. This function returns the project ID if the requested entry is found; otherwise it returns <mi>1.
+The fgetprojent() function, unlike the other functions described above, does not use nsswitch.conf; it reads and
+parses the next line from the stream f, which is assumed to have the format of the project(4) file. This function re<hy>
+turns the same values as getprojent().
+The getprojent(), getprojbyname(), getprojbyid(), getdefaultproj(), and inproj() functions are reentrant inter<hy>
+faces for operations with the project database. These functions use buffers supplied by the caller to store returned
+results and are safe for use in both single-threaded and multithreaded applications.
+Reentrant interfaces require the additional arguments proj, buffer, and bufsize. The proj argument must be a pointer
+to a struct project structure allocated by the caller. On successful completion, the function returns the project entry
+in this structure. Storage referenced by the project structure is allocated from the memory provided with the buffer
+argument, which is bufsize bytes in size. The content of the memory buffer could be lost in cases when these func<hy>
+tions return errors.
+For enumeration in multithreaded applications, the position within the enumeration is a process-wide property
+shared by all threads. The setprojent() function can be used in a multithreaded application but resets the enumera<hy>
+tion position for all threads. If multiple threads interleave calls to getprojent(), the threads will enumerate disjoint
+subsets of the project database. The inproj(), getprojbyname(), getprojbyid(), and getdefaultproj() functions
+leave the enumeration position in an indeterminate state.
+Project entries are represented by the struct project structure defined in <project.h>.
+ struct project {
+  char *pj_name; /* name of the project */
+  projid_t pj_projid; /* numerical project id */
+  char *pj_comment; /* project comment */
+  char **pj_users; /* vector of pointers to
+  project user names */
+  char **pj_groups; /* vector of pointers to
+  project group names */
+  char *pj_attr; /* project attributes */
+ };
+The getprojbyname() and getprojbyid() functions each return a pointer to a struct project if they successfully lo<hy>
+cate the requested entry; otherwise they return NULL.
+The getprojent() function returns a pointer to a struct project if it successfully enumerates an entry; otherwise it re<hy>
+turns NULL, indicating the end of the enumeration.
+The getprojidbyname() function returns the project ID if the requsted entry is found; otherwise it returns <mi>1 and
+sets errno to indicate the error.
+When the pointer returned by the reentrant functions getprojbyname(), getprojbyid(), and getprojent() is non-null,
+it is always equal to the proj pointer that was supplied by the caller.
+Upon failure, NULL is returned and errno is set to indicate the error.
+The getprojent(), getprojbyname(), getprojbyid(), inproj(), getprojidbyname(), fgetprojent(), and getdefault<hy>
+proj() functions will fail if:
+EINTR A signal was caught during the operation.
+EIO An I/O error has occurred.
+EMFILE There are OPEN_MAX file descriptors currently open in the calling process.
+<beginning of page>
+ENFILE The maximum allowable number of files is currently open in the system.
+ERANGE Insufficient storage was supplied by buffer and bufsize to contain the data to be referenced by the result<hy>
+ing project structure.
+These functions can also fail if the name service switch does not specify valid project(4) name service sources. In
+the case of an incompletely configurated name service switch configuration, getprojbyid() and other functions can
+return error values other than those documented above. These conditions usually occur when the nsswitch.conf file
+indicates that one or more name services is providing entries for the project database when that name service does
+not actually make a project table available.
+When compiling multithreaded applications, see Intro(3), Notes On Multithreaded Applications.
+Use of the enumeration interface getprojent() is discouraged. Enumeration is supported for the project file, NIS, and
+LDAP but in general is not efficient. The semantics of enumeration are discussed further in nsswitch.conf(4).
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.64i) |cw(2.86i) lw(2.64i) |lw(2.86i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stabili<hy>
+tyEvolving _ MT-LevelSee Description.
+Intro(3), libproject(3LIB), project_walk(3PROJECT), sysconf(3C), nsswitch.conf(4), project(4), attributes(5)

@@ -1,0 +1,70 @@
+<beginning of page>
+shmop, shmat, shmdt <-> shared memory operations
+#include <sys/types.h>
+#include <sys/shm.h>
+void *shmat(int shmid, const void *shmaddr, int shmflg);
+int shmdt(char *shmaddr);
+int shmdt(const void *shmaddr);
+The shmat() function attaches the shared memory segment associated with the shared memory identifier specified
+by shmid to the data segment of the calling process.
+The permission required for a shared memory control operation is given as {token}, where token is the type of per<hy>
+mission needed. The types of permission are interpreted as follows:
+ 00400 READ by user
+ 00200 WRITE by user
+ 00040 READ by group
+ 00020 WRITE by group
+ 00004 READ by others
+ 00002 WRITE by others
+See the Shared Memory Operation Permissions section of Intro(2) for more information.
+For shared memory segments created with the SHM_SHARE_MMU or SHM_PAGEABLE flags, the default pro<hy>
+tections cannot be changed so as to prevent a single process from affecting other processes sharing the same shared
+segment.
+When (shmflg&SHM_SHARE_MMU) is true, virtual memory resources in addition to shared memory itself are
+shared among processes that use the same shared memory.
+When (shmflg&SHM_PAGEABLE) is true, virtual memory resources are shared and the dynamic shared memory
+(DISM) framework is created. The dynamic shared memory can be resized dynamically within the specified size in
+shmget(2). The DISM shared memory is pageable unless it is locked.
+The shared memory segment is attached to the data segment of the calling process at the address specified based on
+one of the following criteria: <bu> If shmaddr is equal to (void *) 0, the segment is attached to the first available address
+as selected by the system. <bu> If shmaddr is equal to (void *) 0 and ( shmflg&SHM_SHARE_MMU) or (shm<hy>
+flg&SHM_PAGEABLE) is true, then the segment is attached to the first available suitably aligned address. When
+(shmflg&SHM_SHARE_MMU) or (shmflg&SHM_PAGEABLE) is set, however, the permission given by
+shmget() determines whether the segment is attached for reading or reading and writing. <bu> If shmaddr is not equal
+to (void *) 0 and (shmflg&SHM_RND) is true, the segment is attached to the address given by (shmaddr- (shmaddr
+modulus SHMLBA)). <bu> If shmaddr is not equal to (void *) 0 and (shmflg&SHM_RND) is false, the segment is at<hy>
+tached to the address given by shmaddr. <bu> The segment is attached for reading if (shmflg&SHM_RDONLY) is true
+{READ}, otherwise it is attached for reading and writing {READ/WRITE}.
+The shmdt() function detaches from the calling process's data segment the shared memory segment located at the
+address specified by shmaddr. If the application is standard-conforming (see standards(5)), the shmaddr argument
+is of type const void *. Otherwise it is of type char *.
+Shared memory segments must be explicitly removed after the last reference to them has been removed.
+Upon successful completion, shmat() returns the data segment start address of the attached shared memory segment;
+shmdt() returns 0. Otherwise, <mi>1 is returned, the shared memory segment is not attached, and errno is set to indi<hy>
+cate the error.
+The shmat() function will fail if:
+EACCES Operation permission is denied to the calling process (see Intro(2)).
+EINVAL The shmid argument is not a valid shared memory identifier.
+<beginning of page>
+The shmaddr argument is not equal to 0, and the value of (shmaddr- (shmaddr modulus SHMLBA)) is an illegal
+address.
+The shmaddr argument is not equal to 0, is an illegal address, and (shmflg&SHM_RND) is false.
+The shmaddr argument is not equal to 0, is not properly aligned, and (shmfg&SHM_SHARE_MMU) is true.
+SHM_SHARE_MMU is not supported in certain architectures.
+Both (shmflg&SHM_SHARE_MMU) and (shmflg&SHM_PAGEABLE) are true.
+(shmflg&SHM_SHARE_MMU) is true and the shared memory segment specified by shmid() had previously been
+attached by a call to shmat() in which (shmflg&SHM_PAGEABLE) was true.
+(shmflg&SHM_PAGEABLE) is true and the shared memory segment specified by shmid() had previously been at<hy>
+tached by a call to shmat() in which (shmflg&SHM_SHARE_MMU) was true.
+EMFILE The number of shared memory segments attached to the calling process would exceed the system-im<hy>
+posed limit.
+ENOMEM The available data space is not large enough to accommodate the shared memory segment.
+The shmdt() function will fail if:
+EINVAL The shmaddr argument is not the data segment start address of a shared memory segment.
+ENOMEM (shmflg&SHM_SHARE_MMU) is true and attaching to the shared memory segment would exceed a
+limit or resource control on locked memory.
+Using a fixed value for the shmaddr argument can adversely affect performance on certain platforms due to D-cache
+aliasing.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed _ MT-LevelAsync-Signal-Safe _ StandardSee standards(5).
+Intro(2), exec(2), exit(2), fork(2), shmctl(2), shmget(2), attributes(5), standards(5)

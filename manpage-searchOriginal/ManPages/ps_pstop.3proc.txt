@@ -1,0 +1,36 @@
+<beginning of page>
+ps_pstop, ps_pcontinue, ps_lstop, ps_lcontinue, ps_lrolltoaddr, ps_kill <-> process and LWP control in libthread_db
+#include <proc_service.h>
+ps_err_e ps_pstop(struct ps_prochandle *ph);
+ps_err_e ps_pcontinue(struct ps_prochandle *ph);
+ps_err_e ps_lstop(struct ps_prochandle *ph, lwpid_t lwpid);
+ps_err_e ps_lcontinue(struct ps_prochandle *ph,
+ lwpid_t lwpid);
+ps_err_e ps_lrolltoaddr(struct ps_prochandle *ph,
+ lwpid_t lwpid, psaddr_t go_addr, psaddr_t stop_addr);
+ps_err_e ps_kill(struct ps_prochandle *ph, int signum);
+The ps_pstop() function stops the target process identified by ph, while the ps_pcontinue() function allows it to re<hy>
+sume.
+The libthread_db() function uses ps_pstop() to freeze the target process while it is under inspection. Within the
+scope of any single call from outside libthread_db to a libthread_db routine, libthread_db will call ps_pstop(), at
+most once. If it does, it will call ps_pcontinue() within the scope of the same routine.
+The controlling process may already have stopped the target process when it calls libthread_db. In that case, it is
+not obligated to resume the target process when libthread_db calls ps_pcontinue(). In other words, ps_pstop() is
+mandatory, while ps_pcontinue() is advisory. After ps_pstop(), the target process must be stopped; after ps_pcon<hy>
+tinue(), the target process may be running.
+The ps_lstop() and ps_lcontinue() functions stop and resume a single lightweight process (LWP) within the target
+process ph.
+The ps_lrolltoaddr() function is used to roll an LWP forward out of a critical section when the process is stopped. It
+is also used to run the libthread_db agent thread on behalf of libthread. The ps_lrolltoaddr() function is always
+called with the target process stopped, that is, there has been a preceding call to ps_pstop(). The specified LWP
+must be continued at the address go_addr, or at its current address if go_addr is NULL. It should then be stopped
+when its execution reaches stop_addr. This routine does not return until the LWP has stopped at stop_addr.
+The ps_kill() function directs the signal signum to the target process for which the handle is ph. It has the same se<hy>
+mantics as kill(2).
+PS_OK The call completed successfully. In the case of ps_pstop(), the target process is stopped.
+PS_BADLID For ps_lstop(), ps_lcontinue() and ps_lrolltoaddr(); there is no LWP with id lwipd in the target
+process.
+PS_ERR The function did not return successfully.
+See attributes(5) for description of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT LevelSafe
+kill(2), libc_db(3LIB), proc_service(3PROC), attributes(5), threads(5)

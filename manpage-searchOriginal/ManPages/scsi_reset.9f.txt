@@ -1,0 +1,30 @@
+<beginning of page>
+scsi_reset <-> reset a SCSI bus or target
+#include <sys/scsi/scsi.h>
+int scsi_reset(struct scsi_address *ap, int level);
+Solaris DDI specific (Solaris DDI).
+ap Pointer to the scsi_address structure.
+level The level of reset required.
+The scsi_reset() function asks the host adapter driver to reset the SCSI bus or a SCSI target as specified by level. If
+level equals RESET_ALL, the SCSI bus is reset. If it equals RESET_TARGET, ap is used to determine the target
+to be reset. If it equals RESET_LUN, ap is used to determine the logical unit to be reset.
+When given the RESET_LUN level, scsi_reset() can return failure if the LOGICAL UNIT RESET message is not
+supported by the target device, or if the underlying HBA driver does not implement the ability to issue a LOGICAL
+UNIT RESET message.
+Note that, at the point when scsi_reset() resets the logical unit (case RESET_LUN), or the target (case RE<hy>
+SET_TARGET), or the bus (case RESET_ALL), there might be one or more command packets outstanding. That
+is, packets have been passed to scsi_transport(), and queued or possibly transported, but the commands have not
+been completed and the target completion routine has not been called for those packets.
+The successful call to scsi_reset() has the side effect that any such commands currently outstanding are aborted, at
+which point the packets are marked with pkt_reason set to CMD_RESET, and the appropriate bit -- either
+STAT_BUS_RESET or STAT_DEV_RESET -- is set in pkt_statistics. Once thus appropriately marked, the abort<hy>
+ed command packets are passed to the target driver command completion routine.
+Also note that, at the moment that a thread executing scsi_reset() actually resets the target or the bus, it is possible
+that a second thread may have already called scsi_transport(), but not yet queued or transported its command. In
+this case the HBA will not yet have received the second thread's packet and this packet will not be aborted.
+The scsi_reset() function returns:
+1 Upon success.
+0 Upon failure.
+The scsi_reset() function can be called from user, interrupt, or kernel context.
+tran_reset(9E), tran_reset_notify(9E), scsi_abort(9F)
+Writing Device Drivers

@@ -1,0 +1,71 @@
+<beginning of page>
+untimeout <-> cancel previous timeout function call
+#include <sys/types.h>
+#include <sys/conf.h>
+clock_t untimeout(timeout_id_t id);
+Architecture independent level 1 (DDI/DKI).
+id Opaque timeout ID from a previous timeout(9F) call.
+The untimeout() function cancels a pending timeout(9F) request. untimeout() will not return until the pending call<hy>
+back is cancelled or has run. Because of this, locks acquired by the callback routine should not be held across the
+call to untimeout() or a deadlock may result.
+Since no mutex should be held across the call to untimeout(), there is a race condition between the occurrence of an
+expected event and the execution of the timeout handler. In particular, it should be noted that no problems will result
+from calling untimeout() for a timeout which is either running on another CPU, or has already completed. Drivers
+should be structured with the understanding that the arrival of both an interrupt and a timeout for that interrupt can
+occasionally occur, in either order.
+The untimeout() function returns -1 if the id is not found. Otherwise, it returns an integer value greater than or equal
+to 0.
+The untimeout() function can be called from user, interrupt, or kernel context.
+In the following example, the device driver has issued an IO request and is waiting for the device to respond. If the
+device does not respond within 5 seconds, the device driver will print out an error message to the console.
+ static void
+ xxtimeout_handler(void *arg)
+ {
+  struct xxstate *xsp = (struct xxstate *)arg;
+  mutex_enter(&xsp->lock);
+  cv_signal(&xsp->cv);
+  xsp->flags |= TIMED_OUT;
+  mutex_exit(&xsp->lock);
+  xsp->timeout_id = 0;
+ }
+ static uint_t
+ xxintr(caddr_t arg)
+ {
+  struct xxstate *xsp = (struct xxstate *)arg;
+  .
+  .
+  .
+  mutex_enter(&xsp->lock);
+  /* Service interrupt */
+  cv_signal(&xsp->cv);
+  mutex_exit(&xsp->lock);
+  if (xsp->timeout_id != 0) {
+  (void) untimeout(xsp->timeout_id);
+  xsp->timeout_id = 0;
+  }
+  return(DDI_INTR_CLAIMED);
+ }
+ static void
+ xxcheckcond(struct xxstate *xsp)
+ {
+  .
+  .
+  .
+  xsp->timeout_id = timeout(xxtimeout_handler,
+<beginning of page>
+  xsp, (5 * drv_usectohz(1000000)));
+  mutex_enter(&xsp->lock);
+  while (/* Waiting for interrupt or timeout*/)
+  cv_wait(&xsp->cv, &xsp->lock);
+  if (xsp->flags & TIMED_OUT)
+  cmn_err(CE_WARN, "Device not responding");
+  .
+  .
+  .
+  mutex_exit(&xsp->lock);
+  .
+  .
+  .
+ }
+open(9E), cv_signal(9F), cv_wait_sig(9F), delay(9F), timeout(9F)
+Writing Device Drivers

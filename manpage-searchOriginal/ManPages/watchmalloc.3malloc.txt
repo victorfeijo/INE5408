@@ -1,0 +1,65 @@
+<beginning of page>
+watchmalloc <-> debugging memory allocator
+#include <stdlib.h>
+void *malloc(size_t size);
+void free(void *ptr);
+void *realloc(void *ptr, size_t size);
+void *memalign(size_t alignment, size_t size);
+void *valloc(size_t size);
+void *calloc(size_t nelem, size_t elsize);
+#include <malloc.h>
+int mallopt(int cmd, int value);
+struct mallinfo mallinfo(void);
+The collection of malloc() functions in this shared object are an optional replacement for the standard versions of
+the same functions in the system C library. See malloc(3C). They provide a more strict interface than the standard
+versions and enable enforcement of the interface through the watchpoint facility of /proc. See proc(4).
+Any dynamically linked application can be run with these functions in place of the standard functions if the follow<hy>
+ing string is present in the environment (see ld.so.1(1)):
+  LD_PRELOAD=watchmalloc.so.1
+The individual function interfaces are identical to the standard ones as described in malloc(3C). However, laxities
+provided in the standard versions are not permitted when the watchpoint facility is enabled (see WATCHPOINTS
+below): <bu> Memory may not be freed more than once. <bu> A pointer to freed memory may not be used in a call to real<hy>
+loc(). <bu> A call to malloc() immediately following a call to free() will not return the same space. <bu> Any reference to
+memory that has been freed yields undefined results.
+To enforce these restrictions partially, without great loss in speed as compared to the watchpoint facility described
+below, a freed block of memory is overwritten with the pattern 0xdeadbeef before returning from free(). The mal<hy>
+loc() function returns with the allocated memory filled with the pattern 0xbaddcafe as a precaution against applica<hy>
+tions incorrectly expecting to receive back unmodified memory from the last free(). The calloc() function always re<hy>
+turns with the memory zero-filled.
+Entry points for mallopt() and mallinfo() are provided as empty routines, and are present only because some mal<hy>
+loc() implementations provide them.
+The watchpoint facility of /proc can be applied by a process to itself. The functions in watchmalloc.so.1 use this
+feature if the following string is present in the environment:
+MALLOC_DEBUG=WATCH
+This causes every block of freed memory to be covered with WA_WRITE watched areas. If the application attempts
+to write any part of freed memory, it will trigger a watchpoint trap, resulting in a SIGTRAP signal, which normally
+produces an application core dump.
+A header is maintained before each block of allocated memory. Each header is covered with a watched area, thereby
+providing a red zone before and after each block of allocated memory (the header for the subsequent memory block
+serves as the trailing red zone for its preceding memory block). Writing just before or just after a memory block re<hy>
+turned by malloc() will trigger a watchpoint trap.
+Watchpoints incur a large performance penalty. Requesting MALLOC_DEBUG=WATCH can cause the applica<hy>
+tion to run 10 to 100 times slower, depending on the use made of allocated memory.
+Further options are enabled by specifying a comma-separated string of options:
+<beginning of page>
+MALLOC_DEBUG=WATCH,RW,STOP
+WATCH Enables WA_WRITE watched areas as described above.
+RW Enables both WA_READ and WA_WRITE watched areas. An attempt either to read or write freed memory or
+the red zones will trigger a watchpoint trap. This incurs even more overhead and can cause the application to run up
+to 1000 times slower.
+STOP The process will stop showing a FLTWATCH machine fault if it triggers a watchpoint trap, rather than
+dumping core with a SIGTRAP signal. This allows a debugger to be attached to the live process at the point where
+it underwent the watchpoint trap. Also, the various /proc tools described in proc(1) can be used to examine the
+stopped process.
+One of WATCH or RW must be specified, else the watchpoint facility is not engaged. RW overrides WATCH. Un<hy>
+recognized options are silently ignored.
+Sizes of memory blocks allocated by malloc() are rounded up to the worst-case alignment size, 8 bytes for 32-bit
+processes and 16 bytes for 64-bit processes. Accessing the extra space allocated for a memory block is technically a
+memory violation but is in fact innocuous. Such accesses are not detected by the watchpoint facility of watchmal<hy>
+loc.
+Interposition of watchmalloc.so.1 fails innocuously if the target application is statically linked with respect to its
+malloc() functions.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelMT-Safe
+proc(1), bsdmalloc(3MALLOC), calloc(3C), free(3C), malloc(3C), malloc(3MALLOC), mapmalloc(3MAL<hy>
+LOC), memalign(3C), realloc(3C), valloc(3C), libmapmalloc(3LIB), proc(4), attributes(5)

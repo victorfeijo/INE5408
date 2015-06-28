@@ -1,0 +1,167 @@
+<beginning of page>
+umem_alloc, umem_zalloc, umem_free, umem_nofail_callback <-> fast, scalable memory allocation
+cc [ flag ... ] file... -lumem [ library ... ]
+#include <umem.h>
+void *umem_alloc(size_t size, int flags);
+void *umem_zalloc(size_t size, int flags);
+void umem_free(void *buf, size_t size);
+void umem_nofail_callback((int (*callback)(void));
+void *malloc(size_t size);
+void *calloc(size_t nelem, size_t elsize);
+void free(void *ptr);
+void *memalign(size_t alignment, size_t size);
+void *realloc(void *ptr, size_t size);
+void *valloc(size_t size);
+The umem_alloc() function returns a pointer to a block of size bytes suitably aligned for any variable type. The ini<hy>
+tial contents of memory allocated using umem_alloc() is undefined. The flags argument determines the behavior of
+umem_alloc() if it is unable to fulfill the request. The flags argument can take the following values:
+UMEM_DEFAULT Return NULL on failure.
+UMEM_NOFAIL Call an optional callback (set with umem_nofail_callback()) on failure. The callback takes no
+arguments and can finish by: <bu> returning UMEM_CALLBACK_RETRY, in which case the allocation will be re<hy>
+tried. If the allocation fails, the callback will be invoked again. <bu> returning UMEM_CALLBACK_EXIT(status),
+in which case exit(2) is invoked with status as its argument. The exit() function is called only once. If multiple
+threads return from the UMEM_NOFAIL callback with UMEM_CALLBACK_EXIT(status), one will call exit()
+while the other blocks until exit() terminates the program. <bu> invoking a context-changing function (setcontext(2)) or
+a non-local jump (longjmp(3C) or siglongjmp(3C), or ending the current thread of control (thr_exit(3C) or
+pthread_exit(3C). The application is responsible for any necessary cleanup. The state of libumem remains consis<hy>
+tent. If no callback has been set or the callback has been set to NULL, umem_alloc(..., UMEM_NOFAIL) behaves
+as though the callback returned UMEM_CALLBACK_EXIT(255).
+The libumem library can call callbacks from any place that a UMEM_NOFAIL allocation is issued. In multithread<hy>
+ed applications, callbacks are expected to perform their own concurrency management.
+The function call umem_alloc(0, flag) always returns NULL. The function call umem_free(NULL, 0) is allowed.
+The umem_zalloc() function has the same semantics as umem_alloc(), but the block of memory is initialized to ze<hy>
+ros before it is returned.
+The umem_free() function frees blocks previously allocated using umem_alloc() and umem_zalloc(). The buffer
+address and size must exactly match the original allocation. Memory must not be returned piecemeal.
+The umem_nofail_callback() function sets the process-wide UMEM_NOFAIL callback. See the description of
+UMEM_NOFAIL for more information.
+The malloc(), calloc(), free(), memalign(), realloc(), and valloc() functions are as described in malloc(3C). The
+libumem library provides these functions for backwards-compatibility with the standard functions.
+See umem_debug(3MALLOC) for environment variables that effect the debugging features of the libumem library.
+UMEM_OPTIONS Contains a list of comma-separated options. Unrecognized options are ignored. The options
+that are supported are:
+<beginning of page>
+backend=sbrk
+backend=mmap Set the underlying function used to allocate memory. This option can be set to sbrk (the default)
+for an sbrk(2)-based source or mmap for an mmap(2)-based source. If set to a value that is not supported, sbrk will
+be used.
+Example 1 Using the umem_alloc() function.
+ #include <stdio.h>
+ #include <umem.h>
+ ...
+ char *buf = umem_alloc(1024, UMEM_DEFAULT);
+ if (buf == NULL) {
+  fprintf(stderr, "out of memory\n");
+  return (1);
+ }
+ /* cannot assume anything about buf's contents */
+ ...
+ umem_free(buf, 1024);
+ ...
+Example 2 Using the umem_zalloc() function
+ #include <stdio.h>
+ #include <umem.h>
+ ...
+ char *buf = umem_zalloc(1024, UMEM_DEFAULT);
+ if (buf == NULL) {
+  fprintf(stderr, "out of memory\n");
+  return (1);
+ }
+ /* buf contains zeros */
+ ...
+ umem_free(buf, 1024);
+ ...
+Example 3 Using UMEM_NOFAIL
+ #include <stdlib.h>
+ #include <stdio.h>
+ #include <umem.h>
+ /*
+  * Note that the allocation code below does not have to
+  * check for umem_alloc() returning NULL
+  */
+ int
+ my_failure_handler(void)
+ {
+  (void) fprintf(stderr, "out of memory\n");
+  return (UMEM_CALLBACK_EXIT(255));
+ }
+ ...
+ umem_nofail_callback(my_failure_handler);
+ ...
+ int i;
+ char *buf[100];
+ for (i = 0; i < 100; i++)
+  buf[i] = umem_alloc(1024 * 1024, UMEM_NOFAIL);
+ ...
+ for (i = 0; i < 100; i++)
+  umem_free(buf[i], 1024 * 1024);
+ ...
+<beginning of page>
+Example 4 Using UMEM_NOFAIL in a multithreaded application
+ #define _REENTRANT
+ #include <thread.h>
+ #include <stdio.h>
+ #include <umem.h>
+ void *
+ start_func(void *the_arg)
+ {
+  int *info = (int *)the_arg;
+  char *buf = umem_alloc(1024 * 1024, UMEM_NOFAIL);
+  /* does not need to check for buf == NULL */
+  buf[0] = 0;
+  ...
+  /*
+  * if there were other UMEM_NOFAIL allocations,
+  * we would need to arrange for buf to be
+  * umem_free()ed upon failure.
+  */
+  ...
+  umem_free(buf, 1024 * 1024);
+  return (the_arg);
+ }
+ ...
+ int
+ my_failure_handler(void)
+ {
+  /* terminate the current thread with status NULL */
+  thr_exit(NULL);
+ }
+ ...
+ umem_nofail_callback(my_failure_handler);
+ ...
+ int my_arg;
+ thread_t tid;
+ void *status;
+ (void) thr_create(NULL, NULL, start_func, &my_arg, 0,
+  NULL);
+ ...
+ while (thr_join(0, &tid, &status) != 0)
+  ;
+ if (status == NULL) {
+  (void) fprintf(stderr, "thread %d ran out of memory\n",
+  tid);
+ }
+ ...
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed _ MT-LevelMT-Safe _ StandardSee below.
+For malloc(), calloc(), free(), realloc(), and valloc(), see standards(5).
+exit(2), mmap(2), sbrk(2), bsdmalloc(3MALLOC), libumem(3LIB), longjmp(3C), malloc(3C), malloc(3MAL<hy>
+LOC), mapmalloc(3MALLOC), pthread_exit(3C), thr_exit(3C), umem_cache_create(3MALLOC), umem_de<hy>
+bug(3MALLOC), watchmalloc(3MALLOC), attributes(5), standards(5)
+<beginning of page>
+Solaris Modular Debugger Guide
+Any of the following can cause undefined results: <bu> Passing a pointer returned from umem_alloc() or umem_zal<hy>
+loc() to free() or realloc(). <bu> Passing a pointer returned from malloc(), calloc(), valloc(), memalign(), or realloc()
+to umem_free(). <bu> Writing past the end of a buffer allocated using umem_alloc() or umem_zalloc() <bu> Performing
+UMEM_NOFAIL allocations from an atexit(3C) handler.
+If the UMEM_NOFAIL callback performs UMEM_NOFAIL allocations, infinite recursion can occur.
+The following list compares the features of the malloc(3C), bsdmalloc(3MALLOC), malloc(3MALLOC), mtmal<hy>
+loc(3MALLOC) , and the libumem functions. <bu> The malloc(3C), bsdmalloc(3MALLOC), and malloc(3MALLOC)
+functions have no support for concurrency. The libumem and mtmalloc(3MALLOC) functions support concurrent
+allocations. <bu> The bsdmalloc(3MALLOC) functions afford better performance but are space-inefficient. <bu> The mal<hy>
+loc(3MALLOC) functions are space-efficient but have slower performance. <bu> The standard, fully SCD-compliant
+malloc(3C) functions are a trade-off between performance and space-efficiency. <bu> The mtmalloc(3MALLOC) func<hy>
+tions provide fast, concurrent malloc() implementations that are not space-efficient. <bu> The libumem functions pro<hy>
+vide a fast, concurrent allocation implementation that in most cases is more space-efficient than mtmalloc(3MAL<hy>
+LOC).

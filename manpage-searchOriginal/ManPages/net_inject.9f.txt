@@ -1,0 +1,40 @@
+<beginning of page>
+net_inject <-> determine if a network interface name exists for a network protocol
+#include <sys/neti.h>
+int net_inject(const net_data_t net, inject_t style,
+ net_inject_t *packet);
+Solaris DDI specific (Solaris DDI).
+net value returned from a successful call to net_protocol_lookup(9F).
+style method that determines how this packet is to be injected into the network or kernel.
+packet details about the packet to be injected.
+The net_inject() function provides an interface to allow delivery of network layer (layer 3) packets either into the
+kernel or onto the network. The method of delivery is determined by style.
+If NI_QUEUE_IN is specified, the packet is scheduled for delivery up into the kernel, imitating its reception by a
+network interface. In this mode, packet->ni_addr is ignored and packet->ni_physical specifies the interface for
+which the packet is made to appear as if it arrived on.
+If NI_QUEUE_OUT is specified, the packet is scheduled for delivery out of the kernel, as if it were being sent by a
+raw socket. In this mode, packet->ni_addr and packet->ni_physical are both ignored.
+Neither NI_QUEUE_IN or NI_QUEUE_OUT cause the packet to be immediately processed by the kernel. Instead,
+the packet is added to a list and a timeout is scheduled (if there are none already pending) to deliver the packet. The
+call to net_inject() returns once the setup has been completed, and not after the packet has been processed. The
+packet processing is completed on a different thread and in a different context to that of the original packet. Thus, a
+packet queued up using net_inject() for either NI_QUEUE_IN or NI_QUEUE_OUT is presented to the packet
+event again. A packet received by a hook from NH_PHYSICAL_IN and then queued up with NI_QUEUE_IN is
+seen by the hook as another NH_PHYSICAL_IN packet. This also applies to both NH_PHYSICAL_OUT and
+NI_QUEUE_OUT packets.
+If NI_DIRECT_OUT is specified, an attempt is made to send the packet out to a network interface immediately. No
+processing on the packet, aside from prepending any required layer 2 information, is made. In this instance, pack<hy>
+et->ni_addr may be used to specify the next hop (for the purpose of link layer address resolution) and pack<hy>
+et->ni_physical determines which interface the packet should be sent out.
+For all three packets, packet->ni_packet must point to an mblk structure with the packet to be delivered.
+See net_inject_t(9S) for more details on the structure net_inject_t.
+The net_inject() function returns:
+-1 The network protocol does not support this function.
+0 The packet is successfully queued or sent.
+1 The packet could not be queued up or sent out immediately.
+The net_inject() function may be called from user, kernel, or interrupt context.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu _ Interface StabilityCommitted
+<beginning of page>
+net_protocol_lookup(9F), netinfo(9F), net_inject_t(9S)

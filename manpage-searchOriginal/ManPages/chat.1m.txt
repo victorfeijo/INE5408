@@ -1,0 +1,232 @@
+<beginning of page>
+chat <-> automated conversational exchange tool
+chat [options] script
+The chat program implements a conversational text-based exchange between the computer and any serial device, in<hy>
+cluding (but not limited to) a modem, an ISDN TA, and the remote peer itself, establishing a connection between the
+Point-To-Point Protocol daemon (pppd) and the remote pppd process.
+The chat command supports the following options:
+-f <chat file> Read the chat script from the chat file. This option is mutually exclusive with the chat script param<hy>
+eters. You must have read access to use the file. Multiple lines are permitted in the file. Use the space or horizontal
+tab characters to separate the strings.
+-t <timeout> Set the timeout for the expected string to be received. If the string is not received within the time limit,
+the reply string is not sent. If specified, a 'subexpect' (alternate reply) string can be sent. Otherwise, if no alternate
+reply strings remain, the chat script fails.. A failed script will cause the chat program to terminate with a non-zero
+error code.
+-r <report file> Set the file for output of the report strings. If you use the keyword REPORT, the resulting strings
+are written to this file. If the -r option is not used and you use the REPORT keyword, the stderr file is used for the
+report strings.
+-e Start with the echo option turned on. You turn echo on or off at specific points in the chat script using the ECHO
+keyword. When echoing is enabled, all output from the modem is echoed to stderr.
+-E Enables environment variable substitution within chat scripts using the standard $xxx syntax.
+-v Request that the chat script execute in a verbose mode. The chat program logs the execution state of the chat
+script as well as all text received from the modem and output strings sent to the modem. The default is to log through
+syslog(3C) with facility local2; the logging method is alterable using the -S and -s options.
+-V Request that the chat script be executed in a stderr verbose mode. The chat program logs all text received from
+the modem and output strings sent to the modem to stderr. stderr is usually the local console at the station running
+the chat or pppd program.
+-s Use stderr. Log messages from -v and error messages are sent to stderr.
+-S Do not use syslog. By default, error messages are set to syslog. This option prevents log messages from -v and
+error messages from being sent to syslog.
+-T <phone number> Pass in an arbitrary string (usually a telephone number) that will be substituted for the \T sub<hy>
+stitution metacharacter in a send string.
+-U <phone number 2> Pass in a second string (usually a telephone number) that will be substituted for the \U substi<hy>
+tution metacharacter in a send string. This is useful when dialing an ISDN terminal adapter that requires two num<hy>
+bers.
+script If the script is not specified in a file with the -f option, the script is included as parameters to the chat pro<hy>
+gram.
+The chat script defines communications. A script consists of one or more "expect-send" pairs of strings separated by
+spaces, with an optional "subexpect-subsend" string pair, separated by a dash (as in the following example:)
+<beginning of page>
+ogin:-BREAK-ogin: ppp ssword: hello2u2
+The example indicates that the chat program should expect the string "ogin:". If it fails to receive a login prompt
+within the time interval allotted, it sends a break sequence to the remote and then expects the string "ogin:". If the
+first "ogin:" is received, the break sequence is not generated.
+Upon receiving the login prompt, the chat program sends the string "ppp" and then expects the prompt "ssword:".
+When the password prompt is received, it sends the password hello2u2.
+A carriage return is normally sent following the reply string. It is not expected in the "expect" string unless it is
+specifically requested by using the \r character sequence.
+The expect sequence should contain only what is needed to identify the received data. Because it's stored on a disk
+file, it should not contain variable information. Generally it is not acceptable to look for time strings, network identi<hy>
+fication strings, or other variable pieces of data as an expect string.
+To correct for characters that are corrupted during the initial sequence, look for the string "ogin:" rather than "lo<hy>
+gin:". The leading "l" character may be received in error, creating problems in finding the string. For this reason,
+scripts look for "ogin:" rather than "login:" and "ssword:" rather than "password:".
+An example of a simple script follows:
+ ogin: ppp ssword: hello2u2
+The example can be intrepreted as: expect ogin:, send ppp, expect ...ssword:, send hello2u2.
+When login to a remote peer is necessary, simple scripts are rare. At minimum, you should include sub-expect se<hy>
+quences in case the original string is not received. For example, consider the following script:
+ ogin:--ogin: ppp ssword: hello2u2
+This script is more effective than the simple one used earlier. The string looks for the same login prompt; however, if
+one is not received, a single return sequence is sent and then the script looks for login: again. If line noise obscures
+the first login prompt, send the empty line to generate a login prompt again.
+Comments can be embedded in the chat script. Comment lines are ignored by the chat program. A comment starts
+with the hash ("#") character in column one. If a # character is expected as the first character of the expect sequence,
+quote the expect string. If you want to wait for a prompt that starts with a # character, write something like this:
+ # Now wait for the prompt and send logout string
+ '# ' logout
+If the string to send begins with an at sign ("@"), the remainder of the string is interpreted as the name of the file that
+contains the string. If the last character of the data read is a newline, it is removed. The file can be a named pipe (or
+fifo) instead of a regular file. This enables chat to communicate with another program, for example, a program to
+prompt the user and receive a password typed in.
+Many modems report the status of a call as a string. These status strings are often "CONNECTED" or "NO CARRI<hy>
+ER" or "BUSY." If the modem fails to connect to the remote, you can terminate the script. Abort strings may be
+specified in the script using the ABORT sequence. For example:
+ ABORT BUSY ABORT 'NO CARRIER' '' ATZ OK ATDT5551212 CONNECT
+This sequence expects nothing and sends the string ATZ. The expected response is the string OK. When OK is re<hy>
+ceived, the string ATDT5551212 dials the telephone. The expected string is CONNECT. If CONNECT is received,
+the remainder of the script is executed. When the modem finds a busy telephone, it sends the string BUSY, causing
+the string to match the abort character sequence. The script fails because it found a match to the abort string. If the
+NO CARRIER string is received, it aborts for the same reason.
+The CLR_ABORT sequence clears previously set ABORT strings. ABORT strings are kept in an array of a pre-de<hy>
+termined size; CLR_ABORT reclaims the space for cleared entries, enabling new strings to use that space.
+<beginning of page>
+The SAY string enables the script to send strings to a user at a terminal via standard error. If chat is being run by pp<hy>
+pd and pppd is running as a daemon (detached from its controlling terminal), standard error is normally redirected
+to the /etc/ppp/connect-errors file.
+SAY strings must be enclosed in single or double quotes. If carriage return and line feed are required for the output,
+you must explicitly add them to your string.
+The SAY string can provide progress messages to users even with "ECHO OFF." For example, add a line similar to
+the following to the script:
+ ABORT BUSY
+ ECHO OFF
+ SAY "Dialing your ISP...\n"
+ '' ATDT5551212
+ TIMEOUT 120
+ SAY "Waiting up to 2 minutes for connection ..."
+ CONNECT ''
+ SAY "Connected, now logging in ...\n"
+ ogin: account
+ ssword: pass
+ $ \c
+ SAY "Logged in OK ... \n"
+This sequence hides script detail while presenting the SAY string to the user. In this case, you will see:
+ Dialing your ISP...
+ Waiting up to 2 minutes for connection...Connected, now logging in...
+ Logged in OK ...
+REPORT is similar to the ABORT string. With REPORT, however, strings and all characters to the next control
+character (such as a carriage return), are written to the report file.
+REPORT strings can be used to isolate a modem's transmission rate from its CONNECT string and return the value
+to the chat user. Analysis of the REPORT string logic occurs in conjunction with other string processing, such as
+looking for the expect string. It's possible to use the same string for a REPORT and ABORT sequence, but probably
+not useful.
+Report strings may be specified in the script using the REPORT sequence. For example:
+ REPORT CONNECT
+ ABORT BUSY
+ ATDT5551212 CONNECT
+ ogin: account
+The above sequence expects nothing, then sends the string ATDT5551212 to dial the telephone. The expected string
+is CONNECT. If CONNECT is received, the remainder of the script is executed. In addition, the program writes the
+string CONNECT to the report file (specified by -r) in addition to any characters that follow.
+CLR_REPORT clears previously set REPORT strings. REPORT strings are kept in an array of a pre-determined
+size; CLR_REPORT reclaims the space for cleared entries so that new strings can use that space.
+ECHO determines if modem output is echoed to stderr. This option may be set with the -e option, but can also be
+controlled by the ECHO keyword. The "expect-send" pair ECHO ON enables echoing, and ECHO OFF disables it.
+With ECHO, you can select which parts of the conversation should be visible. In the following script:
+ ABORT 'BUSY'
+ ABORT 'NO CARRIER'
+ "" AT&F
+ OK\r\n ATD1234567
+ \r\n \c
+ ECHO ON
+ CONNECT \c
+ ogin: account
+<beginning of page>
+All output resulting from modem configuration and dialing is not visible, but output is echoed beginning with the
+CONNECT (or BUSY) message.
+The HANGUP option determines if a modem hangup is considered as an error. HANGUP is useful for dialing sys<hy>
+tems that hang up and call your system back. HANGUP can be ON or OFF. When HANGUP is set to OFF and the
+modem hangs up (for example, following the first stage of logging in to a callback system), chat continues running
+the script (for example, waiting for the incoming call and second stage login prompt). When the incoming call is
+connected, use the HANGUP ON string to reinstall normal hang up signal behavior. An example of a simple script
+follows:
+ ABORT 'BUSY'
+  "" AT&F
+  OK\r\n ATD1234567
+  \r\n \c
+  CONNECT \c
+  'Callback login:' call_back_ID
+  HANGUP OFF
+  ABORT "Bad Login"
+  'Callback Password:' Call_back_password
+  TIMEOUT 120
+  CONNECT \c
+  HANGUP ON
+  ABORT "NO CARRIER"
+  ogin:--BREAK--ogin: real_account
+The initial timeout value is 45 seconds. Use the -t parameter to change the intial timeout value.
+To change the timeout value for the next expect string, the following example can be used:
+ ''"AT&F
+  OK ATDT5551212
+  CONNECT \c
+  TIMEOUT 10
+  ogin:--ogin: username
+  TIMEOUT 5
+  assword: hello2u2
+The example changes the timeout to ten seconds when it expects the login: prompt. The timeout is changed to five
+seconds when it looks for the password prompt.
+Once changed, the timeout value remains in effect until it is changed again.
+The EOT special reply string instructs the chat program to send an EOT character to the remote. This is equivalent
+to using ^D\c as the reply string. The EOT string normally indicates the end-of-file character sequence. A return
+character is not sent following the EOT. The EOT sequence can embedded into the send string using the sequence
+^D.
+The BREAK special reply string sends a break condition. The break is a special transmitter signal. Many UNIX sys<hy>
+tems handle break by cycling through available bit rates, and sending break is often needed when the remote system
+does not support autobaud. BREAK is equivalent to  using \K\c as the reply string. You embed the break sequence
+into the send string using the \K sequence.
+Expect and reply strings can contain escape sequences. Reply strings accept all escape sequences, while expect
+strings accept most sequences. A list of escape sequences is presented below. Sequences that are not accepted by ex<hy>
+pect strings are indicated.
+'' Expects or sends a null string. If you send a null string, chat  sends the return character. If you expect a null
+string, chat proceeds to the reply string without waiting. This sequence can be a pair of apostrophes or quote mark
+characters.
+<beginning of page>
+\b Represents a backspace character.
+\c Suppresses the newline at the end of the reply string. This is the only method to send a string without a trailing re<hy>
+turn character. This sequence must be at the end of the send string. For example, the sequence hello\c will simply
+send the characters h, e, l, l, o. (Not valid in expect.)
+\d Delay for one second. The program uses sleep(1) which delays to a maximum of one second. (Not valid in ex<hy>
+pect.)
+\K Insert a BREAK. (Not valid in expect.)
+\n Send a newline or linefeed character.
+\N Send a null character. The same sequence may be represented by \0. (Not valid in expect.)
+\p Pause for 1/10th of a second. (Not valid in expect.)
+\q Suppress writing the string to syslog. The string ?????? is written to the log in its place. (Not valid in expect.)
+\r Send or expect a carriage return.
+\s Represents a space character in the string. Can be used when it is not desirable to quote the strings which contains
+spaces. The sequence 'HI TIM' and HI\sTIM are the same.
+\t Send or expect a tab character.
+\T Send the phone number string as specified with the -T option. (Not valid in expect.)
+\U Send the phone number 2 string as specified with the -U option. (Not valid in expect.)
+\\ Send or expect a backslash character.
+\ddd Collapse the octal digits (ddd) into a single ASCII character and send that character. (\000 is not valid in an ex<hy>
+pect string.)
+^C Substitute the sequence with the control character represented by C. For example, the character DC1 (17) is
+shown as ^Q. (Some characters are not valid in expect.)
+Environment variables are available within chat scripts if the -E option is specified on the command line. The
+metacharacter $ introduces the name of the environment variable to substitute. If the substition fails because the re<hy>
+quested environment variable is not set, nothing is replaced for the variable.
+The chat program terminates with the following completion codes:
+0 Normal program termination. Indicates that the script was executed without error to normal conclusion.
+1 One or more of the parameters are invalid or an expect string was too large for the internal buffers. Indicates that
+the program was not properly executed.
+<beginning of page>
+2 An error occurred during the execution of the program. This may be due to a read or write operation failing or
+chat receiving a signal such as SIGINT.
+3 A timeout event occurred when there was an expect string without having a "-subsend" string. This indicates that
+you may not have programmed the script correctly for the condition or that an unexpected event occurred and the ex<hy>
+pected string could not be found.
+4 The first string marked as an ABORT condition occurred.
+5 The second string marked as an ABORT condition occurred.
+6 The third string marked as an ABORT condition occurred.
+7 The fourth string marked as an ABORT condition occurred.
+... The other termination codes are also strings marked as an ABORT condition.
+To determine which event terminated the script, use the termination code. It is possible to decide if the string
+"BUSY" was received from the modem versus "NO DIALTONE." While the first event may be retried, the second
+probably will not succeed during a retry.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUNW<hy>
+pppdu _ Interface StabilityEvolving
+sleep(1), uucp(1C), pppd(1M), uucico(1M), syslog(3C), attributes(5)
+Additional information on chat scripts are available with UUCP documentation. The chat script format was taken
+from scripts used by the uucico program.

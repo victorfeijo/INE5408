@@ -1,0 +1,83 @@
+<beginning of page>
+exec_attr <-> execution profiles database
+/etc/security/exec_attr
+/etc/security/exec_attr is a local database that specifies the execution attributes associated with profiles. The ex<hy>
+ec_attr file can be used with other sources for execution profiles, including the exec_attr NIS map and NIS+ table.
+Programs use the getexecattr(3SECDB) routines to access this information.
+The search order for multiple execution profile sources is specified in the /etc/nsswitch.conf file, as described in the
+nsswitch.conf(4) man page. The search order follows the entry for prof_attr(4).
+A profile is a logical grouping of authorizations and commands that is interpreted by a profile shell to form a secure
+execution environment. The shells that interpret profiles are pfcsh, pfksh, and pfsh. See the pfsh(1) man page. Each
+user's account is assigned zero or more profiles in the user_attr(4) database file.
+Each entry in the exec_attr database consists of one line of text containing seven fields separated by colons (:). Line
+continuations using the backslash (\fR) character are permitted. The basic format of each entry is:
+name:policy:type:res1:res2:id:attr
+name The name of the profile. Profile names are case-sensitive.
+policy The security policy that is associated with the profile entry. The valid policies are suser (standard Solaris su<hy>
+peruser) and solaris. The solaris policy recognizes privileges (see privileges(5)); the suser policy does not.
+The solaris and suser policies can coexist in the same exec_attr database, so that Solaris releases prior to the cur<hy>
+rent release can use the suser policy and the current Solaris release can use a solaris policy. solaris is a superset of
+suser; it allows you to specify privileges in addition to UIDs. Policies that are specific to the current release of So<hy>
+laris or that contain privileges should use solaris. Policies that use UIDs only or that are not specific to the current
+Solaris release should use suser.
+type The type of object defined in the profile. There are two valid types: cmd and act. The cmd type specifies that
+the ID field is a command that would be executed by a shell. The act type is available only if the system is config<hy>
+ured with Trusted Extensions. It specifies that the ID field is a CDE action that should be executed by the Trusted
+Extensions CDE action mechanism.
+res1 Reserved for future use.
+res2 Reserved for future use.
+id A string that uniquely identifies the object described by the profile. For a profile of type cmd, the id is either the
+full path to the command or the asterisk (*) symbol, which is used to allow all commands. An asterisk that replaces
+the filename component in a pathname indicates all files in a particular directory.
+To specify arguments, the pathname should point to a shell script that is written to execute the command with the de<hy>
+sired argument. In a Bourne shell, the effective UID is reset to the real UID of the process when the effective UID is
+less than 100 and not equal to the real UID. Depending on the euid and egid values, Bourne shell limitations might
+make other shells preferable. To prevent the effective UIDs from being reset to real UIDs, you can start the script
+with the -p option.
+ #!/bin/sh -p
+If the Trusted Extensions feature is configured and the profile entry type is act, the id is either the fully qualified
+name of a CDE action, or an asterisk (*) representing a wildcard. A fully qualified CDE action is specified using the
+action name and four additional semicolon-separated fields. These fields can be empty but the semicolons are re<hy>
+quired. The fields in a CDE action are as follows:
+argclass Specifies the argument class (for example, FILE or SESSION.) Corresponds to ARG_CLASS for CDE
+actions.
+<beginning of page>
+argtype Specifies the data type for the argument. Corresponds to ARG_TYPE for CDE actions.
+argmode Specifies the read or write mode for the argument. Corresponds to ARG_MODE for CDE actions.
+argcount Specifies the number of arguments that the action can accept. Corresponds to ARG_COUNT for CDE ac<hy>
+tions.
+attr An optional list of semicolon-separated (;) key-value pairs that describe the security attributes to apply to the
+object upon execution. Zero or more keys may be specified. The list of valid key words depends on the policy en<hy>
+forced. The following key words are valid: euid, uid, egid, gid, privs, and limitprivs.
+euid and uid contain a single user name or a numeric user ID. Commands designated with euid run with the effec<hy>
+tive UID indicated, which is similar to setting the setuid bit on an executable file. Commands designated with uid
+run with both the real and effective UIDs. Setting uid may be more appropriate than setting the euid on privileged
+shell scripts.
+egid and gid contain a single group name or a numeric group ID. Commands designated with egid run with the ef<hy>
+fective GID indicated, which is similar to setting the setgid bit on a file. Commands designated with gid run with
+both the real and effective GIDs. Setting gid may be more appropriate than setting guid on privileged shell scripts.
+privs contains a privilege set which will be added to the inheritable set prior to running the command.
+limitprivs contains a privilege set which will be assigned to the limit set prior to running the command.
+privs and limitprivs are only valid for the solaris policy.
+Example 1 Using Effective User ID
+The following example shows the audit command specified in the Audit Control profile to execute with an effective
+user ID of root (0):
+ Audit Control:suser:cmd:::/usr/sbin/audit:euid=0
+/etc/nsswitch.conf
+/etc/user_attr
+/etc/security/exec_attr
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailibilitySUN<hy>
+Wcsr _ Interface StabilitySee below.
+The command-line syntax is Committed. The output is Uncommitted.
+When deciding which authorization source to use (see DESCRIPTION), keep in mind that NIS+ provides stronger
+authentication than NIS.
+Because the list of legal keys is likely to expand, any code that parses this database must be written to ignore un<hy>
+known key-value pairs without error. When any new keywords are created, the names should be prefixed with a
+unique string, such as the company's stock symbol, to avoid potential naming conflicts.
+The following characters are used in describing the database format and must be escaped with a backslash if used as
+data: colon (:), semicolon (;), equals (=), and backslash (\fR).
+<beginning of page>
+auths(1), dtaction(1), profiles(1), roles(1), sh(1), makedbm(1M), getauthattr(3SECDB), getauusernam(3BSM),
+getexecattr(3SECDB), getprofattr(3SECDB), getuserattr(3SECDB), kva_match(3SECDB), auth_attr(4),
+prof_attr(4), user_attr(4), attributes(5), privileges(5)

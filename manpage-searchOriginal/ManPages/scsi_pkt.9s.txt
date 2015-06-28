@@ -1,0 +1,136 @@
+<beginning of page>
+scsi_pkt <-> SCSI packet structure
+#include <sys/scsi/scsi.h>
+Solaris DDI specific (Solaris DDI).
+A scsi_pkt structure defines the packet that is allocated by scsi_init_pkt(9F). The target driver fills in some informa<hy>
+tion and passes it to scsi_transport(9F) for execution on the target. The host bus adapter (HBA) fills in other infor<hy>
+mation as the command is processed. When the command completes or can be taken no further, the completion
+function specified in the packet is called with a pointer to the packet as its argument. From fields within the packet,
+the target driver can determine the success or failure of the command.
+ opaque_t pkt_ha_private; /* private data for
+  host adapter */
+ struct scsi_address pkt_address; /* destination packet */
+ opaque_t pkt_private; /* private data
+  for target driver */
+ void (*pkt_comp)(struct scsi_pkt *); /* callback */
+ uint_t pkt_flags; /* flags */
+ int pkt_time; /* time allotted to
+  complete command */
+ uchar_t *pkt_scbp; /* pointer to
+  status block */
+ uchar_t *pkt_cdbp; /* pointer to
+  command block */
+ ssize_t pkt_resid; /* number of bytes
+  not transferred */
+ uint_t pkt_state; /* state of command */
+ uint_t pkt_statistics; /* statistics */
+ uchar_t pkt_reason; /* reason completion
+  called */
+ uint_t pkt_cdblen; /* length of pkt_cdbp */
+ uint_t pkt_scdblen; /* length of pkt_scbp */
+ uint_t pkt_tgtlen; /* length of pkt_private */
+ uint_t pkt_numcookies; /* number of DMA cookies */
+ ddi_dma_cookie_t *pkt_cookies; /* array of DMA cookies */
+ uint_t pkt_dma_flags; /* DMA flags */
+pkt_ha_private Opaque pointer that the HBA uses to reference a private data structure that transfers scsi_pkt re<hy>
+quests.
+pkt_address Initialized by scsi_init_pkt(9F), pkt_address records the intended route and the recipient of a request.
+pkt_private Reserved for the use of the target driver, pkt_private is not changed by the HBA driver.
+pkt_comp Specifies the command completion callback routine. When the host adapter driver has gone as far as it
+can in transporting a command to a SCSI target, and the command has either run to completion or can go no further
+for some other reason, the host adapter driver calls the function pointed to by this field and passes a pointer to the
+packet as argument. The callback routine itself is called from interrupt context and must not sleep or call any func<hy>
+tion that might sleep.
+pkt_flags Provides additional information about how the target driver expects the command to be executed. See
+pkt_flag Definitions.
+pkt_time Set by the target driver to represent the maximum time allowed in seconds for this command to complete.
+Timeout starts when the command is transmitted on the SCSI bus. The pkt_time may be 0 if no timeout is required.
+pkt_scbp Points to either a struct scsi_status(9S) or, if auto-rqsense is enabled and pkt_state includes
+STATE_ARQ_DONE, a struct scsi_arq_status. If scsi_status is returned, the SCSI status byte resulting from the
+<beginning of page>
+requested command is available. If scsi_arq_status(9S) is returned, the sense information is also available.
+pkt_cdbp Points to a kernel-addressable buffer with a length specified by a call to the proper resource allocation
+routine, scsi_init_pkt(9F).
+pkt_resid Contains a residual count, either the number of data bytes that have not been transferred (scsi_trans<hy>
+port(9F)) or the number of data bytes for which DMA resources could not be allocated scsi_init_pkt(9F). In the lat<hy>
+ter case, partial DMA resources can be allocated only if scsi_init_pkt(9F) is called with the PKT_DMA_PARTIAL
+flag.
+pkt_state Has bit positions that represent the six most important states that a SCSI command can go through. See
+pkt_state Definitions.
+pkt_statistics Maintains some transport-related statistics. See pkt_statistics Definitions.
+pkt_reason Contains a completion code that indicates why the pkt_comp function was called. See pkt_reason Def<hy>
+initions.
+pkt_cdblen Length of buffer pointed to by pkt_cdbp. See tran_setup_pkt.
+pkt_scblen Length of buffer pointed to by pkt_scbp. See tran_setup_pkt.
+pkt_tgtlen Length of buffer pointed to by pkt_private. See tran_setup_pkt.
+pkt_numcookies Length pkt_cookies array. See tran_setup_pkt.
+pkt_cookies Array of DMA cookies. See tran_setup_pkt.
+pkt_dma_flags DMA flags used, such as DDI_DMA_READ and DDI_DMA_WRITE. See tran_setup_pkt.
+The host adapter driver will update the pkt_resid, pkt_reason, pkt_state, and pkt_statistics fields.
+The appropriate definitions for the structure member pkt_flags are:
+FLAG_NOINTR Run command with no command completion callback. Command is complete upon return from
+scsi_transport(9F).
+FLAG_NODISCON Run command without disconnects.
+FLAG_NOPARITY Run command without parity checking.
+FLAG_HTAG Run command as the head-of-queue-tagged command.
+FLAG_OTAG Run command as an ordered-queue-tagged command.
+FLAG_STAG Run command as a simple-queue-tagged command.
+<beginning of page>
+FLAG_SENSING Indicates a request sense command.
+FLAG_HEAD Place command at the head of the queue.
+FLAG_RENEGOTIATE_WIDE_SYNC Before transporting this command, the host adapter should initiate the
+renegotiation of wide mode and synchronous transfer speed. Normally, the HBA driver manages negotiations but un<hy>
+der certain conditions forcing a renegotiation is appropriate. Renegotiation is recommended before Request Sense
+and Inquiry commands. Refer to the SCSI 2 standard, sections 6.6.21 and 6.6.23.
+This flag should not be set for every packet as this will severely impact performance.
+The appropriate definitions for the structure member pkt_reason are:
+CMD_CMPLT No transport errors; normal completion.
+CMD_INCOMPLETE Transport stopped with abnormal state.
+CMD_DMA_DERR DMAd irection error.
+CMD_TRAN_ERR Unspecified transport error.
+CMD_RESET SCSI bus reset destroyed command.
+CMD_ABORTED Command transport aborted on request.
+CMD_TIMEOUT Command timed out.
+CMD_DATA_OVR Data overrun.
+CMD_CMD_OVR Command overrun.
+CMD_STS_OVR Status overrun.
+CMD_BADMSG Message not command complete.
+CMD_NOMSGOUT Target refused to go to message out phase.
+CMD_XID_FAIL Extended identify message rejected.
+CMD_IDE_FAIL "Initiator Detected Error" message rejected.
+CMD_ABORT_FAIL Abort message rejected.
+CMD_REJECT_FAIL Reject message rejected.
+CMD_NOP_FAIL "No Operation" message rejected.
+<beginning of page>
+CMD_PER_FAIL "Message Parity Error" message rejected.
+CMD_BDR_FAIL "Bus Device Reset" message rejected.
+CMD_ID_FAIL Identify message rejected.
+CMD_UNX_BUS_FREE Unexpected bus free phase.
+CMD_TAG_REJECT Target rejected the tag message.
+CMD_DEV_GONE The device has been removed.
+The appropriate definitions for the structure member pkt_state are:
+STATE_GOT_BUS Bus arbitration succeeded.
+STATE_GOT_TARGET Target successfully selected.
+STATE_SENT_CMD Command successfully sent.
+STATE_XFERRED_DATA Data transfer took place.
+STATE_GOT_STATUS Status received.
+STATE_ARQ_DONE The command resulted in a check condition and the host adapter driver executed an automat<hy>
+ic request sense command.
+STATE_XARQ_DONE The command requested in extra sense data using a PKT_XARQ flag got a check condi<hy>
+tion. The host adapter driver was able to successfully request and return this. The scsi_pkt.pkt_scbp->sts_rqp<hy>
+kt_resid returns the sense data residual based on the statuslen parameter of the scsi_init_pkt(9F) call. The sense da<hy>
+ta begins at scsi_pkt.pkt_scbp->sts_sensedata.
+The definitions that are appropriate for the structure member pkt_statistics are:
+STAT_DISCON Device disconnect.
+STAT_SYNC Command did a synchronous data transfer.
+STAT_PERR SCSI parity error.
+STAT_BUS_RESET Bus reset.
+STAT_DEV_RESET Device reset.
+STAT_ABORTED Command was aborted.
+<beginning of page>
+STAT_TIMEOUT Command timed out.
+tran_init_pkt(9E), tran_setup_pkt(9E), scsi_arq_status(9S), scsi_init_pkt(9F), scsi_transport(9F), scsi_sta<hy>
+tus(9S), scsi_hba_pkt_comp(9F)
+Writing Device Drivers
+HBA drivers should signal scsi_pkt completion by calling scsi_hba_pkt_comp(9F). This is mandatory for HBA
+drivers that implement tran_setup_pkt(9E). Failure to comply results in undefined behavior.

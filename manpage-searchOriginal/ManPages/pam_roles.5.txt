@@ -1,0 +1,54 @@
+<beginning of page>
+pam_roles <-> Solaris Roles account management module
+pam_roles.so.1
+The pam_roles module implements pam_sm_acct_mgmt(3PAM). It provides functionality to verify that a user is
+authorized to assume a role. It also prevents direct logins to a role. The user_attr(4) database is used to determine
+which users can assume which roles.
+The PAM items PAM_USER and PAM_AUSER, and PAM_RHOST are used to determine the outcome of this
+module. PAM_USER represents the new identity being verified. PAM_AUSER, if set, represents the user asserting
+a new identity. If PAM_AUSER is not set, the real user ID of the calling service implies that the user is asserting a
+new identity. Notice that root can never have roles.
+This module is generally stacked above the pam_unix_account(5) module.
+The following options are interpreted:
+allow_remote Allows a remote service to specify the user to enter as a role.
+debug Provides syslog(3C) debugging information at the LOG_DEBUG level.
+The following values are returned:
+PAM_IGNORE If the type of the new user identity (PAM_USER) is "normal". Or, if the type of the new user
+identity is "role" and the user asserting the new identity (PAM_AUSER) has the new identity name in its list of
+roles.
+PAM_USER_UNKNOWN No account is present for user.
+PAM_PERM_DENIED If the type of the new user identity (PAM_USER) is "role" and the user asserting the new
+identity (PAM_AUSER) does not have the new identity name in its list of roles.
+Example 1 Using the pam_roles.so.1 Module
+The following are sample entries from pam.conf(4). These entries demonstrate the use of the pam_roles.so.1 mod<hy>
+ule:
+ cron account required pam_unix_account.so.1
+ #
+ other account requisite pam_roles.so.1
+ other account required pam_unix_account.so.1
+ #
+The cron service does not invoke pam_roles.so.1. Delayed jobs are independent of role assumption. All other ser<hy>
+vices verify that roles cannot directly login. The "su" service (covered by the "other" service entry) verifies that if
+the new user is a role, the calling user is authorized for that role.
+Example 2 Allowing Remote Roles
+Remote roles should only be allowed from remote services that can be trusted to provide an accurate PAM_AUSER<hy>
+name. This trust is a function of the protocol (such as sshd-hostbased).
+The following is a sample entry for a pam.conf(4) file. It demonstrates the use of pam_roles configuration for re<hy>
+mote roles for the sshd-hostbased service.
+ sshd-hostbased account requisite pam_roles.so.1 allow_remote
+ sshd-hostbased account required pam_unix_account
+<beginning of page>
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stabili<hy>
+tyEvolving _ MT LevelMT-Safe with exceptions
+roles(1), sshd(1M), su(1M), libpam(3LIB), pam(3PAM), pam_acct_mgmt(3PAM), pam_setcred(3PAM),
+pam_set_item(3PAM), pam_sm_acct_mgmt(3PAM), syslog(3C), pam.conf(4), user_attr(4), attributes(5),
+pam_authtok_check(5), pam_authtok_get(5), pam_authtok_store(5), pam_dhkeys(5), pam_passwd_auth(5),
+pam_unix_account(5), pam_unix_auth(5), pam_unix_session(5)
+The interfaces in libpam(3LIB) are MT-Safe only if each thread within the multi-threaded application uses its own
+PAM handle.
+This module should never be stacked alone. It never returns PAM_SUCCESS, as it never makes a positive decision.
+The allow_remote option should only be specified for services that are trusted to correctly identify the remote user
+(that is, sshd-hostbased).
+PAM_AUSER has replaced PAM_RUSER whose definition is limited to the rlogin/rsh untrusted remote user
+name. See pam_set_item(3PAM).

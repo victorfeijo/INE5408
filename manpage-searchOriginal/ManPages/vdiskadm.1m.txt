@@ -1,0 +1,277 @@
+<beginning of page>
+vdiskadm <-> create and manage virtual disks
+vdiskadm create -s size [-t type[:opt],[opt]
+ [-c comment] vdname
+vdiskadm destroy [-r] vdname|snapshot
+vdiskadm snapshot vdname@snapname
+vdiskadm rollback [-r] snapshot
+vdiskadm clone [-c comment] vdname|snapshot clone_vdname
+vdiskadm move vdname dir
+vdiskadm rename vdname|snapshot vdname|snapshot
+vdiskadm list [-fp]vdname
+vdiskadm verify vdname
+vdiskadm prop-get [-l] -p property vdname
+vdiskadm prop-set -p property=value vdname
+vdiskadm prop-add -p property=value vdname
+vdiskadm prop-del -p property vdname
+vdiskadm import [-fnpqm] [-x type] -d file|zvol|dsk
+ [-t type[:opt]] vdname
+vdiskadm export -x type[:opt] -d file|zvol|dsk vdname
+vdiskadm convert [-t type[:opt]] vdname
+vdiskadm translate [-i type[:opt]] -I input_file -x type[:opt]
+ -d output_file
+vdiskadm help [command]
+The vdiskadm command manages virtual disks within dom0. In the SYNOPSIS above, vdname is the pathname of
+the virtual disk; it has a maximum length of MAXPATHLEN (1024 bytes).
+vdiskadm is implemented as a set of subcommands, many with their own options and operands. These subcom<hy>
+mands are described under "Subcommands," below.
+The following subsections describe concepts related to virtual disks.
+A snapshot is a read-only copy of a virtual disk. Snapshots can be created extremely quickly and initially consume
+little space. As data within the active virtual disk changes, the snapshot consumes more data than would otherwise
+be shared with the active virtual disk.
+A clone is a writable copy of a virtual disk. The default type of clone is a merged (that is, coalesced) copy of the
+original virtual disk. An example of a merged clone occurs when a virtual disk is comprised of several snapshots; a
+subsequent clone operation results in a new virtual disk containing no snapshots. A clone will be of the same type as
+the original virtual disk (that is, vmdk:fixed). When a merged clone is created there is no linkage back to the origi<hy>
+nal virtual disk or to any of its snapshots. This lack of linkage allows the merged clone to be moved to another phys<hy>
+ical machine.
+The values of numeric properties can be specified using human-readable suffixes, such as k, KB, M, Gb, and so
+forth, up to Z for zettabyte). The following are all valid (and equal) specifications:
+ 1536M 1.5g 1.50GB
+<beginning of page>
+The following types and options of virtual disks are supported: <bu> vmdk:fixed <bu> vmdk:sparse <bu> vdi:fixed <bu>
+vdi:sparse <bu> vhd:fixed <bu> vhd:sparse <bu> raw:fixed
+where vmdk is the native VMware format, vdi is the native VirtualBox format, vhd is the native Microsoft format,
+and raw describes a file that looks like a raw disk. A raw disk is always in fixed format so that option can be explic<hy>
+itly set or implicitly understood.
+If the type is not specified, the default value is vmdk. If the option is not specified, the default value is fixed for type
+raw and sparse for types vmdk, vdi, and vhd.
+Properties are divided into two types, native and user defined. Native properties either export internal statistics or
+control vdiskadm behavior. In addition, native properties are either editable or read-only. User-defined properties
+are arbitrary strings that have no effect on vdiskadm behavior. You can use them to annotate virtual disks in a way
+that is meaningful in your environment. User-defined property names must contain a colon (:) character, to distin<hy>
+guish them from native properties.
+Properties are associated only with the virtual disk and not with individual snapshots.
+Every virtual disk has a set of native properties that export statistics about the virtual disk, as well as control various
+behaviors.
+The following are the native properties for a virtual disk:
+cdrom
+Boolean property that is true if the virtual disk is a CDROM.
+removable
+Boolean property that is true if the virtual disk is a removable media.
+readonly
+Boolean property that is true if the virtual disk is read-only. This property is read-only.
+sectors
+Numeric property containing the number of disk sectors in the given virtual disk. This property is read-only.
+name
+String property that is the name of the virtual disk. This property is read-only.
+max-size
+Numeric property containing the maximum size of the virtual disk in bytes. This property is read-only.
+effective-size
+Numeric property containing the effective size of the virtual disk, in bytes. The effective size includes the size of the
+data file and all snapshots. The effective size can exceed the maximum size. This property is read-only.
+creation-time
+String property containing the date and time that the virtual disk was created. This property is read-only.
+creation-time-epoch
+Numeric property describing the creation-time property in seconds since the epoch (seconds since 00:00:00 UTC,
+Jan. 1, 1970). This property is read-only.
+<beginning of page>
+modification-time
+String property containing the date and time of last modification to virtual disk. This property is read-only.
+modification-time-epoch
+Numeric property describing the modification-time property in seconds since the epoch (seconds since 00:00:00
+UTC, Jan. 1, 1970). This property is read-only.
+description
+String property that contains the comment given when the virtual disk was created or cloned. This property is read-
+only.
+type
+String property that contains the type of virtual disk: vmdk, vhd, vdi, or raw. This property is read-only.
+sparse
+Boolean property that is true if the virtual disk is in sparse format. This property is read-only.
+owner
+String property that contains the user name of the owner of the virtual disk. This property is editable.
+The vdiskadm subcommands and their arguments are described in the following subsections.
+ vdiskadm create -s size [-t type[:opt],[opt]]
+  [-c comment] vdname
+Creates a new virtual disk of the specified size and at the location specified by vdname. If vdname includes a path to
+the virtual disk, the directories that follow from that path will be created during creation of the virtual disk. This sub<hy>
+command has the options listed below.
+-t type[:opt],[opt]]
+Specifies the type of virtual disk to be created. The default type is vmdk. For vmdk and vdi types the default option
+is sparse. For type raw the default option is fixed.
+-c comment
+Comment that can be attached to virtual disk.
+ vdiskadm destroy [-r] vdname|snapshot
+Destroys the specified virtual disk or snapshot. By default, the destroy operation fails if the specified virtual disk
+contains snapshots. This subcommand has the option listed below.
+-r
+Recursively destroys the virtual disk, including all snapshots associated with the virtual disk.
+ vdiskadm snapshot vdname@snapname
+<beginning of page>
+Creates a snapshot of the virtual disk with the specified snapname. This subcommand has no options.
+ vdiskadm rollback [-r] snapshot
+Roll back the virtual disk to a previous snapshot. When a virtual disk is rolled back, all data that has changed since
+the snapshot is discarded, and the virtual disk reverts to the state at the time of the snapshot. By default, the com<hy>
+mand refuses to roll back to a snapshot other than the most recent one. In order to roll back further, all intermediate
+snapshots must be destroyed by specifying the -r option. This subcommand has the option listed below.
+-r
+Recursively destroy any snapshots more recent than the one specified.
+ vdiskadm [-c comment] vdname|snapshot clone_vdname
+Creates a clone of the specified snapshot or virtual disk. The clone is created with the type and option and the size of
+the virtual disk being cloned. If clone_vdname includes a path the directories that flow from that path will be created
+during creation of the cloned virtual disk. By default, a merged clone image is created. This subcommand has the
+option listed below.
+-c comment
+Comment that can be attached to cloned virtual disk.
+ vdiskadm move vdname dir
+Moves a specified virtual disk into the specified directory. The virtual disk maintains the same name. The new direc<hy>
+tory must exist. This subcommand has no options.
+ vdiskadm rename vdname|snapshot vdname|snapshot
+Renames a virtual disk or snapshot. This subcommand has no options.
+ vdiskadm list [-fp]vdname
+Lists a specified virtual disk and its snapshots. This subcommand has the options listed below.
+-f
+Gives a list of all files associated with the virtual disk. This list includes the store file and the extents.
+-p
+Lists the files in an easily parsable format, prefixing the files with a label of file:, snapshot:, or store.
+ vdiskadm verify vdname
+Returns an error if the virtual disk cannot be recognized or opened by Solaris xVM. This subcommand has no op<hy>
+tions.
+ vdiskadm prop-get [-l] -p property vdname
+<beginning of page>
+Returns the value of the property for the specified virtual disk. A property value of all displays all native and user-
+defined properties for the virtual disk. This subcommand has the options listed below.
+-l
+Gives additional property information, such as the writeable status of property.
+-p property
+Specifies the property being queried and displays the value of the property. For the property all, the name of the
+property, a colon, and a space are displayed before the value of the property.
+ vdiskadm prop-set -p property=value vdname
+Sets the value of the specified property for the specified virtual disk. property can be a native or a user-defined prop<hy>
+erty, but must be writable. Can be used to change the value of a property added with the prop-add subcommand.
+This subcommand has the option listed below.
+-p property=value
+Specifies the property being set.
+ vdiskadm -p property=value vdname
+Adds the user-defined property with the specified value to the specified virtual disk. Returns an error if the property
+already exists. The user-defined property name must contain a colon character (:). This subcommand has the option
+listed below.
+-p property=value
+Specifies the property being added.
+ vdiskadm prop-del -p property vdname
+Deletes a user-defined property from the specified virtual disk. This subcommand has the option listed below.
+-p property
+Specifies the property being deleted.
+ vdiskadm import [-fnpqm] [-x type] -d file|zvol|dsk \
+ [-t type[:opt]] vdname
+Creates a new virtual disk using data from a file or block device. The file may be in vdi, vhd, vmdk, or raw format.
+A block device is always assumed to be in raw format. This subcommand has the following options.
+-f
+Returns a list of files that will be used in the import process.
+<beginning of page>
+-n
+Show output from import without actually running the import.
+-p
+Displays files in an easily parsable format.
+-q
+Run in quiet mode giving no output.
+-m
+Move the imported file to virtual disk without copying the data.
+-x type
+Specifies the type of virtual disk data being imported. If vdiskadm is unable to detect the imported file type, -x must
+be specified.
+-d file|zvol|dsk
+File or block device containing data to be imported.
+-t type[:opt]
+Specifies the type of virtual disk to be created on import. The default type is vmdk. For vmdk, vdi, and vhd types
+the default opt is sparse. For type raw the default opt is fixed.
+ vdiskadm export -x type[:opt] -d file|zvol|dsk vdname
+Exports data from a virtual disk to a file or block device. This subcommand has the following options.
+-x type[:opt]
+Specifies the type of virtual disk data being exported.
+-d file|zvol|dsk
+File or block device receiving data being exported.
+ vdiskadm convert [-t type[:opt]] vdname
+Converts a virtual disk into a different type virtual disk. This subcommand has the following option.
+-t type[:opt]
+Specifies the type of virtual disk to be created upon conversion. The default type is vmdk. For vmdk, vdi, and vhd
+types the default opt is sparse. For type raw the default opt is fixed.
+ vdiskadm translate [-i type[:opt]] -I input_file \
+ -x type[:opt] -d output_file
+<beginning of page>
+Translate data from one virtual disk data type to another without creating a virtual disk. This subcommand has the
+following options.
+-i type[:opt]
+Specifies the input type of virtual disk data being translated. If vdiskadm is unable to detect the input file type, -i
+must be specified.
+-I input_file
+File or block device containing data being translated.
+-x type[:opt]
+Specifies the output type of virtual disk data being translated. For vmdk, vdi, and vhd types the default opt is
+sparse. For type raw the default opt is fixed.
+-d output_file
+File or block device receiving data being translated. output_file must not exist. The file will be created during trans<hy>
+lation.
+ vdiskadm help [command]
+Displays a general or command-specific help message. This subcommand has only the command name optional ar<hy>
+gument. Example 1 Creating a vmdk Sparse File
+The following command creates a virtual disk named disk1 of size 8 GB in the directory /guests/disks.
+ # vdiskadm create -s 8g -t vmdk:sparse /guests/disks/disk1
+Example 2 Creating a Snapshot
+The following command creates a snapshot of the virtual disk located at /guests/disks/disk1. The snapshot is named
+install.
+ # vdiskadm snapshot /guests/disks/disk1@install
+Example 3 Creating and Destroying Snapshots
+The following commands create two snapshots, named install and bfu, of the virtual disk located at
+/guests/disks/disk1. The third command destroys the newly created snapshot install.
+ # vdiskadm snapshot /guests/disks/disk1@install
+ # vdiskadm snapshot /guests/disks/disk1@bfu
+ # vdiskadm destroy /guests/disks/disk1@install
+Example 4 Rolling Back a Virtual Disk
+The following command reverts the contents of the virtual disk to the snapshot named install, deleting all intermedi<hy>
+ate snapshots.
+ # vdiskadm rollback -r /guests/disks/disk1@install
+<beginning of page>
+Example 5 Listing a Virtual Disk and Snapshots
+The following command lists all of the images associated with the virtual disk /guests/disks/disk1.
+ # vdiskadm list /guests/disks/disk1
+ disk1@install
+ disk1@bfu
+ disk1
+Example 6 Creating a Clone
+The following command creates a new virtual disk that is a coalesced copy of the virtual disk /guests/disks/disk1.
+The clone is created in the same format (that is, vmdk:sparse) as the original virtual disk.
+ # vdiskadm clone /guests/disks/disk1 /guests/clone/clone_disk1
+Example 7 Adding a User-defined Property
+The following command adds a user-defined property to the virtual disk and assigns it the specified value. This prop<hy>
+erty name was chosen to represent the source and requirements of this virtual disk data using the required colon to
+delineate the fields.
+ # vdiskadm prop-add -p com.sun:required-nic=2 /guests/disks/disk1
+Example 8 Importing Existing vmdk Format File
+The following command takes an existing vmdk format file and imports it to a virtual disk.
+ # vdiskadm import -d /downloads/appliance.vmdk /guests/import/disk1
+Example 9 Importing vmdk File and Converting to vhd
+The following command takes an existing vmdk format file and, upon import, converts it to a vhd-type virtual disk.
+ # vdiskadm import -d /downloads/appliance.vmdk -t vhd \
+ /guests/import/disk1
+Example 10 Importing Data from zvol
+The following command imports virtual disk data from a zvol and, upon import, converts it to a vmdk:fixed type
+virtual disk.
+ # vdiskadm import -d /dev/zvol/dsk/pool1/disk1 -t vmdk:fixed \
+ /guests/import/disk1
+Example 11 Exporting Data to Block Device
+The following command takes an existing virtual disk and, upon export, converts it to a disk slice, of raw type.
+ # vdiskadm export -d /dev/dsk/c0t1d0s3 -x raw /guests/disks/disk1
+Example 12 Converting Virtual Disk Type
+<beginning of page>
+The following command takes an existing virtual disk and converts it (in place) to a different format type.
+ # vdiskadm convert -t vdi:fixed /guests/disks/disk1
+Example 13 Translating Data from One Type to Another
+The following command translates data from a virtual disk format file to raw data written to a zvol without creating
+a virtual disk.
+ # vdiskadm translate -I /downloads/appliance.vmdk -x raw \
+ -d /dev/zvol/dsk/pool1/disk1
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wvdisk _ Interface StabilityUncommitted
+virsh(1M), virt-install(1M), attributes(5), xVM(5)

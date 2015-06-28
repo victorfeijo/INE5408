@@ -1,0 +1,74 @@
+<beginning of page>
+sdp <-> Sockets Direct Protocol driver
+#include <socket.h>
+#include <netinet/in.h>
+s = socket(AF_INET, SOCK_STREAM, PROTO_SDP);
+s = socket(AF_INET6, SOCK_STREAM, PROTO_SDP);
+The Sockets Direct Protocol (SDP) is a transport protocol layered over the Infiniband Transport Framework (IBTF).
+SDP is a standard implementation based on Annex 4 of the Infiniband Architecture Specification Vol 1 and provides
+reliable byte-stream, flow controlled two-way data transmission that closely mimics the Transmission Control Proto<hy>
+col (TCP).
+SDP supports a sockets-based SOCK_STREAM interface to application programs. It also supports graceful close
+(including half-closed sockets), IP addressing (IPv4 or IPv6), the connecting/accepting connect model, out-of-band
+(OOB) data and common socket options. The SDP protocol also supports kernel bypass data transfers and data
+transfers from send-upper-layer-protocol (ULP) buffers to receive ULP buffers. A SDP message includes a BSDH
+header followed by data. (A BSDH header advertises the amount of available buffers on the local side).
+SDP networking functionality is broken into the sdp driver and a function call-based sockfs implementation. A new
+protocol family of PROTO_SDP is introduced to use the SDP transport provided by the driver.
+Sockets utilizing SDP are either active or passive. Active sockets initiate connections to passive sockets. Both active
+and passive sockets must have their local IP or IPv6 address and SDP port number bound with the bind(3SOCKET)
+system call after the socket is created. By default, SDP sockets are active. A passive socket is created by calling the
+listen(3SOCKET) system call after binding the socket with bind(). This process establishes a queueing parameter
+for the passive socket. Connections to the passive socket can be received with the accept(3SOCKET) system call.
+Active sockets use the connect(3SOCKET) call after binding to initiate connections.
+In most cases, SDP sends data when it is presented. When outstanding data is not yet acknowledged, SDP gathers
+small amounts of output to be sent in a single packet once an acknowledgement is received. For a small number of
+clients this packetization may cause significant delays. To circumvent this problem, SDP provided by the driver
+supplies SDP_NODELAY, a socket-level boolean option. Note that this behavior is similar to the TCP_NODELAY
+option.
+SDP provides an urgent data mechanism that can be invoked using the out-of-band provisions of send(3SOCKET).
+The out-of-band delivery behavior is identical to TCP. The caller may mark one byte as "urgent" with the
+MSG_OOB flag to send(3SOCKET). This sets an "urgent pointer" pointing to the byte in the SDP stream. The re<hy>
+ceiver of the stream is notified of the urgent data by a SIGURG signal. The SIOCATMARK ioctl(2) request returns
+a value indicating whether the stream is at the urgent mark. Because the system never returns data across the urgent
+mark in a single read(2) call, it is possible to advance to the urgent data in a simple loop which reads data, testing
+the socket with the SIOCATMARK ioctl() request until it reaches the mark.
+SDP uses IP/IPv6 addresses to refer to local and remote devices and opens a reliable connected IB connection be<hy>
+tween two end points. The sdp driver supports a point-to-point connection, however broadcasting and multicasting
+are not supported.
+SDP supports setsockopt and getsockopt to set and read socket options. Very few socket options affect SDP protocol
+operations. Other common socket options are processed but do not affect SDP protocol operation. All socket op<hy>
+tions are checked for validity. A getsockopt returns the values set or toggled by setsockopt. Socket options that affect
+protocol operations are SO_LINGER, SO_DEBUG, SO_REUSEADDR and SO_OOBINLINE.
+EISCONN A connect() operation was attempted on a socket on which a connect() operation had already been per<hy>
+formed.
+ECONNRESET The remote peer forced the connection to be closed. This usually occurs when the remote machine
+loses state information about the connection due to a crash.
+ECONNREFUSED The remote peer actively refused connection establishment. This usually occurs because no
+process is listening to the port.
+<beginning of page>
+EADDRINUSE A bind() operation was attempted on a socket with a network address/port pair that has already
+been bound to another socket.
+EADDRNOTAVAIL A bind() operation was attempted on a socket with a network address for which no network in<hy>
+terface exists.
+EACCES A bind() operation was attempted with a reserved port number and the effective user ID of the process
+was not the privileged user.
+ENOBUFS The system ran out of memory for internal data structures.
+/kernel/drv/sdp
+32-bit ELF kernel module (x86).
+/kernel/drv/amd64/sdp
+64-bit ELF kernel module (x86).
+/kernel/drv/sparcv9/sdp
+64-bit ELF kernel module (SPARC).
+/kernel/drv/sdpib
+32-bit ELF kernel module (x86).
+/kernel/drv/amd64/sdpib
+64-bit ELF kernel module (x86).
+/kernel/drv/sparcv9/sdpib
+64-bit ELF kernel module (SPARC).
+See attributes(5) for descriptions of the following attribute:
+tab() box; cw(2.38i) |cw(3.12i) lw(2.38i) |lw(3.12i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Architecturex86,
+SPARC _ AvailabilitySUNWibsdp, SUNWibsdp
+read(2), getsockopt(3XNET), socket.h(3HEAD), accept(3SOCKET), bind(3SOCKET), connect(3SOCKET),
+send(3SOCKET), attributes(5), standards(5)
+Infiniband Architecture Specification Vol 1- Annex 4 <em> November, 2002

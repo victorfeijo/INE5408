@@ -1,0 +1,72 @@
+<beginning of page>
+regexpr, compile, step, advance <-> regular expression compile and match routines
+cc [flag]... [file]... -lgen [library]...
+#include <regexpr.h>
+char *compile(char *instring, char *expbuf, const char *endbuf);
+int
+step(const char *string, const char *expbuf);
+int
+advance(const char *string, const char *expbuf);
+extern char *loc1, loc2, locs;
+extern int nbra, regerrno, reglength;
+extern char *braslist[], *braelist[];
+These routines are used to compile regular expressions and match the compiled expressions against lines. The regu<hy>
+lar expressions compiled are in the form used by ed(1).
+The parameter instring is a null-terminated string representing the regular expression.
+The parameter expbuf points to the place where the compiled regular expression is to be placed. If expbuf is NULL,
+compile() uses malloc(3C) to allocate the space for the compiled regular expression. If an error occurs, this space is
+freed. It is the user's responsibility to free unneeded space after the compiled regular expression is no longer need<hy>
+ed.
+The parameter endbuf is one more than the highest address where the compiled regular expression may be placed.
+This argument is ignored if expbuf is NULL. If the compiled expression cannot fit in (endbuf<mi>expbuf) bytes, com<hy>
+pile() returns NULL and regerrno (see below) is set to 50.
+The parameter string is a pointer to a string of characters to be checked for a match. This string should be null-ter<hy>
+minated.
+The parameter expbuf is the compiled regular expression obtained by a call of the function compile().
+The function step() returns non-zero if the given string matches the regular expression, and zero if the expressions
+do not match. If there is a match, two external character pointers are set as a side effect to the call to step(). The
+variables set in step() are loc1 and loc2. loc1 is a pointer to the first character that matched the regular expression.
+The variable loc2 points to the character after the last character that matches the regular expression. Thus if the reg<hy>
+ular expression matches the entire line, loc1 points to the first character of string and loc2 points to the null at the
+end of string.
+The purpose of step() is to step through the string argument until a match is found or until the end of string is
+reached. If the regular expression begins with ^, step() tries to match the regular expression at the beginning of the
+string only.
+The advance() function is similar to step(); but, it only sets the variable loc2 and always restricts matches to the
+beginning of the string.
+If one is looking for successive matches in the same string of characters, locs should be set equal to loc2, and step()
+should be called with string equal to loc2. locs is used by commands like ed and sed so that global substitutions like
+s/y*//g do not loop forever, and is NULL by default.
+The external variable nbra is used to determine the number of subexpressions in the compiled regular expression.
+braslist and braelist are arrays of character pointers that point to the start and end of the nbra subexpressions in the
+matched string. For example, after calling step() or advance() with string sabcdefg and regular expression
+\(abcdef\), braslist[0] will point at a and braelist[0] will point at g. These arrays are used by commands like ed
+and sed for substitute replacement patterns that contain the \n notation for subexpressions.
+Note that it is not necessary to use the external variables regerrno, nbra, loc1, loc2 locs, braelist, and braslist if
+one is only checking whether or not a string matches a regular expression. Example 1 The following is similar to
+the regular expression code from grep:
+<beginning of page>
+ #include<regexpr.h>
+  . . .
+ if(compile(*argv, (char *)0, (char *)0) == (char *)0)
+   regerr(regerrno);
+  . . .
+ if (step(linebuf, expbuf))  
+  succeed();
+If compile() succeeds, it returns a non-NULL pointer whose value depends on expbuf. If expbuf is non-NULL, com<hy>
+pile() returns a pointer to the byte after the last byte in the compiled regular expression. The length of the compiled
+regular expression is stored in reglength. Otherwise, compile() returns a pointer to the space allocated by mal<hy>
+loc(3C).
+The functions step() and advance() return non-zero if the given string matches the regular expression, and zero if
+the expressions do not match.
+If an error is detected when compiling the regular expression, a NULL pointer is returned from compile() and
+regerrno is set to one of the non-zero error numbers indicated below:
+tab(); cw(2.75i) cw(2.75i) lw(2.75i) lw(2.75i) ERRORMEANING 11Range endpoint too large. 16Bad Number.
+25"\digit" out or range. 36Illegal or missing delimiter. 41No remembered string search. 42\(~\) imbalance. 43Too
+many \(. 44More than 2 numbers given in \[~\}. 45} expected after \. 46First number exceeds second in \{~\}. 49[]
+imbalance. 50 Regular expression overflow.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelMT-Safe
+ed(1), grep(1), sed(1), malloc(3C), attributes(5), regexp(5)
+When compiling multi-threaded applications, the _REENTRANT flag must be defined on the compile line. This
+flag should only be used in multi-threaded applications.

@@ -1,0 +1,103 @@
+<beginning of page>
+ppriv <-> inspect or modify process privilege sets and attributes
+/usr/bin/ppriv -e [-D | -N] [-M] [-s spec] command [arg]...
+/usr/bin/ppriv [-v] [-S] [-D | -N] [-s spec]
+ [pid | core]...
+/usr/bin/ppriv -l [-v] [privilege-specification]...
+The first invocation of the ppriv command runs the command specified with the privilege sets and flags modified ac<hy>
+cording to the arguments on the command line.
+The second invocation examines or changes the privilege state of running process and core files.
+The third invocation lists the privileges defined and information about specified privileges or privileges set specifica<hy>
+tions.
+The following options are supported:
+-D Turns on privilege debugging for the processes or command supplied.
+-e Interprets the remainder of the arguments as a command line and runs the command line with specified privilege
+attributes and sets.
+-l Lists all currently defined privileges on stdout.
+-M When a system is configured with Trusted Extensions, this option turns on the NET_MAC_AWARE and
+NET_MAC_AWARE_INHERIT process attributes.
+A process with these attributes and the net_mac_aware privilege can communicate with lower-level remote peers.
+-N Turns off privilege debugging for the processes or command supplied.
+-s spec Modifies a process's privilege sets according to spec, a specification with the format [AEILP][+-=]privset<hy>
+spec, containing no spaces, where:
+AEILP Indicates one or more letters indicating which privilege sets to change. These are case insensitive, for exam<hy>
+ple, either a or A indicates all privilege sets.
++-= Indicates a modifier to respectively add (+), remove (-), or assign (=) the listed privileges to the specified set(s)
+in privsetspec.
+privsetspec Indicates a comma-separated privilege set specification (priv1,priv2, and so on), as described in
+priv_str_to_set(3C).
+Modifying the same set with multiple -s options is possible as long as there is either precisely one assignment to an
+individual set or any number of additions and removals. That is, assignment and addition or removal for one set are
+mutually exclusive.
+-S Short. Reports the shortest possible output strings for sets. The default is portable output. See
+priv_str_to_set(3C).
+-v Verbose. Reports privilege sets using privilege names.
+The ppriv utility examines processes and core files and prints or changes their privilege sets.
+<beginning of page>
+ppriv can run commands with privilege debugging on or off or with fewer privileges than the invoking process.
+When executing a sub process, the only sets that can be modified are L and I. Privileges can only be removed from
+L and I as ppriv starts with P=E=I.
+ppriv can also be used to remove privileges from processes or to convey privileges to other processes. In order to
+control a process, the effective set of the ppriv utility must be a super set of the controlled process's E, I, and P. The
+utility's limit set must be a super set of the target's limit set. If the target's process uids do not match, the
+{PRIV_PROC_OWNER} privilege must be asserted in the utility's effective set. If the controlled processes have
+any uid with the value 0, more restrictions might exist. See privileges(5). Example 1 Obtaining the Process Privi<hy>
+leges of the Current Shell
+The following example obtains the process privileges of the current shell:
+ example$ ppriv $$
+ 387: -sh
+ flags = <none>
+  E: basic
+  I: basic
+  P: basic
+  L: all
+Example 2 Removing a Privilege From Your Shell's Inheritable and Effective Set
+The following example removes a privilege from your shell's inheritable and effective set.
+ example$ ppriv -s EI-proc_session $$
+The subprocess can still inspect the parent shell but it can no longer influence the parent because the parent has more
+privileges in its Permitted set than the ppriv child process:
+ example$ truss -p $$
+ truss: permission denied: 387
+ example$ ppriv $$
+ 387: -sh
+ flags = <none>
+  E: basic,!proc_session
+  I: basic,!proc_session
+  P: basic
+  L: all
+Example 3 Running a Process with Privilege Debugging
+The following example runs a process with privilege debugging:
+ example$ ppriv -e -D cat /etc/shadow
+ cat[418]: missing privilege "file_dac_read" (euid = 21782),
+  needed at ufs_access+0x3c
+ cat: cannot open /etc/shadow
+The privilege debugging error messages are sent to the controlling terminal of the current process. The needed at
+address specification is an artifact of the kernel implementation and it can be changed at any time after a software
+update.
+<beginning of page>
+The system call number can be mapped to a system call using /etc/name_to_sysnum.
+Example 4 Listing the Privileges Available in the Current Zone
+The following example lists the privileges available in the current zone (see zones(5)). When run in the global zone,
+all defined privileges are listed.
+ example$ ppriv -l zone
+  ... listing of all privileges elided ...
+Example 5 Examining a Privilege Aware Process
+The following example examines a privilege aware process:
+ example$ ppriv -S `pgrep rpcbind`
+ 928: /usr/sbin/rpcbind
+ flags = PRIV_AWARE
+  E: net_privaddr,proc_fork,sys_nfs
+  I: none
+  P: net_privaddr,proc_fork,sys_nfs
+  L: none
+See setpflags(2) for explanations of the flags.
+The following exit values are returned:
+0 Successful operation.
+non-zero An error has occurred.
+/proc/* Process files
+/etc/name_to_sysnum system call name to number mapping
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wesu _ Interface StabilitySee below.
+The invocation is Committed. The output is Uncommitted.
+gcore(1), truss(1), setpflags(2), priv_str_to_set(3C), proc(4), attributes(5), privileges(5), zones(5)

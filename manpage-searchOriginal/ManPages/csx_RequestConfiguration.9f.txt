@@ -1,0 +1,101 @@
+<beginning of page>
+csx_RequestConfiguration <-> configure the PC Card and socket
+#include <sys/pccard.h>
+int32_t csx_RequestConfiguration(client_handle_t ch, config_req_t *cr);
+Solaris DDI Specific (Solaris DDI)
+ch Client handle returned from csx_RegisterClient(9F).
+cr Pointer to a config_req_t structure.
+This function configures the PC Card and socket. It must be used by clients that require I/O or IRQ resources for
+their PC Card.
+csx_RequestIO(9F) and csx_RequestIRQ(9F) must be used before calling this function to specify the I/O and IRQ
+requirements for the PC Card and socket if necessary. csx_RequestConfiguration() establishes the configuration in
+the socket adapter and PC Card, and it programs the Base and Limit registers of multi-function PC Cards if these
+registers exist. The values programmed into these registers depend on the IO requirements of this configuration.
+The structure members of config_req_t are:
+ uint32_t Socket; /* socket number */
+ uint32_t Attributes; /* configuration attributes */
+ uint32_t Vcc; /* Vcc value */
+ uint32_t Vpp1; /* Vpp1 value */
+ uint32_t Vpp2; /* Vpp2 value */
+ uint32_t IntType; /* socket interface type - mem or IO */
+ uint32_t ConfigBase; /* offset from start of AM space */
+ uint32_t Status; /* value to write to STATUS register */
+ uint32_t Pin; /* value to write to PRR */
+ uint32_t Copy; /* value to write to COPY register */
+ uint32_t ConfigIndex; /* value to write to COR */
+ uint32_t Present; /* which config registers present */
+ uint32_t ExtendedStatus; /* value to write to EXSTAT register */
+The fields are defined as follows:
+Socket
+Not used in Solaris, but for portability with other Card Services implementations, it should be set to the logical sock<hy>
+et number.
+Attributes
+This field is bit-mapped. It indicates whether the client wishes the IRQ resources to be enabled and whether Card
+Services should ignore the VS bits on the socket interface. The following bits are defined:
+CONF_ENABLE_IRQ_STEERING
+Enable IRQ Steering. Set to connect the PC Card IREQ line to a system interrupt previously selected by a call to
+csx_RequestIRQ(9F). If CONF_ENABLE_IRQ_STEERING is set, once csx_RequestConfiguration() has suc<hy>
+cessfully returned, the client may start receiving IRQ callbacks at the IRQ callback handler established in the call to
+csx_RequestIRQ(9F).
+CONF_VSOVERRIDE
+Override VS pins. After card insertion and prior to the first successful csx_RequestConfiguration(), the voltage lev<hy>
+els applied to the card shall be those indicated by the card's physical key and/or the VS[2:1] voltage sense pins. For
+Low Voltage capable host systems (hosts which are capable of VS pin decoding), if a client desires to apply a volt<hy>
+age not indicated by the VS pin decoding, then CONF_VSOVERRIDE must be set in the Attributes field; other<hy>
+<beginning of page>
+wise, CS_BAD_VCC shall be returned.
+Vcc, Vpp1, Vpp2
+These fields all represent voltages expressed in tenths of a volt. Values from zero (0) to 25.5 volts may be set. To be
+valid, the exact voltage must be available from the system. PC Cards indicate multiple Vcc voltage capability in
+their CIS via the CISTPL_CFTABLE_ENTRY tuple. After card insertion, Card Services processes the CIS, and
+when multiple Vcc voltage capability is indicated, Card Services will allow the client to apply Vcc voltage levels
+which are contrary to the VS pin decoding without requiring the client to set CONF_VSOVERRIDE.
+IntType
+This field is bit-mapped. It indicates how the socket should be configured. The following bits are defined:
+SOCKET_INTERFACE_MEMORY
+Memory only interface.
+SOCKET_INTERFACE_MEMORY_AND_IO
+Memory and I/O interface.
+ConfigBase
+This field is the offset in bytes from the beginning of attribute memory of the configuration registers.
+Present
+This field identifies which of the configuration registers are present. If present, the corresponding bit is set. This field
+is bit-mapped as follows:
+CONFIG_OPTION_REG_PRESENT Configuration Option Register (COR) present
+CONFIG_STATUS_REG_PRESENT Configuration Status Register (CCSR) present
+CONFIG_PINREPL_REG_PRESENT Pin Replacement Register (PRR) present
+CONFIG_COPY_REG_PRESENT Socket and Copy Register (SCR) present
+CONFIG_ESR_REG_PRESENT Extended Status Register (ESR) present
+Status, Pin, Copy, ExtendedStatus
+These fields represent the initial values that should be written to those registers if they are present, as indicated by
+the Present field.
+The Pin field is also used to inform Card Services which pins in the PC Card's PRR (Pin Replacement Register) are
+valid. Only those bits which are set are considered valid. This affects how status is returned by the csx_GetSta<hy>
+tus(9F) function. If a particular signal is valid in the PRR, both the mask (STATUS) bit and the change (EVENT)
+bit must be set in the Pin field. The following PRR bit definitions are provided for client use:
+PRR_WP_STATUS WRITE PROTECT mask
+<beginning of page>
+PRR_READY_STATUS READY mask
+PRR_BVD2_STATUS BVD2 mask
+PRR_BVD1_STATUS BVD1 mask
+PRR_WP_EVENT WRITE PROTECT changed
+PRR_READY_EVENT READY changed
+PRR_BVD2_EVENT BVD2 changed
+PRR_BVD1_EVENT BVD1 changed
+ConfigIndex
+This field is the value written to the COR (Configuration Option Register) for the configuration index required by
+the PC Card. Only the least significant six bits of the ConfigIndex field are significant; the upper two (2) bits are ig<hy>
+nored. The interrupt type in the COR is always set to level mode by Card Services.
+CS_SUCCESS Successful operation.
+CS_BAD_HANDLE Client handle is invalid or csx_RequestConfiguration() not done.
+CS_BAD_SOCKET Error in getting or setting socket hardware parameters.
+CS_BAD_VCC Requested Vcc is not available on socket.
+CS_BAD_VPP Requested Vpp is not available on socket.
+CS_NO_CARD No PC Card in socket.
+CS_BAD_TYPE I/O and memory interface not supported on socket.
+CS_CONFIGURATION_LOCKED csx_RequestConfiguration() already done.
+CS_UNSUPPORTED_FUNCTION No PCMCIA hardware installed.
+This function may be called from user or kernel context.
+csx_AccessConfigurationRegister(9F), csx_GetStatus(9F), csx_RegisterClient(9F), csx_ReleaseConfigura<hy>
+tion(9F), csx_RequestIO(9F), csx_RequestIRQ(9F)
+PC Card 95 Standard, PCMCIA/JEIDA

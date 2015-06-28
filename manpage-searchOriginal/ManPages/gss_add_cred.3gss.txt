@@ -1,0 +1,101 @@
+<beginning of page>
+gss_add_cred <-> add a credential-element to a credential
+cc [ flag... ] file... -lgss [ library... ]
+#include <gssapi/gssapi.h>
+OM_uint32 gss_add_cred(OM_uint32 *minor_status,
+ const gss_cred_id_t input_cred_handle,
+ const gss_name_t desired_name,
+ const gss_OID desired_mech,
+ gss_cred_usage_t cred_usage,
+ OM_uint32 initiator_time_req,
+ OM_uint32 acceptor_time_req,
+ gss_cred_id_t *output_cred_handle,
+ gss_OID_set *actual_mechs,
+ OM_uint32 *initiator_time_rec,
+ OM_uint32 *acceptor_time_rec);
+The parameter descriptions for gss_add_cred() follow:
+minor_status Mechanism specific status code.
+input_cred_handle Credential to which the credential-element is added. If GSS_C_NO_CREDENTIAL is speci<hy>
+fied, the function composes the new credential based on default behavior. While the credential-handle is not modi<hy>
+fied by gss_add_cred(), the underlying credential is modified if output_credential_handle is NULL.
+desired_name Name of the principal for which a credential should be acquired.
+desired_mech Underlying security mechanism with which the credential can be used. GSS_C_NULL_OID can be
+used to obtain a default.
+cred_usage Flag that indicates how a credential is used to initiate or accept security credentials. If the flag is
+GSS_C_ACCEPT, the credentials are used only to accept security credentials. If the flag is GSS_C_INITIATE, the
+credentials are used only to initiate security credentials. If the flag is GSS_C_BOTH, the credentials can be used to
+either initiate or accept security contexts.
+initiator_time_req Number of seconds that the credential may remain valid for initiating security contexts. This ar<hy>
+gument is ignored if the composed credentials are of the GSS_C_ACCEPT type. Specify GSS_C_INDEFINITE to
+request that the credentials have the maximum permitted initiator lifetime.
+acceptor_time_req Number of seconds that the credential may remain valid for accepting security contexts. This ar<hy>
+gument is ignored if the composed credentials are of the GSS_C_INITIATE type. Specify GSS_C_INDEFINITE
+to request that the credentials have the maximum permitted initiator lifetime.
+output_cred_handle Returned credential handle that contains the new credential-element and all the credential-ele<hy>
+ments from input_cred_handle. If a valid pointer to a gss_cred_id_t is supplied for this parameter, gss_add_cred()
+creates a new credential handle that contains all credential-elements from input_cred_handle and the newly acquired
+credential-element. If NULL is specified for this parameter, the newly acquired credential-element is added to the
+credential identified by input_cred_handle.
+The resources associated with any credential handle returned by means of this parameter must be released by the ap<hy>
+plication after use by a call to gss_release_cred(3GSS).
+actual_mechs Complete set of mechanisms for which the new credential is valid. Storage for the returned OID-set
+must be freed by the application after use by a call to gss_release_oid_set(3GSS). Specify NULL if this parameter
+is not required.
+<beginning of page>
+initiator_time_rec Actual number of seconds for which the returned credentials remain valid for initiating contexts
+using the specified mechanism. If a mechanism does not support expiration of credentials, the value GSS_C_IN<hy>
+DEFINITE is returned. Specify NULL if this parameter is not required.
+acceptor_time_rec Actual number of seconds for which the returned credentials remain valid for accepting security
+contexts using the specified mechanism. If a mechanism does not support expiration of credentials, the value
+GSS_C_INDEFINITE is returned. Specify NULL if this parameter is not required.
+The gss_add_cred() function adds a credential-element to a credential. The credential-element is identified by the
+name of the principal to which it refers. This function is not intended as a function to login to the network. A func<hy>
+tion for login to the network would involve creating new mechanism-specific authentication data, rather than acquir<hy>
+ing a handle to existing data.
+If the value of desired_name is GSS_C_NO_NAME, the call is interpreted as a request to add a credential-element
+to invoke default behavior when passed to gss_init_sec_context(3GSS) if the value of cred_usage is GSS_C_INI<hy>
+TIATE or GSS_C_BOTH. The call is also interpreted as a request to add a credential-element to the invoke default
+behavior when passed to gss_accept_sec_context(3GSS) if the value of cred_usage is GSS_C_ACCEPT or
+GSS_C_BOTH.
+The gss_add_cred() function is expected to be used primarily by context acceptors. The GSS-API provides mecha<hy>
+nism-specific ways to obtain GSS-API initiator credentials through the system login process. Consequently, the
+GSS-API does not support acquiring GSS_C_INITIATE or GSS_C_BOTH credentials by means of gss_ac<hy>
+quire_cred(3GSS) for any name other than the following: <bu> GSS_C_NO_NAME <bu> Name produced by gss_in<hy>
+quire_cred(3GSS) applied to a valid credential <bu> Name produced by gss_inquire_context(3GSS) applied to an ac<hy>
+tive context
+If credential acquisition is time consuming for a mechanism, the mechanism can choose to delay the actual acquisi<hy>
+tion until the credential is required by gss_init_sec_context(3GSS), for example, or by gss_accept_sec_con<hy>
+text(3GSS). Such mechanism-specific implementation decisions are invisible to the calling application. A call to
+gss_inquire_cred(3GSS) immediately following the call gss_add_cred() returns valid credential data as well as in<hy>
+curring the overhead of deferred credential acquisition.
+The gss_add_cred() function can be used either to compose a new credential that contains all credential-elements of
+the original in addition to the newly-acquired credential-element. The function can also be used to add the new cre<hy>
+dential-element to an existing credential. If the value of the output_cred_handle parameter is NULL, the new cre<hy>
+dential-element is added to the credential identified by input_cred_handle. If a valid pointer is specified for the out<hy>
+put_cred_handle parameter, a new credential handle is created.
+If the value of input_cred_handle is GSS_C_NO_CREDENTIAL, the gss_add_cred() function composes a cre<hy>
+dential and sets the output_cred_handle parameter based on the default behavior. The call has the same effect as a
+call first made by the application to gss_acquire_cred(3GSS) to specify the same usage and to pass
+GSS_C_NO_NAME as the desired_name parameter. Such an application call obtains an explicit credential handle
+that incorporates the default behaviors, then passes the credential handle to gss_add_cred(), and finally calls gss_re<hy>
+lease_cred(3GSS) on the first credential handle.
+If the value of the input_cred_handle parameter is GSS_C_NO_CREDENTIAL, a non-NULL value must be sup<hy>
+plied for the output_cred_handle parameter.
+The gss_add_cred() function can return the following status codes:
+GSS_S_COMPLETE Successful completion.
+GSS_S_BAD_MECH An unavailable mechanism has been requested.
+GSS_S_BAD_NAMETYPE The type contained within the desired_name parameter is not supported.
+GSS_S_BAD_NAME The value supplied for desired_name parameter is ill formed.
+GSS_S_DUPLICATE_ELEMENT The credential already contains an element for the requested mechanism that
+has overlapping usage and validity period.
+<beginning of page>
+GSS_S_CREDENTIALS_EXPIRED The credentials could not be added because they have expired.
+GSS_S_NO_CRED No credentials were found for the specified name.
+GSS_S_FAILURE The underlying mechanism detected an error for which no specific GSS status code is defined.
+The mechanism-specific status code reported by means of the minor_status parameter details the error condition.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelSafe
+gss_accept_sec_context(3GSS), gss_acquire_cred(3GSS), gss_init_sec_context(3GSS), gss_inquire_con<hy>
+text(3GSS), gss_inquire_cred(3GSS), gss_release_cred(3GSS), gss_release_oid_set(3GSS), libgss(3LIB), at<hy>
+tributes(5)
+Solaris Security for Developers Guide

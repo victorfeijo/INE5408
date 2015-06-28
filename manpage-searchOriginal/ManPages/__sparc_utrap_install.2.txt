@@ -1,0 +1,144 @@
+<beginning of page>
+__sparc_utrap_install <-> install a SPARC V9 user trap handler
+#include <sys/utrap.h>
+int __sparc_utrap_install(utrap_entry_t type,
+ utrap_handler_t new_precise, utrap_handler_t new_deferred,
+ utrap_handler_t *old_precise, utrap_handler_t *old_deferred);
+The __sparc_utrap_install() function establishes new_precise and new_deferred user trap handlers as the new val<hy>
+ues for the specified type and returns the existing user trap handler values in *old_precise and *old_deferred in a sin<hy>
+gle atomic operation. A new handler address of NULL means no user handler of that type will be installed. A new
+handler address of UTH_NOCHANGE means that the user handler for that type should not be changed. An old
+handler pointer of NULL means that the user is not interested in the old handler address.
+A precise trap is caused by a specific instruction and occurs before any program-visible state has been changed by
+this instruction. When a precise trap occurs, the program counter (PC) saved in the Trap Program Counter (TPC)
+register points to the instruction that induced the trap; all instructions prior to this trapping instruction have been ex<hy>
+ecuted. The next program counter (nPC) saved in the Trap Next Program Counter (TnPC) register points to the next
+instruction following the trapping instruction, which has not yet been executed. A deferred trap is also caused by a
+particular instruction, but unlike a precise trap, a deferred trap may occur after the program-visible state has been
+changed. See the SPARC Architecture Manual, Version 9 for further information on precise and deferred traps.
+The list that follows contains hardware traps and their corresponding user trap types. User trap types marked with a
+plus-sign (+) are required and must be provided by all ABI-conforming implementations. The others may not be
+present on every implementation; an attempt to install a user trap handler for those conditions will return EINVAL.
+User trap types marked with an asterisk (*) are implemented as precise traps only.
+tab() box; cw(2.74i) |cw(2.76i) lw(2.74i) |lw(2.76i) Trap NameUser Trap Type (utrap_entry_t) _ illegal_instruc<hy>
+tionT{ UT_ILLTRAP_INSTRUCTION +* or UT_ILLEGAL_INSTRUCTION T} _ fp_disabledUT_FP_DIS<hy>
+ABLED +* _ fp_exception_ieee_754UT_FP_EXCEPTION_IEEE_754 + _ fp_exception_otherUT_FP_EX<hy>
+CEPTION_OTHER _ tag_overflowUT_TAG_OVERFLOW +* _ division_by_zeroUT_DIVISION_BY_ZERO
++ _ mem_address_not_alignedUT_MEM_ADDRESS_NOT_ALIGNED + _ privileged_actionUT_PRIVI<hy>
+LEGED_ACTION + _ privileged_opcodeUT_PRIVILEGED_OPCODE _ async_data_errorUT_ASYNC_DA<hy>
+TA_ERROR _ trap_instructionT{ UT_TRAP_INSTRUCTION_16 through UT_TRAP_INSTRUCTION_31
++* T} _ T{ instruction_access_exception instruction_access_MMU_miss instruction_access_error T}T{
+UT_INSTRUCTION_EXCEPTION or UT_INSTRUCTION_PROTECTION or UT_INSTRUCTION_ER<hy>
+ROR T} _ T{ data_access_exception data_access_MMU_miss data_access_error data_access_protection T}T{
+UT_DATA_EXCEPTION or UT_DATA_PROTECTION or UT_DATA_ERROR T}
+The following explanations are provided for those user trap types that are not self-explanatory.
+UT_ILLTRAP_INSTRUCTION
+This trap is raised by user execution of the ILLTRAP INSTRUCTION. It is always precise.
+UT_ILLEGAL_INSTRUCTION
+This trap will be raised by the execution of otherwise undefined opcodes. It is implementation-dependent as to what
+opcodes raise this trap; the ABI only specifies the interface. The trap may be precise or deferred.
+UT_PRIVILEGED_OPCODE
+All opcodes declared to be privileged in SPARC V9 will raise this trap. It is implementation-dependent whether oth<hy>
+er opcodes will raise it as well; the ABI only specifies the interface.
+UT_DATA_EXCEPTION, UT_INSTRUCTION_EXCEPTION
+No valid user mapping can be made to this address, for a data or instruction access, respectively.
+<beginning of page>
+UT_DATA_PROTECTION, UT_INSTRUCTION_PROTECTION
+A valid mapping exists, and user privilege to it exists, but the type of access (read, write, or execute) is denied, for a
+data or instruction access, respectively.
+UT_DATA_ERROR, UT_INSTRUCTION_ERROR
+A valid mapping exists, and both user privilege and the type of access are allowed, but an unrecoverable error oc<hy>
+curred in attempting the access, for a data or instruction access, respectively. %l1 will contain either BUS_ADDR<hy>
+ERR or BUS_OBJERR.
+UT_FP_DISABLED
+This trap is raised when an application issues a floating point instruction (including load or store) and the SPARC
+V9 Floating Point Registers State (FPRS) FEF bit is 0. If a user handler is installed for this trap, it will be given con<hy>
+trol. Otherwise the system will set FEF to one and retry the instruction.
+For all traps, the handler executes in a new register window, where the in registers are the out registers of the previ<hy>
+ous frame and have the value they contained at the time of the trap, similar to a normal subroutine call after the save
+instruction. The global registers (including the special registers %ccr, %asi, and %y) and the floating-point regis<hy>
+ters have their values from the time of the trap. The stack pointer register %sp plus the BIAS will point to a proper<hy>
+ly-aligned 128-byte register save area; if the handler needs scratch space, it should decrement the stack pointer to ob<hy>
+tain it. If the handler needs access to the previous frame's in registers or local registers, it should execute a
+FLUSHW instruction, and then access them off of the frame pointer. If the handler calls an ABI-conforming func<hy>
+tion, it must set the %asi register to ASI_PRIMARY_NOFAULT before the call.
+On entry to a precise user trap handler %l6 contains the %pc and %l7 contains the %npc at the time of the trap.
+To return from a handler and reexecute the trapped instruction, the handler would execute:
+ jmpl %l6, %g0 ! Trapped PC supplied to user trap handler
+ return %l7 ! Trapped nPC supplied to user trap handler
+To return from a handler and skip the trapped instruction, the handler would execute:
+ jmpl %l7, %g0 ! Trapped nPC supplied to user trap handler
+ return %l7 + 4 ! Trapped nPC + 4
+On entry to a deferred trap handler %o0 contains the address of the instruction that caused the trap and %o1 con<hy>
+tains the actual instruction (right-justified, zero-extended), if the information is available. Otherwise %o0 contains
+the value <mi>1 and %o1 is undefined. Additional information may be made available for certain cases of deferred
+traps, as indicated in the following table.
+tab() box; lw(1.76i) |lw(3.74i) lw(1.76i) |lw(3.74i) InstructionsAdditional Information _ LD-type (LDSTUB)T{
+%o2 contains the effective address (rs1 + rs2 | simm13). T} _ ST-type (CAS, SWAP)T{ %o2 contains the effective
+address ( rs1 + rs2 |simm13). T} _ Integer arithmeticT{ %o2 contains the rs1 value. %o3 contains the rs2 | simm13
+value. %o4 contains the contents of the %y register. T} _ Floating-point arithmeticT{ %o2 contains the address of
+rs1 value. %o3 contains the address of rs2 value. T} _ Control-transferT{ %o2 contains the target address (rs1 +
+rs2 | simm13). T} _ Asynchronous data errorsT{ %o2 contains the address that caused the error. %o3 contains the
+effective ASI, if available, else <mi>1. T}
+To return from a deferred trap, the trap handler issues:
+ta 68 ! ST_RETURN_FROM_DEFERRED_TRAP
+The following pseudo-code explains how the operating system dispatches traps:
+ if (precise trap) {
+  if (precise_handler) {
+<beginning of page>
+  invoke(precise_handler);
+  /* not reached */
+  } else {
+  convert_to_signal(precise_trap);
+  }
+  } else if (deferred_trap) {
+  invoke(deferred_handler);
+  /* not reached */
+  } else {
+  convert_to_signal(deferred_trap);
+  }
+  }
+  if (signal)
+  send(signal);
+User trap handlers must preserve all registers except the locals (%l0-7) and the outs (%o0-7), that is, %i0-7,
+%g1-7, %d0-d62, %asi, %fsr, %fprs, %ccr, and %y, except to the extent that modifying the registers is part of
+the desired functionality of the handler. For example, the handler for UT_FP_DISABLED may load floating-point
+registers.
+Upon successful completion, 0 is returned. Otherwise, a non-zero value is returned and errno is set to indicate the
+error.
+The __sparc_utrap_install() function will fail if:
+EINVAL The type argument is not a supported user trap type; the new user trap handler address is not word aligned;
+the old user trap handler address cannot be returned; or the user program is not a 64-bit executable.
+Example 1 A sample program using the __sparc_utrap_install() function.
+The __sparc_utrap_install() function is normally used by user programs that wish to provide their own tailored ex<hy>
+ception handlers as a faster alternative to signal(3C), or to handle exceptions that are not directly supported by the
+signal() interface, such as fp_disabled.
+ extern void *fpdis_trap_handler();
+ utrap_handler_t new_precise = (utrap_handler_t)fpdis_trap_handler;
+ double d;
+ int err;
+ err = __sparc_utrap_install(UT_FP_DISABLED, new_precise,
+  UTH_NOCHANGE, NULL, NULL);
+ if (err == EINVAL) {
+  /* unexpected error, do something */
+  exit (1);
+ }
+ d = 1.0e-300;
+ ENTRY(fpdis_trap_handler)
+ wr %g0, FPRS_FEF, %fprs
+ jmpl %l6, %g0
+ return %l7
+ SET_SIZE(fpdis_trap_handler)
+This example turns on bit 2, FEF, in the Floating-Point Registers State (FPRS) Register, after a floating-point in<hy>
+struction causes an fp_disabled trap. (Note that this example simulates part of the default system behavior; pro<hy>
+grams do not need such a handler. The example is for illustrative purposes only.)
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelMT-Safe
+<beginning of page>
+signal(3C), attributes(5)
+SPARC Architecture Manual, Version 9
+Manufacturer's processor chip user manuals
+The Exceptions and Interrupt Descriptions section of the SPARC V9 manual documents which hardware traps are
+mandatory or optional, and whether they can be implemented as precise or deferred traps, or both. The manufactur<hy>
+er's processor chip user manuals describe the details of the traps supported for the specific processor implementa<hy>
+tion.

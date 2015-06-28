@@ -1,0 +1,322 @@
+<beginning of page>
+smf_template <-> service management framework support for service metadata
+Templates are defined by service developers to describe metadata about a service in general or individual configura<hy>
+tion properties on a service, including human-consumable descriptions as well as definitions of valid configuration.
+Administrators are provided access to templates through SMF commands that describe configuration values and val<hy>
+idate configuration against templates.
+Tool developers can use templates to provide more helpful user interfaces for service configuration.
+Service metadata is defined in the template as part of the service manifest.
+The svcs -lv and svccfg describe commands can be used to access metadata about properties in a human-readable
+format.
+svccfg(1M)'s validate subcommand can be used to validate a service instance or manifest against template data. A
+set of libscf(3LIB) interfaces is available to access template data.
+The sole interface to define templates is the service manifest.
+Service authors should provide template metadata including common_names, descriptions, choices and con<hy>
+straints for service-specific property groups and properties which they introduce. At a minimum, service authors
+must provide descriptions for property groups and properties in the C locale. Service authors should not provide
+template metadata for framework-delivered property groups such as methods and dependencies.
+See the EXAMPLES section for an example of authoring a template definition for a service.
+All template interfaces search for template data about a property group first on the instance, then on the service, then
+on the service's restarter, and finally globally.
+A property group template is defined by its author to apply to a specific instance, to a service and all of its instances,
+to a restarter's delegates, or globally. A typical service author defines the template on an instance or on a service. A
+template defined on an instance is applied to that instance only, and can override a template for that property group
+defined on the service. A template defined on the service is applied to all instances of that service.
+Restarter authors can define templates in their manifest that apply to any service which uses their restarter, which is
+also known as a delegate. SMF framework authors have defined templates for property groups with well-known
+meanings to the entire SMF framework in the manifest for svc:/system/svc/global.
+Templates defined globally or by the restarter and re-defined by the service or instance are flagged as a validation er<hy>
+ror. Service authors can avoid these errors by creating templates only for property groups specific to their service
+and not consumed by the SMF framework.
+Property group templates can also be wildcarded by name or type. Only the most specific template definition appli<hy>
+cable to a property group is honored.
+The template element defines the start of a template block. All further definitions below can be included in a tem<hy>
+plate block. A template element can be contained in either a service or instance element. If it is contained in the
+service element, it applies to the service and all instances of that service. If it is contained in the instance element, it
+applies to only that instance of the service.
+Whenever possible, we recommend defining the template data for the entire service.
+ <service ... >
+  <template>
+  </template>
+ </service>
+The entire service or instance can define a common name to describe the purpose of the service/instance.
+ <template>
+  <common_name>
+  <loctext xml:lang='C'>console login</loctext>
+  </common_name>
+ <template>
+<beginning of page>
+common_name is a free-form string, but is intended to be used as a label in a GUI or CLI.
+The following guidelines are recommended: <bu> Be brief. A word or two is usually most appropriate. Limit the name
+to under 40 characters. <bu> Be clear. The service, property group, or property name might not be helpful for humans,
+but common_name should help clarify the purpose of the entity. <bu> No punctuation. common_name is not a sentence
+or a paragraph. It should not contain clauses or phrases. Punctuation should only be present to meet trademark re<hy>
+quirements. <bu> Capital letters must be used only for acronyms or proper names. For locales other than English, use
+appropriate capitalization for a sentence fragment.
+The description element contains a longer description of the property group, suitable for a status line or a tool-tip:
+ <template>
+  <description>
+  <loctext xml:lang='C'>Provide the text login prompt on console.
+  </lcotext>
+  </description>
+ <template>
+description Guidelines <bu> Use proper grammar. description is a sentence meant to be read by humans. <bu> Be brief. A
+few sentences are usually most appropriate.
+Documentation for this service can be defined explicitly, so that when the service is experiencing issues, or a con<hy>
+sumer of the service wants more information on it, they can find it easily.
+Documentation can include man pages or references to stable URLs for reference documentation.
+ <template>
+  <documentation>
+  <manpage title='ttymon' section='1M' manpath='/usr/share/man' />
+  <doc_link name='docs.sun.com' uri='http://docs.sun.com' />
+  </documentation>
+ </template>
+The pg_pattern element contains the definitions for a property group:
+ <template>
+  <pg_pattern name="pgname" type="pgtype" target="this" required="true">
+  </pg_pattern>
+ </template>
+name is the property group's name, and type is the property group's type.
+target specifies what the target of this definition is. "this" would refer to the defining service or instance. "in<hy>
+stance" can only be used in a service's template block, and means the definition applies to all instances of this ser<hy>
+vice. "delegate" can only be used in a restarter's template block, and applies to all instances that are delegated to
+that restarter. "all", only usable by the master restarter, would refer to all services on the system. The default value
+of target is "this".
+required indicates whether this property group is required or not. The default value of required is false. If required
+is true, both name and type must be specified.
+name and/or type can be omitted. If either of these attributes is omitted it is treated as a wildcard. For instance, if the
+name attribute is omitted from the pg_pattern definition, the pg_pattern is applied to all property groups that have
+the specified type.
+The common_name element contains the localized, human-readable name for the property group:
+ <pg_pattern ...>
+  <common_name>
+  <loctext xml:lang='C'>startt method</loctext>
+  </common_name>
+<beginning of page>
+ </pg_pattern>
+common_name is a free-form string, but is intended to be used as a label in a GUI or CLI.
+The following guidelines are recommended: <bu> Be brief. A word or two is usually most appropriate. <bu> Be clear. The
+service, property group, or property name might not be helpful for humans, but common_name should help clarify
+the purpose of the entity. <bu> No punctuation. common_name is not a sentence or a paragraph. It should not contain
+clauses or phrases. Punctuation should only be present to meet trademark requirements. <bu> Capital letters must be
+used only for acronyms or proper names. For locales other than English, use appropriate capitalization for a sentence
+fragment.
+The description element contains a longer description of the property group, suitable for a status line or a tool-tip:
+ <pg_pattern ...>
+  <description>
+  <loctext xml:lang='C'>A required method which starts the service.
+  </loctext>
+  </description>
+ </pg_pattern>
+description Guidelines <bu> Use proper grammar. description is a sentence meant to be read by humans. <bu> Be brief. A
+few sentences are usually most appropriate.
+The prop_pattern element contains the definitions for a specific property:
+ <pg_pattern ...>
+  <prop_pattern name="propname" type="proptype" required="true">
+  </prop_pattern>
+ </pg_pattern>
+name is the property's name, and type is the property's type.
+required indicates whether this property is required. The default value of required is false.
+name is always required. type is optional only if required is false.
+The common_name element contains the localized, human-readable name for the property:
+common_name is a free-form string field, but is intended to be used as a label in a GUI or CLI.
+ <prop_pattern ...>
+ <common_name>
+  <loctext xml:lang='C'>retry interval</loctext>
+ </common_name>
+ </prop_pattern>
+The following guidelines are recommended: <bu> Be brief. A word or two is usually most appropriate. <bu> Be clear. The
+service, property group, or property name might not be helpful for humans, but common_name should help clarify
+the purpose of the entity. <bu> No punctuation. common_name is not a sentence or a paragraph. It should not contain
+clauses or phrases. Punctuation should only be present to meet trademark requirements. <bu> Capital letters must be
+used only for acronyms or proper names. For locales other than English, use appropriate capitalization for a sentence
+fragment.
+The units element contains the localized, human-readable units for a numerical property:
+ <prop_pattern ...>
+  <units>
+  <loctext xml:lang='C'>seconds</loctext>
+  </units>
+<beginning of page>
+ </prop_pattern>
+units Guidelines
+The following guidelines are recommended: <bu> Be brief. Strive to use only a single word or label. The plural form is
+usually most appropriate. <bu> No punctuation. units is not a sentence or a paragraph. It should not contain clauses or
+phrases. Punctuation should only be present to meet trademark requirements.
+The description element contains a longer description of the property, suitable for a status line or a tool-tip:
+ <prop_pattern ...>
+  <description> <loctext xml:lang='C'>
+  The number of seconds to wait before retry.
+  </loctext> </description>
+ </prop_pattern>
+description Guidelines <bu> Use proper grammar. description is a sentence meant to be read by humans. <bu> Be brief. A
+few sentences are usually most appropriate.
+The visibility element specifies whether simplified views in higher level software might want to display this property.
+ <prop_pattern ...>
+  <visibility value="hidden | readonly | readwrite"/>
+ </prop_pattern>
+Some properties are internal implementation details and should not be presented as a configuration setting. Others
+might merely be read-only. This property is used to specify these restrictions. A value of hidden indicates that the
+property shouldn't be displayed, readonly means that the property isn't intended to be modified, and readwrite indi<hy>
+cates the property is modifiable.
+This is not a security mechanism, it is solely intended to help prevent the user from shooting himself in the foot, and
+to remove unnecessary clutter from CLI output or a GUI display. Hidden properties is visible in full-disclosure
+modes of many commands and UIs.
+The cardinality and internal_separators elements constrain the structure of a property:
+ <prop_pattern ...>
+  <cardinality min="1" max="1"/>
+  <internal_separators>,<internal_separators>
+ </prop_pattern>
+cardinality indicates the acceptable number of property values. min is the minimum number, and max is the maxi<hy>
+mum number. Both are optional. If neither is specified, <cardinality/> is the same as the default, zero or more val<hy>
+ues.
+internal_separators specify the separator characters used for those property values into which multiple real values
+are packed.
+The constraints element specifies what values are acceptable for a property:
+ <prop_pattern ...>
+ <constraints>
+  <value name="blue" />
+  <range min="1" max="7"/>
+  <include_values type="values"/>
+ </constraints>
+ </prop_pattern>
+The value element includes a possible property value. range includes an integer range.
+value and range can be used in any combination, as restricting their use would prohibit many valid descriptions. If
+<beginning of page>
+no value constraints are specified, the property can take on any value.
+include_values includes all values specified by the values block (see Value Descriptions section).
+The choices block indicates which values a UI should offer the user:
+ <prop_pattern ...>
+ <choices>
+  <range min="1" max="3"/>
+  <value name="vt100" />
+  <value name="xterm" />
+  <include_values type="constraints"/>
+  <include_values type="values"/>
+ </choices>
+ </prop_pattern>
+range and value include ranges and individual values like they do for constraints.
+include_values includes all values specified by either the constraints block or the values block (see next section).
+Like property names, the values a property can take on can also have inscrutable representations. The values element
+contains localized, human-readable descriptions for specific property values:
+ <prop_pattern>
+ <values>
+  <value name="blue">
+  <common_name>
+  <loctext xml:lang='C'>blueloctext xml:lang='C'>blue>
+  </common_name>
+  <description>
+  <loctext xml:lang='C>
+  The color between green and indigo.
+  </loctext>
+  </description>
+  </value>
+ </values>
+ </prop_pattern>
+common_name is a free-form string field, but is intended to be used as a label in a GUI or CLI.
+The following guidelines are recommended: <bu> Be brief. A word or two is usually most appropriate. <bu> Be clear. The
+service, property group, or property name might not be helpful for humans, but common_name should help clarify
+the purpose of the entity. <bu> No punctuation. common_name is not a sentence or a paragraph. It should not contain
+clauses or phrases. Punctuation should only be present to meet trademark requirements. <bu> Capital letters must be
+used only for acronyms or proper names. For locales other than English, use appropriate capitalization for a sentence
+fragment.
+description Guidelines <bu> Use proper grammar. description is a sentence meant to be read by humans. <bu> Be brief. A
+few sentences are usually most appropriate.
+Assuming a basic service which wants to define basic templates data looks like this:
+ <?xml version="1.0"?
+ <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+ <service_bundle type='manifest' name='FOOfoo:foo'>
+ <service name='system/foo' type='service' version='1'>
+  <dependency>
+  name='multi-user'
+  type='service'
+  grouping='require_all'
+  restart_on='none'
+  <service_fmri value='svc:/milestone/multi-user' />
+  </dependency>
+  <exec_method
+<beginning of page>
+  type='method'
+  name='start'
+  exec='/opt/foo/food'
+  timeout_seconds='60'>
+  </exec_method>
+  <exec_method
+  type='method'
+  name='stop'
+  exec=':kill'
+  timeout_seconds='60'>
+  </exec_method>
+  <property_group name='config' type='application'>
+  <propval name='local_only' type='boolean' value='false' />
+  <propval name='config_file' type='astring'
+  value='/opt/foo/foo.conf' />
+  <property name='modules' type='astring'>
+  <astring_list>
+  <value_node value='bar'/>
+  <value_node value='baz'/>
+  </astring_list>
+  </property>
+  </property_group>
+  <instance name='default' enabled='false' />
+ </service_bundle>
+ </service>
+That service could define some basic templates data to help an administrator using this service inside of the <ser<hy>
+vice> tags. The most helpful things are to document the purpose of the service itself and the service-specific con<hy>
+figuration.
+ <template>
+  <common_name> <loctext xml:lang='C'>
+  all-purpose demonstration
+  </loctext> /common_name>
+  <documentation>
+  <manpage title='food' section='1M'
+  manpath='/opt/foo/man' />
+  </documentation>
+  <pg_pattern name='config' type='application' target='this'
+  required='true'>
+  <description> <loctext xml:lang='C'>
+  Basic configuration for foo.
+  </loctext> </description>
+  <prop_pattern name='local_only' type='boolean'
+  required='false'>
+  <description> <loctext xml:lang='C'>
+  Only listen to local connection requests.
+  </loctext> </description>
+  </prop_pattern>
+  <prop_pattern name='config_file' type='astring'
+  required='true'>
+  <cardinality min='1' max='1'/>
+  <description> <loctext xml:lang='C'>
+  Configuration file for foo.
+  </loctext> </description>
+  </prop_pattern>
+  <prop_pattern name='modules' type='astring'
+  required='false'>
+  <description> <loctext xml:lang='C'>
+  Plugin modules for foo.
+  </loctext> /description>
+  <values>
+  <value name='bar'>
+<beginning of page>
+  <description> <loctext xml:lang='C'>
+  Allow foo to access the bar.
+  </loctext> </description>
+  </value>
+  <value name='baz'>
+  <description> <loctext xml:lang='C'>
+  Allow foo to access baz functions.
+  </loctext> </description>
+  </value>
+  <value name='qux'>
+  <description> <loctext xml:lang='C'>
+  Allow foo to access qux functions.
+  </loctext> </description>
+  </value>
+  </values>
+  <choices>
+  <include_values type='values'/>
+  </choices>
+  <prop_pattern>
+  </pg_pattern>
+ </template>
+/usr/share/lib/xml/dtd/service_bundle.dtd.1
+svcs(1), svccfg(1M), libscf(3LIB), service_bundle(4), smf(5)

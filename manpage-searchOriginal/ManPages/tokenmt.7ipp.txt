@@ -1,0 +1,86 @@
+<beginning of page>
+tokenmt <-> Single and Two Rate Three Conformance Level Meter
+The tokenmt module can be configured as a Single or a Two Rate meter. Packets are deemed to belong to one of the
+three levels - Red, Yellow or Green - depending on the configured rate(s) and the burst sizes. When configured as a
+Single Rate meter, tokenmt can operate with just the Green and Red levels.
+Configuration parameters for tokenmt correspond to definitions in RFC- 2697 and RFC- 2698 as follows:
+Configuring tokenmt as a Single Rate meter (from RFC- 2697):
+ committed_rate - CIR
+ committed_burst - CBS
+ peak_burst - EBS
+(thus 'peak_burst' for a single rate meter is actually the 'excess burst' in the RFC. However, throughout the text the
+parameter name "peak burst" is used.)
+Configuring tokenmt as a Two Rate meter (from RFC- 2698):
+ committed_rate - CIR
+ peak_rate - PIR
+ committed_burst - CBS
+ peak_burst - PBS
+The meter is implemented using token buckets C and P, which initially hold tokens equivalent to committed and
+peak burst sizes (bits) respectively. When a packet of size B bits arrive at time t, the following occurs:
+ When operating as a Single Rate meter, the outcome (level)
+ is decided as follows:
+  - Update tokens in C and P
+  o Compute no. of tokens accumulated since the
+  last time packet was seen at the committed rate as
+  T(t) = committed rate * (t - t')
+  (where t' is the time the last packet was seen)
+  o Add T tokens to C up to a maximum of committed burst
+  size. Add remaining tokens ((C+T) - Commited Burst),
+  if any, to P, to a maximum of peak burst size.
+  - Decide outcome
+  o If not color aware
+  o If B <= C, outcome is GREEN and C -= B.
+  o Else, if B <= P, outcome is YELLOW and P -= B.
+  o Else, outcome is Red.
+  o Else,
+  o obtain DSCP from packet
+  o obtain color from color_map, color_map[DSCP]
+  o if (color is GREEN) and (B <= C), outcome is
+  GREEN and C -= B.
+  o Else, if (color is GREEN or YELLOW) and
+  (B <= P), outcome is YELLOW and P -= B.
+  o Else, outcome is RED.
+  Note that if peak_burst and yellow_next_actions are
+  not specified (that is, a single rate meter with two
+  outcomes), the outcome is never YELLOW.
+When operating as a Two Rate meter, the outcome (level) is decided as follows:
+ - Update tokens in C and P
+  o Compute no. of tokens accumulated since the last time a
+  packet was seen at the committed and peak rates as
+  Tc(t) = committed rate * (t - t')
+  Tp(t) = peak rate * (t - t')
+  (where t' is the time the last packet was seen)
+  o Add Tc to C up to a maximum of committed burst size
+  o Add Tp to P up to a maximum of peak burst size
+  - Decide outcome
+  o If not color aware
+  o If B > P, outcome is RED.
+<beginning of page>
+  o Else, if B > C, outcome is YELLOW and P -= B
+  o Else, outcome is GREEN and C -= B & P -= B
+  o Else,
+  o obtain DSCP from packet
+  o obtain color from color_map, color_map[DSCP]
+  o if (color is RED) or (B > P), outcome is RED
+  o Else, if (color is YELLOW) or (B > C),
+  outcome is YELLOW and P -= B
+  o Else, outcome is GREEN and C -= B & P -= B
+The tokenmt module exports the following statistics through kstat:
+Global statistics:
+ module: tokenmt instance: <action id>
+  name: tokenmt statistics class <action name>
+  epackets <number of packets in error>
+  green_bits <number of bits in green>
+  green_packets <number of packets in green>
+  red_bits <number of bits in red>
+  red_packets <number of packets in red>
+  yellow_bits <number of bits in yellow>
+  yellow packets <number of packets in yellow>
+/kernel/ipp/sparcv9/tokenmt
+64-bit module (SPARC only.)
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wqos
+ipqosconf(1M), dlcosmk(7ipp), dscpmk(7ipp), flowacct(7ipp), ipqos(7ipp), ipgpc(7ipp), tswtclmt(7ipp)
+RFC 2697, A Single Rate Three Color Marker J. Heinanen, R. Guerin <em> The Internet Society, 1999
+RFC 2698, A Two Rate Three Color Marker J. Heinanen, R. Guerin <em> The Internet Society, 1999

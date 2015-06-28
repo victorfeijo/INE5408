@@ -1,0 +1,157 @@
+<beginning of page>
+ber_decode, ber_alloc_t, ber_free, ber_bvdup, ber_init, ber_flatten, ber_get_next, ber_skip_tag, ber_peek_tag,
+ber_scanf, ber_get_int, ber_get_stringa, ber_get_stringal, ber_get_stringb, ber_get_null, ber_get_boolean,
+ber_get_bitstring, ber_first_element, ber_next_element, ber_bvfree, ber_bvecfree <-> Basic Encoding Rules library
+decoding functions
+cc[ flag... ] file... -lldap[ library... ]
+#include <lber.h>
+BerElement *ber_alloc_t(int options);
+struct berval *ber_bvdup(const struct berval *bv);
+void ber_free(BerElement *ber, int freebuf);
+BerElement *ber_init(const struct berval *bv);
+int ber_flatten(BerElement *ber, struct berval **bvPtr);
+ber_tag_tber_get_next(Sockbuf *sb, ber_len_t *len, BerElement *ber);
+ber_tag_t ber_skip_tag(BerElement *ber, ber_len_t *len);
+ber_tag_t ber_peek_tag(BerElement *ber, ber_len_t *len);
+ber_tag_t ber_get_int(BerElement *ber, ber_int_t *num);
+ber_tag_t ber_get_stringb(BerElement *ber, char *buf,
+ ber_len_t *len);
+ber_tag_t ber_get_stringa(BerElement *ber, char **buf);
+ber_tag_t ber_get_stringal(BerElement *ber, struct berval **bv);
+ber_tag_t ber_get_null(BerElement *ber);
+ber_tag_t ber_get_boolean(BerElement *ber, int *boolval);
+ber_tag_t ber_get_bitstringa(BerElement *ber, char **buf,
+ ber_len_t *len);
+ber_tag_t ber_first_element(BerElement *ber, ber_len_t *len,
+ char **last);
+ber_tag_t ber_next_element(BerElement *ber, ber_len_t *len,
+ char *last);
+ber_tag_t ber_scanf(BerElement *ber, const char *fmt [, arg...]);
+void ber_bvfree(struct berval *bv);
+void ber_bvecfree(struct berval **bvec);
+These functions provide a subfunction interface to a simplified implementation of the Basic Encoding Rules of
+ASN.1. The version of BER these functions support is the one defined for the LDAP protocol. The encoding rules
+are the same as BER, except that only definite form lengths are used, and bitstrings and octet strings are always en<hy>
+coded in primitive form. In addition, these lightweight BER functions restrict tags and class to fit in a single octet
+(this means the actual tag must be less than 31). When a "tag"is specified in the descriptions below, it refers to the
+tag, class, and primitive or constructed bit in the first octet of the encoding. This man page describes the decoding
+functions in the lber library. See ber_encode(3LDAP) for details on the corresponding encoding functions.
+Normally, the only functions that need be called by an application are ber_get_next() to get the next BER element
+and ber_scanf() to do the actual decoding. In some cases, ber_peek_tag() may also need to be called in normal
+usage. The other functions are provided for those applications that need more control than ber_scanf() provides. In
+general, these functions return the tag of the element decoded, or <mi>1 if an error occurred.
+The ber_get_next() function is used to read the next BER element from the given Sockbuf, sb. A Sockbuf consists
+<beginning of page>
+of the descriptor (usually socket, but a file descriptor works just as well) from which to read, and a BerElement
+structure used to maintain a buffer. On the first call, the sb_ber struct should be zeroed. It strips off and returns the
+leading tag byte, strips off and returns the length of the entire element in len, and sets up ber for subsequent calls to
+ber_scanf(), and all to decode the element.
+The ber_peek_tag() function returns the tag of the next element to be parsed in the BerElement argument. The
+length of this element is stored in the *lenPtr argument. LBER_DEFAULT is returned if there is no further data to
+be read. The decoding position within the ber argument is unchanged by this call; that is, the fact that
+ber_peek_tag() has been called does not affect future use of ber.
+The ber_skip_tag() function is similar to ber_peek_tag(), except that the state pointer in the BerElement argument
+is advanced past the first tag and length, and is pointed to the value part of the next element. This function should
+only be used with constructed types and situations when a BER encoding is used as the value of an OCTET
+STRING. The length of the value is stored in *lenPtr.
+The ber_scanf() function is used to decode a BER element in much the same way that scanf(3C) works. It reads
+from ber, a pointer to a BerElement such as returned by ber_get_next(), interprets the bytes according to the for<hy>
+mat string fmt, and stores the results in its additional arguments. The format string contains conversion specifica<hy>
+tions which are used to direct the interpretation of the BER element. The format string can contain the following
+characters.
+a Octet string. A char ** should be supplied. Memory is allocated, filled with the contents of the octet string, null-
+terminated, and returned in the parameter.
+s Octet string. A char * buffer should be supplied, followed by a pointer to an integer initialized to the size of the
+buffer. Upon return, the null-terminated octet string is put into the buffer, and the integer is set to the actual size of
+the octet string.
+O Octet string. A struct ber_val ** should be supplied, which upon return points to a memory allocated struct berval
+containing the octet string and its length. ber_bvfree() can be called to free the allocated memory.
+b Boolean. A pointer to an integer should be supplied.
+i Integer. A pointer to an integer should be supplied.
+B Bitstring. A char ** should be supplied which will point to the memory allocated bits, followed by an unsigned
+long *, which will point to the length (in bits) of the bitstring returned.
+n Null. No parameter is required. The element is simply skipped if it is recognized.
+v Sequence of octet strings. A char *** should be supplied, which upon return points to a memory allocated null-
+terminated array of char *'s containing the octet strings. NULL is returned if the sequence is empty.
+V Sequence of octet strings with lengths. A struct berval *** should be supplied, which upon return points to a
+memory allocated, null-terminated array of struct berval *'s containing the octet strings and their lengths. NULL is
+returned if the sequence is empty. ber_bvecfree() can be called to free the allocated memory.
+x Skip element. The next element is skipped.
+{ Begin sequence. No parameter is required. The initial sequence tag and length are skipped.
+} End sequence. No parameter is required and no action is taken.
+<beginning of page>
+[ Begin set. No parameter is required. The initial set tag and length are skipped.
+] End set. No parameter is required and no action is taken.
+The ber_get_int() function tries to interpret the next element as an integer, returning the result in num. The tag of
+whatever it finds is returned on success, -1 on failure.
+The ber_get_stringb() function is used to read an octet string into a pre-allocated buffer. The len parameter should
+be initialized to the size of the buffer, and will contain the length of the octet string read upon return. The buffer
+should be big enough to take the octet string value plus a terminating NULL byte.
+The ber_get_stringa() function is used to allocate memory space into which an octet string is read.
+The ber_get_stringal() function is used to allocate memory space into which an octet string and its length are read.
+It takes a struct berval **, and returns the result in this parameter.
+The ber_get_null() function is used to read a NULL element. It returns the tag of the element it skips over.
+The ber_get_boolean() function is used to read a boolean value. It is called the same way that ber_get_int() is
+called.
+The ber_get_bitstringa() function is used to read a bitstring value. It takes a char ** which will hold the allocated
+memory bits, followed by an unsigned long *, which will point to the length (in bits) of the bitstring returned.
+The ber_first_element() function is used to return the tag and length of the first element in a set or sequence. It also
+returns in last a magic cookie parameter that should be passed to subsequent calls to ber_next_element(), which re<hy>
+turns similar information.
+The ber_alloc_t() function constructs and returns BerElement. A null pointer is returned on error. The options field
+contains a bitwise-OR of options which are to be used when generating the encoding of this BerElement. One op<hy>
+tion is defined and must always be supplied:
+ #define LBER_USE_DER 0x01
+When this option is present, lengths will always be encoded in the minimum number of octets. Note that this option
+does not cause values of sets and sequences to be rearranged in tag and byte order, so these functions are not suitable
+for generating DER output as defined in X.509 and X.680
+The ber_init function constructs a BerElement and returns a new BerElement containing a copy of the data in the
+bv argument. The ber_init function returns the null pointer on error.
+The ber_free() function frees a BerElement which is returned from the API calls ber_alloc_t() or ber_init(). Each
+BerElement must be freed by the caller. The second argument freebuf should always be set to 1 to ensure that the in<hy>
+ternal buffer used by the BER functions is freed as well as the BerElement container itself.
+The ber_bvdup() function returns a copy of a berval. The bv_val field in the returned berval points to a different
+area of memory as the bv_val field in the argument berval. The null pointer is returned on error (that is, is out of
+memory).
+The ber_flatten() function allocates a struct berval whose contents are BER encoding taken from the ber argu<hy>
+ment. The bvPtr pointer points to the returned berval, which must be freed using ber_bvfree(). This function re<hy>
+turns 0 on success and <mi>1 on error. Example 1 Assume the variable ber contains a lightweight BER encoding of
+the following ASN.1 object:
+  AlmostASearchRequest := SEQUENCE {
+  baseObject DistinguishedName,
+  scope ENUMERATED {
+  baseObject (0),
+  singleLevel (1),
+  wholeSubtree (2)
+  },
+  derefAliases ENUMERATED {
+  neverDerefaliases (0),
+<beginning of page>
+  derefInSearching (1),
+  derefFindingBaseObj (2),
+  alwaysDerefAliases (3N)
+  },
+  sizelimit INTEGER (0 .. 65535),
+  timelimit INTEGER (0 .. 65535),
+  attrsOnly BOOLEAN,
+  attributes SEQUENCE OF AttributeType
+  }
+Example 2 The element can be decoded using ber_scanf() as follows.
+  int scope, ali, size, time, attrsonly;
+  char *dn, **attrs;
+  if ( ber_scanf( ber, "{aiiiib{v}}", &dn, &scope, &ali,
+  &size, &time, &attrsonly, &attrs ) == -1 )
+  /* error */
+  else
+  /* success */
+If an error occurs during decoding, generally these functions return <mi>1.
+The return values for all of these functions are declared in the <lber.h> header. Some functions may allocate memo<hy>
+ry which must be freed by the calling application.
+See attributes(5) for a description of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsl (32-bit) _ SUNWcslx (64-bit) _ Interface StabilityCommitted
+ber_encode(3LDAP), attributes(5)
+Yeong, W., Howes, T., and Hardcastle-Kille, S., "Lightweight Directory Access Protocol", OSI-DS-26, April 1992.
+Information Processing - Open Systems Interconnection - Model and Notation - Service Definition - Specification of
+Basic Encoding Rules for Abstract Syntax Notation One, International Organization for Standardization, Interna<hy>
+tional Standard 8825.

@@ -1,0 +1,103 @@
+<beginning of page>
+cfgadm_ac <-> EXX00 memory system administration
+/usr/sbin/cfgadm [-c configure] [-f]
+ [-o disable-at-boot | enable-at-boot ] ac#:bank# ...
+/usr/sbin/cfgadm [-c unconfigure]
+ [-o disable-at-bootp | enable-at-boot ] ac#:bank# ...
+/usr/sbin/cfgadm [-v]
+ [-o quick | normal | extended, [max_errors=#] ] -t ac#:bank#...
+/usr/sbin/cfgadm -x relocate-test ac#:bank# ...
+/usr/sbin/cfgadm [-l] -o disable-at-boot | enable-at-boot ac#:bank# ...
+The ac hardware specific library /usr/platform/sun4u/lib/cfgadm/cfgadm_ac.so.1 provides the functionality for
+configuring and unconfiguring memory banks on E6X00, E5X00, E4X00 and E3X00 systems as part of the Dynam<hy>
+ic Reconfiguration of CPU/Memory boards using cfgadm_sysctrl(1M).
+Memory banks appear as attachment points in the device tree. For each CPU/Memory board, two attachment points
+are published, one for each bank on the board: bank0 and bank1. If the bank is unpopulated, the receptacle state is
+empty. If the bank is populated, the receptacle state is connected. The receptacle state of a memory bank can never
+be disconnected. The occupant state of a connected memory bank can be configured or unconfigured. If the occupant
+state is configured, the memory is in use by Solaris, if unconfigured it is not.
+Refer to cfgadm(1M) for complete descriptions of the command options.
+The following options are supported:
+-c configure | unconfigure
+Change the occupant state. The configure argument ensures that the memory is initialized and adds the memory to
+the Solaris memory pool. The unconfigure argument removes the memory from use by Solaris. When a CPU/Mem<hy>
+ory board is to be removed from a system, both banks of memory must be unconfigured.
+cfgadm refuses the configure operation if the memory on the board is marked disabled-at-boot (see info field), un<hy>
+less either the -f (force) option or the enable at boot flag, (-o enable-at-boot), is given. The configure operation takes
+a short time proportional to the size of memory that must be initialized.
+cfgadm refuses the unconfigure operation if there is not enough uncommitted memory in the system (VM viability
+error) or if the bank to be unconfigured has memory that can't be removed (non-relocatable pages error). The pres<hy>
+ence of non-relocatable pages is indicated by the word permanent in the info listing field. Removing memory from
+use by Solaris may take a significant time due to factors such as system load and how much paging to secondary
+storage is required. The unconfigure operation can be cancelled at any time and the memory returned to the fully
+configured state by interrupting the command invocation with a signal. The unconfigure operation self-cancels if no
+memory can be removed within a timeout period. The default timeout period of 60 seconds can be changed using the
+-o timeout=# option, with a value of 0 disabling the timeout.
+-f
+Force option. Use this option to override the block on configuring a memory bank marked as disabled at boot in the
+non-volatile disabled-memory-list variable. See Platform Notes:Sun Enterprise 6x00/5x00/4x00/3x00 Systems
+-l
+List option. This option is supported as described in cfgadm(1M).
+The type field is always memory.
+The info field has the following information for empty banks:
+ slot# empty
+The slot# indicates the system slot into which the CPU/Memory board is inserted. For example, if this were slot11
+the attachment point for use with cfgadm to manipulate the associated board would be sysctrl0:slot11. The info
+<beginning of page>
+field has the following information for connected banks:
+ slot# sizeMb|sizeGb [(sizeMb|sizeGb used)] base 0x###
+  [interleaved #-way] [disabled at boot] [permanent]
+The size of the bank is given in Mb or Gb as appropriate. If the memory is less than completely used, the used size is
+reported. The physical base address is given in hexadecimal. If the memory bank is interleaved with some other
+bank, the interleave factor is reported. If the memory on the board is disabled at boot using the non-volatile dis<hy>
+abled-memory-list variable, this is reported. If the bank has memory that cannot be removed this is reported as per<hy>
+manent.
+-o disable-at-boot | enable-at-boot
+These options allow the state of the non-volatile disabled-memory-list variable to be modified. These options can be
+used in conjunction with the issuing of a -c option or with the explicit or implied listing command, -l, if no com<hy>
+mand is required. Use of -o enable-at-boot with the configure command to override the block on configuring mem<hy>
+ory on a board in the disabled memory list.
+-o extended | normal | quick
+Use with the -t option to specify test level.
+The normal test level ensures that each memory cell stores both a 0 and a 1, and checks that all cells are separately
+addressable. The quick test level only does the 0s and 1s test, and typically misses address line problems. The ex<hy>
+tended test uses patterns to test for adjacent cell interference problems. The default test level is normal. See -t op<hy>
+tion.
+-o max_errors=#
+Use with the -t option to specify the maximum number of allowed errors. If not specified, a default of 32 is assumed.
+-o timeout=#
+Use with the unconfigure command to set the self-cancelling timeout. The default value is 60 and the unit is sec<hy>
+onds. A value of 0 means no timeout.
+-t
+Test an unconfigured bank of memory. Specify the test level using the -o quick | normal | extended option.
+cfgadm exits with a 0 (success) if the test was able to run on the memory bank. The result of the test is available in
+the condition for the attachment point.
+-v
+Verbose option. Use this option in combination with the -t option to display detailed progress and results of
+tests.
+-x relocate-test
+For all pages of memory in use on the specified memory bank, a relocation operation as used in the unconfigure
+command is attempted. The success of this operation does not guarantee that the bank can be unconfigured. Failure
+indicates that it probably cannot be unconfigured. This option is for test purposes only.
+The following operand is supported:
+ac#:bank# The attachment points for memory banks are published by instances of the address controller (ac) driver
+(ac#). One instance of the ac driver is created for each system board, but only those instances associated with
+CPU/Memory boards publish the two bank attachment points, bank0 and bank1.  
+<beginning of page>
+ This form conforms to the logical ap_id specification given in cfgadm(1M). The corresponding physical ap_ids are
+listed in the FILES section.
+The ac driver instance numbering has no relation to the slot number for the  corresponding board. The full
+physical attachment point identifier has the slot number incorporated into it as twice the slot number in hexadecimal
+directly following the fhc@ part.
+/devices/fhc@*,f8800000/ac@0,1000000:bank?
+attachment points
+/usr/platform/sun4u/lib/cfgadm/cfgadm_ac.so.1
+hardware specific library file
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wkvm.u
+cfgadm(1M), cfgadm_sysctrl(1M), config_admin(3CFGADM), attributes(5)
+Sun Enterprise 6x00, 5x00, 4x00 and 3x00 Systems Dynamic Reconfiguration User's Guide
+Platform Notes:Sun Enterprise 6x00/5x00/4x00/3x00 Systems
+Refer to the Sun Enterprise 6x00, 5x00, 4x00 and 3x00 Systems Dynamic Reconfiguration User's Guide for ad<hy>
+ditional details regarding dynamic reconfiguration of EXX00 system CPU/Memory boards.

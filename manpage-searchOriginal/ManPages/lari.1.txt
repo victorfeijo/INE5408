@@ -1,0 +1,219 @@
+<beginning of page>
+lari <-> link analysis of runtime interfaces
+lari [-bCDsVv] [-a | -i | -o] file | directory...
+lari [-CDosv] [-m [-d mapdir]] file
+The lari utility analyzes the interface requirements of dynamic ELF objects. Two basic modes of operation are
+available. The first mode displays runtime interface information. The second mode generates interface definitions.
+Dynamic objects offer symbolic definitions that represent the interface that the object provides for external con<hy>
+sumers. At runtime, bindings are established from the symbolic references of one object to the symbolic definitions
+of another object. lari analyzes both the interface definitions and runtime bindings of the specified objects.
+When displaying runtime interface information, lari can analyze a number of files and/or directories. lari analyzes
+each file that is specified on the command line. lari recursively descends into each directory that is specified on the
+command line, processing each file that is found.
+When generating interface definitions, lari can only process a single file specified on the command line.
+Without the -D option, lari processes files as dynamic ELF objects by using ldd(1). This processing uses the follow<hy>
+ing options:
+ -r and -e LD_DEBUG=files,bindings,detail
+These options provide information on all bindings that are established as part of loading the object. Notice that by
+using ldd, the specified object is not executed, and hence no user controlled loading of objects, by dlopen(3C) for
+example, occurs. To capture all binding information from an executing process, the following environment variables
+can be passed directly to the runtime linker, ld.so.1(1):
+ LD_DEBUG=files,bindings,detail LD_DEBUG_OUTPUT=lari.dbg  
+ LD_BIND_NOW=yes
+The resulting debug output, lari.dbg.pid, can be processed by lari using the -D option. Note: lari attempts to ana<hy>
+lyze each object that has been processed using the path name defined in the debug output. Each object must there<hy>
+fore be accessible to lari for a complete, accurate analysis to be provided. The debug output file must be generated
+in the C locale.
+When displaying interface information, lari analyzes the interfaces of the processed dynamic objects and, by default,
+displays any interesting information. See Interesting Information under EXTENDED DESCRIPTION. The infor<hy>
+mation that is displayed is also suitable for piping to other tools. This capability can aid developers in analyzing
+process bindings or debugging complex binding scenarios.
+The generation of interface definitions by lari can be used to refine the interface requirements of the dynamic ob<hy>
+jects that are processed. When creating a dynamic object, you should define an explicit, versioned interface. This
+definition controls the symbol definitions that are available to external users. In addition, this definition frequently
+reduces the overall runtime execution cost of the object. Interface definitions can be assigned to an object during its
+creation by the link-editor using the -M option and the associated mapfile directives. See the Linker and Libraries
+Guide for more details on using mapfiles to version objects. An initial version of these mapfiles can be created by
+lari.
+The following options are supported.
+-a Displays all interface information for the objects analyzed. Note: The output from this option can be substantial,
+but is often useful for piping to other analysis tools.
+-b Limits the interface information to those symbols that have been explicitly bound to. Note: Symbols defined as
+protected might have been bound to from within the defining object. This binding is satisfied at link-edit time and is
+therefore not visible to the runtime environment. Protected symbols are displayed with this option.
+<beginning of page>
+-C Demangles C++ symbol names. This option is useful for augmenting runtime interface information. When gener<hy>
+ating interface definitions, demangled names are added to the mapfiles as comments.
+-d mapdir Defines the directory, mapdir, in which mapfiles are created. By default, the current working directory is
+used.
+-D Interprets any input files as debugging information rather than as dynamic objects.
+-i Displays interesting interface binding information. This mode is the default if no other output controlling option is
+supplied. See Interesting Information under EXTENDED DESCRIPTION.
+-m Creates mapfiles for each dynamic object that is processed. These mapfiles reflect the interface requirements of
+each object as required by the input file being processed.
+-o Limits the interface information to those symbols that are deemed an overhead. When creating mapfiles, any over<hy>
+head symbols are itemized as local symbols. See Overhead Information under EXTENDED DESCRIPTION.
+-s Saves the bindings information produced from ldd(1) for further analysis. See FILES.
+-V Appends interesting symbol visibilities. Symbols that are defined as singleton or are defined protected are iden<hy>
+tified with this option.
+-v Ignores any objects that are already versioned. Versioned objects have had their interfaces defined, but can con<hy>
+tribute to the interface information displayed. For example, a versioned shared object might reveal overhead symbols
+for a particular process. Shared objects are frequently designed for use by multiple processes, and thus the interfaces
+these objects provide can extend beyond the requirements of any one process. The -v option therefore, can reduce
+noise when displaying interface information.
+The runtime interface information produced from lari has the following format:
+ [information]: symbol-name [demangled-name]: object-name
+Each line describes the interface symbol, symbol-name, together with the object, object-name, in which the symbol
+is defined. If the symbol represents a function, the symbol name is followed by (). If the symbol represents a data
+object, the symbol name is followed by the symbols size, enclosed within []. If the -C option is used, the symbol
+name is accompanied by the symbols demangled name, demangled-name. The information field provides one or
+more of the following tokens that describe the symbol's use:
+cnt:bnd Two decimal values indicate the symbol count, cnt, and the number of bindings to this object, bnd. The
+symbol count is the number of occurrences of this symbol definition that have been found in the objects that are ana<hy>
+lyzed. A count that is greater than 1 indicates multiple instances of a symbol definition. The number of bindings in<hy>
+dicate the number of objects that have been bound to this symbol definition by the runtime linker.
+E This symbol definition has been bound to from an external object.
+S This symbol definition has been bound to from the same object.
+D This symbol definition has been directly bound to.
+I This symbol definition provides for an interposer. An object that explicitly identifies itself as an interposor defines
+all global symbols as interposers. See the -z interpose option of ld(1), and the LD_PRELOAD variable of
+<beginning of page>
+ld.so.1(1). Individual symbols within a dynamic executable can be defined as interposers by using the INTERPOSE
+mapfile directive.
+C This symbol definition is the reference data of a copy-relocation.
+F This symbol definition resides in a filtee.
+P This symbol is defined as protected. This symbol might have an internal binding from the object in which the sym<hy>
+bol is declared. Any internal bindings with this attribute can not be interposed upon by another symbol definition.
+A This symbol definition is the address of a procedure linkage table entry within a dynamic executable.
+U This symbol lookup originated from a user request, for example, dlsym(3C).
+R This symbol definition is acting as a filter, and provides for redirection to a filtee.
+r A binding to this symbol was rejected at some point during a symbol search. A rejection can occur when a direct
+binding request finds a symbol that has been tagged to prevent direct binding. In this scenario, the symbol search is
+repeated using a default search model. The binding can still resolve to the original, rejected symbol. A rejection can
+also occur when a non-default symbol search finds a symbol identified as a singleton. Again, the symbol search is
+repeated using a default search model.
+N This symbol definition explicitly prohibits directly binding to the definition.
+See the Linker and Libraries Guide for more details of these symbol classifications.
+By default, or specifically using the -i option, lari filters any runtime interface information to present interesting
+events. This filtering is carried out mainly to reduce the amount of information that can be generated from large ap<hy>
+plications. In addition, this information is intended to be the focus in debugging complex binding scenarios, and of<hy>
+ten highlights problem areas. However, classifying what information is interesting for any particular application is an
+inexact science. You are still free to use the -a option and to search the binding information for events that are
+unique to the application being investigated.
+When an interesting symbol definition is discovered, all other definitions of the same symbol are output.
+The focus of interesting interface information is the existence of multiple definitions of a symbol. In this case, one
+symbol typically interposes on one or more other symbol definitions. This interposition is seen when the binding
+count, bnd, of one definition is non-zero, while the binding count of all other definitions is zero. Interposition that
+results from the compilation environment, or the linking environment, is not characterized as interesting. Examples
+of these interposition occurrences include copy relocations ([C]) and the binding to procedure linkage addresses
+([A]).
+Interposition is often desirable. The intent is to overload, or replace, the symbolic definition from a shared object. In<hy>
+terpositioning objects can be explicitly tagged ([I]), using the -z interpose option of ld(1). These objects can safely
+interpose on symbols, no matter what order the objects are loaded in a process. However, be cautious when non-ex<hy>
+plicit interposition is employed, as this interposition is a consequence of the load-order of the objects that make up
+the process.
+User-created, multiply-defined symbols are output from lari as interesting. In this example, two definitions of inter<hy>
+pose1() exist, but only the definition in main is referenced:
+ [2:1E]: interpose1(): ./main
+ [2:0]: interpose1(): ./libA.so
+Interposition can also be an undesirable and surprising event, caused by an unexpected symbol name clash. A symp<hy>
+<beginning of page>
+tom of this interposition might be that a function is never called although you know a reference to the function ex<hy>
+ists. This scenario can be identified as a multiply defined symbol, as covered in the previous example. However, a
+more surprising scenario is often encountered when an object both defines and references a specific symbol.
+An example of this scenario is if two dynamic objects define and reference the same function, interpose2(). Any ref<hy>
+erence to this symbol binds to the first dynamic object loaded with the process. In this case, the definition of inter<hy>
+pose2() in object libA.so interposes on, and hides, the definition of interpose2() in object libB.so. The output from
+lari might be:
+ [2:2ES]: interpose2(): ./libA.so
+ [2:0]: interpose2(): ./libB.so
+Multiply defined symbols can also be bound to separately. Separate bindings can be the case when direct bindings
+are in effect ([D]), or because a symbol has protected visibility ([P]). Although separate bindings can be explicitly
+established, instances can exist that are unexpected and surprising. Directly bound symbols, and symbols with pro<hy>
+tected visibility, are output as interesting information.
+When using the -o option, lari displays symbol definitions that might be considered overhead.
+Global symbols that are not referenced are considered an overhead. The symbol information that is provided within
+the object unnecessarily adds to the size of the object's text segment. In addition, the symbol information can in<hy>
+crease the processing required to search for other symbolic references within the object at runtime.
+Global symbols that are only referenced from the same object have the same characteristics. The runtime search for
+a symbolic reference, that results in binding to the same object that made the reference, is an additional overhead.
+Both of these symbol definitions are candidates for reduction to local scope by defining the object's interface. Inter<hy>
+face definitions can be assigned to a file during its creation by the link-editor using the -M option and the associated
+mapfile directives. See the Linker and Libraries Guide for more details on mapfiles. Use lari with the -m option to
+create initial versions of these mapfiles.
+If lari is used to generate mapfiles, versioned shared objects will have mapfiles created indicating that their overhead
+symbols should be reduced to locals. This model allows lari to generate mapfiles for comparison with existing inter<hy>
+face definitions. Use the -v option to ignore versioned shared objects when creating mapfiles.
+Copy-relocations are also viewed as an overhead and generally should be avoided. The size of the copied data is a
+definition of its interface. This definition restricts the ability to change the data size in newer versions of the shared
+object in which the data is defined. This restriction, plus the cost of processing a copy relocation, can be avoided by
+referencing data using a functional interface. The output from lari for a copy relocation might be:
+ [2:1EC]: __iob[0x140]: ./main
+ [2:0]: __iob[0x140]: ./libA.so.1
+Notice that a number of small copy relocations, such as __iob used in the previous example, exist because of historic
+programming interactions with system libraries.
+Another example of overhead information is the binding of a dynamic object to the procedure linkage table entry of
+a dynamic executable. If a dynamic executable references an external function, a procedure linkage table entry is
+created. This structure allows the reference binding to be deferred until the function call is actually made. If a dy<hy>
+namic object takes the address of the same referenced function, the dynamic object binds to the dynamic executables
+procedure linkage table entry. An example of this type of event reveals the following:
+ [2:1EA]: foo(): ./main
+ [2:1E]: foo(): ./libA.so
+A small number of bindings of this type are typically not cause for concern. However, a large number of these bind<hy>
+ings, perhaps from a jump-table programming technique, can contribute to start up overhead. Address relocation
+bindings of this type require relocation processing at application start up, rather than the deferred relocation process<hy>
+ing used when calling functions directly. Use of this address also requires an indirection at runtime. Example 1 An<hy>
+alyzing a case of multiple bindings
+<beginning of page>
+The following example shows the analysis of a process in which multiple symbol definitions exist. The shared ob<hy>
+jects libX.so and libY.so both call the function interpose(). This function exists in both the application main, and
+the shared object libA.so. Because of interposition, both references bind to the definition of interpose() in main.
+The shared objects libX.so and libY.so also both call the function foo(). This function exists in the application main,
+and the shared objects libA.so, libX.so, and libY.so. Because both libX.so and libY.so were built with direct bind<hy>
+ings enabled, each object binds to its own definition.
+ example% lari ./main
+ [3:0]: foo(): ./libA.so
+ [3:1SD]: foo(): ./libX.so
+ [3:1SD]: foo(): ./libY.so
+ [2:0]: interpose(): ./libA.so
+ [2:2EP]: interpose(): ./main
+To analyze binding information more thoroughly, the bindings data can be saved for further inspection. For example,
+the previous output indicates that the function interpose() was called from two objects external to main. Inspection
+of the binding output reveals where the references to this function originated.
+ example% lari -s ./main
+ lari: ./main: bindings information saved as: /usr/tmp/lari.dbg.main
+ .....
+ example% fgrep foo /usr/tmp/lari.dbg.main
+ binding file=./libX.so to file=./main: symbol `interpose'
+ binding file=./libY.so to file=./main: symbol `interpose'
+Note: The bindings output is typically more extensive than shown here, as the output is accompanied with process
+identifier, address and other bindings information.
+Example 2 Generating an interface definition
+The following example creates interface definitions for an application and its dependency, while ignoring any ver<hy>
+sioned system libraries. The application main makes reference to the interfaces one(), two(), and three() in foo.so:
+ example% lari -omv ./main
+ example% cat mapfile-foo.so
+ #
+ # Interface Definition mapfile for:
+ # Dynamic Object: ./foo.so
+ # Process: ./main
+ #
+ foo.so {
+  global:
+  one;
+  three;
+  two;
+  local:
+  _one;
+  _three;
+  _two;
+  *;
+ };
+<beginning of page>
+$TMPDIR/lari.dbg.file Binding output produced by ldd(1).
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Availability<hy>
+SUNWtoo _ Interface StabilitySee below.
+The human readable output is Uncommitted. The options are Committed.
+ld(1), ldd(1), ld.so.1(1), dlopen(3C), dlsym(3C), attributes(5)
+Linker and Libraries Guide

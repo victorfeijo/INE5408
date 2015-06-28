@@ -1,0 +1,107 @@
+<beginning of page>
+sysevent_subscribe_event, sysevent_unsubscribe_event <-> register or unregister interest in event receipt
+cc [ flag... ] file... -lsysevent [ library... ]
+#include <libsysevent.h>
+int sysevent_subscribe_event(sysevent_handle_t *sysevent_hdl,
+ char *event_class, char **event_subclass_list,
+ int num_subclasses);
+void sysevent_unsubscribe_event(sysevent_handle_t *sysevent_hdl,
+ char *event_class);
+event_class system event class string
+event_subclass_list array of subclass strings
+num_subclasses number of subclass strings
+sysevent_hdl sysevent subscriber handle
+The sysevent_subscribe_event() function registers the caller's interest in event notifications belonging to the class
+event_class and the subclasses contained in event_subclass_list. The subscriber handle sysevent_hdl is updated with
+the new subscription and the calling process receives event notifications from the event handler specified in sysev<hy>
+ent_bind_handle.
+System events matching event_class and a subclass contained in event_subclass_list published after the caller re<hy>
+turns from sysevent_subscribe_event() are guaranteed to be delivered to the calling process. Matching system
+events published and queued prior to a call to sysevent_subscribe_event() may be delivered to the process's event
+handler.
+The num_subclasses argument provides the number of subclass string elements in event_subclass_list.
+A caller can use the event class EC_ALL to subscribe to all event classes and subclasses. The event class
+EC_SUB_ALL can be used to subscribe to all subclasses within a given event class.
+Subsequent calls to sysevent_subscribe_event() are allowed to add additional classes or subclasses. To remove an
+existing subscription, sysevent_unsubscribe_event() must be used to remove the subscription.
+The sysevent_unsubscribe_event() function removes the subscription described by event_class for sysevent_hdl.
+Event notifications matching event_class will not be delivered to the calling process upon return.
+A caller can use the event class EC_ALL to remove all subscriptions for sysevent_hdl.
+The library manages all subscription resources.
+The sysevent_subscribe_event() function returns 0 if the subscription is successful. Otherwise, <mi>1 is returned and
+errno is set to indicate the error.
+The sysevent_unsubscribe_event() function returns no value.
+The sysevent_subscribe_event() function will fail if:
+EACCES The calling process has an ID other than the privileged user.
+EINVAL The sysevent_hdl argument is an invalid sysevent handle.
+ENOMEM There is insufficient memory available to allocate subscription resources.
+Example 1 Subscribing for environmental events
+<beginning of page>
+ #include <libsysevent.h>
+ #include <sys/nvpair.h>
+ static int32_t attr_int32;
+ #define CLASS1 "class1"
+ #define CLASS2 "class2"
+ #define SUBCLASS_1 "subclass_1"
+ #define SUBCLASS_2 "subclass_2"
+ #define SUBCLASS_3 "subclass_3"
+ #define MAX_SUBCLASS 3
+ static void
+ event_handler(sysevent_t *ev)
+ {
+  nvlist_t *nvlist;
+  /*
+  * Special processing for events (CLASS1, SUBCLASS_1) and
+  * (CLASS2, SUBCLASS_3)
+  */
+  if ((strcmp(CLASS1, sysevent_get_class_name(ev)) == 0 &&
+  strcmp(SUBCLASS_1, sysevent_get_subclass_name(ev)) == 0) ||
+  (strcmp(CLASS2, sysevent_get_subclass_name(ev) == 0) &&
+  strcmp(SUBCLASS_3, sysevent_get_subclass(ev)) == 0)) {
+  if (sysevent_get_attr_list(ev, &nvlist) != 0)
+  return;
+  if (nvlist_lookup_int32(nvlist, "my_int32_attr", &attr_int32)
+  != 0)
+  return;
+  /* Event Processing */
+  } else {
+  /* Event Processing */
+  }
+ }
+ int
+ main(int argc, char **argv)
+ {
+  sysevent_handle_t *shp;
+  const char *subclass_list[MAX_SUBCLASS];
+  /* Bind event handler and create subscriber handle */
+  shp = sysevent_bind_handle(event_handler);
+  if (shp == NULL)
+  exit(1);
+  /* Subscribe to all CLASS1 event notifications */
+  subclass_list[0] = EC_SUB_ALL;
+  if (sysevent_subscribe_event(shp, CLASS1, subclass_list, 1) != 0) {
+  sysevent_unbind_handle(shp);
+  exit(1);
+  }
+  /* Subscribe to CLASS2 events for subclasses: SUBCLASS_1,
+  * SUBCLASS_2 and SUBCLASS_3
+  */
+  subclass_list[0] = SUBCLASS_1;
+  subclass_list[1] = SUBCLASS_2;
+  subclass_list[2] = SUBCLASS_3;
+  if (sysevent_subscribe_event(shp, CLASS2, subclass_list,
+  MAX_SUBCLASS) != 0) {
+  sysevent_unbind_handle(shp);
+<beginning of page>
+  exit(1);
+  }
+  for (;;) {
+  (void) pause();
+  }
+ }
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed _ MT-LevelMT-Safe
+syseventd(1M), sysevent_bind_handle(3SYSEVENT), sysevent_get_attr_list(3SYSEVENT), sysev<hy>
+ent_get_class_name(3SYSEVENT), sysevent_get_vendor_name(3SYSEVENT), attributes(5)
+The libsysevent interfaces do not work at all in non-global zones.

@@ -1,0 +1,177 @@
+<beginning of page>
+tcp, TCP <-> Internet Transmission Control Protocol
+#include <sys/socket.h>
+#include <netinet/in.h>
+s = socket(AF_INET, SOCK_STREAM, 0);
+s = socket(AF_INET6, SOCK_STREAM, 0);
+t = t_open("/dev/tcp", O_RDWR);
+t = t_open("/dev/tcp6", O_RDWR);
+TCP is the virtual circuit protocol of the Internet protocol family. It provides reliable, flow-controlled, in order, two-
+way transmission of data. It is a byte-stream protocol layered above the Internet Protocol (IP), or the Internet Proto<hy>
+col Version 6 (IPv6), the Internet protocol family's internetwork datagram delivery protocol.
+Programs can access TCP using the socket interface as a SOCK_STREAM socket type, or using the Transport Lev<hy>
+el Interface (TLI) where it supports the connection-oriented (T_COTS_ORD) service type.
+TCP uses IP's host-level addressing and adds its own per-host collection of "port addresses." The endpoints of a
+TCP connection are identified by the combination of an IP or IPv6 address and a TCP port number. Although other
+protocols, such as the User Datagram Protocol (UDP), may use the same host and port address format, the port space
+of these protocols is distinct. See inet(7P) and inet6(7P) for details on the common aspects of addressing in the In<hy>
+ternet protocol family.
+Sockets utilizing TCP are either "active" or "passive." Active sockets initiate connections to passive sockets. Both
+types of sockets must have their local IP or IPv6 address and TCP port number bound with the bind(3SOCKET)
+system call after the socket is created. By default, TCP sockets are active. A passive socket is created by calling the
+listen(3SOCKET) system call after binding the socket with bind(). This establishes a queueing parameter for the
+passive socket. After this, connections to the passive socket can be received with the accept(3SOCKET) system call.
+Active sockets use the connect(3SOCKET) call after binding to initiate connections.
+By using the special value INADDR_ANY with IP, or the unspecified address (all zeroes) with IPv6, the local IP
+address can be left unspecified in the bind() call by either active or passive TCP sockets. This feature is usually used
+if the local address is either unknown or irrelevant. If left unspecified, the local IP or IPv6 address will be bound at
+connection time to the address of the network interface used to service the connection.
+Note that no two TCP sockets can be bound to the same port unless the bound IP addresses are different. IPv4 IN<hy>
+ADDR_ANY and IPv6 unspecified addresses compare as equal to any IPv4 or IPv6 address. For example, if a sock<hy>
+et is bound to INADDR_ANY or unspecified address and port X, no other socket can bind to port X, regardless of
+the binding address. This special consideration of INADDR_ANY and unspecified address can be changed using the
+socket option SO_REUSEADDR. If SO_REUSEADDR is set on a socket doing a bind, IPv4 INADDR_ANY and
+IPv6 unspecified address do not compare as equal to any IP address. This means that as long as the two sockets are
+not both bound to INADDR_ANY/unspecified address or the same IP address, the two sockets can be bound to the
+same port.
+ If an application does not want to allow another socket using the SO_REUSEADDR option to bind to a port its
+socket is bound to, the application can set the socket level option SO_EXCLBIND on a socket. The option values of
+0 and 1 mean enabling and disabling the option respectively. Once this option is enabled on a socket, no other sock<hy>
+et can be bound to the same port.
+Once a connection has been established, data can be exchanged using the read(2) and write(2) system calls.
+Under most circumstances, TCP sends data when it is presented. When outstanding data has not yet been acknowl<hy>
+edged, TCP gathers small amounts of output to be sent in a single packet once an acknowledgement has been re<hy>
+ceived. For a small number of clients, such as window systems that send a stream of mouse events which receive no
+replies, this packetization may cause significant delays. To circumvent this problem, TCP provides a socket-level
+boolean option, TCP_NODELAY. TCP_NODELAY is defined in <netinet/tcp.h>, and is set with setsock<hy>
+opt(3SOCKET) and tested with getsockopt(3SOCKET). The option level for the setsockopt() call is the protocol
+number for TCP, available from getprotobyname(3SOCKET).
+For some applications, it may be desirable for TCP not to send out data unless a full TCP segment can be sent. To
+enable this behavior, an application can use the TCP_CORK socket option. When TCP_CORK is set with a non-
+zero value, TCP sends out a full TCP segment only. When TCP_CORK is set to zero after it has been enabled, all
+<beginning of page>
+buffered data is sent out (as permitted by the peer's receive window and the current congestion window).
+TCP_CORK is defined in <netinet/tcp.h>, and is set with setsockopt(3SOCKET) and tested with getsock<hy>
+opt(3SOCKET). The option level for the setsockopt() call is the protocol number for TCP, available from getpro<hy>
+tobyname(3SOCKET).
+The SO_RCVBUF socket level option can be used to control the window that TCP advertises to the peer. IP level
+options may also be used with TCP. See ip(7P) and ip6(7P).
+Another socket level option, SO_RCVBUF, can be used to control the window that TCP advertises to the peer. IP
+level options may also be used with TCP. See ip(7P) and ip6(7P).
+TCP provides an urgent data mechanism, which may be invoked using the out-of-band provisions of send(3SOCK<hy>
+ET). The caller may mark one byte as "urgent" with the MSG_OOB flag to send(3SOCKET). This sets an "urgent
+pointer" pointing to this byte in the TCP stream. The receiver on the other side of the stream is notified of the urgent
+data by a SIGURG signal. The SIOCATMARK ioctl(2) request returns a value indicating whether the stream is at
+the urgent mark. Because the system never returns data across the urgent mark in a single read(2) call, it is possible
+to advance to the urgent data in a simple loop which reads data, testing the socket with the SIOCATMARK ioctl()
+request, until it reaches the mark.
+Incoming connection requests that include an IP source route option are noted, and the reverse source route is used
+in responding.
+A checksum over all data helps TCP implement reliability. Using a window-based flow control mechanism that
+makes use of positive acknowledgements, sequence numbers, and a retransmission strategy, TCP can usually recov<hy>
+er when datagrams are damaged, delayed, duplicated or delivered out of order by the underlying communication
+medium.
+If the local TCP receives no acknowledgements from its peer for a period of time, (for example, if the remote ma<hy>
+chine crashes), the connection is closed and an error is returned.
+TCP follows the congestion control algorithm described in RFC 2581, and also supports the initial congestion win<hy>
+dow (cwnd) changes in RFC 3390. The initial cwnd calculation can be overridden by the socket option
+TCP_INIT_CWND. An application can use this option to set the initial cwnd to a specified number of TCP seg<hy>
+ments. This applies to the cases when the connection first starts and restarts after an idle period. The process must
+have the PRIV_SYS_NET_CONFIG privilege if it wants to specify a number greater than that calculated by RFC
+3390.
+SunOS supports TCP Extensions for High Performance (RFC 1323) which includes the window scale and time
+stamp options, and Protection Against Wrap Around Sequence Numbers (PAWS). SunOS also supports Selective
+Acknowledgment (SACK) capabilities (RFC 2018) and Explicit Congestion Notification (ECN) mechanism (RFC
+3168).
+Turn on the window scale option in one of the following ways: <bu> An application can set SO_SNDBUF or
+SO_RCVBUF size in the setsockopt() option to be larger than 64K. This must be done before the program calls lis<hy>
+ten() or connect(), because the window scale option is negotiated when the connection is established. Once the con<hy>
+nection has been made, it is too late to increase the send or receive window beyond the default TCP limit of 64K. <bu>
+For all applications, use ndd(1M) to modify the configuration parameter tcp_wscale_always. If tcp_wscale_always
+is set to 1, the window scale option will always be set when connecting to a remote system. If tcp_wscale_always is
+0, the window scale option will be set only if the user has requested a send or receive window larger than 64K. The
+default value of tcp_wscale_always is 1. <bu> Regardless of the value of tcp_wscale_always, the window scale option
+will always be included in a connect acknowledgement if the connecting system has used the option.
+Turn on SACK capabilities in the following way: <bu> Use ndd to modify the configuration parameter tcp_sack_per<hy>
+mitted. If tcp_sack_permitted is set to 0, TCP will not accept SACK or send out SACK information. If
+tcp_sack_permitted is set to 1, TCP will not initiate a connection with SACK permitted option in the SYN seg<hy>
+ment, but will respond with SACK permitted option in the SYN|ACK segment if an incoming connection request
+has the SACK permitted option. This means that TCP will only accept SACK information if the other side of the
+connection also accepts SACK information. If tcp_sack_permitted is set to 2, it will both initiate and accept con<hy>
+nections with SACK information. The default for tcp_sack_permitted is 2 (active enabled).
+Turn on TCP ECN mechanism in the following way: <bu> Use ndd to modify the configuration parameter
+tcp_ecn_permitted. If tcp_ecn_permitted is set to 0, TCP will not negotiate with a peer that supports ECN mech<hy>
+anism. If tcp_ecn_permitted is set to 1 when initiating a connection, TCP will not tell a peer that it supports ECN
+mechanism. However, it will tell a peer that it supports ECN mechanism when accepting a new incoming connection
+request if the peer indicates that it supports ECN mechanism in the SYN segment. If tcp_ecn_permitted is set to 2,
+in addition to negotiating with a peer on ECN mechanism when accepting connections, TCP will indicate in the out<hy>
+<beginning of page>
+going SYN segment that it supports ECN mechanism when TCP makes active outgoing connections. The default
+for tcp_ecn_permitted is 1.
+Turn on the time stamp option in the following way: <bu> Use ndd to modify the configuration parameter
+tcp_tstamp_always. If tcp_tstamp_always is 1, the time stamp option will always be set when connecting to a re<hy>
+mote machine. If tcp_tstamp_always is 0, the timestamp option will not be set when connecting to a remote sys<hy>
+tem. The default for tcp_tstamp_always is 0. <bu> Regardless of the value of tcp_tstamp_always, the time stamp op<hy>
+tion will always be included in a connect acknowledgement (and all succeeding packets) if the connecting system
+has used the time stamp option.
+Use the following procedure to turn on the time stamp option only when the window scale option is in effect: <bu> Use
+ndd to modify the configuration parameter tcp_tstamp_if_wscale. Setting tcp_tstamp_if_wscale to 1 will cause
+the time stamp option to be set when connecting to a remote system, if the window scale option has been set. If
+tcp_tstamp_if_wscale is 0, the time stamp option will not be set when connecting to a remote system. The default
+for tcp_tstamp_if_wscale is 1.
+Protection Against Wrap Around Sequence Numbers (PAWS) is always used when the time stamp option is set.
+SunOS also supports multiple methods of generating initial sequence numbers. One of these methods is the im<hy>
+proved technique suggested in RFC 1948. We HIGHLY recommend that you set sequence number generation pa<hy>
+rameters as close to boot time as possible. This prevents sequence number problems on connections that use the
+same connection-ID as ones that used a different sequence number generation. The svc:/network/initial:default ser<hy>
+vice configures the initial sequence number generation. The service reads the value contained in the configuration
+file /etc/default/inetinit to determine which method to use.
+The /etc/default/inetinit file is an unstable interface, and may change in future releases.
+TCP may be configured to report some information on connections that terminate by means of an RST packet. By
+default, no logging is done. If the ndd(1M) parameter tcp_trace is set to 1, then trace data is collected for all new
+connections established after that time.
+The trace data consists of the TCP headers and IP source and destination addresses of the last few packets sent in
+each direction before RST occurred. Those packets are logged in a series of strlog(9F) calls. This trace facility has a
+very low overhead, and so is superior to such utilities as snoop(1M) for non-intrusive debugging for connections ter<hy>
+minating by means of an RST.
+SunOS supports the keep-alive mechanism described in RFC 1122. It is enabled using the socket option
+SO_KEEPALIVE. When enabled, the first keep-alive probe is sent out after a TCP is idle for two hours If the peer
+does not respond to the probe within eight minutes, the TCP connection is aborted. You can alter the interval for
+sending out the first probe using the socket option TCP_KEEPALIVE_THRESHOLD. The option value is an un<hy>
+signed integer in milliseconds. The system default is controlled by the TCP ndd parameter tcp_keepalive_interval.
+The minimum value is ten seconds. The maximum is ten days, while the default is two hours. If you receive no re<hy>
+sponse to the probe, you can use the TCP_KEEPALIVE_ABORT_THRESHOLD socket option to change the time
+threshold for aborting a TCP connection. The option value is an unsigned integer in milliseconds. The value zero in<hy>
+dicates that TCP should never time out and abort the connection when probing. The system default is controlled by
+the TCP ndd parameter tcp_keepalive_abort_interval. The default is eight minutes.
+svcs(1), ndd(1M), ioctl(2), read(2), svcadm(1M), write(2), accept(3SOCKET), bind(3SOCKET), con<hy>
+nect(3SOCKET), getprotobyname(3SOCKET), getsockopt(3SOCKET), listen(3SOCKET), send(3SOCKET),
+smf(5), inet(7P), inet6(7P), ip(7P), ip6(7P)
+Ramakrishnan, K., Floyd, S., Black, D., RFC 3168, The Addition of Explicit Congestion Notification (ECN) to IP,
+September 2001.
+Mathias, M. and Hahdavi, J. Pittsburgh Supercomputing Center; Ford, S. Lawrence Berkeley National Laboratory;
+Romanow, A. Sun Microsystems, Inc. RFC 2018, TCP Selective Acknowledgement Options, October 1996.
+Bellovin, S., RFC 1948, Defending Against Sequence Number Attacks, May 1996.
+Jacobson, V., Braden, R., and Borman, D., RFC 1323, TCP Extensions for High Performance, May 1992.
+Postel, Jon, RFC 793, Transmission Control Protocol - DARPA Internet Program Protocol Specification, Network
+Information Center, SRI International, Menlo Park, CA., September 1981.
+A socket operation may fail if:
+<beginning of page>
+EISCONN A connect() operation was attempted on a socket on which a connect() operation had already been per<hy>
+formed.
+ETIMEDOUT A connection was dropped due to excessive retransmissions.
+ECONNRESET The remote peer forced the connection to be closed (usually because the remote machine has lost
+state information about the connection due to a crash).
+ECONNREFUSED The remote peer actively refused connection establishment (usually because no process is lis<hy>
+tening to the port).
+EADDRINUSE A bind() operation was attempted on a socket with a network address/port pair that has already
+been bound to another socket.
+EADDRNOTAVAIL A bind() operation was attempted on a socket with a network address for which no network
+interface exists.
+EACCES A bind() operation was attempted with a "reserved" port number and the effective user ID of the process
+was not the privileged user.
+ENOBUFS The system ran out of memory for internal data structures.
+The tcp service is managed by the service management facility, smf(5), under the service identifier:
+ svc:/network/initial:default
+Administrative actions on this service, such as enabling, disabling, or requesting restart, can be performed using sv<hy>
+cadm(1M). The service's status can be queried using the svcs(1) command.

@@ -1,0 +1,99 @@
+<beginning of page>
+enable_extended_FILE_stdio <-> enable extended FILE facility within standard I/O
+#include <stdio.h>
+#include <stdio_ext.h>
+#include <signal.h>
+int enable_extended_FILE_stdio(int low_fd, int signal_action);
+The enable_extended_FILE_stdio() function enables the use of the extended FILE facility (see NOTES) and deter<hy>
+mines which, if any, signal will be sent when an application uses FILE->_file inappropriately.
+The low_fd argument specifies the lowest file descriptor in the range 3 through 255 that the application wants to be
+selected as the unallocatable file descriptor. File descriptors 0, 1, and 2 cannot be used because they are reserved for
+use as the default file descriptors underlying the stdin, stdout, and stderr standard I/O streams. The low_fd argu<hy>
+ment can also be set to <mi>1 to request that enable_extended_FILE_stdio() select a "reasonable" unallocatable file
+descriptor. In this case, enable_extended_FILE_stdio() will first attempt to reserve a relatively large file descriptor,
+but will keep trying to find an unallocatable file descriptor until it is known that no file descriptor can be reserved.
+The signal_action argument specifies the signal that will be sent to the process when the unallocatable file descriptor
+is used as a file descriptor argument to any system call except close(2). If signal_action is <mi>1, the default signal
+(SIGABRT) will be sent. If signal_action is 0, no signal will be sent. Otherwise, the signal specified by signal_ac<hy>
+tion will be sent.
+The enable_extended_FILE_stdio() function calls
+ unallocatablefd = fcntl(low_fd, F_BADFD, action);
+to reserve the unallocatable file descriptor and set the signal to be sent if the unallocatable file descriptor is used in a
+system call. If the fcntl(2) call succeeds, the extended FILE facility is enabled and the unallocatable file descriptor
+is saved for later use by the standard I/O functions. When an attempt is made to open a standard I/O stream (see
+fdopen(3C), fopen(3C), and popen(3C)) with an underlying file descriptor greater than 255, the file descriptor is
+stored in an auxiliary location and the field formerly known as FILE->_file is set to the unallocatable file descriptor.
+If the file descriptor limit for the process is less than or equal to 256 (the system default), the application needs to
+raise the limit (see getrlimit(2)) for the extended FILE facility to be useful. The enable_extended_FILE_stdio()
+function does not attempt to change the file descriptor limit.
+This function is used by the extendedFILE(5) preloadable library to enable the extended FILE facility.
+Upon successful completion, enable_extended_FILE_stdio() returns 0. Otherwise, <mi>1 is returned and errno is set
+to indicate the error.
+The enable_extended_FILE_stdio() function will fail if:
+EAGAIN All file descriptors in the inclusive range 3 through 255 refer to files that are currently open in the process.
+EBADF The low_fd argument is greater than 255, or is less than 3 and not equal to -1.
+EEXIST A file descriptor has already been marked by an earlier call to fcntl().
+EINVAL The signal_action argument is not <mi>1, is not 0, and is not a valid signal number.
+The enable_extended_FILE_stdio() function is available only in the 32-bit compilation environment.
+The fdopen(3C), fopen(3C), and popen(3C) functions all enable the use of the extended FILE facility. For source
+changes, a trailing F character in the mode argument can be used with any of these functions if the FILE *fptr is
+used only within the context of a single function or group of functions and not meant to be returned to a caller. All
+of the source code to the application must then be recompiled, thereby exposing any improper usage of the FILE
+structure fields.
+The F character must not be used if the FILE *fptr is to be returned to a caller. The calling application might not
+<beginning of page>
+understand how to process it. Alternatively, the enable_extended_FILE_stdio() function can be used at a higher
+level in the code.
+Use extendedFILE(5) for binary relief. Example 1 Increase the file limit and enable the extended FILE facility.
+The following example demonstrates how to programmatically increase the file limit and enable extended FILE fa<hy>
+cility.
+ (void) getrlimit(RLIMIT_NOFILE, &rlp);
+ rlp.rlim_cur = 1000; /* set the desired number of file descriptors */
+ retval = setrlimit(RLIMIT_NOFILE, &lrp);
+ if (retval == -1) {
+  /* error */
+ }
+ /* enable extended FILE facility */
+ retval = enable_extended_FILE_stdio(-1, SIGABRT);
+ if (retval == -1) {
+  /* error */
+ }
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsl (32-bit) _ Interface StabilityEvolving _ MT-LevelSafe
+close(2), fcntl(2), getrlimit(2), fdopen(3C), fopen(3C), popen(3C), signal.h(3HEAD), stdio(3C), attributes(5),
+extendedFILE(5)
+Historically, 32-bit Solaris applications have been limited to using only the file descriptors 0 through 255 with the
+standard I/O functions (see stdio(3C)) in the C library. The extended FILE facility allows well-behaved 32-bit appli<hy>
+cations to use any valid file descriptor with the standard I/O functions.
+For the purposes of the extended FILE facility, a well-behaved application is one that: <bu> does not directly access any
+fields in the FILE structure pointed to by the FILE pointer associated with any standard I/O stream, <bu> checks all re<hy>
+turn values from standard I/O functions for error conditions, and <bu> behaves appropriately when an error condition is
+reported.
+The extended FILE facility generates EBADF error returns and optionally delivers a signal to the calling process on
+most attempts to use the file descriptor formerly stored in FILE->_file as an argument to a system call when a file
+descriptor value greater than 255 is being used to access the file underlying the corresponding FILE pointer. The
+only exception is that calls to the close() system call will return an EBADF error in this case, but will not deliver the
+signal. The FILE->_file has been renamed to help applications quickly detect code that needs to be updated.
+The extended FILE facility should only be used by well-behaved applications. Although the extended FILE facility
+reports errors, applications that directly reference FILE->_file should be updated to use public interfaces rather than
+rely on implementation details that no longer work as the application expects (see __fbufsize(3C) and fileno(3C).
+This facility takes great care to avoid problems in well-behaved applications while maintaining maximum compati<hy>
+bility. It also attempts to catch dangerous behavior in applications that are not well-behaved as soon as possible and
+to notify those applications as soon as bad behavior is detected.
+There are, however, limitations. For example, if an application enables this facility and is linked with an object file
+that had a standard I/O stream using an extended FILE pointer, and then used the sequence
+ (void) close(FILE->_file);
+ FILE->_file = myfd;
+to attempt to change the file descriptor associated with the stream, undesired results can occur. The close() function
+will fail, but since this usage ignores the return status, the application proceeds to perform low level I/O on
+<beginning of page>
+FILE->_file while calls to standard I/O functions would continue to use the original, extended FILE pointer. If the
+application continues using standard I/O functions after changing FILE->_file, silent data corruption could occur
+because the application thinks it has changed file descriptors with the above assignment but the actual standard I/O
+file descriptor is stored in the auxiliary location. The chances for corruption are even higher if myfd has a value
+greater than 255 and is truncated by the assignment to the 8-bit _file field.
+Since the_file field has been renamed, attempts to recompile this code will fail. The application should be changed
+not to use this field in the FILE structure.
+The application should not use this facility if it uses _file directly, including using the fileno() macro that was provid<hy>
+ed in stdio.h(3HEAD) in Solaris 2.0 through 2.7.

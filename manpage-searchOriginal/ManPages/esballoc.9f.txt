@@ -1,0 +1,43 @@
+<beginning of page>
+esballoc, desballoc <-> allocate a message block using a caller-supplied buffer
+#include <sys/stream.h>
+mblk_t *esballoc(uchar_t *base, size_t size, uint_t pri,
+ frtn_t *fr_rtnp);
+mblk_t *desballoc(uchar_t *base, size_t size, uint_t pri,
+ frtn_t *fr_rtnp);
+esballoc(): Architecture independent level 1 (DDI/DKI)
+desballoc(): Solaris DDI specific (Solaris DDI)
+base Address of caller-supplied data buffer.
+size Number of bytes in data buffer.
+pri Priority of the request (no longer used).
+fr_rtnp Free routine data structure.
+The esballoc() and desballoc() functions operate identically to allocb(9F), except that the data buffer to associate
+with the message is specified by the caller. The allocated message will have both the b_wptr and b_rptr set to the
+supplied data buffer starting at base. Only the buffer itself can be specified by the caller. The message block and data
+block header are allocated as if by allocb(9F).
+When freeb(9F) is called to free the message, the driver's message-freeing routine, referenced through the
+free_rtn(9S) structure, is called with appropriate arguments to free the data buffer.
+The free_rtn(9S) structure includes the following members:
+ void (*free_func)(); /* caller's freeing routine */
+ caddr_t free_arg; /* argument to free_func() */
+Instead of requiring a specific number of arguments, the free_arg field is defined of type caddr_t. This way, the
+driver can pass a pointer to a structure if more than one argument is needed.
+If esballoc() was used, then free_func will be called asynchronously at some point after the message is no longer
+referenced. If desballoc() was used, then free_func will be called synchronously by the thread releasing the final
+reference. See freeb(9F).
+The free_func routine must not sleep, and must not access any dynamically allocated data structures that could be
+freed before or during its execution. In addition, because messages allocated with desballoc() are freed in the con<hy>
+text of the caller, free_func must not call another module's put procedure, or attempt to acquire a private module
+lock which might be held by another thread across a call to a STREAMS utility routine that could free a message
+block. Finally, free_func routines specified using desballoc may run in interrupt context and thus must only use syn<hy>
+chronization primitives that include an interrupt priority returned from ddi_intr_get_pri(9F) or ddi_intr_get_soft<hy>
+int_pri(9F). If any of these restrictions are not followed, the possibility of lock recursion or deadlock exists.
+On success, a pointer to the newly allocated message block is returned. On failure, NULL is returned.
+The esballoc() and desballoc() functions can be called from user, interrupt, or kernel context.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+<beginning of page>
+Committed
+allocb(9F), ddi_intr_get_pri(9F), ddi_intr_get_softint_pri(9F), freeb(9F), datab(9S), free_rtn(9S)
+Writing Device Drivers
+STREAMS Programming Guide

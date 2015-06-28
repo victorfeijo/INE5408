@@ -1,0 +1,98 @@
+<beginning of page>
+devmap_devmem_setup, devmap_umem_setup <-> set driver memory mapping parameters
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+int devmap_devmem_setup(devmap_cookie_t dhp, dev_info_t *dip,
+ struct devmap_callback_ctl *callbackops, uint_t rnumber,
+ offset_t roff, size_t len, uint_t maxprot,
+ uint_t flags, ddi_device_acc_attr_t *accattrp);
+int devmap_umem_setup(devmap_cookie_t dhp, dev_info_t *dip,
+ struct devmap_callback_ctl *callbackops, ddi_umem_cookie_t cookie,
+ offset_t koff, size_t len, uint_t maxprot, uint_t flags,
+ ddi_device_acc_attr_t *accattrp);
+Solaris DDI specific (Solaris DDI).
+devmap_devmem_setup() parameters:
+dhp An opaque mapping handle that the system uses to describe the mapping.
+dip Pointer to the device's dev_info structure.
+callbackops Pointer to a devmap_callback_ctl(9S) structure. The structure contains pointers to device driver-sup<hy>
+plied functions that manage events on the device mapping. The framework will copy the structure to the system pri<hy>
+vate memory.
+rnumber Index number to the register address space set.
+roff Offset into the register address space.
+len Length (in bytes) of the mapping to be mapped.
+maxprot Maximum protection flag possible for attempted mapping. Some combinations of possible settings are:
+PROT_READ Read access is allowed.
+PROT_WRITE Write access is allowed.
+PROT_EXEC Execute access is allowed.
+PROT_USER User-level access is allowed. The mapping is done as a result of a mmap(2) system call.
+PROT_ALL All access is allowed.
+flags Used to determine the cache attribute.
+Possible values of the cache attribute are:
+IOMEM_DATA_CACHED The CPU can cache the data it fetches and push it to memory at a later time. This is the
+default attribute that is used if no cache attributes are specified.
+<beginning of page>
+IOMEM_DATA_UC_WR_COMBINE The CPU never caches the data, but writes can occur out of order or can be
+combined. Reordering is implied.
+If IOMEM_DATA_UC_WR_COMBINE is specified but not supported, IOMEM_DATA_UNCACHED is used
+instead.
+IOMEM_DATA_UNCACHED The CPU never caches data, but has uncacheable access to memory. Strict ordering
+is implied.
+The cache attributes are mutually exclusive. Any combination of the values leads to a failure. On the SPARC archi<hy>
+tecture, only IOMEM_DATA_CACHED is meaningful. Others lead to a failure.
+accattrp Pointer to a ddi_device_acc_attr() structure of the device. See ddi_device_acc_attr(9S). The value in de<hy>
+vacc_attr_dataorder is ignored in the current release. The value in devacc_attr_endian_flags is meaningful on the
+SPARC architecture only.
+devmap_umem_setup() parameters:
+dhp An opaque data structure that the system uses to describe the mapping.
+dip Pointer to the device's dev_info structure.
+callbackops Pointer to a devmap_callback_ctl(9S) structure. The structure contains pointers to device driver-sup<hy>
+plied functions that manage events on the device mapping.
+cookie A kernel memory cookie (see ddi_umem_alloc(9F)).
+koff Offset into the kernel memory defined by cookie.
+len Length (in bytes) of the mapping to be mapped.
+maxprot Maximum protection flag possible for attempted mapping. Some combinations of possible settings are:
+PROT_READ Read access is allowed.
+PROT_WRITE Write access is allowed.
+PROT_EXEC Execute access is allowed.
+PROT_USER User-level access is allowed (the mapping is being done as a result of a mmap(2) system call).
+PROT_ALL All access is allowed.
+flags Must be set to 0.
+accattrp Pointer to a ddi_device_acc_attr(9S) structure. Ignored in the current release. Reserved for future use.
+The devmap_devmem_setup() and devmap_umem_setup() functions are used in the devmap(9E) entry point to
+<beginning of page>
+pass mapping parameters from the driver to the system.
+The dhp argument specifies a device mapping handle that the system uses to store all mapping parameters of a phys<hy>
+ical contiguous memory. The system copies the data pointed to by callbackops to a system private memory. This al<hy>
+lows the driver to free the data after returning from either devmap_devmem_setup() or devmap_umem_setup().
+The driver is notified of user events on the mappings via the entry points defined by devmap_callback_ctl(9S). The
+driver is notified of the following user events:
+Mapping Setup User has called mmap(2) to create a mapping to the device memory.
+Access User has accessed an address in the mapping that has no translations.
+Duplication User has duplicated the mapping. Mappings are duplicated when the process calls fork(2).
+Unmapping User has called munmap(2) on the mapping or is exiting, exit(2).
+See devmap_map(9E), devmap_access(9E), devmap_dup(9E), and devmap_unmap(9E) for details on these entry
+points.
+By specifying a valid callbackops to the system, device drivers can manage events on a device mapping. For exam<hy>
+ple, the devmap_access(9E) entry point allows the drivers to perform context switching by unloading the mappings
+of other processes and to load the mapping of the calling process. Device drivers may specify NULL to callbackops
+which means the drivers do not want to be notified by the system.
+The maximum protection allowed for the mapping is specified in maxprot. accattrp defines the device access at<hy>
+tributes. See ddi_device_acc_attr(9S) for more details.
+devmap_devmem_setup() is used for device memory to map in the register set given by rnumber and the offset into
+the register address space given by roff. The system uses rnumber and roff to go up the device tree to get the physical
+address that corresponds to roff. The range to be affected is defined by len and roff. The range from roff to roff + len
+must be a physical contiguous memory and page aligned.
+Drivers use devmap_umem_setup() for kernel memory to map in the kernel memory described by cookie and the
+offset into the kernel memory space given by koff. cookie is a kernel memory pointer obtained from ddi_umem_al<hy>
+loc(9F). If cookie is NULL, devmap_umem_setup() returns -1. The range to be affected is defined by len and koff.
+The range from koff to koff + len must be within the limits of the kernel memory described by koff + len and must be
+page aligned.
+Drivers use devmap_umem_setup() to export the kernel memory allocated by ddi_umem_alloc(9F) to user space.
+The system selects a user virtual address that is aligned with the kernel virtual address being mapped to avoid cache
+incoherence if the mapping is not MAP_FIXED.
+0 Successful completion.
+-1 An error occurred.
+devmap_devmem_setup() and devmap_umem_setup() can be called from user, kernel, and interrupt context.
+exit(2), fork(2), mmap(2), munmap(2), devmap(9E), ddi_umem_alloc(9F), ddi_device_acc_attr(9S), de<hy>
+vmap_callback_ctl(9S)
+Writing Device Drivers

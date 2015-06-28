@@ -1,0 +1,95 @@
+<beginning of page>
+dat_rmr_bind <-> bind the RMR to the specified memory region within an LMR
+cc [ flag... ] file... -ldat [ library... ]
+#include <dat/udat.h>
+DAT_RETURN
+ dat_rmr_bind(
+ IN DAT_RMR_HANDLE rmr_handle,
+ IN DAT_LMR_TRIPLET *lmr_triplet,
+ IN DAT_MEM_PRIV_FLAGS mem_privileges,
+ IN DAT_EP_HANDLE ep_handle,
+ IN DAT_RMR_COOKIE user_cookie,
+ IN DAT_COMPLETION_FLAGS completion_flags,
+ OUT DAT_RMR_CONTEXT *rmr_context
+ )
+rmr_handle Handle for an RMR instance.
+lmr_triplet A pointer to an lmr_triplet that defines the memory region of the LMR.
+mem_privileges Consumer-requested memory access privileges for the registered remote memory region. The De<hy>
+fault value is DAT_MEM_PRIV_NONE_FLAG. The constant value DAT_MEM_PRIV_ALL_FLAG = 0x33,
+which specifies both Read and Write privileges, is also defined. Memory privilege definitions are as follows:
+Remote Read DAT_MEM_PRIV_REMOTE_READ_FLAG
+0x02 Remote read access requested.
+Remote Write DAT_MEM_PRIV_REMOTE_WRITE_FLAG
+0x20 Remote write access requested.
+ep_handle Endpoint to which dat_rmr_bind() is posted.
+user_cookie User-provided cookie that is returned to a Consumer at the completion of the dat_rmr_bind(). Can be
+NULL.
+completion_flags Flags for RMR Bind. The default DAT_COMPLETION_DEFAULT_FLAG is 0. Flag definitions
+are as follows:
+Completion Suppression DAT_COMPLETION_SUPPRESS_FLAG
+0x01 Suppress successful Completion.
+Notification of Completion DAT_COMPLETION_UNSIGNALLED_FLAG
+0x04 Non-notification completion. Local Endpoint must be configured for Notification Suppression.
+Barrier Fence DAT_COMPLETION_BARRIER_FENCE_FLAG
+0x08 Request for Barrier Fence.
+<beginning of page>
+rmr_context New rmr_context for the bound RMR suitable to be shared with a remote host.
+The dat_rmr_bind() function binds the RMR to the specified memory region within an LMR and provides the new
+rmr_context value. The dat_rmr_bind() operation is a lightweight asynchronous operation that generates a new
+rmr_context. The Consumer is notified of the completion of this operation through a rmr_bind Completion event on
+the request_evd_handle of the specified Endpoint ep_handle.
+The return value of rmr_context can be transferred by local Consumer to a Consumer on a remote host to be used for
+an RDMA DTO. The use of rmr_context by a remote host for an RDMA DTO prior to the completion of the
+dat_rmr_bind() can result in an error and a broken connection. The local Consumer can ensure that the remote
+Consumer does not have rmr_context before dat_rmr_bind() is completed. One way is to "wait" for the completion
+dat_rmr_bind() on the rmr_bind Event Dispatcher of the specified Endpoint ep_handle. Another way is to send
+rmr_context in a Send DTO over the connection of the Endpoint ep_handle. The barrier-fencing behavior of the
+dat_rmr_bind() with respect to Send and RDMA DTOs ensures that a Send DTO does not start until
+dat_rmr_bind() completed.
+The dat_rmr_bind() function automatically fences all Send, RDMA Read, and RDMA Write DTOs and
+dat_rmr_bind() operations submitted on the Endpoint ep_handle after the dat_rmr_bind(). Therefore, none of
+these operations starts until dat_rmr_bind() is completed.
+If the RMR Bind fails after dat_rmr_bind() returns, connection of ep_handle is broken. The Endpoint transitions
+into a DAT_EP_STATE_DISCONNECTED state and the DAT_CONNECTION_EVENT_BROKEN event is
+delivered to the connect_evd_handle of the Endpoint.
+The dat_rmr_bind() function employs fencing to ensure that operations sending the RMR Context on the same
+Endpoint as the bind specified cannot result in an error from the peer side using the delivered RMR Context too
+soon. One method, used by InfiniBand, is to ensure that none of these operations start on the Endpoint until after the
+bind is completed. Other transports can employ different methods to achieve the same goal.
+Any RDMA DTO that uses the previous value of rmr_context after the dat_rmr_bind() is completed fail and report
+a protection violation.
+By default, dat_rmr_bind() generates notification completions.
+The mem_privileges parameter allows Consumers to restrict the type of remote accesses to the registered RMR by
+RDMA DTOs. Providers whose underlying Transports require that privileges of the requested RMR and the associ<hy>
+ated LMR match, that is <bu> Set RMR's DAT_MEM_PRIV_REMOTE_READ_FLAG requires that LMR's
+DAT_MEM_PRIV_LOCAL_READ_FLAG is also set, <bu> Set RMR's DAT_MEM_PRIV_RE<hy>
+MOTE_WRITE_FLAG requires that LMR's DAT_MEM_PRIV_LOCAL_WRITE_FLAG is also set,
+or the operation fails and returns DAT_PRIVILEGES_VIOLATION.
+In the lmr_triplet, the value of length of zero means that the Consumer does not want to associate an RMR with any
+memory region within the LMR and the return value of rmr_context for that case is undefined.
+The completion of the posted RMR Bind is reported to the Consumer asynchronously through a DTO Completion
+event based on the specified completion_flags value. The value of DAT_COMPLE<hy>
+TION_UNSIGNALLED_FLAG is only valid if the Endpoint Request Completion Flags DAT_COMPLE<hy>
+TION_UNSIGNALLED_FLAG. Otherwise, DAT_INVALID_PARAMETER is returned.
+The user_cookie parameter allows Consumers to have unique identifiers for each dat_rmr_bind(). These identifiers
+are completely under user control and are opaque to the Provider. The Consumer is not required to ensure the
+uniqueness of the user_cookie value. The user_cookie is returned to the Consumer in the rmr_bind Completion
+event for this operation.
+The operation is valid for the Endpoint in the DAT_EP_STATE_CONNECTED and DAT_EP_STATE_DISCON<hy>
+NECTED states. If the operation returns successfully for the Endpoint in DAT_EP_STATE_DISCONNECTED
+state, the posted RMR Bind is immediately flushed to request_evd_handle.
+DAT_SUCCESS The operation was successful.
+<beginning of page>
+DAT_INSUFFICIENT_RESOURCES The operation failed due to resource limitations.
+DAT_INVALID_PARAMETER Invalid parameter. For example, the target_address or segment_length exceeded
+the limits of the existing LMR.
+DAT_INVALID_HANDLE Invalid DAT handle.
+DAT_INVALID_STATE Parameter in an invalid state. Endpoint was not in the a DAT_EP_STATE_CONNECT<hy>
+ED or DAT_EP_STATE_DISCONNECTED state.
+DAT_MODEL_NOT_SUPPORTED The requested Model was not supported by the Provider.
+DAT_PRIVILEGES_VIOLATION Privileges violation for local or remote memory access.
+DAT_PROTECTION_VIOLATION Protection violation for local or remote memory access.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Standard: uDAPL, 1.1, 1.2 _ MT-LevelUnsafe
+libdat(3LIB), attributes(5)

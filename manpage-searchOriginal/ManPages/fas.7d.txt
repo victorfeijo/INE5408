@@ -1,0 +1,267 @@
+<beginning of page>
+fas <-> FAS SCSI Host Bus Adapter Driver
+fas@sbus-slot,0x8800000
+The fas Host Bus Adapter driver is a SCSA compliant nexus driver that supports the Qlogic FAS366 SCSI chip.
+The fas driver supports the standard functions provided by the SCSA interface. The driver supports tagged and un<hy>
+tagged queuing, wide and fast SCSI, almost unlimited transfer size (using a moving DVMA window approach), and
+auto request sense; but it does not support linked commands.
+The fas driver can be configured by defining properties in fas.conf which override the global SCSI settings. Sup<hy>
+ported properties are: scsi-options, target<n>-scsi-options, scsi-reset-delay, scsi-watchdog-tick, scsi-tag-age-lim<hy>
+it, scsi-initiator-id.
+target<n>-scsi-options overrides the scsi-options property value for target<n>. <n> can vary from decimal 0 to 15.
+The supported scsi-options are: SCSI_OPTIONS_DR, SCSI_OPTIONS_SYNC, SCSI_OPTIONS_TAG, SC<hy>
+SI_OPTIONS_FAST, and SCSI_OPTIONS_WIDE.
+After periodic interval scsi-watchdog-tick, the fas driver searches all current and disconnected commands for time<hy>
+outs.
+scsi-tag-age-limit is the number of times that the fas driver attempts to allocate a particular tag ID that is currently
+in use after going through all tag IDs in a circular fashion. After finding the same tag ID in use scsi-tag-age-limit
+times, no more commands will be submitted to this target until all outstanding commands complete or timeout.
+Refer to scsi_hba_attach(9F) for details. Example 1 A sample of fas configuration file
+Create a file called /kernel/drv/fas.conf and add this line:
+scsi-options=0x78;
+This disables tagged queuing, Fast SCSI, and Wide mode for all fas instances. The following example disables an
+option for one specific fas (refer to driver.conf(4) for more details):
+  name="fas" parent="/iommu@f,e0000000/sbus@f,e0001000"
+  reg=3,0x8800000,0x10,3,0x8810000,0x40
+  target1-scsi-options=0x58
+  scsi-options=0x178 scsi-initiator-id=6;
+Note that the default initiator ID in OBP is 7 and that the change to ID 6 will occur at attach time. It may be prefer<hy>
+able to change the initiator ID in OBP.
+The example above sets scsi-options for target 1 to 0x58 and all other targets on this SCSI bus to 0x178.
+The physical pathname of the parent can be determined using the /devices tree or following the link of the logical
+device name:
+  # ls -l /dev/rdsk/c1t3d0s0
+  lrwxrwxrwx 1 root other 78 Aug 28 16:05 /dev/rdsk/c1t3d0s0 ->
+ ../../devices/iommu@f,e0000000 sbus@f,e0001000/SUNW,fas@3,8800000/sd@3,0:a,raw
+Determine the register property values using the output from prtconf(1M) (with the -v option):
+ SUNW,fas, instance #0
+  ....
+  Register Specifications:
+<beginning of page>
+  Bus Type=0x3, Address=0x8800000, Size=10
+  Bus Type=0x3, Address=0x8810000, Size=40
+scsi-options can also be specified per device type using the device inquiry string. All the devices with the same in<hy>
+quiry string will have the same scsi-options set. This can be used to disable some scsi-options on all the devices of
+the same type.
+ device-type-scsi-options-list=
+  "TOSHIBA XM5701TASUN12XCD", "cd-scsi-options";
+ cd-scsi-options = 0x0;
+The above entry in /kernel/drv/fas.conf sets the scsi-options for all devices with inquiry string TOSHIBA
+XM5701TASUN12XCD to cd-scsi-options. To get the inquiry string, run the probe-scsi or probe-scsi-all com<hy>
+mand at the ok prompt before booting the system.
+To set scsi-options more specifically per target:
+ target1-scsi-options=0x78;
+ device-type-scsi-options-list =
+  "SEAGATE ST32550W", "seagate-scsi-options" ;
+ seagate-scsi-options = 0x58;
+ scsi-options=0x3f8;
+The above sets scsi-options for target 1 to 0x78 and for all other targets on this SCSI bus to 0x3f8 except for one
+specific disk type which will have scsi-options set to 0x58.
+scsi-options specified per target ID have the highest precedence, followed by scsi-options per device type. Global
+fas scsi-options (effecting all instances) per bus have the lowest precedence.
+The system needs to be rebooted before the specified scsi-options take effect.
+The target driver needs to set capabilities in the fas driver in order to enable some driver features. The target driver
+can query and modify these capabilities: synchronous, tagged-qing, wide-xfer, auto-rqsense, qfull-retries, qfull-
+retry-interval. All other capabilities can only be queried.
+By default, tagged-qing, auto-rqsense, and wide-xfer capabilities are disabled, while disconnect, synchronous,
+and untagged-qing are enabled. These capabilities can only have binary values (0 or 1). The default value for qfull-
+retries is 10 and the default value for qfull-retry-interval is 100. The qfull-retries capability is a uchar_t (0 to
+255) while qfull-retry-interval is a ushort_t (0 to 65535).
+The target driver needs to enable tagged-qing and wide-xfer explicitly. The untagged-qing capability is always
+enabled and its value cannot be modified, because fas can queue commands even when tagged-qing is disabled.
+Whenever there is a conflict between the value of scsi-options and a capability, the value set in scsi-options prevails.
+Only whom != 0 is supported in the scsi_ifsetcap(9F) call.
+Refer to scsi_ifsetcap(9F) and scsi_ifgetcap(9F) for details.
+/kernel/drv/fas ELF Kernel Module
+/kernel/drv/fas.conf Optional configuration file
+See attributes(5) for descriptions of the following attributes:
+<beginning of page>
+tab() box; cw(2.21i) |cw(3.29i) lw(2.21i) |lw(3.29i) ATTRIBUTE TYPEATTRIBUTE VALUE _ ArchitectureT{
+Limited to Sparc SBus-based systems with FAS366-based SCSI port and SunSWIFT SBus SCSI Host Adapter/Fast
+Ethernet option. T}
+prtconf(1M), driver.conf(4), attributes(5), scsi_abort(9F), scsi_hba_attach(9F), scsi_ifgetcap(9F), scsi_ifset<hy>
+cap(9F), scsi_reset(9F), scsi_sync_pkt(9F), scsi_transport(9F), scsi_device(9S), scsi_extended_sense(9S), sc<hy>
+si_inquiry(9S), scsi_pkt(9S)
+Writing Device Drivers
+ANSI Small Computer System Interface-2 (SCSI-2)
+QLogic Corporation, FAS366 Technical Manuals.
+The messages described below are some that may appear on the system console, as well as being logged.
+The first five messages may be displayed while the fas driver is trying to attach; these messages mean that the fas
+driver was unable to attach. All of these messages are preceded by "fas%d", where "%d" is the instance number of
+the fas controller.
+Device in slave-only slot
+The SBus device has been placed in a slave-only slot and will not be accessible; move to non-slave-only SBus slot.
+Device is using a hilevel intr
+The device was configured with an interrupt level that cannot be used with this fas driver. Check the SBus device.
+Cannot alloc dma handle
+Driver was unable to allocate memory for a DMA controller.
+Cannot alloc cmd area
+Driver was unable to allocate memory for a command address.
+Cannot create kmem_cache
+Driver was unable to allocate memory for internal data structures.
+Unable to map FAS366 registers
+Driver was unable to map device registers; check for bad hardware. Driver did not attach to device; SCSI devices
+will be inaccessible.
+Cannot add intr
+Driver could not add its interrupt service routine to the kernel.
+Cannot map dma
+Driver was unable to locate a DMA controller. This is an auto-configuration error.
+Cannot bind cmdarea
+Driver was unable to bind the DMA handle to an address.
+<beginning of page>
+Cannot create devctl minor node
+Driver is unable to create a minor node for the controller.
+Cannot attach
+The driver was unable to attach; usually follows another warning that indicates why attach failed.
+Disabled TQ since disconnects are disabled
+Tagged queuing was disabled because disconnects were disabled in scsi-options.
+Bad clock frequency
+Check for bad hardware.
+Sync of pkt (<address>) failed
+Syncing a SCSI packet failed. Refer to scsi_sync_pkt(9F).
+All tags in use!
+The driver could not allocate another tag number. The target devices do not properly support tagged queuing.
+Gross error in FAS366 status
+The driver experienced severe SCSI bus problems. Check cables and terminator.
+Spurious interrupt
+The driver received an interrupt while the hardware was not interrupting.
+Lost state in phasemanage
+The driver is confused about the state of the SCSI bus.
+Unrecoverable DMA error during selection
+The DMA controller experienced host SBus problems. Check for bad hardware.
+Bad sequence step (<step number>) in selection
+The FAS366 hardware reported a bad sequence step. Check for bad hardware.
+Undetermined selection failure
+The selection of a target failed unexpectedly. Check for bad hardware.
+Target <n>: failed reselection (bad reselect bytes)
+A reconnect failed, target sent incorrect number of message bytes. Check for bad hardware.
+Target <n>: failed reselection (bad identify message)
+A reconnect failed, target didn't send identify message or it got corrupted. Check for bad hardware.
+<beginning of page>
+Target <n>: failed reselection (not in msgin phase)
+Incorrect SCSI bus phase after reconnection. Check for bad hardware.
+Target <n>: failed reselection (unexpected bus free)
+Incorrect SCSI bus phase after reconnection. Check for bad hardware.
+Target <n>: failed reselection (timeout on receiving tag msg)
+A reconnect failed; target failed to send tag bytes. Check for bad hardware.
+Target <n>: failed reselection (botched tag)
+A reconnect failed; target failed to send tag bytes. Check for bad hardware.
+Target <n>: failed reselection (invalid tag)
+A reconnect failed; target sent incorrect tag bytes. Check for bad hardware.
+Target <n>: failed reselection (Parity error in reconnect msg's)
+A reconnect failed; parity error detected. Check for bad hardware.
+Target <n>: failed reselection (no command)
+A reconnect failed; target accepted abort or reset, but still tries to reconnect. Check for bad hardware.
+Unexpected bus free
+Target disconnected from the bus without notice. Check for bad hardware.
+Target <n> didn't disconnect after sending <message>
+The target unexpectedly did not disconnect after sending <message>.
+Bad sequence step (0x?) in selection
+The sequence step register shows an improper value. The target might be misbehaving.
+Illegal dma boundary?
+An attempt was made to cross a boundary that the driver could not handle.
+Unwanted data xfer direction for Target <n>
+The target went into an unexpected phase.
+Unrecoverable DMA error on dma <send/receive>
+There is a DMA error while sending/receiving data. The host DMA controller is experiencing some problems.
+SCSI bus DATA IN phase parity error
+The driver detected parity errors on the SCSI bus.
+<beginning of page>
+SCSI bus MESSAGE IN phase parity error
+The driver detected parity errors on the SCSI bus.
+SCSI bus STATUS phase parity error
+The driver detected parity errors on the SCSI bus.
+Premature end of extended message
+An extended SCSI bus message did not complete. Suspect a target firmware problem.
+Premature end of input message
+A multibyte input message was truncated. Suspect a target firmware problem.
+Input message botch
+The driver is confused about messages coming from the target.
+Extended message <n> is too long
+The extended message sent by the target is longer than expected.
+<name> message <n> from Target <m> garbled
+Target <m> sent message <name> of value <n> which the driver did not understand.
+Target <n> rejects our message <name>
+Target <n> rejected a message sent by the driver.
+Rejecting message <name> from Target <n>
+The driver rejected a message received from target <n>.
+Cmd transmission error
+The driver was unable to send out command bytes.
+Target <n> refused message resend
+The target did not accept a message resend.
+MESSAGE OUT phase parity error
+The driver detected parity errors on the SCSI bus.
+Two byte message <name> <value> rejected
+The driver does not accept this two byte message.
+Gross error in fas status <stat>
+The fas chip has indicated a gross error like FIFO overflow.
+<beginning of page>
+Polled cmd failed (target busy)
+A polled command failed because the target did not complete outstanding commands within a reasonable time.
+Polled cmd failed
+A polled command failed because of timeouts or bus errors.
+Auto request sense failed
+Driver is unable to get request sense from the target.
+Disconnected command timeout for Target <id>.<lun>
+A timeout occurred while target id/lun was disconnected. This is usually a target firmware problem. For tagged
+queuing targets, <n> commands were outstanding when the timeout was detected.
+Disconnected tagged cmds (<n>) timeout for Target <id>.<lun>
+A timeout occurred while target id/lun was disconnected. This is usually a target firmware problem. For tagged
+queuing targets, <n> commands were outstanding when the timeout was detected.
+Connected command timeout for Target <id>.<lun>
+This is usually a SCSI bus problem. Check cables and termination.
+Target <id>.<lun> reverting to async. mode
+A data transfer hang was detected. The driver attempts to eliminate this problem by reducing the data transfer rate.
+Target <id>.<lun> reducing sync. transfer rate
+A data transfer hang was detected. The driver attempts to eliminate this problem by reducing the data transfer rate.
+Reverting to slow SCSI cable mode
+A data transfer hang was detected. The driver attempts to eliminate this problem by reducing the data transfer rate.
+Target <id> reducing sync. transfer rate
+A data transfer hang was detected. The driver attempts to eliminate this problem by reducing the data transfer rate.
+Target <id> reverting to async. mode
+A data transfer hang was detected. The driver attempts to eliminate this problem by reducing the data transfer rate.
+Target <id> disabled wide SCSI mode
+Due to problems on the SCSI bus, the driver goes into more conservative mode of operation to avoid further prob<hy>
+lems.
+Reset SCSI bus failed
+An attempt to reset the SCSI bus failed.
+External SCSI bus reset
+Another initiator reset the SCSI bus.
+<beginning of page>
+The fas hardware (FAS366) supports both Wide and Fast SCSI mode, but fast20 is not supported. The maximum
+SCSI bandwidth is 20 MB/sec. Initiator mode block sequence (IBS) is not supported.
+The fas driver exports properties indicating per target the negotiated transfer speed (target<n>-sync-speed),
+whether wide bus is supported (target<n>-wide), scsi-options for that particular target (target<n>-scsi-options),
+and whether tagged queuing has been enabled (target<n>-TQ). The sync-speed property value is the data transfer
+rate in KB/sec. The target<n>-TQ and the target<n>-wide property have value 1 to indicate that the correspond<hy>
+ing capability is enabled, or 0 to indicate that the capability is disabled for that target. Refer to prtconf(1M) (ver<hy>
+bose option) for viewing the fas properties.
+ SUNW,fas,instance #1
+  Driver software properties:
+  name <target3-TQ> length <4>
+  value <0x00000001>.
+  name <target3-wide> length <4>
+  value <0x00000000>.
+  name <target3-sync-speed> length <4>
+  value <0x00002710>.
+  name <target3-scsi-options> length <4>
+  value <0x000003f8>.
+  name <target0-TQ> length <4>
+  value <0x00000001>.
+  name <pm_norm_pwr> length <4>
+  value <0x00000001>.
+  name <pm_timestamp> length <4>
+  value <0x30040346>.
+  name <scsi-options> length <4>
+  value <0x000003f8>.
+  name <scsi-watchdog-tick> length <4>
+  value <0x0000000a>.
+  name <scsi-tag-age-limit> length <4>
+  value <0x00000002>.
+  name <scsi-reset-delay> length <4>
+  value <0x00000bb8>.
+  Register Specifications:
+  Bus Type=0x3, Address=0x8800000, Size=10
+  Bus Type=0x3, Address=0x8810000, Size=40
+  Interrupt Specifications:
+  Interrupt Priority=0x35 (ipl 5)

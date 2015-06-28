@@ -1,0 +1,197 @@
+<beginning of page>
+login <-> sign on to the system
+login [-p] [-d device] [-R repository] [-s service]
+ [-t terminal] [-u identity] [-U ruser]
+ [-h hostname [terminal] | -r hostname]
+ [name [environ]...]
+The login command is used at the beginning of each terminal session to identify oneself to the system. login is in<hy>
+voked by the system when a connection is first established, after the previous user has terminated the login shell by
+issuing the exit command.
+If login is invoked as a command, it must replace the initial command interpreter. To invoke login in this fashion,
+type:
+ exec login
+from the initial shell. The C shell and Korn shell have their own built-ins of login. See ksh(1), ksh93(1), and csh(1)
+for descriptions of login built-ins and usage.
+login asks for your user name, if it is not supplied as an argument, and your password, if appropriate. Where possi<hy>
+ble, echoing is turned off while you type your password, so it does not appear on the written record of the session.
+If you make any mistake in the login procedure, the message:
+ Login incorrect
+is printed and a new login prompt appears. If you make five incorrect login attempts, all five can be logged in
+/var/adm/loginlog, if it exists. The TTY line is dropped.
+If password aging is turned on and the password has aged (see passwd(1) for more information), the user is forced
+to changed the password. In this case the /etc/nsswitch.conf file is consulted to determine password repositories (see
+nsswitch.conf(4)). The password update configurations supported are limited to the following five cases. <bu> passwd:
+files <bu> passwd: files nis <bu> passwd: files nisplus <bu> passwd: compat (==> files nis) <bu> passwd: compat (==> files nis<hy>
+plus)
+passwd_compat: nisplus
+Failure to comply with the configurations prevents the user from logging onto the system because passwd(1) fails. If
+you do not complete the login successfully within a certain period of time, it is likely that you are silently discon<hy>
+nected.
+After a successful login, accounting files are updated. Device owner, group, and permissions are set according to the
+contents of the /etc/logindevperm file, and the time you last logged in is printed (see logindevperm(4)).
+The user-ID, group-ID, supplementary group list, and working directory are initialized, and the command interpreter
+(usually ksh) is started.
+The basic environment is initialized to:
+ HOME=your-login-directory
+ LOGNAME=your-login-name
+ PATH=/usr/bin:
+ SHELL=last-field-of-passwd-entry
+ MAIL=/var/mail/
+ TZ=timezone-specification
+For Bourne shell and Korn shell logins, the shell executes /etc/profile and $HOME/.profile, if it exists.
+For the ksh93 Korn shell, an interactive shell then executes /etc/ksh.kshrc, followed by the file specified by the
+ENV environment variable. If $ENV is not set, this defaults to $HOME/.kshrc. For the ksh and /usr/xpg4/bin/sh
+Korn Shell, an interactive shell executes the file named by $ENV (no default).
+<beginning of page>
+For C shell logins, the shell executes /etc/.login, $HOME/.cshrc, and $HOME/.login. The default /etc/profile and
+/etc/.login files check quotas (see quota(1M)), print /etc/motd, and check for mail. None of the messages are print<hy>
+ed if the file $HOME/.hushlogin exists. The name of the command interpreter is set to <mi> (dash), followed by the
+last component of the interpreter's path name, for example, <mi>sh.
+If the login-shell field in the password file (see passwd(4)) is empty, then the default command interpreter,
+/usr/bin/sh, is used. If this field is * (asterisk), then the named directory becomes the root directory. At that point,
+login is re-executed at the new level, which must have its own root structure.
+The environment can be expanded or modified by supplying additional arguments to login, either at execution time
+or when login requests your login name. The arguments can take either the form xxx or xxx=yyy. Arguments without
+an = (equal sign) are placed in the environment as:
+ Ln=xxx
+where n is a number starting at 0 and is incremented each time a new variable name is required. Variables containing
+an = (equal sign) are placed in the environment without modification. If they already appear in the environment, then
+they replace the older values.
+There are two exceptions: The variables PATH and SHELL cannot be changed. This prevents people logged into re<hy>
+stricted shell environments from spawning secondary shells that are not restricted. login understands simple single-
+character quoting conventions. Typing a \ (backslash) in front of a character quotes it and allows the inclusion of
+such characters as spaces and tabs.
+Alternatively, you can pass the current environment by supplying the -p flag to login. This flag indicates that all cur<hy>
+rently defined environment variables should be passed, if possible, to the new environment. This option does not by<hy>
+pass any environment variable restrictions mentioned above. Environment variables specified on the login line take
+precedence, if a variable is passed by both methods.
+To enable remote logins by root, edit the /etc/default/login file by inserting a # (pound sign) before the CON<hy>
+SOLE=/dev/console entry. See FILES.
+For accounts in name services which support automatic account locking, the account can be configured to be auto<hy>
+matically locked (see user_attr(4) and policy.conf(4)) if successive failed login attempts equals or exceeds RE<hy>
+TRIES. Currently, only the files repository (see passwd(4) and shadow(4)) supports automatic account locking. See
+also pam_unix_auth(5).
+The login command uses pam(3PAM) for authentication, account management, session management, and password
+management. The PAM configuration policy, listed through /etc/pam.conf, specifies the modules to be used for lo<hy>
+gin. Here is a partial pam.conf file with entries for the login command using the UNIX authentication, account man<hy>
+agement, and session management modules:
+ login auth required pam_authtok_get.so.1
+ login auth required pam_dhkeys.so.1
+ login auth required pam_unix_auth.so.1
+ login auth required pam_dial_auth.so.1
+ login account requisite pam_roles.so.1
+ login account required pam_unix_account.so.1
+ login session required pam_unix_session.so.1
+The Password Management stack looks like the following:
+ other password required pam_dhkeys.so.1
+ other password requisite pam_authtok_get.so.1
+ other password requisite pam_authtok_check.so.1
+ other password required pam_authtok_store.so.1
+If there are no entries for the service, then the entries for the other service is used. If multiple authentication mod<hy>
+ules are listed, then the user can be prompted for multiple passwords.
+<beginning of page>
+When login is invoked through rlogind or telnetd, the service name used by PAM is rlogin or telnet, respectively.
+The following options are supported:
+-d device login accepts a device option, device. device is taken to be the path name of the TTY port login is to oper<hy>
+ate on. The use of the device option can be expected to improve login performance, since login does not need to call
+ttyname(3C). The -d option is available only to users whose UID and effective UID are root. Any other attempt to
+use -d causes login to quietly exit.
+-h hostname [terminal] Used by in.telnetd(1M) to pass information about the remote host and terminal type.
+Terminal type as a second argument to the -h option should not start with a hyphen (-).
+-p Used to pass environment variables to the login shell.
+-r hostname Used by in.rlogind(1M) to pass information about the remote host.
+-R repository Used to specify the PAM repository that should be used to tell PAM about the "identity" (see option
+-u below). If no "identity" information is passed, the repository is not used.
+-s service Indicates the PAM service name that should be used. Normally, this argument is not necessary and is used
+only for specifying alternative PAM service names. For example: "ktelnet" for the Kerberized telnet process.
+-u identity Specifies the "identity" string associated with the user who is being authenticated. This usually is not be
+the same as that user's Unix login name. For Kerberized login sessions, this is the Kerberos principal name associat<hy>
+ed with the user.
+-U ruser Indicates the name of the person attempting to login on the remote side of the rlogin connection. When
+in.rlogind(1M) is operating in Kerberized mode, that daemon processes the terminal and remote user name informa<hy>
+tion prior to invoking login, so the "ruser" data is indicated using this command line parameter. Normally (non-Ker<hy>
+beros authenticated rlogin), the login daemon reads the remote user information from the client.
+The following exit values are returned:
+0 Successful operation.
+non-zero Error.
+$HOME/.cshrc Initial commands for each csh.
+$HOME/.hushlogin Suppresses login messages.
+$HOME/.kshrc User's commands for interactive ksh93, if $ENV is unset; executes after /etc/ksh.kshrc.
+$HOME/.login User's login commands for csh.
+$HOME/.profile User's login commands for sh, ksh, and ksh93.
+$HOME/.rhosts Private list of trusted hostname/username combinations.
+<beginning of page>
+/etc/.login System-wide csh login commands.
+/etc/issue Issue or project identification.
+/etc/ksh.kshrc System-wide commands for interactive ksh93.
+/etc/logindevperm Login-based device permissions.
+/etc/motd Message-of-the-day.
+/etc/nologin Message displayed to users attempting to login during machine shutdown.
+/etc/passwd Password file.
+/etc/profile System-wide sh, ksh, and ksh93 login commands.
+/etc/shadow List of users' encrypted passwords.
+/usr/bin/sh User's default command interpreter.
+/var/adm/lastlog Time of last login.
+/var/adm/loginlog Record of failed login attempts.
+/var/adm/utmpx Accounting.
+/var/adm/wtmpx Accounting.
+/var/mail/your-name Mailbox for user your-name.
+/etc/default/login Default value can be set for the following flags in /etc/default/login. Default values are specified
+as comments in the /etc/default/login file, for example, TIMEZONE=EST5EDT.
+TIMEZONE Sets the TZ environment variable of the shell (see environ(5)).
+HZ Sets the HZ environment variable of the shell.
+ULIMIT Sets the file size limit for the login. Units are disk blocks. Default is zero (no limit).
+CONSOLE If set, root can login on that device only. This does not prevent execution of remote commands with
+rsh(1). Comment out this line to allow login by root.
+PASSREQ Determines if login requires a non-null password.
+<beginning of page>
+ALTSHELL Determines if login should set the SHELL environment variable.
+PATH Sets the initial shell PATH variable.
+SUPATH Sets the initial shell PATH variable for root.
+TIMEOUT Sets the number of seconds (between 0 and 900) to wait before abandoning a login session.
+UMASK Sets the initial shell file creation mode mask. See umask(1).
+SYSLOG Determines whether the syslog(3C) LOG_AUTH facility should be used to log all root logins at level
+LOG_NOTICE and multiple failed login attempts atLOG_CRIT.
+DISABLETIME If present, and greater than zero, the number of seconds that login waits after RETRIES failed at<hy>
+tempts or the PAM framework returns PAM_ABORT. Default is 20 seconds. Minimum is 0 seconds. No maximum
+is imposed.
+SLEEPTIME If present, sets the number of seconds to wait before the login failure message is printed to the screen.
+This is for any login failure other than PAM_ABORT. Another login attempt is allowed, providing RETRIES has
+not been reached or the PAM framework is returned PAM_MAXTRIES. Default is 4 seconds. Minimum is 0 sec<hy>
+onds. Maximum is 5 seconds.
+Both su(1M) and sulogin(1M) are affected by the value of SLEEPTIME.
+RETRIES Sets the number of retries for logging in (see pam(3PAM)). The default is 5. The maximum number of
+retries is 15. For accounts configured with automatic locking (see SECURITY above), the account is locked and lo<hy>
+gin exits. If automatic locking has not been configured, login exits without locking the account.
+SYSLOG_FAILED_LOGINS Used to determine how many failed login attempts are allowed by the system before
+a failed login message is logged, using the syslog(3C) LOG_NOTICE facility. For example, if the variable is set to
+0, login logs all failed login attempts.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu _ Interface StabilityCommitted
+csh(1), exit(1), ksh(1), ksh93(1), mail(1), mailx(1), newgrp(1), passwd(1), rlogin(1), rsh(1), sh(1),
+shell_builtins(1), telnet(1), umask(1), in.rlogind(1M), in.telnetd(1M), logins(1M), quota(1M), su(1M), sulo<hy>
+gin(1M), syslogd(1M), useradd(1M), userdel(1M), pam(3PAM), rcmd(3SOCKET), syslog(3C), ttyname(3C),
+auth_attr(4), exec_attr(4), hosts.equiv(4), issue(4), logindevperm(4), loginlog(4), nologin(4), nsswitch.conf(4),
+pam.conf(4), passwd(4), policy.conf(4), profile(4), shadow(4), user_attr(4), utmpx(4), wtmpx(4), attributes(5),
+environ(5), pam_unix_account(5), pam_unix_auth(5), pam_unix_session(5), pam_authtok_check(5), pam_au<hy>
+thtok_get(5), pam_authtok_store(5), pam_dhkeys(5), pam_passwd_auth(5), termio(7I)
+Login incorrect
+The user name or the password cannot be matched.
+Not on system console
+Root login denied. Check the CONSOLE setting in /etc/default/login.
+<beginning of page>
+No directory! Logging in with home=/
+The user's home directory named in the passwd(4) database cannot be found or has the wrong permissions. Contact
+your system administrator.
+No shell
+Cannot execute the shell named in the passwd(4) database. Contact your system administrator.
+NO LOGINS: System going down in N minutes
+The machine is in the process of being shut down and logins have been disabled.
+Users with a UID greater than 76695844 are not subject to password aging, and the system does not record their last
+login time.
+If you use the CONSOLE setting to disable root logins, you should arrange that remote command execution by root
+is also disabled. See rsh(1), rcmd(3SOCKET), and hosts.equiv(4) for further details.
+The pam_unix(5) module is no longer supported. Similar functionality is provided by pam_unix_account(5),
+pam_unix_auth(5), pam_unix_session(5), pam_authtok_check(5), pam_authtok_get(5), pam_auth<hy>
+tok_store(5), pam_dhkeys(5), and pam_passwd_auth(5).

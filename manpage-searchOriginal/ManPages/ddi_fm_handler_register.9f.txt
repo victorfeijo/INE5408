@@ -1,0 +1,51 @@
+<beginning of page>
+ddi_fm_handler_register, ddi_fm_handler_unregister <-> register or unregister an error handling callback
+#include <sys/ddifm.h>
+void ddi_fm_handler_register(dev_info_t *dip,
+ ddi_err_func_t error_handler, void *impl_data);
+void ddi_fm_handler_unregister(dev_info_t *dip);
+Solaris DDI specific (Solaris DDI)
+dip Pointer to the dev_info structure
+error_handler Pointer to an error handler callback function
+impl_data Pointer to private data for use by the caller
+The ddi_fm_handler_register() function registers an error handler callback routine with the I/O Fault Management
+framework. The error handler callback, error_handler, is called to process error conditions detected by the system.
+In addition to its device instance, dip, the error handler is called with a pointer to a fault management error status
+structure, ddi_fm_error_t. For example:
+ int (*ddi_err_func_t)(dev_info_t *dip, ddi_fm_error_t *error_status);
+A driver error handling callback is passed the following arguments: <bu> a pointer to the device instance registered for
+this callback. <bu> a data structure containing common fault management data and status for error handling.
+The primary responsibilities of the error handler include: <bu> to check for outstanding hardware or software errors. <bu>
+where possible, to isolate the device that might have caused the errors. <bu> to report errors that were detected.
+During the invocation of an error handler, a device driver might need to quiesce or suspend all I/O activities in order
+to check for error conditions or status in: <bu> hardware control and status registers. <bu> outstanding I/O transactions. <bu>
+access or DMA handles.
+For each error detected, the driver must formulate and post an error report via ddi_fm_ereport_post() for problem
+analysis by the Solaris Fault Manager fmd(1M).
+For a PCI, PCI/X, or PCI Express leaf device, the pci_ereport_post() function is provided to carry out reporting
+responsibilities on behalf of the driver. In many cases, an error handler callback function of the following form can
+be used:
+ xxx_err_cb(dev_info_t *dip, ddi_fm_error_t *errp) {
+  pci_ereport_post(dip, errp, NULL);
+  return (errp->fme_status);
+ }
+In addition, the driver might be able to carry out further device specific checks within the error handler.
+Error handlers can be called from kernel, interrupt, or high-level interrupt context. The interrupt block cookie re<hy>
+turned from ddi_fm_init() should be used to allocate and initialize any synchronization variables and locks that
+might be used within the error handler callback function. Such locks may not be held by the driver when a device
+register is accessed with functions such as ddi_get8(9F) and ddi_put8(9F).
+The data structure, ddi_fm_error_t, contains an FMA protocol (format 1) ENA for the current error propagation
+chain, the status of the error handler callback, an error expectation flag, and any potential access or DMA handles
+associated with an error detected by the parent nexus.
+The ddi_fm_handler_unregister() function removes a previously registered error handling callback for the device
+instance specified by the dip.
+The ddi_fm_handler_register() and ddi_fm_handler_unregister() functions must be called from kernel context in
+<beginning of page>
+an attach(9E) or detach(9E) entry point. The registered error handler, error_handler, callback can be called from
+kernel, interrupt, or high level interrupt context.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed
+fmd(1M), attributes(5), attach(9E), detach(9E), ddi_fm_ereport_post(9F), ddi_fm_init(9F), ddi_get8(9F),
+ddi_put8(9F), pci_ereport_post(9F), ddi_fm_error(9S)
+Writing Device Drivers

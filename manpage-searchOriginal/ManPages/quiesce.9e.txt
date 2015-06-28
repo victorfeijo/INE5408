@@ -1,0 +1,37 @@
+<beginning of page>
+quiesce <-> quiesce a device
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+int prefixquiesce(dev_info_t *dip);
+int ddi_quiesce_not_needed(dev_info_t *dip);
+Solaris DDI specific (Solaris DDI)
+dip A pointer to the device's dev_info structure.
+The quiesce() function quiesces a device so that the device no longer generates interrupts, modifies or accesses
+memory. The driver should reset the device to a hardware state from which the device can be correctly configured by
+the driver's attach() routine without a system power cycle or being configured by the firmware. For devices with a
+defined reset state configuration, the driver should return that device to that state as part of the quiesce operation.
+Fast Reboot, where firmware is bypassed when booting to a new OS image, is such a case.
+quiesce() is only called for an attached device instance as one of the final operations of a reboot sequence, and no
+other thread can be active for this device. The system guarantees that no other driver entry point is active or invoked
+while quiesce() is invoked. The system also guarantees that no timeout or taskq is invoked. The system is single-
+threaded and can not be interrupted. Therefore, the driver's quiesce() implementation must not use locks or time<hy>
+outs, or rely on them being called. The driver must discard all outstanding I/O instead of waiting for completion. At
+the conclusion of the quiesce() operation, the driver must guarantee that the device no longer has access to memory
+or interrupts.
+The only DDI interfaces that can be called by the quiesce() implementation are non-blocking functions, such as the
+ddi_get*() and ddi_put*() functions.
+If quiesce() determines a particular instance of the device cannot be quiesced when requested because of some ex<hy>
+ceptional condition, quiesce() returns DDI_FAILURE. This rarely happens.
+If a driver has previously implemented the obsolete reset() interface, its functionality must be merged into quiesce().
+The driver's reset() routine is no longer called if an implementation of quiesce() is present.
+ddi_quiesce_not_needed() always returns DDI_SUCCESS. A driver can set its devo_quiesce device function to
+ddi_quiesce_not_needed() to indicate that the device it manages does not need to be quiesced.
+quiesce() returns the following:
+DDI_SUCCESS The device has been successfully quiesced.
+DDI_FAILURE The operation failed.
+This function is called from kernel context only.
+reboot(1M), uadmin(1M), uadmin(2), attach(9E), detach(9E), ddi_add_intr(9F), ddi_map_regs(9F), pci_con<hy>
+fig_setup(9F), timeout(9F), dev_ops(9S)
+When quiesce() is called, the system is single-threaded, therefore the driver's quiesce() implementation must not be
+blocked. For example, the implementation must not create or tear down mappings, call FMA functions, or create or
+cancel callbacks.

@@ -1,0 +1,306 @@
+<beginning of page>
+ikecert <-> manipulates the machine's on-filesystem public-key certificate databases
+ikecert certlocal
+ [-a | -e | -h | -k | -l | -r | -U | -C | -L]
+ [[-p] -T PKCS#11 token identifier]
+ [option_specific_arguments]...
+ikecert certdb [-a | -e | -h | -l | -r | -U | -C | -L]
+ [[-p] -T PKCS#11 token identifier]
+ [option_specific_arguments]...
+ikecert certrldb [-a | -e | -h | -l | -r]
+ [option_specific_arguments]...
+ikecert tokens
+The ikecert command manipulates the machine's on-filesystem public-key certificate databases. See the "Files" sec<hy>
+tion, below.
+ikecert has three subcommands, one for each of the three major repositories, plus one for listing available hardware
+tokens: <bu> certlocal deals with the private-key repository, <bu> certdb deals with the public-key repository, and: <bu>
+certrldb deals with the certificate revocation list (CRL) repository. <bu> tokens shows the available PKCS#11 tokens
+for a given PKCS#11 library.
+The only supported PKCS#11 library and hardware is the Sun Cryptographic Accelerator 4000.
+Except for tokens, each subcommand requires one option, possibly followed by one or more option-specific argu<hy>
+ments.
+The tokens subcommand lists all available tokens in the PKCS#11 library specified in /etc/inet/ike/config.
+The following options are supported:
+-a
+certlocal
+When specified with the certlocal subcommand, this option installs (adds) a private key into the Internet Key Ex<hy>
+change (IKE) local ID database. The key data is read from standard input, and is in either Solaris-only format or un<hy>
+encrypted PKCS#8 DER format. Key format is automatically detected. PKCS#8 key files in PEM format and files in
+password protected, encrypted format are not recognized, but can be converted appropriately using tools available in
+OpenSSL.
+This option cannot be used with PKCS#11 hardware objects when the corresponding public certificate is not already
+present in the IKE database. When importing both a public certificate and a private key, the public portion must be
+imported first using the certdb subcommand.
+certdb
+When specified with the certdb subcommand, this option reads a certificate from standard input and adds it to the
+IKE certificate database. The certificate must be a X.509 certificate in PEM Base64 or ASN.1 BER encoding. The
+certificate adopts the name of its identity.
+This option can import a certificate into a PKCS#11 hardware key store one of two ways: Either a matching public
+key object and an existing private key object were created using the certlocal -kc option, or if a PKCS#11 token is
+explicitly specified using the -T option.
+certrldb
+When specified with the certrldb subcommand, this option installs (adds) a CRL into the IKE database. The CRL
+reads from standard input.
+<beginning of page>
+-e [-f pkcs8] slot
+certlocal
+When specified with the certlocal subcommand, this option extracts a private key from the IKE local ID database.
+The key data are written to standard output. The slot specifies which private key to extract. Private keys are only ex<hy>
+tracted in binary/ber format.
+Use this option with extreme caution. See the "Security" section, below.
+This option will not work with PKCS#11 hardware objects.
+When used in conjunction with "-f pkcs8", the private key is extracted in unencrypted PKCS#8 format.
+-e [-f output-format] certspec
+certdb
+When specified with the certdb subcommand, this option extracts a certificate from the IKE certificate database
+which matches the certspec and writes it to standard output. The output-format option specifies the encoding format.
+Valid options are PEM and BER. This extracts the first matching identity. The default output format is PEM.
+certrldb
+When specified with the certrldb subcommand, this option extracts a CRL from the IKE database. The key data are
+written to standard output. The certspec specifies which CRL that is extracted. The first one that matches in the
+database is extracted. See NOTES, below, for details on certspec patterns.
+-kc -m keysize -t keytype -D dname -A altname[ ... ]
+[-S validity start_time][-F validity end_time]
+[-T PKCS#11 token identifier]
+certlocal
+When specified with the certlocal subcommand, this option generates a IKE public/private key pair and adds it into
+the local ID database. It also generates a certificate request and sends that to standard output. For details on the
+above options see for details on the dname argument and see ALTERNATIVE NAMES for details on the altname
+argument(s) to this command.
+If -T is specified, the hardware token will generate the pair of keys.
+If -p is specified with -T, the PKCS#11 token pin is stored in the clear on-disk, with root-protected file permissions.
+If not specified, one must unlock the token with ikeadm(1M) once in.iked(1M) is running.
+-ks -m keysize -t keytype -D dname -A altname[ ... ]
+[-S validity start_time][-F validity end_time]
+[-f output-format][[-p] -T PKCS#11 token identifier]
+
+certlocal
+When specified with the certlocal subcommand, generates a public/private key pair and adds it into the local ID
+database. This option also generates a self-signed certificate and installs it into the certificate database. See NOTES,
+below, for details on the dname and altname arguments to this command.
+If -T is specified, the hardware token will generate the pair of keys, and the self-signed certificate will also be stored
+in the hardware.
+<beginning of page>
+-l [-v] [slot]
+certlocal
+When specified with the certlocal subcommand, this option lists private keys in the local ID database. The -v option
+switches output to a verbose mode where the entire certificate is printed.
+Use the -voption with extreme caution. See the "Security" section, below. The -v option will not work with
+PKCS#11 hardware objects.
+-l [-v] [certspec]
+certdb
+When specified with the certdb subcommand, this option lists certificates in the IKE certificate database matching
+the certspec, if any pattern is given. The list displays the identity string of the certificates, as well as, the private key
+if in the key database. The -v switches the output to a verbose mode where the entire certificate is printed.
+If the matching ceritifcate is on a hardware token, the token ID is also listed.
+certrldb
+When specified with the certrldb subcommand, this option lists the CRLs in the IKE database along with any cer<hy>
+tificates that reside in the database and match the Issuer Name. certspec can be used to specify to list a specific
+CRL. The -v option switches the output to a verbose mode where the entire certificate is printed. See NOTES, be<hy>
+low, for details oncertspec patterns.
+-r slot
+certlocal
+When specified with the certlocal subcommand, deletes the local ID in the specified slot. If there is a corresponding
+public key, it is not be deleted. If this slot is deemed as "corrupted" or otherwise unrecognizable, it is deleted as well.
+If this is invoked on a PKCS#11 hardware object, it will also delete the PKCS#11 public key and private key objects.
+If the public key object was already deleted by certdb -r, that is not a problem.
+-r certspec
+certdb
+Removes certificates from the IKE certificate database. Certificates matching the specified certificate pattern are
+deleted. Any private keys in the certlocal database corresponding to these certificates are not deleted. This removes
+the first matching identity.
+If the pattern specifies a slot and the slot is deemed as "corrupted" or otherwise unrecognizable, it is deleted as well.
+If this is invoked on a PKCS#11 hardware object, it will also delete the certificate and the PKCS#11 public key ob<hy>
+ject. If the public key object was already deleted by certlocal -r, that is not a problem.
+certrldb
+When specified with the certrldb subcommand, this option deletes the CRL with the given certspec.
+<beginning of page>
+-U slot
+certlocal
+When specified with the certlocal subcommand and the -T flag, this option unlinks a PKCS#11 private key object
+from the IKE database. There will be no attempt to access the hardware keystore or to validate or remove the on-to<hy>
+ken private key object. The object is simply disassociated from the IKE database.
+certdb
+When specified with the certdb subcommand and the -T flag, this option unlinks a PKCS#11 certificate object from
+the IKE database. There will be no attempt to access the hardware keystore or to validate or remove the on-token
+certificate or public key objects. The objects are simply disassociated from the IKE database.
+-C certspec
+certlocal
+When specified with the certlocal subcommand, this option copies both the private key and its corresponding certifi<hy>
+cate and the public key from the on-disk keystore to the hardware keystore specified by its PKCS#11 token. This
+subcommand attempts to create each of these components, even if one part fails. In all cases, the original on-disk
+private key and public certificate are still retained and must be deleted separately. Some hardware keystores, such as
+FIPS-140 compliant devices, may not support migration of private key objects in this manner.
+certdb
+When specified with the certdb subcommand, this option copies the certificate matching the given certspec and cor<hy>
+responding public key from the on-disk keystore to the hardware keystore specified by its PKCS#11 token. The orig<hy>
+inal public certificate is still retained and must be deleted separately, if desired.
+If -p is specified, the PKCS#11 token pin is stored in the clear on-disk, with root-protected file permissions. If not
+specified, one must unlock the token with ikeadm(1M) once in.iked(1M) is running.
+-L pattern
+certlocal
+When specified with the certlocal subcommand, this option links an existing on-token private key object to the IKE
+database. The object itself remains on the token. This option simply lets the IKE infrastructure know that the object
+exists, as if it had been originally created on-token with the Solaris IKE utilities.
+certdb
+When specified with the certdb subcommand, this option links an existing on-token certificate object to the IKE
+database. The object itself remains on the token. This option simply lets the IKE infrastructure know that the object
+exists, as if it had been originally created on-token with the Solaris IKE utilities.
+If -p is specified, the PKCS#11 token pin is stored in the clear on-disk, with root-protected file permissions. If not
+specified, one must unlock the token with ikeadm(1M) once in.iked(1M) is running.
+The following parameters are supported:
+certspec
+Specifies the pattern matching of certificate specifications. Valid certspecs are the Subject Name, Issuer Name, and
+Subject Alternative Names.
+These can be specified as certificates that match the given certspec values and that do not match other certspec val<hy>
+<beginning of page>
+ues. To signify a certspec value that is not supposed to be present in a certificate, place an ! in front of the tag.
+Valid certspecs are:
+ <Subject Names>
+ SUBJECT=<Subject Names>
+ ISSUER=<Issuer Names>
+ SLOT=<Slot Number in the certificate database>
+ Example:"ISSUER=C=US, O=SUN" IP=1.2.3.4 !DNS=example.com
+ Example:"C=US, O=CALIFORNIA" IP=5.4.2.1 DNS=example.com
+Valid arguments to the alternative names are as follows:
+ IP=<IPv4 address>
+ DNS=<Domain Name Server address>
+ EMAIL=<email (RFC 822) address>
+ URI=<Uniform Resource Indicator value>
+ DN=<LDAP Directory Name value>
+ RID=<Registered Identifier value>
+Valid Slot numbers can be specified without the keyword tag. Alternative name can also be issued with keyword
+tags.
+-A
+Subject Alternative Names the certificate. The argument that follows the -A option should be in the form of tag=val<hy>
+ue. Valid tags are IP, DNS, EMAIL, URI, DN, and RID (See example below).
+-D
+X.509 distinguished name for the certificate subject. It typically has the form of: C=country, O=organization,
+OU=organizational unit, CN=common name. Valid tags are: C, O, OU, and CN.
+-f
+Encoding output format. pem for PEM Base64 or ber for ASN.1 BER. If -f is not specified, pem is assumed.
+-F validity end_time
+Finish certificate validity time. If the -F flag is not specified, the validity end time is calculated at four years from the
+validity start time. See NOTES for an explanation for the validity date and time syntax.
+-m
+Key size. It can be 512, 1024, 2048, 3072, or 4096. Use the following command to determine the key sizes support<hy>
+ed by the Solaris Cryptographic Framework:
+ % cryptoadm list -vm
+The mechanisms displayed by the preceding command are described in pkcs11_softtoken(5). If your system has
+hardware acceleration, the mechanisms supported by the hardware will be listed in a separate section for each
+provider. Mechanisms can be any of:
+ CKM_RSA_PKCS_KEY_PAIR_GEN
+ CKM_DSA_KEY_PAIR_GEN
+ CKM_DH_PKCS_KEY_PAIR_GEN
+Note -
+<beginning of page>
+Some hardware does not support all key sizes. For example, the Sun Cryptographic Accelerator 4000's keystore
+(when using the -T option, below), supports only up to 2048-bit keys for RSA and 1024-bit keys for DSA.
+-S validity start_time
+Start certificate validity time. If the -S flag is not specified, the current date and time is used for the validity start
+time. See NOTES, below, for an explanation for the validity date and time syntax.
+-t
+Key type. It can be rsa-sha1, rsa-md5, or dsa-sha1.
+-T
+PKCS#11 token identifier for hardware key storage. This specifies a hardware device instance in conformance to the
+PKCS#11 standard. A PKCS#11 library must be specified in /etc/inet/ike/config. (See ike.config(4).)
+A token identifier is a 32-character space-filled string. If the token given is less than 32 characters long, it will be au<hy>
+tomatically padded with spaces.
+If there is more than one PKCS#11 library on a system, keep in mind that only one can be specified at a time in
+/etc/inet/ike/config. There can be multiple tokens (each with individual key storage) for a single PKCS#11 library
+instance.
+This command can save private keys of a public-private key pair into a file. Any exposure of a private key may lead
+to compromise if the key is somehow obtained by an adversary.
+The PKCS#11 hardware object functionality can address some of the shortcomings of on-disk private keys. Because
+IKE is a system service, user intervention at boot is not desireable. The token's PIN, however, is still needed. The
+PINfor the PKCS#11 token, therefore, is stored where normally the on-disk cryptographic keys would reside. This
+design decision is deemed acceptable because, with a hardware key store, possession of the key is still unavailable,
+only use of the key is an issue if the host is compromised. Beyond the PIN, the security of ikecert then reduces to
+the security of the PKCS#11 implementation. The PKCS#11 implementation should be scrutinized also.
+Refer to the afterword by Matt Blaze in Bruce Schneier's Applied Cryptography: Protocols, Algorithms, and Source
+Code in C for additional information. Example 1 Generating a Self-Signed Certificate
+The following is an example of a self-signed certificate:
+ example# ikecert certlocal -ks -m 512 -t rsa-md5 -D "C=US, O=SUN" -A
+ IP=1.2.3.4
+ Generating, please wait...
+ Certificate generated.
+ Certificate added to database.
+ -----BEGIN X509 CERTIFICATE-----
+ MIIBRDCB76ADAgECAgEBMA0GCSqGSIb3DQEBBAUAMBsxCzAJBgNVBAYTAlVTMQww
+ CgYDVQQKEwNTVU4wHhcNMDEwMzE0MDEzMDM1WhcNMDUwMzE0MDEzMDM1WjAbMQsw
+ CQYDVQQGEwJVUzEMMAoGA1UEChMDU1VOMFowDQYJKoZIhvcNAQEBBQADSQAwRgJB
+ APDhqpKgjgRoRUr6twTMTtSuNsReEnFoReVer!ztpXpQK6ybYlRH18JIqU/uCV/r
+ 26R/cVXTy5qc5NbMwA40KzcCASOjIDAeMAsGA1UdDwQEAwIFoDAPBgNVHREECDAG
+ hwQBAgMEMA0GCSqGSIb3DQEBBAUAA0EApTRD23KzN95GMvPD71hwwClukslKLVg8
+ f1xm9ZsHLPJLRxHFwsqqjAad4j4wwwriiUmGAHLTGB0lJMl8xsgxag==
+ -----END X509 CERTIFICATE-----
+Example 2 Generating a CA Request
+Generating a CA request appears the same as the self-signed certificate. The only differences between the two is the
+option -c instead of -s, and the certificate data is a CA request.
+ example# ikecert certlocal -kc -m 512 -t rsa-md5 \
+<beginning of page>
+  -D "C=US, O=SUN" -A IP=1.2.3.4
+Example 3 A CA Request Using a Hardware Key Store
+The following example illustrates the specification of a token using the -T option.
+ example# # ikecert certlocal -kc -m 1024 -t rsa-md5 -T vca0-keystore \
+  -D "C=US, O=SUN" -A IP=1.2.3.4
+The following exit values are returned:
+0
+Successful completion.
+non-zero
+An error occurred. Writes an appropriate error message to standard error.
+/etc/inet/secret/ike.privatekeys/*
+Private keys. A private key must have a matching public-key certificate with the same filename in /etc/inet/ike/pub<hy>
+lickeys/.
+/etc/inet/ike/publickeys/*
+Public-key certificates. The names are only important with regard to matching private key names.
+/etc/inet/ike/crls/*
+Public key certificate revocation lists.
+/etc/inet/ike/config
+Consulted for the pathname of a PKCS#11 library.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu _ Interface StabilityEvolving
+ikeadm(1M), in.iked(1M), getdate(3C), ike.config(4), attributes(5), pkcs11_softtoken(5)
+Schneier, Bruce. Applied Cryptography: Protocols, Algorithms, and Source Code in C. Second Edition. John Wiley
+& Sons. New York, NY. 1996.
+RSA Labs, PKCS#11 v2.11: Cryptographic Token Interface Standards, November 2001.
+The following is the validity date and time syntax when the -F or -S flags are used:
+For relative dates, the syntax is as follows:
+ {+,-}[Ns][Nm][Nh][Nd][Nw][NM][Ny]
+<beginning of page>
+where:
+N
+represents an integer
+s
+represents seconds
+m
+represents minutes
+h
+represents hours
+d
+represents days
+w
+represents weeks
+M
+represents months
+y
+represents years
+These parameters can be given in any order. For example, "+3d12h" is three and a half days from now, and "-3y2M"
+is three years and 2 months ago.
+All parameters with fixed values can be added up in absolute seconds. Months and years, which have variable num<hy>
+bers of seconds, are calculated using calendar time. Months and years, which are not of fixed length, are defined
+such that adding a year or month means the same day next year or month. For instance, if it is Jan 26, 2005 and the
+certificate should expire 3 years and 1 month from today, the expiration (end validity time) date will be Feb 26,
+2008. Overflows are dealt with accordingly. For example, one month from Jan 31, 2005 is March 3, 2005, since
+February has only 28 days.
+For absolute dates, the syntax of the date formats included in the file /etc/datemsk are accepted (See getdate(3C)
+for details). Any date string prepended with a "+" or "-" is treated as a time relative to the current time, while others
+are treated as absolute dates. Sanity checking is also done to ensure that the end validity date is greater than the start
+validity date. For example, the following command would create a certificate with start date 1 day and 2 hours ago
+and an end date of Jan 22nd, 2007 at 12:00:00 local time.
+ # ikecert certlocal -ks -t rsa-sha1 -m 1024 \
+  -D "CN=mycert, O=Sun, C=US" \
+  -S -1d2h -F "01/22/2007 12:00:00"
+As in.iked(1M) can run only in the global zone and exclusive-IP zones, this command is not useful in shared-IP
+zones.

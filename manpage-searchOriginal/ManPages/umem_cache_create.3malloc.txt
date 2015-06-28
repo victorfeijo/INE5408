@@ -1,0 +1,262 @@
+<beginning of page>
+umem_cache_create, umem_cache_destroy, umem_cache_alloc, umem_cache_free <-> allocation cache manipulation
+cc [ flag ... ] file... -lumem [ library ... ]
+#include <umem.h>
+umem_cache_t *umem_cache_create(char *debug_name, size_t bufsize,
+ size_t align, umem_constructor_t *constructor,
+ umem_destructor_t *destructor, umem_reclaim_t *reclaim,
+ void *callback_data, vmem_t *source, int cflags);
+void umem_cache_destroy(umem_cache_t *cache);
+void *umem_cache_alloc(umem_cache_t *cache, int flags);
+void umem_cache_free(umem_cache_t *cache, void *buffer);
+These functions create, destroy, and use an "object cache" An object cache is a collection of buffers of a single size,
+with optional content caching enabled by the use of callbacks (see Cache Callbacks). Object caches are MT-Safe.
+Multiple allocations and freeing of memory from different threads can proceed simultaneously. Object caches are
+faster and use less space per buffer than malloc(3MALLOC) and umem_alloc(3MALLOC). For more information
+about object caching, see "The Slab Allocator: An Object-Caching Kernel Memory Allocator" and "Magazines and
+vmem: Extending the Slab Allocator to Many CPUs and Arbitrary Resources".
+The umem_cache_create() function creates object caches. Once a cache has been created, objects can be requested
+from and returned to the cache using umem_cache_alloc() and umem_cache_free(), respectively. A cache with no
+outstanding buffers can be destroyed with umem_cache_destroy().
+The umem_cache_create() function creates a cache of objects and takes as arguments the following:
+debug_name A human-readable name for debugging purposes.
+bufsize The size, in bytes, of the buffers in this cache.
+align The minimum alignment required for buffers in this cache. This parameter must be a power of 2. If 0, it is re<hy>
+placed with the minimum required alignment for the current architecture.
+constructor The callback to construct an object.
+destructor The callback to destroy an object.
+reclaim The callback to reclaim objects.
+callback_data An opaque pointer passed to the callbacks.
+source This parameter must be NULL.
+cflags This parameter must be either 0 or UMC_NODEBUG. If UMC_NODEBUG, all debugging features are dis<hy>
+abled for this cache. See umem_debug(3MALLOC).
+Each cache can have up to three associated callbacks:
+ int constructor(void *buffer, void *callback_data, int flags);
+ void destructor(void *buffer, void *callback_data);
+ void reclaim(void *callback_data);
+The callback_data argument is always equal to the value passed to umem_cache_create(), thereby allowing a client
+<beginning of page>
+to use the same callback functions for multiple caches, but with customized behavior.
+The reclaim callback is called when the umem function is requesting more memory from the operating system. This
+callback can be used by clients who retain objects longer than they are strictly needed (for example, caching non-ac<hy>
+tive state). A typical reclaim callback might return to the cache ten per cent of the unneeded buffers.
+The constructor and destructor callbacks enable the management of buffers with the constructed state. The construc<hy>
+tor takes as arguments a buffer with undefined contents, some callback data, and the flags to use for any allocations.
+This callback should transform the buffer into the constructed state.
+The destructor callback takes as an argument a constructed object and prepares it for return to the general pool of
+memory. The destructor should undo any state that the constructor created. For debugging, the destructor can also
+check that the buffer is in the constructed state, to catch incorrectly freed buffers. See umem_debug(3MALLOC)
+for further information on debugging support.
+The umem_cache_destroy() function destroys an object cache. If the cache has any outstanding allocations, the be<hy>
+havior is undefined.
+The umem_cache_alloc() function takes as arguments:
+cache a cache pointer
+flags flags that determine the behavior if umem_cache_alloc() is unable to fulfill the allocation request
+If successful, umem_cache_alloc() returns a pointer to the beginning of an object of bufsize length.
+There are three cases to consider: <bu> A new buffer needed to be allocated. If the cache was created with a constructor,
+it is applied to the buffer and the resulting object is returned. <bu> The object cache was able to use a previously freed
+buffer. If the cache was created with a constructor, the object is returned unchanged from when it was freed. <bu> The
+allocation of a new buffer failed. The flags argument determines the behavior:
+UMEM_DEFAULT The umem_cache_alloc() function returns NULL if the allocation fails.
+UMEM_NOFAIL The umem_cache_alloc() function cannot return NULL. A callback is used to determine what
+action occurs. See umem_alloc(3MALLOC) for more information.
+The umem_cache_free() function takes as arguments:
+cache a cache pointer
+buf a pointer previously returned from umem_cache_alloc(). This argument must not be NULL.
+If the cache was created with a constructor callback, the object must be returned to the constructed state before it is
+freed.
+Undefined behavior results if an object is freed multiple times, if an object is modified after it is freed, or if an object
+is freed to a cache other than the one from which it was allocated.
+When a constructor callback is in use, there is essentially a contract between the cache and its clients. The cache
+guarantees that all objects returned from umem_cache_alloc() will be in the constructed state, and the client guaran<hy>
+tees that it will return the object to the constructed state before handing it to umem_cache_free().
+Upon failure, the umem_cache_create() function returns a null pointer.
+The umem_cache_create() function will fail if:
+EAGAIN There is not enough memory available to allocate the cache data structure.
+<beginning of page>
+EINVAL The debug_name argument is NULL, the align argument is not a power of two or is larger than the system
+pagesize, or the bufsize argument is 0.
+ENOMEM The libumem library could not be initialized, or the bufsize argument is too large and its use would
+cause integer overflow to occur.
+Example 1 Use a fixed-size structure with no constructor callback.
+ #include <umem.h>
+ typedef struct my_obj {
+  long my_data1;
+ } my_obj_t;
+ /*
+  * my_objs can be freed at any time. The contents of
+  * my_data1 is undefined at allocation time.
+  */
+ umem_cache_t *my_obj_cache;
+ ...
+ my_obj_cache = umem_cache_create("my_obj", sizeof (my_obj_t),
+  0, NULL, NULL, NULL, NULL, NULL, 0);
+ ...
+ my_obj_t *cur = umem_cache_alloc(my_obj_cache, UMEM_DEFAULT);
+ ...
+ /* use cur */
+ ...
+ umem_cache_free(my_obj_cache, cur);
+ ...
+Example 2 Use an object with a mutex.
+ #define _REENTRANT
+ #include <synch.h>
+ #include <umem.h>
+ typedef struct my_obj {
+  mutex_t my_mutex;
+  long my_data;
+ } my_obj_t;
+ /*
+  * my_objs can only be freed when my_mutex is unlocked.
+  */
+ int
+ my_obj_constructor(void *buf, void *ignored, int flags)
+ {
+  my_obj_t *myobj = buf;
+  (void) mutex_init(&my_obj->my_mutex, USYNC_THREAD, NULL);
+  return (0);
+ }
+ void
+ my_obj_destructor(void *buf, void *ignored)
+ {
+  my_obj_t *myobj = buf;
+  (void) mutex_destroy(&my_obj->my_mutex);
+ }
+<beginning of page>
+ umem_cache_t *my_obj_cache;
+ ...
+ my_obj_cache = umem_cache_create("my_obj", sizeof (my_obj_t),
+  0, my_obj_constructor, my_obj_destructor, NULL, NULL,
+  NULL, 0);
+ ...
+ my_obj_t *cur = umem_cache_alloc(my_obj_cache, UMEM_DEFAULT);
+ cur->my_data = 0; /* cannot assume anything about my_data */
+ ...
+ umem_cache_free(my_obj_cache, cur);
+ ...
+Example 3 Use a more complex object with a mutex.
+ #define _REENTRANT
+ #include <assert.h>
+ #include <synch.h>
+ #include <umem.h>
+ typedef struct my_obj {
+  mutex_t my_mutex;
+  cond_t my_cv;
+  struct bar *my_barlist;
+  unsigned my_refcount;
+ } my_obj_t;
+ /*
+  * my_objs can only be freed when my_barlist == NULL,
+  * my_refcount == 0, there are no waiters on my_cv, and
+  * my_mutex is unlocked.
+  */
+ int
+ my_obj_constructor(void *buf, void *ignored, int flags)
+ {
+  my_obj_t *myobj = buf;
+  (void) mutex_init(&my_obj->my_mutex, USYNC_THREAD, NULL);
+  (void) cond_init(&my_obj->my_cv, USYNC_THREAD, NULL);
+  myobj->my_barlist = NULL;
+  myobj->my_refcount = 0;
+  return (0);
+ }
+ void
+ my_obj_destructor(void *buf, void *ignored)
+ {
+  my_obj_t *myobj = buf;
+  assert(myobj->my_refcount == 0);
+  assert(myobj->my_barlist == NULL);
+  (void) cond_destroy(&my_obj->my_cv);
+  (void) mutex_destroy(&my_obj->my_mutex);
+ }
+ umem_cache_t *my_obj_cache;
+ ...
+ my_obj_cache = umem_cache_create("my_obj", sizeof (my_obj_t),
+  0, my_obj_constructor, my_obj_destructor, NULL, NULL,
+  NULL, 0);
+ ...
+ my_obj_t *cur = umem_cache_alloc(my_obj_cache, UMEM_DEFAULT);
+ ...
+<beginning of page>
+ /* use cur */
+ ...
+ umem_cache_free(my_obj_cache, cur);
+ ...
+Example 4 Use objects with a subordinate buffer while reusing callbacks.
+ #include assert.h>
+ #include umem.h>
+ typedef struct my_obj {
+  char *my_buffer;
+  size_t my_size;
+ } my_obj_t;
+ /*
+  * my_size and the my_buffer pointer should never be changed
+  */
+ int
+ my_obj_constructor(void *buf, void *arg, int flags)
+ {
+  size_t sz = (size_t)arg;
+  my_obj_t *myobj = buf;
+  if ((myobj->my_buffer = umem_alloc(sz, flags)) == NULL)
+  return (1);
+  my_size = sz;
+  return (0);
+ }
+ void
+ my_obj_destructor(void *buf, void *arg)
+ {
+  size_t sz = (size_t)arg;
+  my_obj_t *myobj = buf;
+  assert(sz == buf->my_size);
+  umem_free(myobj->my_buffer, sz);
+ }
+ ...
+ umem_cache_t *my_obj_4k_cache;
+ umem_cache_t *my_obj_8k_cache;
+ ...
+ my_obj_cache_4k = umem_cache_create("my_obj_4k", sizeof (my_obj_t),
+  0, my_obj_constructor, my_obj_destructor, NULL,
+  (void *)4096, NULL, 0);
+ my_obj_cache_8k = umem_cache_create("my_obj_8k", sizeof (my_obj_t),
+  0, my_obj_constructor, my_obj_destructor, NULL,
+  (void *)8192, NULL, 0);
+ ...
+ my_obj_t *my_obj_4k = umem_cache_alloc(my_obj_4k_cache,
+  UMEM_DEFAULT);
+ my_obj_t *my_obj_8k = umem_cache_alloc(my_obj_8k_cache,
+  UMEM_DEFAULT);
+ /* no assumptions should be made about the contents
+ of the buffers */
+ ...
+ /* make sure to return them to the correct cache */
+ umem_cache_free(my_obj_4k_cache, my_obj_4k);
+<beginning of page>
+ umem_cache_free(my_obj_8k_cache, my_obj_8k);
+ ...
+See the EXAMPLES section of umem_alloc(3MALLOC) for examples involving the UMEM_NOFAIL flag.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed _ MT-LevelMT-Safe
+setcontext(2), atexit(3C), libumem(3LIB), longjmp(3C), swapcontext(3C), thr_exit(3C), umem_alloc(3MAL<hy>
+LOC), umem_debug(3MALLOC), attributes(5)
+Bonwick, Jeff, "The Slab Allocator: An Object-Caching Kernel Memory Allocator", Proceedings of the Summer
+1994 Usenix Conference.
+Bonwick, Jeff and Jonathan Adams, "Magazines and vmem: Extending the Slab Allocator to Many CPUs and Arbi<hy>
+trary Resources", Proceedings of the Summer 2001 Usenix Conference.
+Any of the following can cause undefined results: <bu> Destroying a cache that has outstanding allocated buffers. <bu> Us<hy>
+ing a cache after it has been destroyed. <bu> Calling umem_cache_free() on the same buffer multiple times. <bu> Passing
+a NULL pointer to umem_cache_free(). <bu> Writing past the end of a buffer. <bu> Reading from or writing to a buffer af<hy>
+ter it has been freed. <bu> Performing UMEM_NOFAIL allocations from an atexit(3C) handler.
+Per-cache callbacks can be called from a variety of contexts. The use of functions that modify the active context,
+such as setcontext(2), swapcontext(3C), and thr_exit(3C), or functions that are unsafe for use in multithreaded ap<hy>
+plications, such as longjmp(3C) and siglongjmp(3C), result in undefined behavior.
+A constructor callback that performs allocations must pass its flags argument unchanged to umem_alloc(3MAL<hy>
+LOC) and umem_cache_alloc(). Any allocations made with a different flags argument results in undefined behavior.
+The constructor must correctly handle the failure of any allocations it makes.
+Object caches make the following guarantees about objects: <bu> If the cache has a constructor callback, it is applied to
+every object before it is returned from umem_cache_alloc() for the first time. <bu> If the cache has a constructor call<hy>
+back, an object passed to umem_cache_free() and later returned from umem_cache_alloc() is not modified be<hy>
+tween the two events. <bu> If the cache has a destructor, it is applied to all objects before their underlying storage is re<hy>
+turned.
+No other guarantees are made. In particular, even if there are buffers recently freed to the cache, umem_cache_al<hy>
+loc() can fail.

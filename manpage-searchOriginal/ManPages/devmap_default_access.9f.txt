@@ -1,0 +1,80 @@
+<beginning of page>
+devmap_default_access <-> default driver memory access function
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+int devmap_default_access(devmap_cookie_t dhp, void *pvtp,
+ offset_t off, size_t len, uint_t type, uint_t rw);
+Solaris DDI specific (Solaris DDI).
+dhp An opaque mapping handle that the system uses to describe the mapping.
+pvtp Driver private mapping data.
+off User offset within the logical device memory at which the access begins.
+len Length (in bytes) of the memory being accessed.
+type Type of access operation.
+rw Type of access.
+devmap_default_access() is a function providing the semantics of devmap_access(9E). The drivers call de<hy>
+vmap_default_access() to handle the mappings that do not support context switching. The drivers should call de<hy>
+vmap_do_ctxmgt(9F) for the mappings that support context management.
+devmap_default_access() can either be called from devmap_access(9E) or be used as the devmap_access(9E) en<hy>
+try point. The arguments dhp, pvtp, off, len, type, and rw are provided by the devmap_access(9E) entry point and
+must not be modified.
+0 Successful completion.
+Non-zero An error occurred.
+devmap_default_access() must be called from the driver's devmap_access(9E) entry point. Example 1 Using de<hy>
+vmap_default_access in devmap_access.
+The following shows an example of using devmap_default_access() in the devmap_access(9E) entry point.
+ ...
+ #define OFF_DO_CTXMGT 0x40000000
+ #define OFF_NORMAL 0x40100000
+ #define CTXMGT_SIZE 0x100000
+ #define NORMAL_SIZE 0x100000
+ /*
+  * Driver devmap_contextmgt(9E) callback function.
+  */
+ static int
+ xx_context_mgt(devmap_cookie_t dhp, void *pvtp, offset_t offset,
+  size_t length, uint_t type, uint_t rw)
+ {
+  ......
+  /*
+  * see devmap_contextmgt(9E) for an example
+  */
+<beginning of page>
+ }
+ /*
+  * Driver devmap_access(9E) entry point
+  */
+ static int
+ xxdevmap_access(devmap_cookie_t dhp, void *pvtp, offset_t off,
+  size_t len, uint_t type, uint_t rw)
+ {
+  offset_t diff;
+  int err;
+  /*
+  * check if off is within the range that supports
+  * context management.
+  */
+  if ((diff = off - OFF_DO_CTXMG) >= 0 && diff < CTXMGT_SIZE) {
+  /*
+  * calculates the length for context switching
+  */
+  if ((len + off) > (OFF_DO_CTXMGT + CTXMGT_SIZE))
+  return (-1);
+  /*
+  * perform context switching
+  */
+  err = devmap_do_ctxmgt(dhp, pvtp, off, len, type,
+  rw, xx_context_mgt);
+  /*
+  * check if off is within the range that does normal
+  * memory mapping.
+  */
+  } else if ((diff = off - OFF_NORMAL) >= 0 && diff < NORMAL_SIZE) {
+  if ((len + off) > (OFF_NORMAL + NORMAL_SIZE))
+  return (-1);
+  err = devmap_default_access(dhp, pvtp, off, len, type, rw);
+  } else
+  return (-1);
+  return (err);
+ }
+devmap_access(9E), devmap_do_ctxmgt(9F), devmap_callback_ctl(9S)
+Writing Device Drivers

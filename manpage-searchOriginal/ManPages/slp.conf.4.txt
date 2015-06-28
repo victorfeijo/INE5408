@@ -1,0 +1,231 @@
+<beginning of page>
+slp.conf <-> configuration file for Service Location Protocol agents
+/etc/inet/slp.conf
+slp.conf provides all Service Location Protocol ("SLP") agents with their operational configuration. slpd(1M)
+reads slp.conf on startup. Service Agents ("SAs") and User Agents ("UAs") read slp.conf on invocation of the SA
+and UA library routines; configuration parameters are then cached on a per-process basis. All SA's must use the
+same set of properties as slpd on the local machine, since slpd acts as an SA server.
+The configuration file format consists of a newline-delimited list of zero or more property definitions. Each property
+definition corresponds to a particular configurable SLP, network, or other parameter in one or more of the three SLP
+agents. The file format grammar is shown in RFC 2234 as follows:
+ config-file = line-list
+ line-list = line / line line-list
+ line = property-line / comment-line
+ comment-line = ( "#" / ";" ) 1*allchar newline
+ property-line = property newline
+ property = tag "=" value-list
+ tag = prop / prop "." tag
+ prop = 1*tagchar
+ value-list = value / value "," value-list
+ value = int / bool /
+  "(" value-list ")" / string
+ int = 1*DIGIT
+ bool = "true" / "false" / "TRUE" / "FALSE"
+ newline = CR / ( CRLF )
+ string = 1*stringchar
+ tagchar = DIGIT / ALPHA / tother / escape
+ tother = %x21-%x2d / %x2f /
+  %x3a / %x3c-%x40 /
+  %x5b-%x60 / %7b-%7e
+  ; i.e., all characters except `.',
+  ; and `='.
+ stringchar = DIGIT / ALPHA / sother / escape
+ sother = %x21-%x29 / %x2a-%x2b /
+  %x2d-%x2f / %x3a-%x40 /
+  %x5b-%x60 / %7b-%7e
+  ; i.e., all characters except `,'
+ allchar = DIGIT / ALPHA / HTAB / SP
+ escape = "
+  ; Used for reserved characters
+The properties fall into one of the following categories: <bu> DA Configuration <bu> Static Scope Configuration <bu> Tracing
+and Logging <bu> Serialized Proxy Registrations <bu> Networking Configuration Parameters <bu> UA Configuration
+The following are configuration properties and their parameters for DAs:
+net.slp.isDA
+Setting Type Boolean
+Default Value False
+Range of Values True or False
+A boolean that indicates whether slpd(1M) is to act as a DA. If False, slpd(1M) is not run as a DA.
+net.slp.DAHeartBeat
+Setting Type Integer
+<beginning of page>
+Default Value 10800 seconds (3 hours)
+Range of Values 2000 - 259200000 seconds
+A 32-bit integer giving the number of seconds for the passive DA advertisement heartbeat. The default value is
+10800 seconds. This property is ignored if net.slp.isDA is False.
+net.slp.DAAttributes
+Setting Type List of Strings
+Default Value Unassigned
+Range of Values List of Attribute Tag/Value List Pairs
+A comma-separated list of parenthesized attribute tag/value list pairs that the DA must advertise in DA advertise<hy>
+ments. The property must be in the SLP attribute list wire format, which requires that you use a backslash ("
+The following properties and their parameters allow you to configure various aspects of scope and DA handling:
+net.slp.useScopes
+Setting Type List of Strings
+Default Value Default, for SA and DA; unassigned for UA.
+Range of Values List of Strings
+A list of strings indicating either the scopes that a UA or an SA is allowed to use when making requests, or the
+scopes a DA must support. If not present for the DA and SA, the default scope Default is used. If not present for
+the UA, then the user scoping model is in force, in which active and passive DA or SA discovery are used for scope
+discovery. The scope Default is used if no other information is available. If a DA or SA gets another scope in a re<hy>
+quest, a SCOPE_NOT_SUPPORTED error is returned, unless the request was multicast, in which case it is
+dropped. If a DA receives another scope in a registration, a SCOPE_NOT_SUPPORTED error will be returned.
+Unlike other properties, this property is "read-only", so attempts to change it programmatically after the configura<hy>
+tion file has been read are ignored.
+net.slp.DAAddresses
+Setting Type List of Strings
+Default Value Unassigned
+Range of Values IPv4 addresses or host names
+A list of IP addresses or DNS-resolvable names that denote the DAs to use for statically configured UAs and
+SAs. The property is read by slpd(1M), and registrations are forwarded to the DAs. The DAs are provided to UAs
+upon request. Unlike other properties, this property is "read-only", so attempts to change it after the configuration
+file has been read are ignored.
+The following grammar describes the property:
+ addr-list = addr / addr "," addr-list
+ addr = fqdn / hostnumber
+ fqdn = ALPHA / ALPHA *[ anum / "-" ] anum
+<beginning of page>
+ anum = ALPHA / DIGIT
+ hostnumber = 1*3DIGIT 3("." 1*3DIGIT)
+The following is an example using this grammar:
+ sawah,mandi,sambal
+IP addresses can be used instead of host names in networks where DNS is not deployed, but network administrators
+are reminded that using IP addresses will complicate machine renumbering, since the SLP configuration property
+files in statically configured networks will have to be changed.
+These properties direct tracing and logging information to be sent to syslogd at the LOG_INFO priority. These
+properties affect slpd(1M) only.
+net.slp.traceDATraffic
+Setting Type Boolean
+Default Value False
+Range of Values True or False
+Set net.slp.traceDATraffic to True to enable logging of DA traffic by slpd.
+net.slp.traceMsg
+Setting Type Boolean
+Default Value False
+Range of Values True or False
+Set net.slp.traceMsg to True to display details about SLP messages. The fields in all incoming messages and
+outgoing replies are printed by slpd.
+net.slp.traceDrop
+Setting Type Boolean
+Default Value False
+Range of Values True or False
+Set this property to True to display details when an SLPmessage is dropped by slpd for any reason.
+net.slp.traceReg
+Setting Type Boolean
+Default Value False
+Range of Values True or False
+Set this property to True to display the table of service advertisements when a registration or deregistration is pro<hy>
+<beginning of page>
+cessed by slpd.
+The following properties control reading and writing serialized registrations.
+net.slp.serializedRegURL
+Setting Type String
+Default Value Unassigned
+Range of Values Valid URL
+A string containing a URL pointing to a document, which contains serialized registrations that should be pro<hy>
+cessed when the slpd starts up.
+The properties that follow allow you to set various network configuration parameters:
+net.slp.isBroadcastOnly
+Setting Type Boolean
+Default Value False
+Range of Values True or False
+A boolean that indicates if broadcast should be used instead of multicast.
+net.slp.multicastTTL
+Setting Type Positive Integer
+Default Value 255
+Range of Values A positive integer from 1 to 255.
+A positive integer less than or equal to 255 that defines the multicast TTL.
+net.slp.DAActiveDiscoveryInterval
+Setting Type Integer
+Default Value 900 seconds (15 minutes)
+Range of Values From 300 to 10800 seconds
+A 16-bit positive integer giving the number of seconds between DA active discovery queries. The default value is
+900 seconds (15 minutes). If the property is set to zero, active discovery is turned off. This is useful when the DAs
+available are explicitly restricted to those obtained from the net.slp.DAAddresses property.
+net.slp.multicastMaximumWait
+<beginning of page>
+Setting Type Integer
+Default Value 15000 milliseconds (15 seconds)
+Range of Values
+ 1000 to 60000 milliseconds
+A 32-bit integer giving the maximum value for the sum of the net.slp.multicastTimeouts values and
+net.slp.DADiscoveryTimeouts values in milliseconds.
+net.slp.multicastTimeouts
+Setting Type List of Integers
+Default Value 3000,3000,3000,3000
+Range of Values List of Positive Integers
+A list of 32-bit integers used as timeouts, in milliseconds, to implement the multicast convergence algorithm. Each
+value specifies the time to wait before sending the next request, or until nothing new has been learned from two suc<hy>
+cessive requests. In a fast network the aggressive values of 1000,1250,1500,2000,4000 allow better performance.
+The sum of the list must equal net.slp.multicastMaximumWait.
+net.slp.passiveDADetection
+Setting Type Boolean
+Default Value True
+Range of Values True or False
+A boolean indicating whether slpd should perform passive DA detection.
+net.slp.DADiscoveryTimeouts
+Setting Type List of Integers.
+Default Value 2000,2000,2000,2000,3000,4000
+Range of Values List of Positive Integers
+A list of 32-bit integers used as timeouts, in milliseconds, to implement the multicast convergence algorithm during
+active DA discovery. Each value specifies the time to wait before sending the next request, or until nothing new has
+been learned from two successive requests. The sum of the list must equal net.slp.multicastMaximumWait.
+net.slp.datagramTimeouts
+Setting Type List of Integers
+<beginning of page>
+Default Value 3000,3000,3000
+Range of Values List of Positive Integers
+A list of 32-bit integers used as timeouts, in milliseconds, to implement unicast datagram transmission to DAs. The
+nth value gives the time to block waiting for a reply on the nth try to contact the DA.
+net.slp.randomWaitBound
+Setting Type Integer
+Default Value 1000 milliseconds (1 second)
+Range of Values 1000 to 3000 milliseconds
+Sets the upper bound for calculating the random wait time before attempting to contact a DA.
+net.slp.MTU
+Setting Type Integer
+Default Value 1400
+Range of Values 128 to 8192
+A 16-bit integer that specifies the network packet size, in bytes. The packet size includes IP and TCP or UDP head<hy>
+ers.
+net.slp.interfaces
+Setting Type List of Strings
+Default Value Default interface
+Range of Values IPv4 addresses or host names
+List of strings giving the IP addresses or host names of the network interface cards on which the DA or SA should
+listen on port 427 for multicast, unicast UDP, and TCP messages. The default value is unassigned, indicating that
+the default network interface card should be used. An example is:
+ 195.42.42.42,195.42.142.1,195.42.120.1
+The example machine has three interfaces on which the DA should listen. Note that if IP addresses are used, the
+property must be renumbered if the network is renumbered.
+The following configuration parameters apply to the UA:
+net.slp.locale
+Setting Type String
+<beginning of page>
+Default Value en
+Range of Values See RFC 1766 for a list of the locale language tag names.
+A RFC 1766 Language Tag for the language locale. Setting this property causes the property value to become
+the default locale for SLP messages.
+net.slp.maxResults
+Setting Type Integer
+Default Value -1
+Range of Values -1, positive integer
+A 32 bit-integer that specifies the maximum number of results to accumulate and return for a synchronous request
+before the timeout, or the maximum number of results to return through a callback if the request results are reported
+asynchronously. Positive integers and -1 are legal values. If the value of net.slp.maxResults is -1, all results should
+be returned.
+net.slp.typeHint
+Setting Type List of Strings
+Default Value Unassigned
+Range of Values Service type names
+A list of service type names. In the absence of any DAs, UAs perform SA discovery to find scopes. If the
+net.slp.typeHint property is set, only SA's advertising types on the list respond. Note that UAs set this property pro<hy>
+grammatically. It is not typically set in the configuration file. The default is unassigned, meaning do not restrict the
+type.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wslpr _ CSIEnabled _ Interface Stability Standard
+slpd(1M), slpd.reg(4), slp_api(3SLP), slp(7P)
+System Administration Guide: Network Services
+Alvestrand, H.RFC 1766: Tags for the Identification of Languages. Network Working Group. March 1995.
+Crocker, D., Overell, P.RFC 2234, Augmented BNF for Syntax Specifications: ABNF. The Internet Society. 1997.
+Kempf, J. and Guttman, E. RFC 2614, An API for Service Location. The Internet Society. June 1999.

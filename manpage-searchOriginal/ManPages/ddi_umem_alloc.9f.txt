@@ -1,0 +1,52 @@
+<beginning of page>
+ddi_umem_alloc, ddi_umem_free <-> allocate and free page-aligned kernel memory
+#include <sys/types.h>
+#include <sys/sunddi.h>
+void *ddi_umem_alloc(size_t size, int flag,
+ ddi_umem_cookie_t *cookiep);
+void ddi_umem_free(ddi_umem_cookie_t cookie);
+Solaris DDI specific (Solaris DDI).
+size Number of bytes to allocate.
+flag Used to determine the sleep and pageable conditions.
+Possible sleep flags are DDI_UMEM_SLEEP, which allows sleeping until memory is available, and
+DDI_UMEM_NOSLEEP, which returns NULL immediately if memory is not available.
+The default condition is to allocate locked memory; this can be changed to allocate pageable memory using the
+DDI_UMEM_PAGEABLE flag.
+cookiep Pointer to a kernel memory cookie.
+cookie A kernel memory cookie allocated in ddi_umem_alloc().
+ddi_umem_alloc() allocates page-aligned kernel memory and returns a pointer to the allocated memory. The num<hy>
+ber of bytes allocated is a multiple of the system page size (roundup of size). The allocated memory can be used in
+the kernel and can be exported to user space. See devmap(9E) and devmap_umem_setup(9F) for further informa<hy>
+tion.
+flag determines whether the caller can sleep for memory and whether the allocated memory is locked or not.
+DDI_UMEM_SLEEP allocations may sleep but are guaranteed to succeed. DDI_UMEM_NOSLEEP allocations
+do not sleep but may fail (return NULL) if memory is currently unavailable. If DDI_UMEM_PAGEABLE is set,
+pageable memory will be allocated. These pages can be swapped out to secondary memory devices. The initial con<hy>
+tents of memory allocated using ddi_umem_alloc() is zero-filled.
+*cookiep is a pointer to the kernel memory cookie that describes the kernel memory being allocated. A typical use of
+cookiep is in devmap_umem_setup(9F) when the drivers want to export the kernel memory to a user application.
+To free the allocated memory, a driver calls ddi_umem_free() with the cookie obtained from ddi_umem_alloc().
+ddi_umem_free() releases the entire buffer.
+Non-null Successful completion. ddi_umem_alloc() returns a pointer to the allocated memory.
+NULL Memory cannot be allocated by ddi_umem_alloc() because DDI_UMEM_NOSLEEP is set and the system
+is out of resources.
+ddi_umem_alloc() can be called from any context if flag is set to DDI_UMEM_NOSLEEP. If
+DDI_UMEM_SLEEP is set, ddi_umem_alloc() can be called from user and kernel context only.
+ddi_umem_free() can be called from any context.
+devmap(9E), condvar(9F), devmap_umem_setup(9F), kmem_alloc(9F), mutex(9F), rwlock(9F), semaphore(9F)
+Writing Device Drivers
+Setting the DDI_UMEM_PAGEABLE flag in ddi_umem_alloc() will result in an allocation of pageable memory.
+Because these pages can be swapped out to secondary memory devices, drivers should use this flag with care. This
+memory must not be used for the following purposes: <bu> For synchronization objects such as locks and condition vari<hy>
+ables. See mutex(9F), semaphore(9F), rwlock(9F), and condvar(9F). <bu> For driver interrupt routines.
+<beginning of page>
+Memory allocated using ddi_umem_alloc() without setting DDI_UMEM_PAGEABLE flag cannot be paged.
+Available memory is therefore limited by the total physical memory on the system. It is also limited by the available
+kernel virtual address space, which is often the more restrictive constraint on large-memory configurations.
+Excessive use of kernel memory is likely to effect overall system performance. Over-commitment of kernel memory
+may cause unpredictable consequences.
+Misuse of the kernel memory allocator, such as writing past the end of a buffer, using a buffer after freeing it, freeing
+a buffer twice, or freeing an invalid pointer, will cause the system to corrupt data or panic.
+Do not call ddi_umem_alloc() within DDI_SUSPEND and DDI_RESUME operations. Memory acquired at these
+times is not reliable. In some cases, such a call can cause a system to hang.
+ddi_umem_alloc(0, flag, cookiep) always returns NULL. ddi_umem_free(NULL) has no effects on system.

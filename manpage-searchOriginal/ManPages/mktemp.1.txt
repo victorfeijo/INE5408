@@ -1,0 +1,85 @@
+<beginning of page>
+mktemp <-> make temporary filename
+mktemp [-dtqu] [-p directory] [template]
+The mktemp utility makes a temporary filename. To do this, mktemp takes the specified filename template and
+overwrites a portion of it to create a unique filename. See OPERANDS.
+The template is passed to mkdtemp(3C) for directories or mkstemp(3C) for ordinary files.
+If mktemp can successfully generate a unique filename, the file (or directory) is created with file permissions such
+that it is only readable and writable by its owner (unless the -u flag is given) and the filename is printed to standard
+output.
+mktemp allows shell scripts to safely use temporary files. Traditionally, many shell scripts take the name of the pro<hy>
+gram with the PID as a suffix and used that as a temporary filename. This kind of naming scheme is predictable and
+the race condition it creates is easy for an attacker to win. A safer, though still inferior approach is to make a tempo<hy>
+rary directory using the same naming scheme. While this guarantees that a temporary file is not subverted, it still al<hy>
+lows a simple denial of service attack. Use mktemp instead.
+The following options are supported:
+-d Make a directory instead of a file.
+-p directory Use the specified directory as a prefix when generating the temporary filename. The directory is overrid<hy>
+den by the user's TMPDIR environment variable if it is set. This option implies the -t flag.
+-q Fail silently if an error occurs. This is useful if a script does not want error output to go to standard error.
+-t Generate a path rooted in a temporary directory. This directory is chosen as follows: If the user's TMPDIR envi<hy>
+ronment variable is set, the directory contained therein is used. Otherwise, if the -p flag was given the specified di<hy>
+rectory is used. If none of the above apply, /tmp is used. In this mode, the template (if specified) should be a directo<hy>
+ry component (as opposed to a full path) and thus should not contain any forward slashes.
+-u Operate in unsafe mode. The temp file is unlinked before mktemp exits. This is slightly better than mktemp(3C),
+but still introduces a race condition. Use of this option is discouraged.
+The following operands are supported:
+template template can be any filename with one or more Xs appended to it, for example /tmp/tfile.XXXXXX.
+If template is not specified, a default of tmp.XXXXXX is used and the -t flag is implied.
+Example 1 Using mktemp
+The following example illustrates a simple use of mktemp in a sh(1) script. In this example, the script quits if it can<hy>
+not get a safe temporary file.
+ TMPFILE=`mktemp /tmp/example.XXXXXX`
+ if [ -z "$TMPFILE" ]; then exit 1; fi
+ echo "program output" >> $TMPFILE
+Example 2 Using mktemp to Support TMPDIR
+The following example uses mktemp to support for a user's TMPDIR environment variable:
+ TMPFILE=`mktemp -t example.XXXXXX`
+ if [ -z "$TMPFILE" ]; then exit 1; fi
+ echo "program output" >> $TMPFILE
+<beginning of page>
+Example 3 Using mktemp Without Specifying the Name of the Temporary File
+The following example uses mktemp without specifying the name of the temporary file. In this case the -t flag is
+implied.
+ TMPFILE=`mktemp`
+ if [ -z "$TMPFILE" ]; then exit 1; fi
+ echo "program output" >> $TMPFILE
+Example 4 Using mktemp with a Default Temporary Directory Other than /tmp
+The following example creates the temporary file in /extra/tmp unless the user's TMPDIR environment variable
+specifies otherwise:
+ TMPFILE=`mktemp -p /extra/tmp example.XXXXX`
+ if [ -z "$TMPFILE" ]; then exit 1; fi
+ echo "program output" >> $TMPFILE
+Example 5 Using mktemp to Remove a File
+The following example attempts to create two temporary files. If creation of the second temporary file fails, mktemp
+removes the first file before exiting:
+ TMP1=`mktemp -t example.1.XXXXXX`
+ if [ -z "$TMP1" ]; then exit 1; fi
+ TMP2=`mktemp -t example.2.XXXXXX`
+ if [ -z "$TMP2" ]; then
+  rm -f $TMP1
+  exit 1
+ fi
+Example 6 Using mktemp
+The following example does not exit if mktemp is unable to create the file. That part of the script has been protect<hy>
+ed.
+ TMPFILE=`mktemp -q -t example.XXXXXX`
+ if [ ! -z "$TMPFILE" ]
+ then
+  # Safe to use $TMPFILE in this block
+  echo data > $TMPFILE
+  ...
+  rm -f $TMPFILE
+ fi
+See environ(5) for descriptions of the following environment variables that affect the execution of mktemp with the
+-t option: TMPDIR.
+The following exit values are returned:
+0 Successful completion.
+1 An error occurred.
+<beginning of page>
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu _ Interface StabilityCommitted
+sh(1), mkdtemp(3C), mkstemp(3C), attributes(5), environ(5)
+The mktemp utility appeared in OpenBSD 2.1. The Solaris implementation uses only as many `Xs' as are signifi<hy>
+cant for mktemp(3C) and mkstemp(3C).

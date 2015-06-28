@@ -1,0 +1,87 @@
+<beginning of page>
+nisrestore <-> restore NIS+ directory backup
+nisrestore [-fv] backup-dir directory...
+nisrestore [-fv] -a backup-dir
+nisrestore -t backup-dir
+nisrestore restores an existing backup of a NIS+ directory object that was created using nisbackup(1M). The back<hy>
+up-dir is the UNIX directory that contains the NIS+ backup on the server being restored. The nisrestore command
+can be used to restore a NIS+ directory object or a complete NIS+ database. It also can be used as an "out of band"
+fast replication for a new replica server being initialized. The rpc.nisd(1M) daemon must be stopped before running
+nisrestore.
+The first synopsis is used to restore a single directory object or a specified list of directory objects. The directory can
+be partially qualified or fully qualified. The server being restored will be verified against the list of servers serving
+the directory. If this server is not configured to serve this object, nisrestore will exit with an error. The -f option will
+override this check and force the operation.
+The second synopsis will restore all of the directory objects contained in the backup-dir. Again, the server will be
+validated against the serving list for each of the directory objects in the backup-dir. If one of the objects in the back<hy>
+up-dir are not served by this server, nisrestore will exit with an error. The -f option will override this check and
+force the operation.
+The -a option will attempt to restore all NIS+ objects contained in the backup-dir. If any of these objects are not
+served by the server, nisrestore will exit with an error. If the backup-dir contains objects that are not served by the
+server, nisrestore must be executed without the -a option and the specific directory objects listed.
+The -f option will disable verification of the server being configured to serve the objects being restored. This option
+should be used with care, as data could be inadvertently restored to a server that doesn't serve the restored data. This
+option is required in the case of restoring a single server domain (master server only) or if the other NIS+ servers are
+unavailable for NIS+ lookups.
+The combination of options -f and -a should be used with caution, as no validation of the server serving the restored
+objects will be done.
+New replicas can be quickly added to a namespace with the nisrestore command. The steps are as follows.
+Configure the new replica on the master server (see nisserver(1M)):
+ master# nisserver -R -h replica
+Temporarily stop the rpc.nisd server process on the new replica server:
+ replica# svcadm disable -t network/rpc/nisplus:default
+Create a backup of the NIS+ database on the master, which will include the new replica information. See nisback<hy>
+up(1M). The /backup will need to be exported to the new replica. See share_nfs(1M).
+ master# nisbackup -a /backup
+Restore the backup of the NIS+ database on the new replica. Use the -f option if nisrestore is unable to lookup the
+NIS+ objects being restored. The backup should be available through nfs or similar means. See share_nfs(1M).
+ replica# nisrestore -f -a //nfs-mnt/backup
+Restart the rpc.nisd(1M) process on the new replica, and the server will immediately be available for service:
+<beginning of page>
+ replica# svcadm enable network/rpc/nisplus:default
+The following options are supported:
+-a Restores all directory objects included in the backup-dir partition.
+-f Forces the restoration of a directory without the validation of the server in the directory object's serving list.
+-t Lists all directory objects contained in backup-dir.
+-v Verbose option. Additional output will be produced upon execution of the command.
+The following options are supported:
+backup-dir The UNIX directory that contains the data files for the NIS+ directory objects to be restored.
+directory The NIS+ directory object(s) to be restored. This can be a fully or partially qualified name.
+Example 1 Restoring the Directory Object on a Replica Server from a Local UFS Partition
+To restore the org_dir directory object of the domain foo.com on a replica server from a local ufs partition named
+/var/backup:
+ replica_server# nisrestore /var/backup org_dir.foo.com.
+Example 2 Forcing the Restore of a Backed up NIS+ Namespace to a Replica Server From the Backup Partition
+To force the restore of an entire backed up NIS+ namespace to a replica server from the backup partition named
+/var/backup:
+ replica_server# nisrestore -f -a /var/backup
+Example 3 Restoring the Subdomain on a Master Server From a Backup that Includes Other Directory Objects
+To restore the subdomain sub.foo.com on a master server, from a backup that includes other directory objects:
+ master_server# nisrestore /var/backup sub.foo.com. \
+  org_dir.sub.foo.com. groups_dir.sub.foo.com.
+0 Successful completion.
+1 An error occurred.
+/backup-dir/backup_list
+This ASCII file contains a list of all the objects contained in this backup-dir directory. This information can be dis<hy>
+played with the -t option.
+<beginning of page>
+/backup-dir/directory-object
+A subdirectory that is created in the backup-dir which contains the directory-object backup.
+/backup-dir/directory-object/data
+A subdirectory that contains the data files that are part of the directory-object backup.
+/backup-dir/directory-object/last.upd
+This data file contains timestamp information about the directory-object.
+/backup-dir/directory-object/data.dict
+A NIS+ data dictionary for all of the objects contained in this directory-object backup.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wnisu
+svcs(1), NIS+(1), nisdefaults(1), nisbackup(1M), nisserver(1M), rpc.nisd(1M), share_nfs( 1M), svcadm(1M),
+nisfiles(4), attributes(5), smf(5)
+NIS+ might not be supported in future releases of the Solaris Operating system. Tools to aid the migration from
+NIS+ to LDAP are available in the current Solaris release. For more information, visit http://www.sun.com/directo<hy>
+ry/nisplus/transition.html.
+The NIS+ service is managed by the service management facility, smf(5), under the service identifier:
+ svc:/network/rpc/nisplus:default
+Administrative actions on this service, such as enabling, disabling, or requesting restart, can be performed using sv<hy>
+cadm(1M). The service's status can be queried using the svcs(1) command.

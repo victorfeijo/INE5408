@@ -1,0 +1,114 @@
+<beginning of page>
+prnio <-> generic printer interface
+#include <sys/prnio.h>
+The prnio generic printer interface defines ioctl commands and data structures for printer device drivers.
+prnio defines and provides facilities for five basic phases of the printing process: <bu> Identification <em> Retrieve device
+information/attributes <bu> Setup <em> Set device attributes <bu> Transfer <em> Transfer data to or from the device <bu> Cleanup <em>
+Transfer phase conclusion <bu> Abort <em> Transfer phase interruption
+During the Identification phase, the application retrieves a set of device capabilities and additional information using
+the PRNIOC_GET_IFCAP, PRNIOC_GET_STATUS, PRNIOC_GET_TIMEOUTS, PRNIOC_GET_IFIN<hy>
+FO and PRNIOC_GET_1284_DEVID commands.
+During the Setup phase the application sets some interface attributes and probably resets the printer as described in
+the PRNIOC_SET_IFCAP, PRNIOC_SET_TIMEOUTS and PRNIOC_RESET sections.
+During the Transfer phase, data is transferred in a forward (host to peripheral) or reverse direction (peripheral to
+host). Transfer is accomplished using write(2) and read(2) system calls. For prnio compliant printer drivers, for<hy>
+ward transfer support is mandatory, while reverse transfer support is optional. Applications can also use
+PRNIOC_GET_STATUS and PRNIOC_GET_1284_STATUS commands during the transfer to monitor the de<hy>
+vice state.
+The Cleanup phase is accomplished by closing the device using close(2). Device drivers supporting prnio may set
+non-zero error code as appropriate. Applications should explicitly close(2) a device before exiting and check errno
+value.
+The Abort phase is accomplished by interrupting the write(2) and read(2) system calls. The application can perform
+some additional cleanup during the Abort phase as described in PRNIOC_GET_IFCAP section.
+PRNIOC_GET_IFCAP Application can retrieve printer interface capabilities using this command. The ioctl(2) ar<hy>
+gument is a pointer to uint_t, a bit field representing a set of properties and services provided by a printer driver. Set
+bit means supported capability. The following values are defined:
+ PRN_BIDI - When this bit is set, the interface operates in a bidirectional mode, instead of forward-only
+ mode.
+ PRN_HOTPLUG - If this bit is set, the interface allows device hot-plugging.
+ PRN_1284_DEVID - If this bit is set, the device is capable of returning 1284 device ID (see
+ PRNIOC_GET_1284_DEVID.)
+ PRN_1284_STATUS - If this bit is set, the device driver can return device status lines (see
+ PRNIOC_GET_1284_STATUS). Some devices support this ioctl in unidirectional mode only.
+ PRN_TIMEOUTS - If this bit is set the peripheral may stall during the transfer phase and the driver can time<hy>
+ out and return from the write(2) and read(2) returning the number of bytes that have been transferred. If
+ PRN_TIMEOUTS is set, the driver supports this functionality and the timeout values can be retrieved and
+ modified via the PRNIOC_GET_TIMEOUTS and PRNIOC_SET_TIMEOUTS ioctls. Otherwise, applica<hy>
+ tions can implement their own timeouts and abort phase.
+ PRN_STREAMS - This bit impacts the application abort phase behaviour. If the device claimed
+ PRN_STREAMS capability, the application must issue an I_FLUSH ioctl(2) before close(2) to dismiss the
+ untransferred data. Only STREAMS drivers can support this capability.
+PRNIOC_SET_IFCAP This ioctl can be used to change interface capabilities. The argument is a pointer to uint_t
+bit field that is described in detail in the PRNIOC_GET_IFCAP section. Capabilities should be set one at a time;
+otherwise the command will return EINVAL. The following capabilities can be changed by this ioctl:
+ PRN_BIDI - When this capability is set, the interface operates in a bidirectional mode, instead of forward-only
+ mode. Devices that support only one mode will not return error; applications should use PRNIOC_GET_IF<hy>
+ CAP to check if the mode was successfully changed. Because some capabilities may be altered as a side effect
+ of changing other capabilities, this command should be followed by PRNIOC_GET_IFCAP.
+PRNIOC_GET_IFINFO This command can be used to retrieve printer interface info string, which is an arbitrary
+format string usually describing the bus type. The argument is a pointer to struct prn_interface_info as described
+below.
+ struct prn_interface_info {
+  uint_t  if_len; /* length of buffer */
+<beginning of page>
+  uint_t  if_rlen; /* actual info length */
+  char *if_data; /* buffer address */
+ };
+The application allocates a buffer and sets if_data and if_len values to its address and length, respectively. The driv<hy>
+er returns the string to this buffer and sets if_len to its length. If if_len is less that if_rlen, the driver must return
+the first if_len bytes of the string. The application may then repeat the command with a bigger buffer.
+Although prnio does not limit the contents of the interface info string, some values are recommended and defined in
+<sys/prnio.h> by the following macros:
+ PRN_PARALLEL - Centronics or IEEE 1284 compatible devices
+ PRN_SERIAL - EIA-232/EIA-485 serial ports
+ PRN_USB - Universal Serial Bus printers
+ PRN_1394 - IEEE 1394 peripherals
+ Printer interface info string is for information only: no  implications should be made from its value.
+PRNIOC_RESET Some applications may want to reset the printer state during Setup and/or Cleanup phase using
+PRNIOC_RESET command. Reset semantics are device-specific, and in general, applications using this command
+should be aware of the printer type.
+Each prnio compliant driver is required to accept this request, although performed actions are completely driver-de<hy>
+pendent. More information on the PRNIOC_RESET implementation for the particular driver is available in the cor<hy>
+responding man page and printer manual.
+PRNIOC_GET_1284_DEVID This command can be used to retrieve printer device ID as  defined by IEEE
+1284-1994.The ioctl(2) argument is a pointer to struct prn_1284_device_id as described below.
+ struct prn_1284_device_id {
+  uint_t  id_len; /* length of buffer */
+  uint_t  id_rlen; /* actual ID length */
+  char *id_data; /* buffer address */
+ };
+For convenience, the two-byte length field is not considered part of device ID string and is not returned  in the
+user buffer. Instead, id_rlen value shall be set to (length - 2) by the driver, where length is the ID length field value.
+If buffer length is less than id_rlen, the driver returns the first id_len bytes of the ID.
+The printer driver must return the most up-to-date value of the device ID.
+PRNIOC_GET_STATUS This command can be used by applications to retrieve current device status. The argu<hy>
+ment is a pointer to uint_t, where the status word is returned. Status is a combination of the following bits:
+ PRN_ONLINE - For devices that support PRN_HOTPLUG capability,   this bit is set when
+ the device is online, otherwise the device is offline. Devices without PRN_HOTPLUG support should always
+ have this bit set.
+ PRN_READY - This bit indicates if the device is ready to receive/send data. Applications may use this bit for
+ an outbound flow control
+PRNIOC_GET_1284_STATUS Devices that support PRN_1284_STATUS capability accept this ioctl to retrieve
+the device status lines defined in IEEE 1284 for use in Compatibility mode. The following bits may be set by the
+driver:
+ PRN_1284_NOFAULT - Device is not in error state
+ PRN_1284_SELECT - Device is selected
+ PRN_1284_PE - Paper error
+ PRN_1284_BUSY - Device is busy
+PRNIOC_GET_TIMEOUTS This command retrieves current transfer timeout values for the driver. The argument
+is a pointer to struct prn_timeouts as described below.
+ struct prn_timeouts {
+<beginning of page>
+  uint_t tmo_forward; /* forward transfer timeout */
+  uint_t tmo_reverse; /* reverse transfer timeout */
+  };
+tmo_forward and tmo_reverse define forward and reverse transfer timeouts in seconds. This command is only valid
+for drivers that support PRN_TIMEOUTS capability.
+PRNIOC_SET_TIMEOUTS This command sets current transfer timeout values for the driver. The argument is a
+pointer to struct prn_timeouts. See PRNIOC_GET_TIMEOUTS for description of this structure. This com<hy>
+mand is only valid for drivers that support PRN_TIMEOUTS capability.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Architecture
+SPARC, IA _ Interface StabilityEvolving
+close(2), ioctl(2), read(2), write(2), attributes(5), ecpp(7D), usbprn(7D), lp(7D)
+IEEE Std 1284-1994

@@ -1,0 +1,275 @@
+<beginning of page>
+fsattr <-> extended file attributes
+Attributes are logically supported as files within the file system. The file system is therefore augmented with an or<hy>
+thogonal name space of file attributes. Any file (including attribute files) can have an arbitrarily deep attribute tree
+associated with it. Attribute values are accessed by file descriptors obtained through a special attribute interface.
+This logical view of "attributes as files" allows the leveraging of existing file system interface functionality to sup<hy>
+port the construction, deletion, and manipulation of attributes.
+The special files "." and ".." retain their accustomed semantics within the attribute hierarchy. The "." attribute file
+refers to the current directory and the ".." attribute file refers to the parent directory. The unnamed directory at the
+head of each attribute tree is considered the "child" of the file it is associated with and the ".." file refers to the asso<hy>
+ciated file. For any non-directory file with attributes, the ".." entry in the unnamed directory refers to a file that is not
+a directory.
+Conceptually, the attribute model is fully general. Extended attributes can be any type of file (doors, links, directo<hy>
+ries, and so forth) and can even have their own attributes (fully recursive). As a result, the attributes associated with
+a file could be an arbitrarily deep directory hierarchy where each attribute could have an equally complex attribute
+tree associated with it. Not all implementations are able to, or want to, support the full model. Implementation are
+therefore permitted to reject operations that are not supported. For example, the implementation for the UFS file
+system allows only regular files as attributes (for example, no sub-directories) and rejects attempts to place attributes
+on attributes.
+The following list details the operations that are rejected in the current implementation:
+link Any attempt to create links between attribute and non-attribute space is rejected to prevent security-related or
+otherwise sensitive attributes from being exposed, and therefore manipulable, as regular files.
+rename Any attempt to rename between attribute and non-attribute space is rejected to prevent an already linked file
+from being renamed and thereby circumventing the link restriction above.
+mkdir, symlink, mknod Any attempt to create a "non-regular" file in attribute space is rejected to reduce the func<hy>
+tionality, and therefore exposure and risk, of the initial implementation.
+The entire available name space has been allocated to "general use" to bring the implementation in line with the
+NFSv4 draft standard [NFSv4]. That standard defines "named attributes" (equivalent to Solaris Extended Attributes)
+with no naming restrictions. All Sun applications making use of opaque extended attributes will use the prefix
+"SUNW".
+The command interface for extended attributes is the set of applications provided by Solaris for the manipulation of
+attributes from the command line. This interface consists of a set of existing utilities that have been extended to be
+"attribute-aware", plus the runat utility designed to "expose" the extended attribute space so that extended attributes
+can be manipulated as regular files.
+The -@ option enable utilities to manipulate extended attributes. As a rule, this option enables the utility to enter in<hy>
+to attribute space when the utility is performing a recursive traversal of file system space. This is a fully recursive
+concept. If the underlying file system supports recursive attributes and directory structures, the -@ option opens
+these spaces to the file tree-walking algorithms.
+The following utilities accommodate extended attributes (see the individual manual pages for details):
+cp By default, cp ignores attributes and copies only file data. This is intended to maintain the semantics implied by
+cp currently, where attributes (such as owner and mode) are not copied unless the -p option is specified. With the -@
+(or -p) option, cp attempts to copy all attributes along with the file data.
+cpio The -@ option informs cpio to archive attributes, but by default cpio ignores extended attributes. See Extended
+Archive Formats below for a description of the new archive records.
+du File sizes computed include the space allocated for any extended attributes present.
+<beginning of page>
+find By default, find ignores attributes. The -xattr expression provides support for searches involving attribute
+space. It returns true if extended attributes are present on the current file.
+fsck The fsck utility manages extended attribute data on the disk. A file system with extended attributes can be
+mounted on versions of Solaris that are not attribute-aware (versions prior to Solaris 9), but the attributes will not be
+accessible and fsck will strip them from the files and place them in lost+found. Once the attributes have been
+stripped the file system is completely stable on Solaris versions that are not attribute-aware, but would now be con<hy>
+sidered corrupted on attribute-aware versions of Solaris. The attribute-aware fsck utility should be run to stabilize
+the file system before using it in an attribute-aware environment.
+fsdb This fsdb utility is able to find the inode for the "hidden" extended attribute directory.
+ls The ls -@ command displays an "@" following the mode information when extended attributes are present. More
+precisely, the output line for a given file contains an "@" character following the mode characters if the pathconf(2)
+variable XATTR_EXISTS is set to true. See the pathconf() section below. The -@ option uses the same general
+output format as the -l option.
+mv When a file is moved, all attributes are carried along with the file rename. When a file is moved across a file sys<hy>
+tem boundary, the copy command invoked is similar to the cp -p variant described above and extended attributes are
+"moved". If the extended file attributes cannot be replicated, the move operation fails and the source file is not re<hy>
+moved.
+pax The -@ option informs pax to archive attributes, but by default pax ignores extended attributes. The pax(1)
+utility is a generic replacement for both tar(1) and cpio(1) and is able to produce either output format in its archive.
+See Extended Archive Formats below for a description of the new archive records.
+tar In the default case, tar does not attempt to place attributes in the archive. If the -@ option is specified, however,
+tar traverses into the attribute space of all files being placed in the archive and attempts to add the attributes to the
+archive. A new record type has been introduced for extended attribute entries in tar archive files (the same is true for
+pax and cpio archives) similar to the way ACLs records were defined. See Extended Archive Formats below for a
+description of the new archive records.
+There is a class of utilities (chmod, chown, chgrp) that one might expect to be modified in a manner similar to
+those listed above. For example, one might expect that performing chmod on a file would not only affect the file it<hy>
+self but would also affect at least the extended attribute directory if not any existing extended attribute files. This is
+not the case. The model chosen for extended attributes implies that the attribute directory and the attributes them<hy>
+selves are all file objects in their own right, and can therefore have independent file status attributes associated with
+them (a given implementation cannot support this, for example, for intrinsic attributes). The relationship is left un<hy>
+defined and a fine-grained control mechanism (runat(1)) is provided to allow manipulation of extended attribute sta<hy>
+tus attributes as necessary.
+The runat utility has the following syntax:
+ runat filename [command]
+The runat utility executes the supplied command in the context of the "attribute space" associated with the indicated
+file. If no command argument is supplied, a shell is invoked. See runat(1) for details.
+The primary interface required to access extended attributes at the programmatic level is the openat(2) function.
+Once a file descriptor has been obtained for an attribute file by an openat() call, all normal file system semantics ap<hy>
+ply. There is no attempt to place special semantics on read(2), write(2), ftruncate(3C), or other functions when ap<hy>
+plied to attribute file descriptors relative to "normal" file descriptors.
+The set of existing attributes can be browsed by calling openat() with "." as the file name and the O_XATTR flag
+set, resulting in a file descriptor for the attribute directory. The list of attributes is obtained by calls to getdents(2)
+on the returned file descriptor. If the target file did not previously have any attributes associated with it, an empty
+top-level attribute directory is created for the file and subsequent getdents() calls will return only "." and "..". While
+<beginning of page>
+the owner of the parent file owns the extended attribute directory, it is not charged against its quota if the directory is
+empty. Attribute files themselves, however, are charged against the user quota as any other regular file.
+Additional system calls have been provided as convenience functions. These include the fchownat(2), fstatat(2), fu<hy>
+timesat(2), renameat(2), unlinkat(2). These new functions, along with openat(), provide a mechanism to access
+files relative to an arbitrary point in the file system, rather than only the current working directory. This mechanism
+is particularly useful in situations when a file descriptor is available with no path. The openat() function, in particu<hy>
+lar, can be used in many contexts where chdir() or fchdir() is currently required. See chdir(2).
+ int openat (int fd, const char *path, int oflag [, mode_t mode])
+The openat(2) function behaves exactly as open(2) except when given a relative path. Where open() resolves a rela<hy>
+tive path from the current working directory, openat() resolves the path based on the vnode indicated by the supplied
+file descriptor. When oflag is O_XATTR, openat() interprets the path argument as an extended attribute reference.
+The following code fragment uses openat() to examine the attributes of some already opened file:
+ dfd = openat(fd, ".", O_RDONLY|O_XATTR);
+ (void)getdents(dfd, buf, nbytes);
+If openat() is passed the special value AT_FDCWD as its first (fd) argument, its behavior is identical to open() and
+the relative path arguments are interpreted relative to the current working directory. If the O_XATTR flag is provid<hy>
+ed to openat() or to open(), the supplied path is interpreted as a reference to an extended attribute on the current
+working directory.
+ int unlinkat (int dirfd, const char *pathflag, int flagflag)
+The unlinkat(2) function deletes an entry from a directory. The path argument indicates the name of the entry to re<hy>
+move. If path an absolute path, the dirfd argument is ignored. If it is a relative path, it is interpreted relative to the di<hy>
+rectory indicated by the dirfd argument. If dirfd does not refer to a valid directory, the function returns ENOTDIR.
+If the special value AT_FDCWD is specified for dirfd, a relative path argument is resolved relative to the current
+working directory. If the flag argument is 0, all other semantics of this function are equivalent to unlink(2). If flag
+is set to AT_REMOVEDIR, all other semantics of this function are equivalent to rmdir(2).
+ int renameat (int fromfd, const char *old, int tofd, const char *new)
+The renameat(2) function renames an entry in a directory, possibly moving the entry into a different directory. The
+old argument indicates the name of the entry to rename. If this argument is a relative path, it is interpreted relative to
+the directory indicated by the fd argument. If it is an absolute path, the fromfd argument is ignored. The new argu<hy>
+ment indicates the new name for the entry. If this argument is a relative path, it is interpreted relative to the directory
+indicated by the tofd argument. If it is an absolute path, the tofd argument is ignored.
+In the relative path cases, if the directory file descriptor arguments do not refer to a valid directory, the function re<hy>
+turns ENOTDIR. All other semantics of this function are equivalent to rename(2).
+If a special value AT_FDCWD is specified for either the fromfd or tofd arguments, their associated path arguments
+(old and new) are interpreted relative to the current working directory if they are not specified as absolute paths. Any
+attempt to use renameat() to move a file that is not an extended attribute into an extended attribute directory (so that
+it becomes an extended attribute) will fail. The same is true for an attempt to move a file that is an extended attribute
+into a directory that is not an extended attribute directory.
+ int fstatat (int fd, const char *path, struct stat* buf, int flag)
+The fstatat(2) function obtains information about a file. If the path argument is relative, it is resolved relative to the
+fd argument file descriptor, otherwise the fd argument is ignored. If the fd argument is a special value AT_FDCWD
+the path is resolved relative to the current working directory. If the path argument is a null pointer, the function re<hy>
+turns information about the file referenced by the fd argument. In all other relative path cases, if the fd argument
+does not refer to a valid directory, the function returns ENOTDIR. If AT_SYMLINK_NOFOLLOW is set in the
+flag argument, the function will not automatically traverse a symbolic link at the position of the path. If _AT_TRIG<hy>
+GER is set in the flag argument and the vnode is a trigger mount point, the mount is performed and the function re<hy>
+turns the attributes of the root of the mounted filesystem. The fstatat() function is a multipurpose function that can
+be used in place of stat(), lstat(), or fstat(). See stat(2)
+<beginning of page>
+The function call stat(path, buf) is identical to fstatat(AT_FDCWD, path, buf, 0).
+The function call lstat(path, buf) is identical to fstatat(AT_FDCWD, path, buf, AT_SYMLINK_NOFOLLOW)
+The function call fstat(fildes, buf) is identical to fstatat(fildes, NULL, buf, 0).
+ int fchownat (int fd, const char *path, uid_t owner, gid_t group, \
+  int flag)
+The fchownat(2) function sets the owner ID and group ID for a file. If the path argument is relative, it is resolved
+relative to the fd argument file descriptor, otherwise the fd argument is ignored. If the fd argument is a special value
+AT_FDCWD the path is resolved relative to the current working directory. If the path argument is a null pointer, the
+function sets the owner and group ID of the file referenced by the fd argument. In all other relative path cases, if the
+fd argument does not refer to a valid directory, the function returns ENOTDIR. If the flag argument is set to
+AT_SYMLINK_NOFOLLOW, the function will not automatically traverse a symbolic link at the position of the
+path. The fchownat() function is a multi-purpose function that can be used in place of chown(), lchown(), or
+fchown(). See chown(2).
+The function call chown(path, owner, group) is equivalent to fchownat(AT_FDCWD, path, owner, group, 0).
+The function call lchown(path, owner, group) is equivalent to fchownat(AT_FDCWD, path, owner, group,
+AT_SYMLINK_NOFOLLOW).
+ int futimesat (int fd, const char *path, const struct timeval \
+  times[2])
+The futimesat(2) function sets the access and modification times for a file. If the path argument is relative, it is re<hy>
+solved relative to the fd argument file descriptor; otherwise the fd argument is ignored. If the fd argument is the spe<hy>
+cial value AT_FDCWD, the path is resolved relative to the current working directory. If the path argument is a null
+pointer, the function sets the access and modification times of the file referenced by the fd argument. In all other rel<hy>
+ative path cases, if the fd argument does not refer to a valid directory, the function returns ENOTDIR. The futime<hy>
+sat() function can be used in place of utimes(2).
+The function call utimes(path, times) is equivalent to futimesat(AT_FDCWD, path, times).
+ long int pathconf(const char *path, int name)
+Two variables have been added to pathconf(2) to provide enhanced support for extended attribute manipulation. The
+XATTR_ENABLED variable allows an application to determine if attribute support is currently enabled for the file
+in question. The XATTR_EXISTS variable allows an application to determine whether there are any extended at<hy>
+tributes associated with the supplied path.
+ int attropen (const char *path, const char *attrpath, int oflag \
+  [, mode_t mode])
+The attropen(3C) function returns a file descriptor for the named attribute, attrpath, of the file indicated by path.
+The oflag and mode arguments are identical to the open(2) arguments and are applied to the open operation on the
+attribute file (for example, using the O_CREAT flag creates a new attribute). Once opened, all normal file system
+operations can be used on the attribute file descriptor. The attropen() function is a convenience function and is
+equivalent to the following sequence of operations:
+ fd = open (path, O_RDONLY);
+ attrfd = openat(fd, attrpath, oflag|O_XATTR, mode);
+ close(fd);
+The set of existing attributes can be browsed by calling attropen() with "." as the attribute name. The list of at<hy>
+tributes is obtained by calling getdents(2) (or fdopendir(3C) followed by readdir(3C), see below) on the returned
+file descriptor.
+ DIR * fdopendir (const int fd)
+<beginning of page>
+The fdopendir(3C) function promotes a file descriptor for a directory to a directory pointer suitable for use with the
+readdir(3C) function. The originating file descriptor should not be used again following the call to fdopendir(). The
+directory pointer should be closed with a call to closedir(3C). If the provided file descriptor does not reference a di<hy>
+rectory, the function returns ENOTDIR. This function is useful in circumstances where the only available handle on
+a directory is a file descriptor. See attropen(3C) and openat(2).
+The following examples demonstrate how the API might be used to perform basic operations on extended attributes:
+Example 1 List extended attributes on a file.
+ attrdirfd = attropen("test", ".", O_RDONLY);
+ dirp = fdopendir(attrdirfd);
+ while (dp = readdir(dirp)) {
+ ...
+Example 2 Open an extended attribute.
+ attrfd = attropen("test", dp->d_name, O_RDONLY);
+or
+ attrfd = openat(attrdirfd, dp->d_name, O_RDONLY);
+Example 3 Read from an extended attribute.
+ while (read(attrfd, buf, 512) > 0) {
+ ...
+Example 4 Create an extended attribute.
+ newfd = attropen("test", "attr", O_CREAT|O_RDWR);
+or
+ newfd = openat(attrdirfd, "attr", O_CREAT|O_RDWR);
+Example 5 Write to an extended attribute.
+ count = write(newfd, buf, length);
+Example 6 Delete an extended attribute.
+ error = unlinkat(attrdirfd, "attr");
+Applications intending to access the interfaces defined here as well as the POSIX and X/Open specification-con<hy>
+forming interfaces should define the macro _ATFILE_SOURCE to be 1 and set whichever feature test macros are
+appropriate to obtain the desired environment. See standards(5).
+As noted above in the description of command utilities modified to provide support for extended attributes, the ar<hy>
+chive formats for tar(1) and cpio(1) have been extended to provide support for archiving extended attributes. This
+section describes the specifics of the archive format extensions.
+The tar archive is made up of a series of 512 byte blocks. Each archived file is represented by a header block and ze<hy>
+ro or more data blocks containing the file contents. The header block is structured as shown in the following table.
+tab(); cw(1.83i) cw(1.83i) cw(1.83i) lw(1.83i) lw(1.83i) lw(1.83i) Field NameLength (in Octets)Description
+Name100File name string Mode812 file mode bits Uid8User ID of file owner Gid8Group ID of file owner
+Size12Size of file Mtime12File modification time Chksum8File contents checksum Typeflag1File type flag
+<beginning of page>
+Linkname100Link target name if file linked Magic6"ustar" Version2"00" Uname32User name of file owner
+Gname32Group name of file owner Devmajor8Major device ID if special file Devminor8Minor device ID if special
+file Prefix155Path prefix string for file
+The extended attribute project extends the above header format by defining a new header type (for the Typeflag
+field). The type 'E' is defined to be used for all extended attribute files. Attribute files are stored in the tar archive as
+a sequence of two <header ,data> pairs. The first file contains the data necessary to locate and name the extended
+attribute in the file system. The second file contains the actual attribute file data. Both files use an 'E' type header.
+The prefix and name fields in extended attribute headers are ignored, though they should be set to meaningful values
+for the benefit of archivers that do not process these headers. Solaris archivers set the prefix field to "/dev/null" to
+prevent archivers that do not understand the type 'E' header from trying to restore extended attribute files in inappro<hy>
+priate places.
+The cpio archive format is octet-oriented rather than block-oriented. Each file entry in the archive includes a header
+that describes the file, followed by the file name, followed by the contents of the file. These data are arranged as de<hy>
+scribed in the following table.
+tab(); cw(1.83i) cw(1.83i) cw(1.83i) lw(1.83i) lw(1.83i) lw(1.83i) Field NameLength (in Octets)Description
+c_magic670707 c_dev6First half of unique file ID c_ino6Second half of unique file ID c_mode6File mode bits
+c_uid6User ID of file owner c_gid6Group ID of file owner c_nlink6Number of links referencing file c_rdev6Infor<hy>
+mation for special files c_mtime11Modification time of file c_namesize6Length of file pathname c_file<hy>
+size11Length of file content c_namec_namesizeFile pathname c_filedatac_filesizeFile content
+The basic archive file structure is not changed for extended attributes. The file type bits stored in the c_mode field
+for an attribute file are set to 0xB000. As with the tar archive format, extended attributes are stored in cpio archives
+as two consecutive file entries. The first file describes the location/name for the extended attribute. The second file
+contains the actual attribute file content. The c_name field in extended attribute headers is ignored, though it should
+be set to a meaningful value for the benefit of archivers that do not process these headers. Solaris archivers start the
+pathname with "/dev/null/"to prevent archivers that do not understand the type 'E' header from trying to restore ex<hy>
+tended attribute files in inappropriate places.
+Both the tar and cpio archive formats can contain the special files described above, always paired with the extended
+attribute data record, for identifying the precise location of the extended attribute. These special data files are neces<hy>
+sary because there is no simple naming mechanism for extended attribute files. Extended attributes are not visible in
+the file system name space. The extended attribute name space must be "tunneled into" using the openat() function.
+The attribute identification data must support not only the flat naming structure for extended attributes, but also the
+possibility of future extensions allowing for attribute directory hierarchies and recursive attributes. The data file is
+therefore composed of a sequence of records. It begins with a fixed length header describing the content. The fol<hy>
+lowing table describes the format of this data file.
+tab(); cw(1.7i) cw(1.76i) cw(2.04i) lw(1.7i) lw(1.76i) lw(2.04i) Field NameLength (in Octets)Description h_ver<hy>
+sion7Name file version h_size10Length of data file h_component_len10Total length of all path segments
+h_link_comp_len10Total length of all link segments pathh_component_lenComplex path
+link_pathh_link_comp_lenComplex link path
+As demonstrated above, the header is followed by a record describing the "path" to the attribute file. This path is
+composed of two or more path segments separated by a null character. Each segment describes a path rooted at the
+hidden extended attribute directory of the leaf file of the previous segment, making it possible to name attributes on
+attributes. The first segment is always the path to the parent file that roots the entire sequence in the normal name
+space. The following table describes the format of each segment.
+tab(); cw(1.57i) cw(1.74i) cw(2.19i) lw(1.57i) lw(1.74i) lw(2.19i) Field NameLength (in Octets)Description _
+h_namesz7Length of segment path h_typeflag1Actual file type of attribute file h_namesh_nameszParent path +
+segment path
+If the attribute file is linked to another file, the path record is followed by a second record describing the location of
+<beginning of page>
+the referencing file. The structure of this record is identical to the record described above.
+cp(1), cpio(1), find(1), ls(1), mv(1), pax(1), runat(1), tar(1), du(1), fsck(1M), chown(2), link(2), open(2), path<hy>
+conf(2), rename(2), stat(2), unlink(2), utimes(2), attropen(3C), standards(5)

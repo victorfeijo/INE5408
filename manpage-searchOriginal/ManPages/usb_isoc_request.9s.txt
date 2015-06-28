@@ -1,0 +1,133 @@
+<beginning of page>
+usb_isoc_request <-> USB isochronous request structure
+#include <sys/usb/usba.h>
+Solaris DDI specific (Solaris DDI)
+A request sent through an isochronous pipe is used to transfer large amounts of packetized data with relative unrelia<hy>
+bility, but with bounded service periods. A packet is guaranteed to be tried within a bounded time period, but is not
+retried upon failure. Isochronous transfers are supported on both USB 1.1 and USB 2.0 devices. For further informa<hy>
+tion, see section 5.6 of the USB 2.0 specification available at www.usb.org.
+This section provides information on acceptable combinations of flags and attributes with additional details. The fol<hy>
+lowing fields of the usb_isoc_req_t are used to format an isochronous request.
+ usb_frame_number_t
+  isoc_frame_no; /* frame num to start sending req. */
+ ushort_t isoc_pkts_count; /* num USB pkts in this request */
+ /*
+  * The sum of all pkt lengths in an isoc request. Recommend to set it to
+  * zero, so the sum of isoc_pkt_length in the isoc_pkt_descr list will be
+  * used automatically and no check will be apply to this element.
+  */
+ ushort_t isoc_pkts_length;
+ ushort_t isoc_error_count;/* num pkts completed w/errs */
+ usb_req_attrs_t isoc_attributes;/* request-specific attrs */
+ mblk_t *isoc_data; /* data to xfer */
+  /* IN or OUT: alloc. by client. */
+  /* Size=total of all pkt lengths. */
+ usb_opaque_t isoc_client_private; /* for client driver excl use. */
+ struct usb_isoc_pkt_descr /* (see below) */
+  *isoc_pkt_descr;
+ /*
+  * Normal callback function, called upon completion.
+  * This function cannot block as it executes in soft interrupt context.
+  */
+ void (*isoc_cb)(
+  usb_pipe_handle_t ph, struct usb_isoc_req *req);
+ /* Exception callback function, for error handling. */
+ void (*isoc_exc_cb)(
+  usb_pipe_handle_t ph, struct usb_isoc_req *req);
+ usb_cr_t isoc_completion_reason; /* overall completion status */
+  /* set by USBA framework */
+  /* See usb_completion_reason(9S) */
+ usb_cb_flags_t isoc_cb_flags; /* recovery done by callback hndlr */
+  /* set by USBA on exception. */
+  /* See usb_callback_flags(9S) */
+A usb_isoc_pkt_descr_t describes the status of an isochronous packet transferred within a frame or microframe.
+The following fields of a usb_isoc_pkt_descr_t packet descriptor are used within an usb_isoc_req_t. The
+isoc_pkt_length is set by the client driver to the amount of data managed by the packet for input or output. The lat<hy>
+ter two fields are set by the USBA framework to indicate status. Any packets with an isoc_completion_reason, oth<hy>
+er than USB_CR_OK, are reflected in the isoc_error_count of the usb_isoc_req_t.
+  ushort_t isoc_pkt_length; /* number bytes to transfer */
+  ushort_t isoc_pkt_actual_length; /* actual number transferred */
+  usb_cr_t isoc_pkt_status; /* completion status */
+If two multi-frame isoc requests that both specify the USB_ATTRS_ISOC_XFER_ASAP attribute are scheduled
+closely together, the first frame of the second request is queued to start after the last frame of the first request.
+No stalls are seen in isochronous transfer exception callbacks. Because transfers are not retried upon failure,
+<beginning of page>
+isochronous transfers continue regardless of errors.
+Request attributes define special handling for transfers. The following attributes are valid for isochronous requests:
+USB_ATTRS_ISOC_START_FRAME Start transferring at the starting frame number specified in the
+isoc_frame_no field of the request.
+USB_ATTRS_ISOC_XFER_ASAP Start transferring as soon as possible. The USBA framework picks an immedi<hy>
+ate frame number to map to the starting frame number.
+USB_ATTRS_SHORT_XFER_OK Accept transfers where less data is received than expected.
+The usb_isoc_req_t contains an array of descriptors that describe isochronous packets. One isochronous packet is
+sent per frame or microframe. Because packets that comprise a transfer are sent across consecutive frames or mi<hy>
+croframes, USB_ATTRS_ONE_XFER is invalid.
+See usb_request_attributes(9S) for more information.
+Isochronous transfers/requests are subject to the following constraints and caveats:
+ 1) The following table indicates combinations of usb_pipe_isoc_xfer
+  flags argument and fields of the usb_isoc_req_t request argument
+  (X = don't care). (Note that attributes considered in this table
+  are ONE_XFER, START_FRAME, XFER_ASAP, and SHORT_XFER, and that
+  some transfer types are characterized by multiple table entries.)
+ Flags Type Attributes Data Semantics
+ ---------------------------------------------------------------
+ X X X NULL illegal
+ X X ONE_XFER X illegal
+ X X ISOC_START_FRAME X illegal
+  & ISOC_XFER_ASAP
+ X X !ISOC_START_FRAME X illegal
+  & !ISOC_XFER_ASAP
+ X OUT SHORT_XFER_OK X illegal
+ X IN X !=NULL See table note (A)
+ X X ISOC_START_FRAME !=NULL See table note (B)
+ X X ISOC_XFER_ASAP !=NULL See table note (C)
+ Table notes:
+  A) continuous polling, new data is returned in
+  cloned request structures via continous callbacks,
+  original request is returned on stop polling
+  B) invalid if the current_frame number is past
+  "isoc_frame_no" or "isoc_frame_no" == 0
+  C)"isoc_frame_no" is ignored. The USBA framework
+  determines which frame to insert and start
+  the transfer.
+ 2) USB_FLAGS_SLEEP indicates to wait for resources but
+  not for completion.
+ 3) For polled reads:
+<beginning of page>
+  A. The USBA framework accepts a request which
+  specifies the size and number of packets to fill
+  with data. The packets get filled one packet per
+  (1 ms) frame/(125 us) microframe. All requests
+  have an implicit USB_ATTRS_SHORT_XFER_OK attribute
+  set, since transfers continue in spite of any en-
+  countered. The amount of data read per packet will
+  match the isoc_pkt_length field of the packet
+  descriptor unless a short transfer occurs. The
+  actual size is returned in the
+  isoc_pkt_actual_length field of the packet
+  descriptor. When all packets of the request have
+  been processed, a normal callback is done to sig-
+  nal the completion of the original request.
+  B. When continuous polling is stopped, the original
+  request is returned in an exception callback with a
+  completion reason of USB_CR_STOPPED_POLLING.
+  (NOTE: Polling can be restarted from an exception
+  callback corresponding to an original request.
+  Please see usb_pipe_isoc_xfer(9F) for more information.
+  C. Callbacks must be specified.
+  The isoc_completion_reason indicates the status of the transfer. See
+  usb_completion_reason(9s) for usb_cr_t definitions.
+  The isoc_cb_flags are set prior to calling the exception
+  callback handler to summarize recovery actions taken and
+  errors encountered during recovery. See usb_callback_flags(9s)
+  for usb_cb_flags_t definitions.
+ --- Callback handling ---
+ All usb request types share the same callback handling. Please see
+ usb_callback_flags(9s) for a description of use and operation.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ ArchitecturePCI-
+based systems _ Interface stabilityCommitted _ AvailabilitySUNWusbu
+attributes(5), usb_alloc_request(9F), usb_get_current_frame_number(9F), usb_get_max_pkts_per_isoc_re<hy>
+quest(9F), usb_pipe_bulk_xfer(9F), usb_pipe_ctrl_xfer(9F), usb_pipe_intr_xfer(9F), usb_pipe_isoc_xfer(9F),
+usb_bulk_request(9S), usb_callback_flags(9S), usb_completion_reason(9S), usb_ctrl_request(9S), usb_in<hy>
+tr_request(9S), usb_request_attributes(9S)

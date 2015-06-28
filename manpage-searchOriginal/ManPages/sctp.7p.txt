@@ -1,0 +1,169 @@
+<beginning of page>
+sctp, SCTP <-> Stream Control Transmission Protocol
+#include <sys/socket.h>
+#include <netinet/in.h>
+s = socket(AF_INET, SOCK_STREAM, IPPROTO_SCTP);
+s = socket(AF_INET, SOCK_SEQPACKET, IPPROTO_SCTP);
+s = socket(AF_INET6, SOCK_STREAM, IPPROTO_SCTP);
+s = socket(AF_INET6, SOCK_SEQPACKET, IPPROTO_SCTP);
+SCTP is a transport protocol layered above the Internet Protocol (IP), or the Internet Protocol Version 6 (IPv6).
+SCTP provides a reliable, session oriented, flow-controlled, two-way transmission of data. It is a message- oriented
+protocol and supports framing of individual messages boundaries. An SCTP association is created between two end<hy>
+points for data transfer which is maintained during the lifetime of the transfer. An SCTP association is setup between
+two endpoints using a four-way handshake mechanism with the use of a cookie to guard against some types of denial
+of service (DoS) attacks. These endpoints may be represented by multiple IP addresses.
+An SCTP message includes a common SCTP header followed by one or more chunks. Included in the common
+header is a 32-bit field which contains the checksum (computed using CRC-32c polynomial) of the entire SCTP
+packet.
+SCTP transfers data payloads in the form of DATA chunks. Each DATA chunk contains a Transmission Sequence
+Number (TSN), which governs the transmission of messages and detection of loss. DATA chunk exchanges follow
+the Transmission Control Protocol's (TCP) Selective ACK (SACK) mechanism. The receiver acknowledges data by
+sending SACK chunks, which not only indicate the cumulative TSN range received, but also non-cumulative TSNs
+received, implying gaps in the received TSN sequence. SACKs are sent using the delayed acknowledgment method
+similar to TCP, that is, one SCTP per every other received packet with an upper bound on the delay (when there are
+gaps detected the frequency is increased to one every received packet). Flow and congestion control follow TCP al<hy>
+gorithms: Slow Start, Congestion Avoidance, Fast Recovery and Fast retransmit. But unlike TCP, SCTP does not
+support half-close connection and "urgent" data.
+SCTP is designed to support a number of functions that are critical for telephony signalling transport, including mul<hy>
+ti-streaming. SCTP allows data to be partitioned into multiple streams that have the property of independent se<hy>
+quenced delivery so that message loss in any one stream only affects delivery within that stream. In many applica<hy>
+tions (particularly telephony signalling), it is only necessary to maintain sequencing of messages that affect some re<hy>
+source. Other messages may be delivered without having to maintain overall sequence integrity. A DATA chunk on
+an SCTP association contains the Stream Id/Stream Sequence Number pair, in addition to the TSN, which is used for
+sequenced delivery within a stream.
+SCTP uses IP's host level addressing and adds its own per-host collection of port addresses. The endpoints of an
+SCTP association are identified by the combination of IP address(es) and an SCTP port number. By providing the
+ability for an endpoint to have multiple IP addresses, SCTP supports multi-homing, which makes an SCTP associa<hy>
+tion more resilient in the presence of network failures (assuming the network is constructed to provided redundan<hy>
+cy). For a multi-homed SCTP association, a single address is used as the primary address, which is used as the desti<hy>
+nation address for normal DATA chunk transfers. Retransmitted DATA chunks are sent over alternate address(es) to
+increase the probability of reaching the remote endpoint. Continued failure to send DATA chunks over the primary
+address results in selecting an alternate address as the primary address. Additionally, SCTP monitors the accessibili<hy>
+ty of all alternate addresses by sending periodic "heartbeats" chunks. An SCTP association supports multi-homing
+by exchanging the available list of addresses during association setup (as part of its four-way handshake mecha<hy>
+nism). An SCTP endpoint is associated with a local address using the bind(3SOCKET) call. Subsequently, the end<hy>
+point can be associated with additional addresses using sctp_bindx(3SOCKET). By using a special value of INAD<hy>
+DR_ANY with IP or the unspecified address (all zeros) with IPv6 in the bind() or sctp_bindx() calls, an endpoint
+can be bound to all available IP or IPv6 addresses on the system.
+SCTP uses a three-way mechanism to allow graceful shutdown, where each endpoint has confirmation of the DATA
+chunks received by the remote endpoint prior to completion of the shutdown. An Abort is provided for error cases
+when an immediate shutdown is needed.
+Applications can access SCTP using the socket interface as a SOCK_STREAM (one-to-one style) or SOCK_SEQ<hy>
+PACKET (one-to-many style) socket type.
+One-to-one style socket interface supports similar semantics as sockets for connection oriented protocols, such as
+TCP. Thus, a passive socket is created by calling the listen(3SOCKET) function after binding the socket using
+<beginning of page>
+bind(). Associations to this passive socket can be received using accept(3SOCKET) function. Active sockets use the
+connect(3SOCKET) function after binding to initiate an association. If an active socket is not explicitly bound, an
+implicit binding is performed. If an application wants to exchange data during the association setup phase, it should
+not call connect(), but use sendto(3SOCKET)/sendmsg(3SOCKET) to implicitly initiate an association. Once an
+association has been established, read(2) and write(2) can used to exchange data. Additionally, send(3SOCKET),
+recv(3SOCKET), sendto(), recvfrom(3SOCKET), sendmsg(), and recvmsg(3SOCKET) can be used.
+One-to-many socket interface supports similar semantics as sockets for connection less protocols, such as UDP
+(however, unlike UDP, it does not support broadcast or multicast communications). A passive socket is created us<hy>
+ing the listen() function after binding the socket using bind(). An accept() call is not needed to receive associations
+to this passive socket (in fact, an accept() on a one-to-many socket will fail). Associations are accepted automatical<hy>
+ly and notifications of new associations are delivered in recvmsg() provided notifications are enabled. Active sockets
+after binding (implicitly or explicitly) need not call connect() to establish an association, implicit associations can be
+created using sendmsg()/recvmsg() or sendto()/recvfrom() calls. Such implicit associations cannot be created using
+send() and recv() calls. On an SCTP socket (one-to-one or one-to-many), an association may be established using
+sendmsg(). However, if an association already exists for the destination address specified in the msg_name member
+of the msg parameter, sendmsg() must include the association id in msg_iov member of the msg parameter (using
+sctp_sndrcvinfo structure) for a one-to-many SCTP socket. If the association id is not provided, sendmsg() fails
+with EADDRINUSE. On a one-to-one socket the destination information in the msg parameter is ignored for an es<hy>
+tablished association.
+A one-to-one style association can be created from a one-to-many association by branching it off using the
+sctp_peeloff(3SOCKET) call; send() and recv() can be used on such peeled off associations. Calling close(2) on a
+one-to-many socket will gracefully shutdown all the associations represented by that one-to-many socket.
+The sctp_sendmsg(3SOCKET) and sctp_recvmsg(3SOCKET) functions can be used to access advanced features
+provided by SCTP.
+SCTP provides the following socket options which are set using setsockopt(3SOCKET) and read using getsock<hy>
+opt(3SOCKET). The option level is the protocol number for SCTP, available from getprotobyname(3SOCKET).
+SCTP_NODELAY
+Turn on/off any Nagle-like algorithm (similar to TCP_NODELAY).
+SO_RCVBUF
+Set the receive buffer.
+SO_SNDBUF
+Set the send buffer.
+SCTP_AUTOCLOSE
+For one-to-many style socket, automatically close any association that has been idle for more than the specified
+number of seconds. A value of '0' indicates that no associations should be closed automatically.
+SCTP_EVENTS
+Specify various notifications and ancillary data the user wants to receive.
+SCTP_STATUS
+Retrieve current status information about an SCTP association.
+SCTP_GET_ASSOC_STATS
+Gather and reset per endpoint association statistics.
+Example Usage:
+<beginning of page>
+ #include <netinet/sctp.h>
+ struct sctp_assoc_stats stat;
+ int rc;
+ int32_t len = sizeof (stat);
+ /*
+  * Per endpoint stats use the socket descriptor for sctp association.
+  */
+ /* Gather per endpoint association statistics */
+ rc = getsockopt(sd, IPPROTO_SCTP, SCTP_GET_ASSOC_STATS, &stat, &len);
+Extract from the modified header file:
+ sctp.h
+  /*
+  * SCTP socket option used to read per endpoint association statistics.
+  */
+  #define SCTP_GET_ASSOC_STATS 24
+  /*
+  * A socket user request reads local per endpoint association stats.
+  * All stats are counts except sas_maxrto, which is the max value
+  * since the last user request for stats on this endpoint.
+  */
+  typedef struct sctp_assoc_stats {
+  uint64_t sas_rtxchunks; /* Retransmitted Chunks */
+  uint64_t sas_gapcnt; /* Gap Acknowledgements Received */
+  uint64_t sas_maxrto; /* Maximum Observed RTO this period */
+  uint64_t sas_outseqtsns; /* TSN received > next expected */
+  uint64_t sas_osacks; /* SACKs sent */
+  uint64_t sas_isacks; /* SACKs received */
+  uint64_t sas_octrlchunks; /* Control chunks sent - no dups */
+  uint64_t sas_ictrlchunks; /* Control chunks received - no dups */
+  uint64_t sas_oodchunks; /* Ordered data chunks sent */
+  uint64_t sas_iodchunks; /* Ordered data chunks received */
+  uint64_t sas_ouodchunks; /* Unordered data chunks sent */
+  uint64_t sas_iuodchunks; /* Unordered data chunks received */
+  uint64_t sas_idupchunks; /* Dups received (ordered+unordered) */
+ } sctp_assoc_stats_t;
+The ability of SCTP to use multiple addresses in an association can create issues with some network utilities. This
+requires a system administrator to be careful in setting up the system.
+For example, the tcpd allows an administrator to use a simple form of address/hostname access control. While tcpd
+can work with SCTP, the access control part can have some problems. The tcpd access control is only based on one
+of the addresses at association setup time. Once as association is allowed, no more checking is performed. This
+means that during the life time of the association, SCTP packets from different addresses of the peer host can be re<hy>
+ceived in the system. This may not be what the system administrator wants as some of the peer's addresses are sup<hy>
+posed to be blocked.
+Another example is the use of IP Filter, which provides several functions such as IP packet filtering (ipf(1M)) and
+NAT ipnat(1M)). For packet filtering, one issue is that a filter policy can block packets from some of the addresses
+of an association while allowing packets from other addresses to go through. This can degrade SCTP's performance
+when failure occurs. There is a more serious issue with IP address rewrite by NAT. At association setup time, SCTP
+endpoints exchange IP addresses. But IP Filter is not aware of this. So when NAT is done on a packet, it may change
+the address to an unacceptable one. Thus the SCTP association setup may succeed but packets cannot go through af<hy>
+terwards when a different IP address is used for the association.
+ipf(1M), ipnat(1M), ndd(1M), ioctl(2), close(2), read(2), write(2), accept(3SOCKET), bind(3SOCKET), con<hy>
+nect(3SOCKET), getprotobyname(3SOCKET), getsockopt(3SOCKET), libsctp(3LIB), listen(3SOCKET),
+<beginning of page>
+recv(3SOCKET), recvfrom(3SOCKET), recvmsg(3SOCKET), sctp_bindx(3SOCKET), sctp_getladdrs(3SOCK<hy>
+ET), sctp_getpaddrs(3SOCKET), sctp_freepaddrs(3SOCKET), sctp_opt_info(3SOCKET), sctp_peeloff(3SOCK<hy>
+ET), sctp_recvmsg(3SOCKET), sctp_sendmsg(3SOCKET), send(3SOCKET), sendmsg(3SOCKET), send<hy>
+to(3SOCKET), socket(3SOCKET), ipfilter(5), tcp(7P), udp(7P), inet(7P), inet6(7P), ip(7P), ip6(7P)
+R. Stewart, Q. Xie, K. Morneault, C. Sharp, H. Schwarzbauer, T. Taylor, I. Rytina, M. Kalla, L. Zang, V. Paxson,
+RFC 2960, Stream Control Transmission Protocol, October 2000
+L. Ong, J. Yoakum, RFC 3286, An Introduction to Stream Control Transmission Protocol (SCTP), May 2002
+J. Stone, R. Stewart, D. Otis, RFC 3309, Stream Control Transmission Protocol (SCTP) Checksum Change, Septem<hy>
+ber 2002.
+A socket operation may fail if:
+EPROTONOSUPPORT The socket type is other than SOCK_STREAM and SOCK_SEQPACKET.
+ETIMEDOUT An association was dropped due to excessive retransmissions.
+ECONNREFUSED The remote peer refused establishing an association.
+EADDRINUSE A bind() operation was attempted on a socket with a network address/port pair that has already
+been bound to another socket.
+EINVAL A bind() operation was attempted on a socket with an invalid network address.
+EPERM A bind() operation was attempted on a socket with a "reserved" port number and the effective user ID of
+the process was not the privileged user.

@@ -1,0 +1,61 @@
+<beginning of page>
+mnttab <-> mounted file system table
+The file /etc/mnttab is really a file system that provides read-only access to the table of mounted file systems for the
+current host. /etc/mnttab is read by programs using the routines described in getmntent(3C). Mounting a file sys<hy>
+tem adds an entry to this table. Unmounting removes an entry from this table. Remounting a file system causes the
+information in the mounted file system table to be updated to reflect any changes caused by the remount. The list is
+maintained by the kernel in order of mount time. That is, the first mounted file system is first in the list and the most
+recently mounted file system is last. When mounted on a mount point the file system appears as a regular file con<hy>
+taining the current mnttab information.
+Each entry is a line of fields separated by TABs in the form:
+ special mount_point fstype options time
+where:
+special The name of the resource that has been mounted.
+mount_point The pathname of the directory on which the filesystem is mounted.
+fstype The file system type of the mounted file system.
+options The mount options. See respective mount file system man page in the See Also section below.
+time The time at which the file system was mounted.
+Examples of entries for the special field include the pathname of a block-special device, the name of a remote file
+system in the form of host:pathname, or the name of a swap file, for example, a file made with mkfile(1M).
+The following ioctl(2) calls are supported:
+MNTIOC_NMNTS Returns the count of mounted resources in the current snapshot in the uint32_t pointed to by
+arg.
+MNTIOC_GETDEVLIST Returns an array of uint32_t's that is twice as long as the length returned by MNTI<hy>
+OC_NMNTS. Each pair of numbers is the major and minor device number for the file system at the corresponding
+line in the current /etc/mnttab snapshot. arg points to the memory buffer to receive the device number information.
+MNTIOC_SETTAG Sets a tag word into the options list for a mounted file system. A tag is a notation that will ap<hy>
+pear in the options string of a mounted file system but it is not recognized or interpreted by the file system code. arg
+points to a filled in mnttagdesc structure, as shown in the following example:
+ uint_t mtd_major; /* major number for mounted fs */
+ uint_t mtd_minor; /* minor number for mounted fs */
+ char *mtd_mntpt; /* mount point of file system */
+ char *mtd_tag; /* tag to set/clear */
+If the tag already exists then it is marked as set but not re-added. Tags can be at most MAX_MNTOPT_TAG long.
+Use of this ioctl is restricted to processes with the {PRIV_SYS_MOUNT} privilege.
+MNTIOC_CLRTAG Marks a tag in the options list for a mounted file system as not set. arg points to the same
+structure as MNTIOC_SETTAG, which identifies the file system and tag to be cleared.
+Use of this ioctl is restricted to processes with the {PRIV_SYS_MOUNT} privilege.
+<beginning of page>
+EFAULT The arg pointer in an MNTIOC_ ioctl call pointed to an inaccessible memory location or a character
+pointer in a mnttagdesc structure pointed to an inaccessible memory location.
+EINVAL The tag specified in a MNTIOC_SETTAG call already exists as a file system option, or the tag specified
+in a MNTIOC_CLRTAG call does not exist.
+ENAMETOOLONG The tag specified in a MNTIOC_SETTAG call is too long or the tag would make the total
+length of the option string for the mounted file system too long.
+EPERM The calling process does not have {PRIV_SYS_MOUNT} privilege and either a MNTIOC_SETTAG or
+MNTIOC_CLRTAG call was made.
+/etc/mnttab Usual mount point for mnttab file system
+/usr/include/sys/mntio.h Header file that contains IOCTL definitions
+mkfile(1M), mount_cachefs(1M), mount_hsfs(1M), mount_nfs(1M), mount_pcfs(1M), mount_ufs(1M),
+mount(1M), ioctl(2), read(2), poll(2), stat(2), getmntent(3C)
+The mnttab file system provides the previously undocumented dev=xxx option in the option string for each mounted
+file system. This is provided for legacy applications that might have been using the dev=information option.
+Using dev=option in applications is strongly discouraged. The device number string represents a 32-bit quantity and
+might not contain correct information in 64-bit environments.
+Applications requiring device number information for mounted file systems should use the getextmntent(3C) inter<hy>
+face, which functions properly in either 32- or 64-bit environments.
+The snapshot of the mnttab information is taken any time a read(2) is performed at offset 0 (the beginning) of the
+mnttab file. The file modification time returned by stat(2) for the mnttab file is the time of the last change to
+mounted file system information. A poll(2) system call requesting a POLLRDBAND event can be used to block
+and wait for the system's mounted file system information to be different from the most recent snapshot since the
+mnttab file was opened.

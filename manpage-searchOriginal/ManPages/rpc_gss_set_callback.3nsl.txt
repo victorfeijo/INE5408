@@ -1,0 +1,37 @@
+<beginning of page>
+rpc_gss_set_callback <-> specify callback for context
+#include <rpc/rpcsec_gss.h>
+bool_t rpc_gss_set_callback(struct rpc_gss_callback_t *cb);
+A server may want to specify a callback routine so that it knows when a context gets first used. This user-defined
+callback may be specified through the rpc_gss_set_callback() routine. The callback routine is invoked the first time
+a context is used for data exchanges, after the context is established for the specified program and version.
+The user-defined callback routine should take the following form:
+ bool_t callback(struct svc_req *req, gss_cred_id_t deleg,
+  gss_ctx_id_t gss_context, rpc_gss_lock_t *lock, void **cookie);
+rpc_gss_set_callback() takes one argument: a pointer to a rpc_gss_callback_t structure. This structure contains
+the RPC program and version number as well as a pointer to a user-defined callback() routine. (For a description of
+rpc_gss_callback_t and other RPCSEC_GSS data types, see the rpcsec_gss(3NSL) man page.)
+The user-defined callback() routine itself takes the following arguments:
+req Pointer to the received service request. svc_req is an RPC structure containing information on the context of an
+RPC invocation, such as program, version, and transport information.
+deleg Delegated credentials, if any. (See NOTES, below.)
+gss_context GSS context (allows server to do GSS operations on the context to test for acceptance criteria). See
+NOTES, below.
+lock This parameter is used to enforce a particular QOP and service for a session. This parameter points to a RPC<hy>
+SEC_GSS rpc_gss_lock_t structure. When the callback is invoked, the rpc_gss_lock_t.locked field is set to
+TRUE, thus locking the context. A locked context will reject all requests having different values for QOP or service
+than those specified by the raw_cred field of the rpc_gss_lock_t structure.
+cookie A four-byte quantity that an application may use in any manner it wants to <em> RPC does not interpret it. (For
+example, the cookie could be a pointer or index to a structure that represents a context initiator.) The cookie is re<hy>
+turned, along with the caller's credentials, with each invocation of rpc_gss_getcred().
+rpc_gss_set_callback() returns TRUE if the use of the context is accepted; false otherwise.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelMT-Safe
+_ AvailabilitySUNWrsg (32-bit) _ SUNWrsgx (64-bit)
+rpc(3NSL), rpc_gss_getcred(3NSL), rpcsec_gss(3NSL), attributes(5)
+ONC+ Developer's Guide
+Linn, J. RFC 2078, Generic Security Service Application Program Interface, Version 2. Network Working Group.
+January 1997.
+If a server does not specify a callback, all incoming contexts will be accepted.
+Because the GSS-API is not currently exposed, the deleg and gss_context arguments are mentioned for information<hy>
+al purposes only, and the user-defined callback function may choose to do nothing with them.

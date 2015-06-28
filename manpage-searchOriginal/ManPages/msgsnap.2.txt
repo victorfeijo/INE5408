@@ -1,0 +1,75 @@
+<beginning of page>
+msgsnap <-> message queue snapshot operation
+#include <sys/msg.h>
+msgsnap(int msqid, void *buf, size_t bufsz, long msgtyp);
+The msgsnap() function reads all of the messages of type msgtyp from the queue associated with the message queue
+identifier specified by msqid and places them in the user-defined buffer pointed to by buf.
+The buf argument points to a user-defined buffer that on return will contain first a buffer header structure:
+ struct msgsnap_head {
+  size_t msgsnap_size; /* bytes used/required in the buffer */
+  size_t msgsnap_nmsg; /* number of messages in the buffer */
+ };
+followed by msgsnap_nmsg messages, each of which starts with a message header:
+ struct msgsnap_mhead {
+  size_t msgsnap_mlen; /* number of bytes in the message */
+  long msgsnap_mtype; /* message type */
+ };
+and followed by msgsnap_mlen bytes containing the message contents.
+Each subsequent message header is located at the first byte following the previous message contents, rounded up to a
+sizeof(size_t) boundary.
+The bufsz argument specifies the size of buf in bytes. If bufsz is less than sizeof(msgsnap_head), msgsnap() fails
+with EINVAL. If bufsz is insufficient to contain all of the requested messages, msgsnap() succeeds but returns with
+msgsnap_nmsg set to 0 and with msgsnap_size set to the required size of the buffer in bytes.
+The msgtyp argument specifies the types of messages requested as follows: <bu> If msgtyp is 0, all of the messages on
+the queue are read. <bu> If msgtyp is greater than 0, all messages of type msgtyp are read. <bu> If msgtyp is less than 0, all
+messages with type less than or equal to the absolute value of msgtyp are read.
+The msgsnap() function is a non-destructive operation. Upon completion, no changes are made to the data structures
+associated with msqid.
+Upon successful completion, msgsnap() returns 0. Otherwise, <mi>1 is returned and errno is set to indicate the error.
+The msgsnap() function will fail if:
+EACCES Operation permission is denied to the calling process. See Intro(2).
+EINVAL The msqid argument is not a valid message queue identifier or the value of bufsz is less than sizeof(struct
+msgsnap_head).
+EFAULT The buf argument points to an illegal address.
+The msgsnap() function returns a snapshot of messages on a message queue at one point in time. The queue con<hy>
+tents can change immediately following return from msgsnap(). Example 1 msgsnap() example
+This is sample C code indicating how to use the msgsnap function (see msgids(2)).
+ void
+ process_msgid(int msqid)
+ {
+  size_t bufsize;
+  struct msgsnap_head *buf;
+<beginning of page>
+  struct msgsnap_mhead *mhead;
+  int i;
+  /* allocate a minimum-size buffer */
+  buf = malloc(bufsize = sizeof(struct msgsnap_head));
+  /* read all of the messages from the queue */
+  for (;;) {
+  if (msgsnap(msqid, buf, bufsize, 0) != 0) {
+  perror("msgsnap");
+  free(buf);
+  return;
+  }
+  if (bufsize >= buf->msgsnap_size) /* we got them all */
+  break;
+  /* we need a bigger buffer */
+  buf = realloc(buf, bufsize = buf->msgsnap_size);
+  }
+  /* process each message in the queue (there may be none) */
+  mhead = (struct msgsnap_mhead *)(buf + 1); /* first message */
+  for (i = 0; i < buf->msgsnap_nmsg; i++) {
+  size_t mlen = mhead->msgsnap_mlen;
+  /* process the message contents */
+  process_message(mhead->msgsnap_mtype, (char *)(mhead+1), mlen);
+  /* advance to the next message header */
+  mhead = (struct msgsnap_mhead *)
+  ((char *)mhead + sizeof(struct msgsnap_mhead) +
+  ((mlen + sizeof(size_t) - 1) & ~(sizeof(size_t) - 1)));
+  }
+  free(buf);
+ }
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelAsync-
+Signal-Safe
+ipcrm(1), ipcs(1), Intro(2), msgctl(2), msgget(2), msgids(2), msgrcv(2), msgsnd(2), attributes(5)

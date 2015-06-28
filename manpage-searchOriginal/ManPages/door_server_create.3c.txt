@@ -1,0 +1,69 @@
+<beginning of page>
+door_server_create <-> specify an alternative door server thread creation function
+cc -mt [ flag... ] file... [ library... ]
+#include <door.h>
+void (*) () door_server_create(void (*create_proc)(door_info_t*));
+Normally, the doors library creates new door server threads in response to incoming concurrent door invocations au<hy>
+tomatically. There is no pre-defined upper limit on the number of server threads that the system creates in response
+to incoming invocations (1 server thread for each active door invocation). These threads are created with the default
+thread stack size and POSIX (see standards(5)) threads cancellation disabled. The created threads also have the
+THR_BOUND | THR_DETACHED attributes for Solaris threads and the PTHREAD_SCOPE_SYSTEM |
+PTHREAD_CREATE_DETACHED attributes for POSIX threads. The signal disposition, and scheduling class of
+the newly created thread are inherited from the calling thread (initially from the thread calling door_create(), and
+subsequently from the current active door server thread).
+The door_server_create() function allows control over the creation of server threads needed for door invocations.
+The procedure create_proc is called every time the available server thread pool is depleted. In the case of private
+server pools associated with a door (see the DOOR_PRIVATE attribute in door_create()), information on which
+pool is depleted is passed to the create function in the form of a door_info_t structure. The di_proc and di_data
+members of the door_info_t structure can be used as a door identifier associated with the depleted pool. The cre<hy>
+ate_proc procedure may limit the number of server threads created and may also create server threads with appro<hy>
+priate attributes (stack size, thread-specific data, POSIX thread cancellation, signal mask, scheduling attributes, and
+so forth) for use with door invocations.
+The overall amount of data and argument descriptors that can be sent through a door is limited by both the server
+thread's stack size and by the parameters of the door itself. See door_setparam(3C).
+The specified server creation function should create user level threads using thr_create() with the THR_BOUND
+flag, or in the case of POSIX threads, pthread_create() with the PTHREAD_SCOPE_SYSTEM attribute. The
+server threads make themselves available for incoming door invocations on this process by issuing a door_re<hy>
+turn(NULL, 0, NULL, 0). In this case, the door_return() arguments are ignored. See door_return(3C) and
+thr_create(3C).
+The server threads created by default are enabled for POSIX thread cancellations which may lead to unexpected
+thread terminations while holding resources (such as locks) if the client aborts the associated door_call(). See
+door_call(3C). Unless the server code is truly interested in notifications of client aborts during a door invocation
+and is prepared to handle such notifications using cancellation handlers, POSIX thread cancellation should be dis<hy>
+abled for server threads using pthread_setcancelstate (PTHREAD_CANCEL_DISABLE, NULL). If all doors are
+created with the DOOR_NO_CANCEL flag (see door_create(3C)), the threads will never be cancelled by an
+aborted door_call() call
+The create_proc procedure need not create any additional server threads if there is at least one server thread current<hy>
+ly active in the process (perhaps handling another door invocation) or it may create as many as seen fit each time it
+is called. If there are no available server threads during an incoming door invocation, the associated door_call()
+blocks until a server thread becomes available. The create_proc procedure must be MT-Safe.
+Upon successful completion, door_server_create() returns a pointer to the previous server creation function. This
+function has no failure mode (it cannot fail). Example 1 Creating door server threads.
+The following example creates door server threads with cancellation disabled and an 8k stack instead of the default
+stack size:
+ #include <door.h>
+ #include <pthread.h>
+ #include <thread.h>
+ void *
+ my_thread(void *arg)
+ {
+  pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
+  door_return(NULL, 0, NULL, 0);
+ }
+ void
+ my_create(door_info_t *dip)
+<beginning of page>
+ {
+  thr_create(NULL, 8192, my_thread, NULL,
+  THR_BOUND | THR_DETACHED, NULL);
+ }
+ main()
+ {
+  (void)door_server_create(my_create);
+  ...
+ }
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Architectureall _
+AvailabilitySUNWcsu _ Interface StabilityStable _ MT-LevelSafe
+door_bind(3C), door_call(3C), door_create(3C), door_return(3C), pthread_create(3C), pthread_setcancel<hy>
+state(3C), thr_create(3C), attributes(5), cancellation(5), standards(5)

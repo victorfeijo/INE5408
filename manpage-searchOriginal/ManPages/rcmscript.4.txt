@@ -1,0 +1,301 @@
+<beginning of page>
+rcmscript <-> script interface specification for the Reconfiguration and Coordination Manager
+rcm_scriptname scriptinfo
+rcm_scriptname register
+rcm_scriptname resourceinfo resourcename
+rcm_scriptname queryremove resourcename
+rcm_scriptname preremove resourcename
+rcm_scriptname postremove resourcename
+rcm_scriptname undoremove resourcename
+Reconfiguration and Coordination Manager (RCM) is a framework designed to coordinate device consumers during
+Solaris Dynamic Reconfiguration (DR). The interfaces specified in this man page allow device consumers, such as
+application vendors or site administrators, to act before and after DR operations take place by providing RCM
+scripts. You can write your own RCM scripts to shut down your applications, or to cleanly release the devices from
+your applications during dynamic remove operations.
+An RCM script is an executable perl script, a shell script or a binary. Perl is the recommended language. Each script
+is run in its own address space using the user-id of the script file owner.
+An RCM script is invoked on demand in response to DR as follows:
+ <scriptname> <command> [args ...]
+Every script must implement the following RCM commands:
+scriptinfo Get script information.
+register Register devices the script handles.
+resourceinfo Get resource information.
+A script might include some or all the of the following commands:
+queryremove Queries whether the resource can be released.
+preremove Releases the resource.
+postremove Provides post-resource removal notification.
+undoremove Undo the actions done in preremove.
+When a script's register command is run, the script should supply, in return data, all resource names the script or its
+application handles that could potentially be removed by DR. A resource name refers to a name in /dev path name.
+Below is a high-level overview of the sequence of script invocations that occurs when dynamic removal of a script's
+registered resource is attempted. See the COMMANDS section for a detailed description of the commands. 1. Prior
+to removing the resource from the system during DR, the script's queryremove command is run:
+ <scriptname> queryremove <resourcename>
+<beginning of page>
+The script should check for obvious reasons why the resource can not be removed from the perspective of its service
+or application. 2. If the script indicates that the resource can be removed in the queryremove command. The
+script's preremove command is run:
+ <scriptname> preremove <resourcename>
+The script releases the resource from the service or application represented by the script and prepares for the re<hy>
+source removal. Releasing the resource includes closing the resource if the resource is currently opened by its appli<hy>
+cation. 3. The system then proceeds to remove the resource. 4. If the system has removed the resource successful<hy>
+ly the script's postremove command is run:
+ <scriptname> postremove <resourcename>
+Otherwise the script's undoremove command is run:
+ <scriptname> undoremove <resourcename>
+For any commands the script does not implement, it must exit with exit status of 2. RCM silently returns success for
+the script's unimplemented commands.
+A script performs the following basic steps: <bu> Takes RCM command and additional arguments from the command
+line and environment parameters. <bu> Processes the command. <bu> Writes the expected return data to stdout as
+name=value pairs delimited by newlines, where name is the name of the return data item that RCM expects and val<hy>
+ue is the value associated with the data item.
+The initial environment of RCM scripts is set as follows: <bu> Process UID is set to the UID of the script. <bu> Process
+GID is set to the GID of the script. <bu> PATH variable is set to /usr/sbin:/usr/bin. <bu> Current working directory is set
+to: <bu> /var/run for scripts owned by root <bu> /tmp for scripts not owned by root <bu> File descriptor 0 (stdin) is set to
+/dev/null <bu> Environment variable RCM_ENV_DEBUG_LEVEL is set to the debug level. Logging is discussed be<hy>
+low. <bu>
+ The following environment variables are also set where possible: <bu> LANG <bu> LC_COLLATE <bu> LC_CTYPE <bu>
+LC_MESSAGES <bu> LC_MONETARY <bu> LC_NUMERIC <bu> LC_TIME <bu> LC_ALL <bu> TZ See environ(5) for a de<hy>
+scription of these variables. See gettext(1) for details on retrieving localized messages.
+All environment variable names beginning with RCM_ENV_ are reserved for use by the RCM.
+The character encoding used by the RCM and RCM scripts to exchange RCM commands, environment parameters,
+and name-value pairs is ASCII unless the controlling environment variables are specified otherwise.
+The scriptinfo command is invoked to gather information about the script.
+Return data: If successful, the script must write the following name-value pairs to stdout and exit with status 0: <bu>
+rcm_script_version=1 <bu> rcm_script_func_info=script_func_info <bu> rcm_cmd_timeout=command_timeout_value
+where script_func_info is a localized human-readable message describing the functionality of the script.
+The RCM monitors the execution time of RCM commands by RCM scripts. command_timeout_value is the maxi<hy>
+mum time in seconds the script is expected to take to process any RCM command except the scriptinfo command it<hy>
+self. If an RCM script does not process the RCM command and exit within this time, RCM sends a SIGABRT sig<hy>
+nal to the script process. RCM then waits for a few seconds for the script to finish the processing of the current RCM
+command and exit. If the script does not exit within this time, RCM sends a SIGKILL signal to the script.
+The rcm_cmd_timeout name-value pair is optional. It is only needed if the script is expected to take more than a
+few seconds to process any RCM command. Setting this name to a value of 0 (zero) disables the timer. If this name-
+value pair is not supplied, a default value is assigned by the RCM.
+Upon failure, the script must specify the failure reason using the name-value pair rcm_failure_reason and exit with
+status 1.
+The register command is invoked to allow a script to specify the resources that it or its application handles that
+could potentially be removed by DR. The script has to supply all its resource names to RCM using the name-value
+pair rcm_resource_name.
+<beginning of page>
+Return Data: If successful, the script must write the following name-value pairs to stdout and exit with status 0:
+ rcm_resource_name=resourcename
+ rcm_resource_name=resourcename
+  .
+  .
+  .
+where resourcename is the name of the resource the script is interested in.
+Upon failure, the script must specify the failure reason using the name-value pair rcm_failure_reason and exit with
+status 1.
+The resourceinfo command is invoked to get the usage information about resourcename.
+Return Data: If successful, the script must write the following name-value pair to stdout and exit with status 0:
+ rcm_resource_usage_info=resource_usage
+where resource_usage is a localized human readable message describing the usage of the resource by the script.
+Upon failure, the script must specify the failure reason using the name-value pair rcm_failure_reason and exit with
+status 1.
+Prior to removing the resource from the system, the queryremove command is invoked to query the script to deter<hy>
+mine whether the script can release the given resource successfully from the service or application it represents. The
+script does not actually release the resource. The script might indicate that it is not able to release the resource if the
+resource is critical for its service or application.
+Additional environment parameter:
+RCM_ENV_FORCE Can be one of:
+FALSE Normal request.
+TRUE Request is urgent. The script should check whether the resource can be released successfully by force, such
+as by using the force option to unmount a file system.
+Return Data: If the command succeeds, the script must return no data and exit with status 0.
+If the script would not be able to release the resource, it must specify the reason using the name-value pair rcm_fail<hy>
+ure_reason and exit with status 3.
+Upon any other failure, the script must specify the failure reason using the name-value pair rcm_failure_reason and
+exit with status 1.
+The preremove command is invoked prior to an attempt to remove the given resourcename. In response to this com<hy>
+mand the script can either release the resource (including closing the device if the device is currently opened) from
+the service or application it represents or indicate that it can not release the resource if the resource is critical for its
+service or application.
+Additional environment parameter:
+RCM_ENV_FORCE Can be one of:
+FALSE Normal request.
+<beginning of page>
+TRUE Request is urgent. The script should make extra effort to release the resource, such as by using the force op<hy>
+tion to unmount a file system.
+Return Data: If the command succeeds, the script must return no data and exit with status 0.
+If the script cannot release the resource, it must specify the reason using the name-value pair rcm_failure_reason
+and exit with status 3.
+Upon any other failure, the script must specify the failure reason using the name-value pair rcm_failure_reason and
+exit with status 1.
+The postremove command is invoked after the given resourcename has been removed.
+Return Data: If the command succeeds, the script must return no data and exit with status 0.
+Upon failure, the script must specify the failure reason using the name-value pair rcm_failure_reason and exit with
+status 1.
+undoremove resourcename
+The undoremove command is invoked to undo what was done in the previous preremove command for the given
+resourcename. The script can bring the state of the resource to the same state it was in when the script received the
+preremove command for that resource.
+Return Data: If the command succeeds, the script must return no data and exit with status 0.
+Upon failure, the script must specify the failure reason using the name-value pair rcm_failure_reason and exit with
+status 1.
+A script must log all error and debug messages by writing to stdout the name-value pairs listed below. The logged
+messages go to syslogd(1M) with the syslog facility of LOG_DAEMON. See syslog.conf(4).
+rcm_log_err=message Logs the message with the syslog level of LOG_ERR.
+rcm_log_warn=message Logs the message with the syslog level of LOG_WARNING.
+rcm_log_info=message Logs the message with the syslog level of LOG_INFO.
+rcm_log_debug=message Logs the message with the syslog level of LOG_DEBUG.
+A script can use the environment variable RCM_ENV_DEBUG_LEVEL to control the amount of information to
+log. RCM_ENV_DEBUG_LEVEL is a numeric value ranging from 0 to 9, with 0 meaning log the least amount of
+information and 9 meaning log the most.
+You must use the following format to name a script:
+ vendor,service
+where vendor is the stock symbol (or any distinctive name) of the vendor providing the script and service is the
+name of service the script represents.
+You must be a superuser (root) to install or remove an RCM script.
+Select one of the following directories where you want to place the script:
+<beginning of page>
+/etc/rcm/scripts
+Scripts for specific systems
+/usr/platform/`uname -i`/lib/rcm/scripts
+Scripts for specific hardware implementation
+/usr/platform/`uname -m`/lib/rcm/scripts
+Scripts for specific hardware class
+/usr/lib/rcm/scripts
+Scripts for any hardware
+To install a script, copy the script to the appropriate directory from the list above, change the userid and the groupid
+of the script to the desired values, and send SIGHUP to rcm_daemon. For example:
+ # cp SUNW,sample.pl /usr/lib/rcm/scripts
+ # chown user[:group] /usr/lib/rcm/scripts/SUNW,sample.pl
+ # pkill -HUP -x -u root rcm_daemon
+Remove the script from the appropriate directory from the list above and send SIGHUP to rcm_daemon. For exam<hy>
+ple:
+ # rm /usr/lib/rcm/scripts/SUNW,sample.pl
+ # pkill -HUP -x -u root rcm_daemon
+Example 1 Site Customization RCM Script
+ #! /usr/bin/perl -w
+ #
+ # A sample site customization RCM script for a tape backup application.
+ #
+ # This script registers all tape drives in the system with RCM.
+ # When the system attempts to remove a tape drive by DR the script
+ # does the following:
+ # - if the tape drive is not being used for backup, it allows the
+ # DR to continue.
+ # - if the tape drive is being used for backup, and when DR is not
+ # forced (RCM_ENV_FORCE=FALSE) it indicates that it cannot release
+ # the tape drive with appropriate error message. When forced
+ # (RCM_ENV_FORCE=TRUE) it kills the tape backup application in
+ # order to allow the DR to continue.
+ #
+ # This script does not implement the postremove and undoremove commands
+ # since there is nothing to cleanup after DR remove operation is
+ # completed or failed. If any cleanup is needed after the DR removal
+ # completed, postremove command needs to implemented. If any cleanup is
+ # needed in the event of DR removal failure, undoremove command needs
+ # to be implemented.
+ #
+ use strict;
+ my ($cmd, %dispatch);
+ $cmd = shift(@ARGV);
+<beginning of page>
+ # dispatch table for RCM commands
+ %dispatch = (
+  "scriptinfo" => do_scriptinfo,
+  "register" => do_register,
+  "resourceinfo" => do_resourceinfo,
+  "queryremove" => do_preremove,
+  "preremove" => do_preremove
+ );
+ if (defined($dispatch{$cmd})) {
+  &{$dispatch{$cmd}};
+ } else {
+  exit (2);
+ }
+ sub do_scriptinfo
+ {
+  print "rcm_script_version=1\n";
+  print "rcm_script_func_info=Tape backup appl script for DR\n";
+  exit (0);
+ }
+ sub do_register
+ {
+  my ($dir, $f, $errmsg);
+  $dir = opendir(RMT, "/dev/rmt");
+  if (!$dir) {
+  $errmsg = "Unable to open /dev/rmt directory: $!";
+  print "rcm_failure_reason=$errmsg\n";
+  exit (1);
+  }
+  while ($f = readdir(RMT)) {
+  # ignore hidden files and multiple names for the same device
+  if (($f !~ /^./) && ($f =~ /^[0-9]+$/)) {
+  print "rcm_resource_name=/dev/rmt/$f\n";
+  }
+  }
+  closedir(RMT);
+  exit (0);
+ }
+ sub do_resourceinfo
+ {
+  my ($rsrc, $unit);
+  $rsrc = shift(@ARGV);
+  if ($rsrc =~ /^devrmt([0-9]+)$/) {
+  $unit = $1;
+  print "rcm_resource_usage_info=Backup Tape Unit Number $unit\n";
+  exit (0);
+  } else {
+  print "rcm_failure_reason=Unknown tape device!\n";
+  exit (1);
+  }
+ }
+ sub do_preremove
+ {
+  my ($rsrc);
+  $rsrc = shift(@ARGV);
+<beginning of page>
+  # check if backup application is using this resource
+  # if (the backup application is not running on $rsrc) {
+  # allow the DR to continue
+  # exit (0);
+  #}
+  #
+  # If RCM_ENV_FORCE is FALSE deny the operation.
+  # If RCM_ENV_FORCE is TRUE kill the backup application in order
+  # to allow the DR operation to proceed
+  #
+  if ($ENV{RCM_ENV_FORCE} eq 'TRUE') {
+  if ($cmd eq 'preremove') {
+  # kill the tape backup application
+  }
+  exit (0);
+  } else {
+  #
+  # indicate that the tape drive can not be released
+  # since the device is being used for backup by the
+  # tape backup application
+  #
+  print "rcm_failure_reason=tape backup in progress pid=...\n";
+  exit (3);
+  }
+ }
+A script must exit with following exit status values:
+0 Operation specified by the given RCM command has been executed successfully by the script. For queryremove
+command it also means that the script can successfully release the resource.
+1 An error occurred while processing the RCM command. The script should provide the error message to RCM us<hy>
+ing the name-value pair rcm_failure_reason before exiting.
+2 The script does not support the given RCM command. A script must exit with this status if it cannot understand the
+given RCM command.
+3 Indicates that the script cannot release the resource for preremove and queryremove commands. The script
+should provide a message to RCM specifying the reason for not being able to release the resource using the name-
+value pair rcm_failure_reason before exiting.
+If a script cannot successfully process an RCM command, it must supply to the RCM a message indicating the rea<hy>
+son for failure by writing a name-value pair, in the form shown below, to stdout and exiting with the appropriate exit
+status.
+ rcm_failure_reason=failure_reason
+where failure_reason is a localized human readable message describing the reason for failure of the RCM command.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stabili<hy>
+tyEvolving
+<beginning of page>
+gettext(1), cfgadm(1M), cfgadm_scsi(1M), cfgadm_pci(1M), syslog(3C), signal.h(3HEAD), syslog.conf(4), at<hy>
+tributes(5), environ(5)
+RCM scripts are expected to properly handle all RCM commands that the script implements and to log all errors.
+Only root has permission to add or remove an RCM script. An ill-behaved RCM script can cause unexpected DR
+failures.
+RCM commands are invoked only for the resources whose subsystems participate within the RCM framework. Cur<hy>
+rently, not all susbsystems participate within the RCM framework.

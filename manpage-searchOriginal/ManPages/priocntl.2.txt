@@ -1,0 +1,584 @@
+<beginning of page>
+priocntl <-> process scheduler control
+#include <sys/types.h>
+#include <sys/priocntl.h>
+#include <sys/rtpriocntl.h>
+#include <sys/tspriocntl.h>
+#include <sys/iapriocntl.h>
+#include <sys/fsspriocntl.h>
+#include <sys/fxpriocntl.h>
+long priocntl(idtype_t idtype, id_t id, int cmd, /* arg */ ...);
+The priocntl() function provides for control over the scheduling of an active light weight process (LWP).
+LWPs fall into distinct classes with a separate scheduling policy applied to each class. The classes currently support<hy>
+ed are the realtime class, the time-sharing class, the fair-share class, and the fixed-priority class. The characteristics
+of these classes are described under the corresponding headings below.
+The class attribute of an LWP is inherited across the fork(2) function and the exec(2) family of functions. The pri<hy>
+ocntl() function can be used to dynamically change the class and other scheduling parameters associated with a run<hy>
+ning LWP or set of LWPs given the appropriate permissions as explained below.
+In the default configuration, a runnable realtime LWP runs before any other LWP. Therefore, inappropriate use of re<hy>
+altime LWP can have a dramatic negative impact on system performance.
+The priocntl() function provides an interface for specifying a process, set of processes, or an LWP to which the
+function applies. The priocntlset(2) function provides the same functions as priocntl(), but allows a more general
+interface for specifying the set of LWPs to which the function is to apply.
+For priocntl(), the idtype and id arguments are used together to specify the set of LWPs. The interpretation of id de<hy>
+pends on the value of idtype. The possible values for idtype and corresponding interpretations of id are as follows:
+P_ALL The priocntl() function applies to all existing LWPs. The value of id is ignored. The permission restrictions
+described below still apply.
+P_CID The id argument is a class ID (returned by the priocntl() PC_GETCID command as explained below). The
+priocntl() function applies to all LWPs in the specified class.
+P_GID The id argument is a group ID. The priocntl() function applies to all LWPs with this effective group ID.
+P_LWPID The id argument is an LWP ID. The priocntl function applies to the LWP with the specified ID within the
+calling process.
+P_PGID The id argument is a process group ID. The priocntl() function applies to all LWPs currently associated
+with processes in the specified process group.
+P_PID The id argument is a process ID specifying a single process. The priocntl() function applies to all LWPs cur<hy>
+rently associated with the specified process.
+P_PPID The id argument is a parent process ID. The priocntl() function applies to all LWPs currently associated
+with processes with the specified parent process ID.
+P_PROJID The id argument is a project ID. The priocntl() function applies to all LWPs with this project ID.
+P_SID The id argument is a session ID. The priocntl() function applies to all LWPs currently associated with pro<hy>
+cesses in the specified session.
+<beginning of page>
+P_TASKID The id argument is a task ID. The priocntl() function applies to all LWPs currently associated with pro<hy>
+cesses in the specified task.
+P_UID The id argument is a user ID. The priocntl() function applies to all LWPs with this effective user ID.
+P_ZONEID The id argument is a zone ID. The priocntl() function applies to all LWPs with this zone ID.
+P_CTID The id argument is a process contract ID. The priocntl() function applies to all LWPs with this process
+contract ID.
+An id value of P_MYID can be used in conjunction with the idtype value to specify the LWP ID, parent process ID,
+process group ID, session ID, task ID, class ID, user ID, group ID, project ID, zone ID, or process contract ID of the
+calling LWP.
+To change the scheduling parameters of an LWP (using the PC_SETPARMS or PC_SETXPARMS command as
+explained below) , the real or effective user ID of the LWP calling priocntl() must match the real or the calling LWP
+must have sufficient privileges. These are the minimum permission requirements enforced for all classes. An individ<hy>
+ual class might impose additional permissions requirements when setting LWPs to that class and/or when setting
+class-specific scheduling parameters.
+A special SYS scheduling class exists for the purpose of scheduling the execution of certain special system process<hy>
+es (such as the swapper process). It is not possible to change the class of any LWP to SYS. In addition, any process<hy>
+es in the SYS class that are included in a specified set of processes are disregarded by priocntl(). For example, an
+idtype of P_UID and an id value of 0 would specify all processes with a user ID of 0 except processes in the SYS
+class and (if changing the parameters using PC_SETPARMS or PC_SETXPARMS) the init(1M) process.
+The init process is a special case. For a priocntl() call to change the class or other scheduling parameters of the init
+process (process ID 1), it must be the only process specified by idtype and id. The init process can be assigned to
+any class configured on the system, but the time-sharing class is almost always the appropriate choice. (Other choic<hy>
+es might be highly undesirable. See the System Administration Guide: Basic Administration for more information.)
+The data type and value of arg are specific to the type of command specified by cmd.
+A pcinfo_t structure with the following members, defined in <sys/priocntl.h>, is used by the PC_GETCID and
+PC_GETCLINFO commands.
+ id_t pc_cid; /* Class id */
+ char pc_clname[PC_CLNMSZ]; /* Class name */
+ int pc_clinfo[PC_CLINFOSZ]; /* Class information */
+The pc_cid member is a class ID returned by the priocntl() PC_GETCID command.
+The pc_clname member is a buffer of size PC_CLNMSZ, defined in <sys/priocntl.h>, used to hold the class name:
+RT for realtime, TS for time-sharing, IAfor interactive, FSS for fair-share, or FX for fixed-priority. Each string is
+null-terminated.
+The pc_clinfo member is a buffer of size PC_CLINFOSZ, defined in <sys/priocntl.h>, used to return data describ<hy>
+ing the attributes of a specific class. The format of this data is class-specific and is described under the appropriate
+heading (REALTIME CLASS, TIME-SHARING CLASS, INTERACTIVE CLASS, FAIR-SHARE CLASS, or
+FIXED-PRIORITY CLASS) below.
+A pcparms_t structure with the following members, defined in <sys/priocntl.h>, is used by the PC_SETPARMS
+and PC_GETPARMS commands.
+ id_t pc_cid; /* LWP class */
+ int pc_clparms[PC_CLPARMSZ]; /* Class-specific params */
+The pc_cid member is a class ID returned by the priocntl() PC_GETCID command. The special class ID
+PC_CLNULL can also be assigned to pc_cid when using the PC_GETPARMS command as explained below.
+<beginning of page>
+The pc_clparms buffer holds class-specific scheduling parameters. The format of this parameter data for a particular
+class is described under the appropriate heading below. PC_CLPARMSZ is the length of the pc_clparms buffer and
+is defined in <sys/priocntl.h>.
+The PC_SETXPARMS and PC_GETXPARMS commands exploit the varargs declaration of priocntl(). The ar<hy>
+gument following the command code is a class name: RT for realtime, TS for time-sharing, IA for interactive, FSS
+for fair-share, or FX for fixed-priority. The parameters after the class name build a chain of (key, value) pairs, where
+the key determines the meaning of the value within the pair. When using PC_GETXPARMS, the value associated
+with the key is always a pointer to a scheduling parameter. In contrast, when using PC_SETXPARMS the schedul<hy>
+ing parameter is given as a direct value. A key value of 0 terminates the sequence and all further keys or values are
+ignored.
+The PC_SETXPARMS and PC_GETXPARMS commands are more flexible than PC_SETPARMS and
+PC_GETPARMS and should replace PC_SETPARMS and PC_GETPARMS on a long-term basis.
+Available priocntl() commands are:
+PC_ADMIN This command provides functionality needed for the implementation of the dispadmin(1M) utility. It
+is not intended for general use by other applications.
+PC_DONICE Set or get nice value of the specified LWP(s) associated with the specified process(es). When this
+command is used with the idtype of P_LWPID, it sets the nice value of the LWP. The arg argument points to a
+structure of type pcnice_t. The pc_val member specifies the nice value and the pc_op specifies the type of the opera<hy>
+tion.
+When pc_op is set to PC_GETNICE, priocntl() sets the pc_val to the highest priority (lowest numerical value) per<hy>
+taining to any of the specified LWPs.
+When pc_op is set to PC_SETNICE, priocntl() sets the nice value of all LWPs in the specified set to the value
+specified in pc_val member of pcnice_t structure.
+The priocntl() function returns <mi>1 with errno set to EPERM if the calling LWP doesn't have appropriate permis<hy>
+sions to set or get nice values for one or more of the target LWPs. If priocntl() encounters an error other than per<hy>
+missions, it does not continue through the set of target LWPs but returns the error immediately.
+PC_GETCID Get class ID and class attributes for a specific class given the class name. The idtype and id argu<hy>
+ments are ignored. If arg is non-null, it points to a structure of type pcinfo_t. The pc_clname buffer contains the
+name of the class whose attributes you are getting.
+On success, the class ID is returned in pc_cid, the class attributes are returned in the pc_clinfo buffer, and the prioc<hy>
+ntl() call returns the total number of classes configured in the system (including the sys class). If the class specified
+by pc_clname is invalid or is not currently configured, the priocntl() call returns <mi>1 with errno set to EINVAL. The
+format of the attribute data returned for a given class is defined in the <sys/rtpriocntl.h>, <sys/tspriocntl.h>,
+<sys/iapriocntl.h>, <sys/fsspriocntl.h>, or <sys/fxpriocntl.h> header and described under the appropriate heading
+below.
+If arg is a null pointer, no attribute data is returned but the priocntl() call still returns the number of configured
+classes.
+PC_GETCLINFO Get class name and class attributes for a specific class given class ID. The idtype and id argu<hy>
+ments are ignored. If arg is non-null, it points to a structure of type pcinfo_t. The pc_cid member is the class ID of
+the class whose attributes you are getting.
+On success, the class name is returned in the pc_clname buffer, the class attributes are returned in the pc_clinfo buf<hy>
+fer, and the priocntl() call returns the total number of classes configured in the system (including the sys class). The
+format of the attribute data returned for a given class is defined in the <sys/rtpriocntl.h>, <sys/tspriocntl.h>,
+<sys/iapriocntl.h>, <sys/fsspriocntl.h>, or <sys/fxpriocntl.h> header and described under the appropriate heading
+below.
+If arg is a null pointer, no attribute data is returned but the priocntl() call still returns the number of configured
+classes.
+<beginning of page>
+PC_GETPARMS Get the class and/or class-specific scheduling parameters of an LWP. The arg member points to a
+structure of type pcparms_t.
+If pc_cid specifies a configured class and a single LWP belonging to that class is specified by the idtype and id val<hy>
+ues or the procset structure, then the scheduling parameters of that LWP are returned in the pc_clparms buffer. If the
+LWP specified does not exist or does not belong to the specified class, the priocntl() call returns <mi>1 with errno set
+to ESRCH.
+If pc_cid specifies a configured class and a set of LWPs is specified, the scheduling parameters of one of the speci<hy>
+fied LWP belonging to the specified class are returned in the pc_clparms buffer and the priocntl() call returns the
+process ID of the selected LWP. The criteria for selecting an LWP to return in this case is class-dependent. If none of
+the specified LWPs exist or none of them belong to the specified class, the priocntl() call returns <mi>1 with errno set
+to ESRCH.
+If pc_cid is PC_CLNULL and a single LWP is specified, the class of the specified LWP is returned in pc_cid and its
+scheduling parameters are returned in the pc_clparms buffer.
+PC_GETXPARMS Get the class or class-specific scheduling parameters of an LWP. The class name (first argument
+after PC_GETXPARMS) specifies the class and the (key, value) pair sequence contains a pointer to the class-spe<hy>
+cific parameters. The keys and the types of the class-specific parameter data are described below and can also be
+found in the class-specific headers <sys/rtpriocntl.h>, <sys/tspriocntl.h>, <sys/iapriocntl.h>, <sys/fsspriocntl.h>,
+and <sys/fxpriocntl.h>. If the specified class is a configured class and a single LWP belonging to that class is speci<hy>
+fied by the idtype and id values or the procset structure, then the scheduling parameters of that LWP are returned in
+the given (key, value) pair buffers. If the LWP specified does not exist or does not belong to the specified class, pri<hy>
+ocntl() returns <mi>1 and errno is set to ESRCH.
+If the class name specifies a configured class and a set of LWPs is given, the scheduling parameters of one of the
+specified LWPs belonging to the specified class are returned and the priocntl() call returns the process ID of the se<hy>
+lected LWP. The criteria for selecting an LWP to return in this case is class-dependent. If none of the specified LWPs
+exist or none of them belong to the specified class, priocntl() returns <mi>1 and errno is set to ESRCH.
+If the class name is a null pointer, a single process or LWP is specified, and a (key, value) pair for a class name re<hy>
+quest is given, priocntl() fills the buffer pointed to by value with the class name of the specified process or LWP.
+The key for the class name request is PC_KY_CLNAME and the class name buffer should be declared as:
+ char pc_clname[PC_CLNMSZ]; /* Class name */
+PC_SETPARMS Set the class and class-specific scheduling parameters of the specified LWP(s) associated with the
+specified process(es). When this command is used with the idtype of P_LWPID, it will set the class and class-spe<hy>
+cific scheduling parameters of the LWP. The arg argument points to a structure of type pcparms_t. The pc_cid
+member specifies the class you are setting and the pc_clparms buffer contains the class-specific parameters you are
+setting. The format of the class-specific parameter data is defined in the <sys/rtpriocntl.h>, <sys/tspriocntl.h>,
+<sys/iapriocntl.h>, <sys/fsspriocntl.h>, or <sys/fxpriocntl.h> header and described under the appropriate class
+heading below.
+When setting parameters for a set of LWPs, priocntl() acts on the LWPs in the set in an implementation-specific or<hy>
+der. If priocntl() encounters an error for one or more of the target processes, it might or might not continue through
+the set of LWPs, depending on the nature of the error. If the error is related to permissions (EPERM), priocntl()
+continues through the LWP set, resetting the parameters for all target LWPs for which the calling LWP has appropri<hy>
+ate permissions. The priocntl() function then returns <mi>1 with errno set to EPERM to indicate that the operation
+failed for one or more of the target LWPs. If priocntl() encounters an error other than permissions, it does not con<hy>
+tinue through the set of target LWPs but returns the error immediately.
+PC_SETXPARMS Set the class and class-specific scheduling parameters of the specified LWP(s) associated with
+the specified process(es). When this command is used with P_LWPID as idtype, it will set the class and class-spe<hy>
+cific scheduling parameters of the LWP. The class name (first argument after PC_SETXPARMS) specifies the class
+to be changed and the following (key, value) pair sequence contains the class-specific parameters to be changed. On<hy>
+ly those (key,value) pairs whose scheduling behavior is to change must be specified. The keys and the types of the
+class-specific parameter data are described below and can also be found in the class-specific header files <sys/rtpri<hy>
+ocntl.h>, <sys/tspriocntl.h>, <sys/iapriocntl.h>, <sys/fsspriocntl.h>, and <sys/fxpriocntl.h>.
+When setting parameters for a set of LWPs, priocntl() acts on the LWPs in the set in an implementation-specific or<hy>
+<beginning of page>
+der. If priocntl() encounters an error for one or more of the target processes, it might or might not continue through
+the set of LWPs, depending on the nature of the error. If the error is related to permissions (EPERM), priocntl()
+continues to reset the parameters for all target LWPs where the calling LWP has appropriate permissions. The prioc<hy>
+ntl() function returns <mi>1 and errno is set to EPERM when the operation failed for one or more of the target LWPs.
+All errors other than EPERM result in an immediate termination of priocntl().
+The realtime class provides a fixed priority preemptive scheduling policy for those LWPS requiring fast and deter<hy>
+ministic response and absolute user/application control of scheduling priorities. If the realtime class is configured in
+the system, it should have exclusive control of the highest range of scheduling priorities on the system. This ensures
+that a runnable realtime LWP is given CPU service before any LWP belonging to any other class.
+The realtime class has a range of realtime priority (rt_pri) values that can be assigned to an LWP within the class.
+Realtime priorities range from 0 to x, where the value of x is configurable and can be determined for a specific instal<hy>
+lation by using the priocntl() PC_GETCID or PC_GETCLINFO command.
+The realtime scheduling policy is a fixed priority policy. The scheduling priority of a realtime LWP is never changed
+except as the result of an explicit request by the user/application to change the rt_pri value of the LWP.
+For an LWP in the realtime class, the rt_pri value is, for all practical purposes, equivalent to the scheduling priority
+of the LWP. The rt_pri value completely determines the scheduling priority of a realtime LWP relative to other LW<hy>
+Ps within its class. Numerically higher rt_pri values represent higher priorities. Since the realtime class controls the
+highest range of scheduling priorities in the system, it is guaranteed that the runnable realtime LWP with the highest
+rt_pri value is always selected to run before any other LWPs in the system.
+In addition to providing control over priority, priocntl() provides for control over the length of the time quantum al<hy>
+lotted to the LWP in the realtime class. The time quantum value specifies the maximum amount of time an LWP can
+run assuming that it does not complete or enter a resource or event wait state (sleep). If another LWP becomes
+runnable at a higher priority, the currently running LWP might be preempted before receiving its full time quantum.
+The realtime quantum signal can be used for the notification of runaway realtime processes about the consumption
+of their time quantum. Those processes, which are monitored by the realtime time quantum signal, receive the con<hy>
+figured signal in the event of time quantum expiration. The default value (0) of the time quantum signal will denote
+no signal delivery and a positive value will denote the delivery of the signal specified by the value. The realtime
+quantum signal can be set with the priocntl() PC_SETXPARMS command and displayed with the priocntl()
+PC_GETXPARMS command as explained below.
+The system's process scheduler keeps the runnable realtime LWPs on a set of scheduling queues. There is a separate
+queue for each configured realtime priority and all realtime LWPs with a given rt_pri value are kept together on the
+appropriate queue. The LWPs on a given queue are ordered in FIFO order (that is, the LWP at the front of the queue
+has been waiting longest for service and receives the CPU first). Realtime LWPs that wake up after sleeping, LWPs
+that change to the realtime class from some other class, LWPs that have used their full time quantum, and runnable
+LWPs whose priority is reset by priocntl() are all placed at the back of the appropriate queue for their priority. An
+LWP that is preempted by a higher priority LWP remains at the front of the queue (with whatever time is remaining
+in its time quantum) and runs before any other LWP at this priority. Following a fork(2) function call by a realtime
+LWP, the parent LWP continues to run while the child LWP (which inherits its parent's rt_pri value) is placed at the
+back of the queue.
+A rtinfo_t structure with the following members, defined in <sys/rtpriocntl.h>, defines the format used for the at<hy>
+tribute data for the realtime class.
+ short rt_maxpri; /* Maximum realtime priority */
+The priocntl() PC_GETCID and PC_GETCLINFO commands return realtime class attributes in the pc_clinfo
+buffer in this format.
+The rt_maxpri member specifies the configured maximum rt_pri value for the realtime class. If rt_maxpri is x, the
+valid realtime priorities range from 0 to x.
+A rtparms_t structure with the following members, defined in <sys/rtpriocntl.h>, defines the format used to speci<hy>
+fy the realtime class-specific scheduling parameters of an LWP.
+ short rt_pri; /* Real-Time priority */
+ uint_t rt_tqsecs; /* Seconds in time quantum */
+ int rt_tqnsecs; /* Additional nanoseconds in quantum */
+<beginning of page>
+When using the priocntl() PC_SETPARMS or PC_GETPARMS commands, if pc_cid specifies the realtime class,
+the data in the pc_clparms buffer are in this format.
+These commands can be used to set the realtime priority to the specified value or get the current rt_pri value. Setting
+the rt_pri value of an LWP that is currently running or runnable (not sleeping) causes the LWP to be placed at the
+back of the scheduling queue for the specified priority. The LWP is placed at the back of the appropriate queue re<hy>
+gardless of whether the priority being set is different from the previous rt_pri value of the LWP. A running LWP can
+voluntarily release the CPU and go to the back of the scheduling queue at the same priority by resetting its rt_pri
+value to its current realtime priority value. To change the time quantum of an LWP without setting the priority or af<hy>
+fecting the LWP's position on the queue, the rt_pri member should be set to the special value RT_NOCHANGE,
+defined in <sys/rtpriocntl.h>. Specifying RT_NOCHANGE when changing the class of an LWP to realtime from
+some other class results in the realtime priority being set to 0.
+For the priocntl() PC_GETPARMS command, if pc_cid specifies the realtime class and more than one realtime
+LWP is specified, the scheduling parameters of the realtime LWP with the highest rt_pri value among the specified
+LWPs are returned and the LWP ID of this LWP is returned by the priocntl() call. If there is more than one LWP
+sharing the highest priority, the one returned is implementation-dependent.
+The rt_tqsecs and rt_tqnsecs members are used for getting or setting the time quantum associated with an LWP or
+group of LWPs. rt_tqsecs is the number of seconds in the time quantum and rt_tqnsecs is the number of additional
+nanoseconds in the quantum. For example, setting rt_tqsecs to 2 and rt_tqnsecs to 500,000,000 (decimal) would re<hy>
+sult in a time quantum of two and one-half seconds. Specifying a value of 1,000,000,000 or greater in the rt_tqnsecs
+member results in an error return with errno set to EINVAL. Although the resolution of the tq_nsecs member is
+very fine, the specified time quantum length is rounded up by the system to the next integral multiple of the system
+clock's resolution. The maximum time quantum that can be specified is implementation-specific and equal to
+INT_MAX1 ticks. The INT_MAX value is defined in <limits.h>. Requesting a quantum greater than this maxi<hy>
+mum results in an error return with errno set to ERANGE, although infinite quantums can be requested using a spe<hy>
+cial value as explained below. Requesting a time quantum of 0 by setting both rt_tqsecs and rt_tqnsecs to 0 results
+in an error return with errno set to EINVAL.
+The rt_tqnsecs member can also be set to one of the following special values defined in <sys/rtpriocntl.h>, in
+which case the value of rt_tqsecs is ignored:
+RT_TQINF Set an infinite time quantum.
+RT_TQDEF Set the time quantum to the default for this priority (see rt_dptbl(4)).
+RT_NOCHANGE Do not set the time quantum. This value is useful when you wish to change the realtime priority
+of an LWP without affecting the time quantum. Specifying this value when changing the class of an LWP to realtime
+from some other class is equivalent to specifying RT_TQDEF.
+When using the priocntl() PC_SETXPARMS or PC_GETXPARMS commands, the first argument after the com<hy>
+mand code must be the class name of the realtime class (RT) . The next arguments are formed as (key, value) pairs,
+terminated by a 0 key. The definition for the keys of the realtime class can be found in <sys/rtpriocntl.h>. A repeat<hy>
+ed specification of the same key results in an error return and errno set to EINVAL.
+tab() box; cw(1.44i) |cw(1.08i) |cw(2.98i) lw(1.44i) |lw(1.08i) |lw(2.98i) KeyValue TypeDescription _
+RT_KY_PRIpri_trealtime priority RT_KY_TQSECSuint_tseconds in time quantum _ RT_KY_TQNSECSint<hy>
+nanoseconds in time quantum _ RT_KY_TQSIGintrealtime time quantum signal
+When using the priocntl() PC_GETXPARMS command, the value associated with the key is always a pointer to a
+scheduling parameter of the value type shown in the table above. In contrast, when using the priocntl() PC_SETX<hy>
+PARMS command, the scheduling parameter is given as a direct value.
+A priocntl() PC_SETXPARMS command with the class name (RT) and without a following (key, value) pair will
+set or reset all realtime scheduling parameters of the target process(es) to their default values. Changing the class of
+an LWP to realtime from some other class causes the parameters to be set to their default values. The default real<hy>
+time priority (RT_KY_PRI) is 0. A default time quantum (RT_TQDEF) is assigned to each priority class (see
+<beginning of page>
+rt_dptbl(4)). The default realtime time quantum signal (RT_KY_TQSIG) is 0.
+The value associated with RT_KY_TQSECS is the number of seconds in the time quantum. The value associated
+with RT_KY_TQNSECS is the number of nanoseconds in the quantum. Specifying a value of 1,000,000,000 or
+greater for the number of nanoseconds results in an error return and errno is set to EINVAL. The specified time
+quantum is rounded up by the system to the next integral multiple of the system clock's resolution. The maximum
+time quantum that can be specified is implementation-specific and equal to INT_MAX ticks, defined in <limits.h>.
+Requesting a quantum greater than this maximum results in an error return and errno is set to ERANGE. If seconds
+(RT_KY_TQSECS) but no nanoseconds (RT_KY_TQNSECS) are supplied, the number of nanoseconds is set to
+0. If nanoseconds (RT_KY_TQNSECS) but no seconds (RT_KY_TQSECS) are supplied, the number of seconds
+is set to 0. A time quantum of 0 (seconds and nanoseconds are 0) results in an error return with errno set to EIN<hy>
+VAL. Special values for RT_KY_TQSECS are RT_TQINF and RT_TQDEF (as described above). The priocntl()
+command PC_SETXPARMS knows no special value RT_NOCHANGE.
+To change the class of an LWP to realtime from any other class, the LWP invoking priocntl() must have sufficient
+privileges. To change the priority or time quantum setting of a realtime LWP, the LWP invoking priocntl() must
+have sufficient privileges or must itself be a realtime LWP whose real or effective user ID matches the real of effec<hy>
+tive user ID of the target LWP.
+The realtime priority and time quantum are inherited across fork(2) and the exec family of functions. When using
+the time quantum signal with a user-defined signal handler across the exec functions, the new image must install an
+appropriate user-defined signal handler before the time quantum expires. Otherwise, unpredictable behavior might
+result.
+The time-sharing scheduling policy provides for a fair and effective allocation of the CPU resource among LWPs
+with varying CPU consumption characteristics. The objectives of the time-sharing policy are to provide good re<hy>
+sponse time to interactive LWPs and good throughput to CPU-bound jobs, while providing a degree of user/applica<hy>
+tion control over scheduling.
+The time-sharing class has a range of time-sharing user priority (see ts_upri below) values that can be assigned to
+LWPs within the class. A ts_upri value of 0 is defined as the default base priority for the time-sharing class. User
+priorities range from <mi>x to +x where the value of x is configurable and can be determined for a specific installation
+by using the priocntl() PC_GETCID or PC_GETCLINFO command.
+The purpose of the user priority is to provide some degree of user/application control over the scheduling of LWPs
+in the time-sharing class. Raising or lowering the ts_upri value of an LWP in the time-sharing class raises or lowers
+the scheduling priority of the LWP. It is not guaranteed, however, that an LWP with a higher ts_upri value will run
+before one with a lower ts_upri value, since the ts_upri value is just one factor used to determine the scheduling pri<hy>
+ority of a time-sharing LWP. The system can dynamically adjust the internal scheduling priority of a time-sharing
+LWP based on other factors such as recent CPU usage.
+In addition to the system-wide limits on user priority (returned by the PC_GETCID and PC_GETCLINFO com<hy>
+mands) there is a per LWP user priority limit (see ts_uprilim below) specifying the maximum ts_upri value that can
+be set for a given LWP. By default, ts_uprilim is 0.
+A tsinfo_t structure with the following members, defined in <sys/tspriocntl.h>, defines the format used for the at<hy>
+tribute data for the time-sharing class.
+ short ts_maxupri; /* Limits of user priority range */
+The priocntl() PC_GETCID and PC_GETCLINFO commands return time-sharing class attributes in the pc_clin<hy>
+fo buffer in this format.
+The ts_maxupri member specifies the configured maximum user priority value for the time-sharing class. If
+ts_maxupri is x, the valid range for both user priorities and user priority limits is from <mi>x to +x.
+A tsparms_t structure with the following members, defined in <sys/tspriocntl.h>, defines the format used to speci<hy>
+fy the time-sharing class-specific scheduling parameters of an LWP.
+ short ts_uprilim; /* Time-Sharing user priority limit */
+ short ts_upri; /* Time-Sharing user priority */
+When using the priocntl() PC_SETPARMS or PC_GETPARMS commands, if pc_cid specifies the time-sharing
+class, the data in the pc_clparms buffer is in this format.
+<beginning of page>
+For the priocntl() PC_GETPARMS command, if pc_cid specifies the time-sharing class and more than one time-
+sharing LWP is specified, the scheduling parameters of the time-sharing LWP with the highest ts_upri value among
+the specified LWPs is returned and the LWP ID of this LWP is returned by the priocntl() call. If there is more than
+one LWP sharing the highest user priority, the one returned is implementation-dependent.
+Any time-sharing LWP can lower its own ts_uprilim (or that of another LWP with the same user ID). Only a time-
+sharing LWP with sufficient privileges can raise a ts_uprilim. When changing the class of an LWP to time-sharing
+from some other class, sufficient privileges are required to set the initial ts_uprilim to a value greater than 0. At<hy>
+tempts by an unprivileged LWP to raise a ts_uprilim or set an initial ts_uprilim greater than 0 fail with a return value
+of <mi>1 and errno set to EPERM.
+Any time-sharing LWP can set its own ts_upri (or that of another LWP with the same user ID) to any value less than
+or equal to the LWP's ts_uprilim. Attempts to set the ts_upri above the ts_uprilim (and/or set the ts_uprilim below
+the ts_upri) result in the ts_upri being set equal to the ts_uprilim.
+Either of the ts_uprilim or ts_upri members can be set to the special value TS_NOCHANGE, defined in <sys/tspri<hy>
+ocntl.h>, to set one of the values without affecting the other. Specifying TS_NOCHANGE for the ts_upri when the
+ts_uprilim is being set to a value below the current ts_upri causes the ts_upri to be set equal to the ts_uprilim being
+set. Specifying TS_NOCHANGE for a parameter when changing the class of an LWP to time-sharing (from some
+other class) causes the parameter to be set to a default value. The default value for the ts_uprilim is 0 and the default
+for the ts_upri is to set it equal to the ts_uprilim that is being set.
+When using the priocntl() PC_SETXPARMS or PC_GETXPARMS commands, the first argument after the com<hy>
+mand code is the class name of the time-sharing class (TS) . The next arguments are formed as (key, value) pairs,
+terminated by a 0 key. The definition for the keys of the time-sharing class can be found in <sys/tspriocntl.h>. A
+repeated specification of the same key results in an error return and errno set to EINVAL.
+tab() box; cw(1.44i) |cw(1.08i) |cw(2.98i) lw(1.44i) |lw(1.08i) |lw(2.98i) KeyValue TypeDescription _ TS_KY_UP<hy>
+RILIMpri_tuser priority limit TS_KY_UPRIpri_tuser priority
+When using the priocntl() PC_GETXPARMS command, the value associated with the key is always a pointer to a
+scheduling parameter of the value type in the table above. In contrast, when using the priocntl() PC_SETXPARMS
+command, the scheduling parameter is given as a direct value.
+A priocntl() PC_SETXPARMS command with the class name (TS) and without a following (key, value) pair will
+set or reset all time-sharing scheduling parameters of the target process(es) to their default values. Changing the
+class of an LWP to time-sharing from some other class causes the parameters to be set to their default values. The
+default value for the user priority limit (TS_KY_UPRILIM) is 0. The default value for the user priority
+(TS_KY_UPRI) is equal to the user priority limit (TS_KY_UPRILIM) that is being set.
+The priocntl() command PC_SETXPARMS knows no special value TS_NOCHANGE.
+The time-sharing user priority and user priority limit are inherited across fork() and the exec family of functions.
+The interactive scheduling policy is a variation on the time-sharing scheduling policy. All that can be said about the
+time-sharing scheduling policy is also true for the interactive scheduling policy, with one addition: An LWP in the
+interactive class with its ia_mode value set to IA_SET_INTERACTIVE has its time-sharing priority boosted by
+IA_BOOST (10).
+An iainfo_t structure with the following members, defined in <sys/iapriocntl.h>, defines the format used for the at<hy>
+tribute data for the interactive class.
+ short ia_maxupri; /* Limits of user priority range */
+The priocntl() PC_GETCID and PC_GETCLINFO commands return interactive class attributes in the pc_clinfo
+buffer in this format.
+The ia_maxupri member specifies the configured maximum user priority value for the interactive class. If ia_max<hy>
+upri is x, the valid range for both user priorities and user priority limits is from -x to +x.
+A iaparms_t structure with the following members, defined in <sys/iapriocntl.h>, defines the format used to speci<hy>
+<beginning of page>
+fy the interactive class-specific scheduling parameters of an LWP.
+ short ia_uprilim; /* Interactive user priority limit */
+ short ia_upri; /* Interactive user priority */
+ int ia_mode; /* interactive on/off */
+When using the priocntl() PC_SETPARMS or PC_GETPARMS commands, if pc_cid specifies the interactive
+class, the data in the pc_clparms buffer is in this format.
+For the priocntl() PC_GETPARMS command, if pc_cid specifies the interactive class and more than one interac<hy>
+tive LWP is specified, the scheduling parameters of the interactive LWP with the highest ia_upri value among the
+specified LWPs is returned and the LWP ID of this LWP is returned by the priocntl() call. If there is more than one
+LWP sharing the highest user priority, the one returned is implementation-dependent.
+All that is said above in the TIME-SHARING CLASS section concerning manipulation of ts_uprilim and ts_upri
+applies equally to manipulations of ia_uprilim and ia_upri in the interactive class.
+When using the PC_SETPARMS command, the ia_mode member must be set to one of the values IA_SET_IN<hy>
+TERACTIVE, IA_INTERACTIVE_OFF, or IA_NOCHANGE, defined in <sys/iapriocntl.h>, to set the interac<hy>
+tive mode on or off or to make no change to the interactive mode.
+When using the priocntl() PC_SETXPARMS or PC_GETXPARMS commands, the first argument after the com<hy>
+mand code is the class name of the interactive class (IA) . The next arguments are formed as (key, value) pairs, ter<hy>
+minated by a 0 key. The definition for the keys of the interactive class can be found in <sys/iapriocntl.h>. A repeat<hy>
+ed specification of the same key results in an error return and errno set to EINVAL.
+tab(); cw(1.83i) cw(1.83i) cw(1.83i) lw(1.83i) lw(1.83i) lw(1.83i) KeyValue TypeDescription IA_KY_UP<hy>
+RILIMpri_tuser priority limit IA_KY_UPRIpri_tuser priority IA_KY_MODEintinteractive mode
+When using the priocntl() PC_GETXPARMS command, the value associated with the key is always a pointer to a
+scheduling parameter of the value type in the table above. In contrast, when using the priocntl() PC_SETXPARMS
+command, the scheduling parameter is given as a direct value.
+A priocntl() PC_SETXPARMS command with the class name (IA) and without a following (key, value) pair will
+set or reset all interactive scheduling parameters of the target process(es) to their default values. Changing the class
+of an LWP to interactive from some other class causes the parameters to be set to their default values. The default
+value for the user priority limit (IA_KY_UPRILIM) is 0. The default value for the user priority (IA_KY_UPRI) is
+equal to the user priority limit (IA_KY_UPRILIM) that is being set. The default value for the interactive mode
+(IA_KY_MODE) is IA_SET_INTERACTIVE.
+The priocntl() command PC_SETXPARMS knows no special value IA_NOCHANGE.
+The interactive user priority and user priority limit are inherited across fork and the exec family of functions.
+The fair-share scheduling policy provides a fair allocation of CPU resources among projects, independent of the
+number of processes they contain. Projects are given "shares" to control their quota of CPU resources. See FSS(7)
+for more information about how to configure shares.
+The fair share class supports the notion of per-LWP user priority (see fss_upri below) values for compatibility with
+the time-sharing scheduling class. An fss_upri value of 0 is defined as the default base priority for the fair-share
+class. User priorities range from -x to +x where the value of x is configurable and can be determined for a specific in<hy>
+stallation by using the priocntl() PC_GETCID or PC_GETCLINFO command.
+The purpose of the user priority is to provide some degree of user/application control over the scheduling of LWPs
+in the fair-share class. Raising the fss_upri value of an LWP in the fair-share class tells the scheduler to give this
+LWP more CPU time slices, while lowering the fss_upri value tells the scheduler to give it less CPU slices. It is not
+guaranteed, however, that an LWP with a higher fss_upri value will run before one with a lower fss_upri value. This
+is because the fss_upri value is just one factor used to determine the scheduling priority of a fair-share LWP. The
+system can dynamically adjust the internal scheduling priority of a fair-share LWP based on other factors such as re<hy>
+cent CPU usage. The fair-share scheduler attempts to provide an evenly graded effect across the whole range of user
+priority values.
+<beginning of page>
+User priority values do not interfere with project shares. That is, changing a user priority value of a process does not
+have any effect on its project CPU entitlement, which is based on the number of shares it is allocated in comparison
+with other projects.
+In addition to the system-wide limits on user priority (returned by the PC_GETCID and PC_GETCLINFO com<hy>
+mands), there is a per-LWP user priority limit (see fss_uprilim below) that specifies the maximum fss_upri value
+that can be set for a given LWP. By default, fss_uprilim is 0.
+A fssinfo_t structure with the following members, defined in <sys/fsspriocntl.h>, defines the format used for the
+attribute data for the fair-share class.
+ short fss_maxupri; /* Limits of user priority range */
+The priocntl() PC_GETCID and PC_GETCLINFO commands return fair-share class attributes in the pc_clinfo
+buffer in this format.
+fss_maxupri specifies the configured maximum user priority value for the fair-share class. If fss_maxupri is x, the
+valid range for both user priorities and user priority limits is from -x to +x.
+A fssparms_t structure with the following members, defined in <sys/fsspriocntl.h>, defines the format used to
+specify the fair-share class-specific scheduling parameters of an LWP.
+ short fss_uprilim; /* Fair-share user priority limit */
+ short fss_upri; /* Fair-share user priority */
+When using the priocntl() PC_SETPARMS or PC_GETPARMS commands, if pc_cid specifies the fair-share
+class, the data in the pc_clparms buffer is in this format.
+For the priocntl() PC_GETPARMS command, if pc_cid specifies the fair-share class and more than one fair-share
+LWP is specified, the scheduling parameters of the fair-share LWP with the highest fss_upri value among the speci<hy>
+fied LWPs is returned and the LWP ID of this LWP is returned by the priocntl() call. If there is more than one LWP
+sharing the highest user priority, the one returned is implementation-dependent.
+Any fair-share LWP can lower its own fss_uprilim (or that of another LWP with the same user ID). Only a fair-share
+LWP with sufficient privileges can raise an fss_uprilim. When changing the class of an LWP to fair-share from some
+other class, sufficient privileges are required to enter the FSS class or to set the initial fss_uprilim to a value greater
+than 0. Attempts by an unprivileged LWP to raise an fss_uprilim or set an initial fss_uprilim greater than 0 fail with a
+return value of -1 and errno set to EPERM.
+Any fair-share LWP can set its own fss_upri (or that of another LWP with the same user ID) to any value less than or
+equal to the LWP's fss_uprilim. Attempts to set the fss_upri above the fss_uprilim (and/or set the fss_uprilim below
+the fss_upri) result in the fss_upri being set equal to the fss_uprilim.
+Either of the fss_uprilim or fss_upri members can be set to the special value FSS_NOCHANGE (defined in
+<sys/fsspriocntl.h>) to set one of the values without affecting the other. Specifying FSS_NOCHANGE for the
+fss_upri when the fss_uprilim is being set to a value below the current fss_upri causes the fss_upri to be set equal to
+the fss_uprilim being set. Specifying FSS_NOCHANGE for a parameter when changing the class of an LWP to
+fair-share (from some other class) causes the parameter to be set to a default value. The default value for the fss_up<hy>
+rilim is 0 and the default for the fss_upri is to set it equal to the fss_uprilim which is being set.
+The fair-share user priority and user priority limit are inherited across fork() and the exec family of functions.
+The fixed-priority class provides a fixed-priority preemptive scheduling policy for those LWPs requiring that the
+scheduling priorities do not get dynamically adjusted by the system and that the user/application have control of the
+scheduling priorities.
+The fixed-priority class has a range of fixed-priority user priority (see fx_upri below) values that can be assigned to
+LWPs within the class. A fx_upri value of 0 is defined as the default base priority for the fixed-priority class. User
+priorities range from 0 to x where the value of x is configurable and can be determined for a specific installation by
+using the priocntl() PC_GETCID or PC_GETCLINFO command.
+The purpose of the user priority is to provide user/application control over the scheduling of processes in the fixed-
+priority class. For processes in the fixed-priority class, the fx_upri value is, for all practical purposes, equivalent to
+the scheduling priority of the process. The fx_upri value completely determines the scheduling priority of a fixed-
+<beginning of page>
+priority process relative to other processes within its class. Numerically higher fx_upri values represent higher prior<hy>
+ities.
+In addition to the system-wide limits on user priority (returned by the PC_GETCID and PC_GETCLINFO com<hy>
+mands), there is a per-LWP user priority limit (see fx_uprilim below) that specifies the maximum fx_upri value that
+can be set for a given LWP. By default, fx_uprilim is 0.
+A structure with the following member (defined in <sys/fxpriocntl.h>) defines the format used for the attribute data
+for the fixed-priority class.
+ pri_t fx_maxupri; /* Maximum user priority */
+The priocntl() PC_GETCID and PC_GETCLINFO commands return fixed-priority class attributes in the pc_clin<hy>
+fo buffer in this format.
+The fx_maxupri member specifies the configured maximum user priority value for the fixed-priority class. If fx_max<hy>
+upri is x, the valid range for both user priorities and user priority limits is from 0 to x.
+A structure with the following members (defined in <sys/fxpriocntl.h>) defines the format used to specify the fixed-
+priority class-specific scheduling parameters of an LWP.
+ pri_t fx_upri; /* Fixed-priority user priority */
+ pri_t fx_uprilim; /* Fixed-priority user priority limit */
+ uint_t fx_tqsecs; /* seconds in time quantum */
+ int fx_tqnsecs; /* additional nanosecs in time quant */
+When using the priocntl() PC_SETPARMS or PC_GETPARMS commands, if pc_cid specifies the fixed-priority
+class, the data in the pc_clparms buffer is in this format.
+For the priocntl() PC_GETPARMS command, if pc_cid specifies the fixed-priority class and more than one fixed-
+priority LWP is specified, the scheduling parameters of the fixed-priority LWP with the highest fx_upri value among
+the specified LWPs is returned and the LWP ID of this LWP is returned by the priocntl() call. If there is more than
+one LWP sharing the highest user priority, the one returned is implementation-dependent.
+Any fixed-priority LWP can lower its own fx_uprilim (or that of another LWP with the same user ID). Only a fixed-
+priority LWP with sufficient privileges can raise a fx_uprilim. When changing the class of an LWP to fixed-priority
+from some other class, sufficient privileges are required to set the initial fx_uprilim to a value greater than 0. At<hy>
+tempts by an unprivileged LWP to raise a fx_uprilim or set an initial fx_uprilim greater than 0 fail with a return val<hy>
+ue of -1 and errno set to EPERM.
+Any fixed-priority LWP can set its own fx_upri (or that of another LWP with the same user ID) to any value less
+than or equal to the LWP's fx_uprilim. Attempts to set the fx_upri above the fx_uprilim (and/or set the fx_uprilim
+below the fx_upri) result in the fx_upri being set equal to the fx_uprilim.
+Either of the fx_uprilim or fx_upri members can be set to the special value FX_NOCHANGE (defined in <sys/fx<hy>
+priocntl.h>) to set one of the values without affecting the other. Specifying FX_NOCHANGE for the fx_upri when
+the fx_uprilim is being set to a value below the current fx_upri causes the fx_upri to be set equal to the fx_uprilim be<hy>
+ing set. Specifying FX_NOCHANGE for a parameter when changing the class of an LWP to fixed-priority (from
+some other class) causes the parameter to be set to a default value. The default value for the fx_uprilim is 0 and the
+default for the fx_upri is to set it equal to the fx_uprilim that is being set. The default for time quantum is dependent
+on the fx_upri and on the system configuration; see fx_dptbl(4).
+The fx_tqsecs and fx_tqnsecs members are used for getting or setting the time quantum associated with an LWP or
+group of LWPs. fx_tqsecs is the number of seconds in the time quantum and fx_tqnsecs is the number of additional
+nanoseconds in the quantum. For example, setting fx_tqsecs to 2 and fx_tqnsecs to 500,000,000 (decimal) would re<hy>
+sult in a time quantum of two and one-half seconds. Specifying a value of 1,000,000,000 or greater in the fx_tqnsecs
+member results in an error return with errno set to EINVAL. Although the resolution of the tq_nsecs member is
+very fine, the specified time quantum length is rounded up by the system to the next integral multiple of the system
+clock's resolution. The maximum time quantum that can be specified is implementation-specific and equal to
+INT_MAX ticks (defined in <limits.h>). Requesting a quantum greater than this maximum results in an error return
+with errno set to ERANGE, although infinite quantums can be requested using a special value as explained below.
+Requesting a time quantum of 0 (setting both fx_tqsecs and fx_tqnsecs to 0) results in an error return with errno set
+to EINVAL.
+<beginning of page>
+The fx_tqnsecs member can also be set to one of the following special values (defined in <sys/fxpriocntl.h>), in
+which case the value of fx_tqsecs is ignored:
+FX_TQINF Set an infinite time quantum.
+FX_TQDEF Set the time quantum to the default for this priority (see fx_dptbl(4)).
+FX_NOCHANGE Do not set the time quantum. This value is useful in changing the user priority of an LWP with<hy>
+out affecting the time quantum. Specifying this value when changing the class of an LWP to fixed-priority from
+some other class is equivalent to specifying FX_TQDEF.
+When using the priocntl() PC_SETXPARMS or PC_GETXPARMS commands, the first argument after the com<hy>
+mand code must be the class name of the fixed-priority class (FX) . The next arguments are formed as (key, value)
+pairs, terminated by a 0 key. The definition for the keys of the fixed-priority class can be found in <sys/fxprioc<hy>
+ntl.h>. A repeated specification of the same key results in an error return and errno set to EINVAL.
+tab() box; cw(1.44i) |cw(1.08i) |cw(2.98i) lw(1.44i) |lw(1.08i) |lw(2.98i) KeyValue TypeDescription _ FX_KY_UP<hy>
+RILIMpri_tuser priority limit FX_KY_UPRIpri_tuser priority _ FX_KY_TQSECSuint_tseconds in time quan<hy>
+tum _ FX_KY_TQNSECSintnanoseconds in time quantum
+When using the priocntl() PC_GETXPARMS command, the value associated with the key is always a pointer to a
+scheduling parameter of the value type shown in the table above. In contrast, when using the priocntl() PC_SETX<hy>
+PARMS command, the scheduling parameter is given as a direct value.
+A priocntl() PC_SETXPARMS command with the class name (FX) and without a following (key, value) pair will
+set or reset all realtime scheduling parameters of the target process(es) to their default values. Changing the class of
+an LWP to fixed-priority from some other class causes the parameters to be set to their default values. The default
+value for the user priority limit (FX_KY_UPRILIM) is 0. The default value for the user priority (FX_KY_UPRI)
+is equal to the user priority limit (FX_KY_UPRILIM) that is being set. A default time quantum (FX_TQDEF) is
+assigned to each priority class (see fx_dptbl(4)).
+The value associated with FX_KY_TQSECS is the number of seconds in the time quantum. The value associated
+with FX_KY_TQNSECS is the number of nanoseconds in the quantum. Specifying a value of 1,000,000,000 or
+greater for the number of nanoseconds results in an error return and errno is set to EINVAL. The specified time
+quantum is rounded up by the system to the next integral multiple of the system clock's resolution. The maximum
+time quantum that can be specified is implementation-specific and equal to INT_MAX ticks, defined in <limits.h>.
+Requesting a quantum greater than this maximum results in an error return and errno is set to ERANGE. If seconds
+(FX_KY_TQSECS) but no nanoseconds (FX_KY_TQNSECS) are supplied, the number of nanoseconds is set to
+0. If nanoseconds (FX_KY_TQNSECS) but no seconds (FX_KY_TQSECS) are supplied, the number of seconds
+is set to 0. A time quantum of 0 (seconds and nanoseconds are 0) results in an error return with errno set to EIN<hy>
+VAL. Special values for FX_KY_TQSECS are FX_TQINF and FX_TQDEF (as described above). The priocntl()
+command PC_SETXPARMS knows no special value FX_NOCHANGE.
+The fixed-priority user priority and user priority limit are inherited across fork(2) and the exec family of functions.
+Unless otherwise noted above, priocntl() returns 0 on success. On failure, priocntl() returns <mi>1 and sets errno to in<hy>
+dicate the error.
+The priocntl() function will fail if:
+EAGAIN An attempt to change the class of an LWP failed because of insufficient resources other than memory (for
+example, class-specific kernel data structures).
+EFAULT One of the arguments points to an illegal address.
+EINVAL The argument cmd was invalid, an invalid or unconfigured class was specified, or one of the parameters
+specified was invalid.
+<beginning of page>
+ENOMEM An attempt to change the class of an LWP failed because of insufficient memory.
+EPERM The {PRIV_PROC_PRIOCNTL} privilege is not asserted in the effective set of the calling LWP.
+The calling LWP does not have sufficient privileges to affect the target LWP.
+ERANGE The requested time quantum is out of range.
+ESRCH None of the specified LWPs exist.
+priocntl(1), dispadmin(1M), init(1M), exec(2), fork(2), nice(2), priocntlset(2), fx_dptbl(4), process(4), rt_dpt<hy>
+bl(4), privileges(5)
+System Administration Guide: Basic Administration
+Programming Interfaces Guide

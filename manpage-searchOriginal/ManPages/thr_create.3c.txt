@@ -1,0 +1,175 @@
+<beginning of page>
+thr_create <-> create a thread
+cc -mt [ flag... ] file...[ library... ]
+#include <thread.h>
+int thr_create(void *stack_base, size_t stack_size,
+ void *(*start_func) (void*), void *arg, long flags,
+ thread_t *new_thread_ID);
+Thread creation adds a new thread of control to the current process. The procedure main() is a single thread of con<hy>
+trol. Each thread executes concurrently with all other threads within the calling process and with other threads from
+other active processes.  
+Although a newly created thread shares all of the calling process's global data with the other threads in the process,
+it has its own set of attributes and private execution stack. The new thread inherits the calling thread's signal mask
+and scheduling priority. Pending signals for a new thread are not inherited and will be empty.
+The call to create a thread takes the address of a user-defined function, specified by start_func, as one of its argu<hy>
+ments. This function is the complete execution routine for the new thread.
+The lifetime of a thread begins with the successful return from thr_create(), which calls start_func() and ends with
+one of the following: <bu> the normal completion of start_func(), <bu> an explicit call to thr_exit(3C), or <bu> the conclusion
+of the calling process (see exit(2)).
+The new thread performs by calling the function defined by start_func with only one argument, arg. If more than
+one argument needs to be passed to start_func, the arguments can be packed into a structure, the address of which
+can be passed to arg.
+If start_func returns, the thread terminates with the exit status set to the start_func return value (see thr_exit(3C)).
+When the thread from which main() originated returns, the effect is the same as if an implicit call to exit() were
+made using the return value of main() as the exit status. This behavior differs from a start_func return. If main()
+calls thr_exit(3C), only the main thread exits, not the entire process.
+If the thread creation fails, a new thread is not created and the contents of the location referenced by the pointer to
+the new thread are undefined.
+The flags argument specifies which attributes are modifiable for the created thread. The value in flags is determined
+by the bitwise inclusive-OR of the following:
+THR_BOUND This flag is obsolete and is maintained for compatibility.
+THR_DETACHED This flag affects the detachstate attribute of the thread. The new thread is created detached. The
+exit status of a detached thread is not accessible to other threads. Its thread ID and other resources may be re-used as
+soon as the thread terminates. thr_join(3C) will not wait for a detached thread.
+THR_NEW_LWP This flag is obsolete and is maintained for compatibility.
+THR_SUSPENDED This flag affects the suspended attribute of the thread. The new thread is created suspended
+and will not execute start_func until it is started by thr_continue().
+THR_DAEMON This flag affects the daemon attribute of the thread. In addition to being created detached
+(THR_DAEMON implies THR_DETACHED), the thread is marked as a daemon. Daemon threads do not interfere
+with the exit conditions for a process. A process will terminate when the last non-daemon thread exits or the process
+calls exit(2). Also, a thread that is waiting in thr_join(3C) for any thread to terminate will return EDEADLK when
+all remaining threads in the process are either daemon threads or other threads waiting in thr_join(). Daemon
+threads are most useful in libraries that want to use threads.
+Default thread creation:
+ thread_t tid;
+<beginning of page>
+ void *start_func(void *), *arg;
+ thr_create(NULL, 0, start_func, arg, 0, &tid);
+Create a detached thread whose thread ID we do not care about:
+ thr_create(NULL, 0, start_func, arg, THR_DETACHED, NULL);
+If stack_base is not NULL, the new thread uses the stack beginning at the address specified by stack_base and con<hy>
+tinuing for stack_size bytes, where stack_size must be greater than or equal to THR_MIN_STACK. If stack_base is
+NULL, thr_create() allocates a stack for the new thread with at least stack_size bytes. If stack_size is 0, a default
+size is used. If stack_size is not 0, it must be greater than or equal to THR_MIN_STACK. See NOTES.
+When new_thread_ID is not NULL, it points to a location where the ID of the new thread is stored if thr_create() is
+successful. The ID is only valid within the calling process.
+If successful, the thr_create() function returns 0. Otherwise, an error value is returned to indicate the error.
+EAGAIN A resource control limit on the total number of threads in a process, task, project, or zone has been ex<hy>
+ceeded or some system resource has been exceeded.
+EINVAL The stack_base argument is not NULL and stack_size is less than THR_MIN_STACK, or the stack_base
+argument is NULL and stack_size is not 0 and is less than THR_MIN_STACK.
+ENOMEM The system cannot allocate stack for the thread.
+The thr_create() function may use mmap() to allocate thread stacks from MAP_PRIVATE, MAP_NORE<hy>
+SERVE, and MAP_ANON memory mappings if stack_base is NULL, and consequently may return upon failure the
+relevant error values returned by mmap(). See the mmap(2) manual page for these error values.
+The following is an example of concurrency with multithreading. Since POSIX threads and Solaris threads are fully
+compatible even within the same process, this example uses pthread_create() if you execute a.out 0, or thr_cre<hy>
+ate() if you execute a.out 1.
+Five threads are created that simultaneously perform a time-consuming function, sleep(10). If the execution of this
+process is timed, the results will show that all five individual calls to sleep for ten-seconds completed in about ten
+seconds, even on a uniprocessor. If a single-threaded process calls sleep(10) five times, the execution time will be
+about 50-seconds.
+The command-line to time this process is:
+/usr/bin/time a.out 0 (for POSIX threading)
+or
+/usr/bin/time a.out 1 (for Solaris threading) Example 1 An example of concurrency with multithreading.
+ #define _REENTRANT /* basic 3-lines for threads */
+ #include <pthread.h>
+ #include <thread.h>
+ #define NUM_THREADS 5
+ #define SLEEP_TIME 10
+ void *sleeping(void *); /* thread routine */
+ int i;
+ thread_t tid[NUM_THREADS]; /* array of thread IDs */
+ int
+ main(int argc, char *argv[])
+ {
+  if (argc == 1) {
+  printf("use 0 as arg1 to use pthread_create()\n");
+<beginning of page>
+  printf("or use 1 as arg1 to use thr_create()\n");
+  return (1);
+  }
+  switch (*argv[1]) {
+  case '0': /* POSIX */
+  for ( i = 0; i < NUM_THREADS; i++)
+  pthread_create(&tid[i], NULL, sleeping,
+  (void *)SLEEP_TIME);
+  for ( i = 0; i < NUM_THREADS; i++)
+  pthread_join(tid[i], NULL);
+  break;
+  case '1': /* Solaris */
+  for ( i = 0; i < NUM_THREADS; i++)
+  thr_create(NULL, 0, sleeping, (void *)SLEEP_TIME, 0,
+  &tid[i]);
+  while (thr_join(0, NULL, NULL) == 0)
+  continue;
+  break;
+  } /* switch */
+  printf("main() reporting that all %d threads have
+  terminated\n", i);
+  return (0);
+ } /* main */
+ void *
+ sleeping(void *arg)
+ {
+  int sleep_time = (int)arg;
+  printf("thread %d sleeping %d seconds ...\n", thr_self(),
+  sleep_time);
+  sleep(sleep_time);
+  printf("\nthread %d awakening\n", thr_self());
+  return (NULL);
+ }
+Had main() not waited for the completion of the other threads (using pthread_join(3C) or thr_join(3C)), it would
+have continued to process concurrently until it reached the end of its routine and the entire process would have exit<hy>
+ed prematurely (see exit(2)).
+Example 2 Creating a default thread with a new signal mask.
+The following example demonstrates how to create a default thread with a new signal mask. The new_mask argu<hy>
+ment is assumed to have a value different from the creator's signal mask (orig_mask). The new_mask argument is
+set to block all signals except for SIGINT. The creator's signal mask is changed so that the new thread inherits a dif<hy>
+ferent mask, and is restored to its original value after thr_create() returns.
+This example assumes that SIGINT is also unmasked in the creator. If it is masked by the creator, then unmasking
+the signal opens the creator to this signal. The other alternative is to have the new thread set its own signal mask in
+its start routine.
+ thread_t tid;
+ sigset_t new_mask, orig_mask;
+ int error;
+ (void)sigfillset(&new_mask);
+ (void)sigdelset(&new_mask, SIGINT);
+ (void)thr_sigsetmask(SIG_SETMASK, &new_mask, &orig_mask);
+ error = thr_create(NULL, 0, do_func, NULL, 0, &tid);
+ (void)thr_sigsetmask(SIG_SETMASK, &orig_mask, NULL);
+<beginning of page>
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelMT-Safe
+exit(2), getrlimit(2), mmap(2), exit(3C), sleep(3C), thr_exit(3C), thr_join(3C), thr_min_stack(3C), thr_setcon<hy>
+currency(3C), thr_suspend(3C), attributes(5), standards(5), threads(5)
+Since multithreaded-application threads execute independently of each other, their relative behavior is unpredictable.
+It is therefore possible for the thread executing main() to finish before all other user-application threads.
+Using thr_join(3C) in the following syntax,
+ while (thr_join(0, NULL, NULL) == 0)
+  continue;
+will cause the invoking thread (which may be main()) to wait for the termination of all non-daemon threads, exclud<hy>
+ing threads that are themselves waiting in thr_join(); however, the second and third arguments to thr_join() need
+not necessarily be NULL.
+A thread has not terminated until thr_exit() has finished. The only way to determine this is by thr_join(). When
+thr_join() returns a departed thread, it means that this thread has terminated and its resources are reclaimable. For
+instance, if a user specified a stack to thr_create(), this stack can only be reclaimed after thr_join() has reported
+this thread as a departed thread. It is not possible to determine when a detached thread has terminated. A de<hy>
+tached thread disappears without leaving a trace.
+Typically, thread stacks allocated by thr_create() begin on page boundaries and any specified (a red-zone) size is
+rounded up to the next page boundary. A page with no access permission is appended to the top of the stack so that
+most stack overflows will result in a SIGSEGV signal being sent to the offending thread. Thread stacks allocated by
+the caller are used as is.
+Using a default stack size for the new thread, instead of passing a user-specified stack size, results in much better
+thr_create() performance. The default stack size for a user-thread is 1 megabyte in a 32-bit process and 2 megabyte
+in a 64-bit process.
+A user-specified stack size must be greater than or equal to THR_MIN_STACK. A minimum stack size may not ac<hy>
+commodate the stack frame for the user thread function start_func. If a stack size is specified, it must accommodate
+start_func requirements and the functions that it may call in turn, in addition to the minimum requirement.
+It is usually very difficult to determine the runtime stack requirements for a thread. THR_MIN_STACK specifies
+how much stack storage is required to execute a trivial start_func. The total runtime requirements for stack storage
+are dependent on the storage required to do runtime linking, the amount of storage required by library runtimes (like
+printf()) that your thread calls. Since these storage parameters are not known before the program runs, it is best to
+use default stacks. If you know your runtime requirements or decide to use stacks that are larger than the default,
+then it makes sense to specify your own stacks.

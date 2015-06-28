@@ -1,0 +1,118 @@
+<beginning of page>
+readdir, readdir_r <-> read directory
+#include <sys/types.h>
+#include <dirent.h>
+struct dirent *readdir(DIR *dirp);
+struct dirent *readdir_r(DIR *dirp, struct dirent *entry);
+cc [ flag... ] file... -D_POSIX_PTHREAD_SEMANTICS [ library... ]
+int readdir_r(DIR *restrict dirp, struct dirent *restrict entry,
+ struct dirent **restrict result);
+The type DIR, which is defined in the header <dirent.h>, represents a directory stream, which is an ordered se<hy>
+quence of all the directory entries in a particular directory. Directory entries represent files. Files can be removed
+from a directory or added to a directory asynchronously to the operation of readdir() and readdir_r().
+The readdir() function returns a pointer to a structure representing the directory entry at the current position in the
+directory stream specified by the argument dirp, and positions the directory stream at the next entry. It returns a null
+pointer upon reaching the end of the directory stream. The structure dirent defined by the <dirent.h> header de<hy>
+scribes a directory entry.
+The readdir() function will not return directory entries containing empty names. If entries for . (dot) or .. (dot-dot)
+exist, one entry will be returned for dot and one entry will be returned for dot-dot; otherwise they will not be re<hy>
+turned.
+The pointer returned by readdir() points to data that can be overwritten by another call to readdir() on the same di<hy>
+rectory stream. These data are not overwritten by another call to readdir() on a different directory stream.
+If a file is removed from or added to the directory after the most recent call to opendir(3C) or rewinddir(3C),
+whether a subsequent call to readdir() returns an entry for that file is unspecified.
+The readdir() function can buffer several directory entries per actual read operation. It marks for update the
+st_atime field of the directory each time the directory is actually read.
+After a call to fork(2), either the parent or child (but not both) can continue processing the directory stream using
+readdir(), rewinddir() or seekdir(3C). If both the parent and child processes use these functions, the result is unde<hy>
+fined.
+If the entry names a symbolic link, the value of the d_ino member is unspecified.
+Unless the end of the directory stream has been reached or an error occurred, the readdir_r() function initializes the
+dirent structure referenced by entry to represent the directory entry at the current position in the directory stream
+referred to by dirp, and positions the directory stream at the next entry.
+The caller must allocate storage pointed to by entry to be large enough for a dirent structure with an array of char
+d_name member containing at least NAME_MAX (that is, pathconf(directory, _PC_NAME_MAX)) plus one el<hy>
+ements. (_PC_NAME_MAX is defined in <unistd.h>.)
+The readdir_r() function will not return directory entries containing empty names. It is unspecified whether entries
+are returned for . (dot) or .. (dot-dot).
+If a file is removed from or added to the directory after the most recent call to opendir() or rewinddir(), whether a
+subsequent call to readdir_r() returns an entry for that file is unspecified.
+The readdir_r() function can buffer several directory entries per actual read operation. It marks for update the
+st_atime field of the directory each time the directory is actually read.
+The standard-conforming version (see standards(5)) of the readdir_r() function performs all of the actions de<hy>
+scribed above and sets the pointer pointed to by result. If a directory entry is returned, the pointer will be set to the
+same value as the entry argument; otherwise, it will be set to NULL.
+Upon successful completion, readdir() and the default readdir_r() return a pointer to an object of type struct di<hy>
+rent. When an error is encountered, a null pointer is returned and errno is set to indicate the error. When the end of
+the directory is encountered, a null pointer is returned and errno is not changed.
+<beginning of page>
+The standard-conforming readdir_r() returns 0 if the end of the directory is encountered or a directory entry is
+stored in the structure referenced by entry. Otherwise, an error number is returned to indicate the failure.
+The readdir() and readdir_r() functions will fail if:
+EOVERFLOW One of the values in the structure to be returned cannot be represented correctly.
+The readdir() and readdir_r() functions may fail if:
+EBADF The dirp argument does not refer to an open directory stream.
+ENOENT The current position of the directory stream is invalid.
+The readdir() and readdir_r() functions should be used in conjunction with opendir(), closedir(), and rewinddir()
+to examine the contents of the directory. Since readdir() and the default readdir_r() return a null pointer both at
+the end of the directory and on error, an application wanting to check for error situations should set errno to 0 be<hy>
+fore calling either of these functions. If errno is set to non-zero on return, an error occurred.
+It is safe to use readdir() in a threaded application, so long as only one thread reads from the directory stream at any
+given time. The readdir() function is generally preferred over the readdir_r() function.
+The standard-conforming readdir_r() returns the error number if an error occurred. It returns 0 on success (includ<hy>
+ing reaching the end of the directory stream).
+The readdir() and readdir_r() functions have transitional interfaces for 64-bit file offsets. See lf64(5). Example 1
+Search the current directory for the entry name.
+The following sample program will search the current directory for each of the arguments supplied on the command
+line:
+ #include <sys/types.h>
+ #include <dirent.h>
+ #include <errno.h>
+ #include <stdio.h>
+ #include <strings.h>
+ static void lookup(const char *arg)
+ {
+  DIR *dirp;
+  struct dirent *dp;
+  if ((dirp = opendir(".")) == NULL) {
+  perror("couldn't open '.'");
+  return;
+  }
+  do {
+  errno = 0;
+  if ((dp = readdir(dirp)) != NULL) {
+  if (strcmp(dp->d_name, arg) != 0)
+  continue;
+  (void) printf("found %s\n", arg);
+  (void) closedir(dirp);
+  return;
+  }
+  } while (dp != NULL);
+  if (errno != 0)
+  perror("error reading directory");
+  else
+<beginning of page>
+  (void) printf("failed to find %s\n", arg);
+  (void) closedir(dirp);
+  return;
+ }
+ int main(int argc, char *argv[])
+ {
+  int i;
+  for (i = 1; i < argc; i++)
+  lookup(argv[i]);
+  return (0);
+ }
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Standard _ MT-LevelSee below.
+The readdir() function is Unsafe. The readdir_r() function is Safe.
+fork(2), lstat(2), symlink(2), Intro(3), closedir(3C), opendir(3C), rewinddir(3C), scandir(3C), seekdir(3C), at<hy>
+tributes(5), lf64(5), standards(5)
+When compiling multithreaded programs, see the MULTITHREADED APPLICATIONS section of Intro(3).
+Solaris 2.4 and earlier releases provided a readdir_r() interface as specified in POSIX.1c Draft 6. The final
+POSIX.1c standard changed the interface as described above. Support for the Draft 6 interface is provided for com<hy>
+patibility only and might not be supported in future releases. New applications and libraries should use the standard-
+conforming interface.
+For POSIX.1c-conforming applications, the _POSIX_PTHREAD_SEMANTICS and _REENTRANT flags are
+automatically turned on by defining the _POSIX_C_SOURCE flag with a value >= 199506L.

@@ -1,0 +1,112 @@
+<beginning of page>
+getservbyname, getservbyname_r, getservbyport, getservbyport_r, getservent, getservent_r, setservent, endservent <->
+get service entry
+cc [ flag ... ] file ... -lsocket -lnsl [ library ... ]
+#include <netdb.h>
+struct servent *getservbyname(const char *name, const char *proto);
+struct servent *getservbyname_r(const char *name, const char *proto,
+ struct servent *result, char *buffer, int buflen);
+struct servent *getservbyport(int port, const char *proto);
+struct servent *getservbyport_r(int port, const char *proto,
+ struct servent *result, char *buffer, int buflen);
+struct servent *getservent(void);
+struct servent *getservent_r(struct servent *result, char *buffer,
+ int buflen);
+int setservent(int stayopen);
+int endservent(void);
+These functions are used to obtain entries for Internet services. An entry may come from any of the sources for ser<hy>
+vices specified in the /etc/nsswitch.conf file. See nsswitch.conf(4).
+The getservbyname() and getservbyport() functions sequentially search from the beginning of the file until a
+matching protocol name or port number is found, or until end-of-file is encountered. If a protocol name is also
+supplied (non-null), searches must also match the protocol.
+The getservbyname() function searches for an entry with the Internet service name specified by the name parameter.
+The getservbyport() function searches for an entry with the Internet port number port.
+All addresses are returned in network order. In order to interpret the addresses, byteorder(3SOCKET) must be used
+for byte order conversion. The string proto is used by both getservbyname() and getservbyport() to restrict the
+search to entries with the specified protocol. If proto is NULL, entries with any protocol can be returned.
+The functions setservent(), getservent(), and endservent() are used to enumerate entries from the services database.
+The setservent() function sets (or resets) the enumeration to the beginning of the set of service entries. This function
+should be called before the first call to getservent(). Calls to the functions getservbyname() and getservbyport()
+leave the enumeration position in an indeterminate state. If the stayopen flag is non-zero, the system may keep allo<hy>
+cated resources such as open file descriptors until a subsequent call to endservent().
+The getservent() function reads the next line of the file, opening the file if necessary. getservent() opens and
+rewinds the file. If the stayopen flag is non-zero, the net data base will not be closed after each call to getservent()
+(either directly, or indirectly through one of the other "getserv"calls).
+Successive calls to getservent() return either successive entries or NULL, indicating the end of the enumeration.
+The endservent() function closes the file. The endservent() function can be called to indicate that the caller expects
+to do no further service entry retrieval operations; the system can then deallocate resources it was using. It is still al<hy>
+lowed, but possibly less efficient, for the process to call more service entry retrieval functions after calling endser<hy>
+vent().
+The functions getservbyname(), getservbyport(), and getservent() use static storage that is re-used in each call,
+making these functions unsafe for use in multithreaded applications.
+The functions getservbyname_r(), getservbyport_r(), and getservent_r() provide reentrant interfaces for these op<hy>
+erations.
+Each reentrant interface performs the same operation as its non-reentrant counterpart, named by removing the "_r"
+suffix. The reentrant interfaces, however, use buffers supplied by the caller to store returned results, and are safe for
+<beginning of page>
+use in both single-threaded and multithreaded applications.
+Each reentrant interface takes the same parameters as its non-reentrant counterpart, as well as the following addi<hy>
+tional parameters. The parameter result must be a pointer to a struct servent structure allocated by the caller. On
+successful completion, the function returns the service entry in this structure. The parameter buffer must be a pointer
+to a buffer supplied by the caller. This buffer is used as storage space for the service entry data. All of the pointers
+within the returned struct servent result point to data stored within this buffer. See the RETURN VALUES section
+of this manual page. The buffer must be large enough to hold all of the data associated with the service entry. The
+parameter buflen should give the size in bytes of the buffer indicated by buffer.
+For enumeration in multithreaded applications, the position within the enumeration is a process-wide property
+shared by all threads. The setservent() function can be used in a multithreaded application but resets the enumera<hy>
+tion position for all threads. If multiple threads interleave calls to getservent_r(), the threads will enumerate disjoint
+subsets of the service database.
+Like their non-reentrant counterparts, getservbyname_r() and getservbyport_r() leave the enumeration position in
+an indeterminate state.
+Service entries are represented by the struct servent structure defined in <netdb.h>:
+ struct servent {
+  char *s_name;   /* official name of service */
+  char **s_aliases;   /* alias list */
+  int s_port;    /* port service resides at */
+  char *s_proto;   /* protocol to use */
+ };
+The members of this structure are:
+s_name The official name of the service.
+s_aliases A zero terminated list of alternate names for the service.  
+s_port The port number at which the service resides. Port numbers are    returned in net<hy>
+work byte order.  
+s_proto The name of the protocol to use when contacting the service
+The functions getservbyname(), getservbyname_r(), getservbyport(), and getservbyport_r() each return a pointer
+to a struct servent if they successfully locate the requested entry; otherwise they return NULL.
+The functions getservent() and getservent_r() each return a pointer to a struct servent if they successfully enumer<hy>
+ate an entry; otherwise they return NULL, indicating the end of the enumeration.
+The functions getservbyname(), getservbyport(), and getservent() use static storage, so returned data must be
+copied before a subsequent call to any of these functions if the data is to be saved.
+When the pointer returned by the reentrant functions getservbyname_r(), getservbyport_r(), and getservent_r() is
+non-null, it is always equal to the result pointer that was supplied by the caller.
+The reentrant functions getservbyname_r(), getservbyport_r(), and getservent_r() return NULL and set errno to
+ERANGE if the length of the buffer supplied by caller is not large enough to store the result. See Intro(2) for the
+proper usage and interpretation of errno in multithreaded applications.
+/etc/services Internet network services
+/etc/netconfig network configuration file
+<beginning of page>
+/etc/nsswitch.conf configuration file for the name-service switch
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelT{ See
+"Reentrant Interfaces" in DESCRIPTION. T}
+Intro(2), Intro(3), byteorder(3SOCKET), netdir(3NSL), netconfig(4), nsswitch.conf(4), services(4), at<hy>
+tributes(5), netdb.h(3HEAD)
+The reentrant interfaces getservbyname_r(), getservbyport_r(), and getservent_r() are included in this release on
+an uncommitted basis only, and are subject to change or removal in future minor releases.
+The functions that return struct servent return the least significant 16-bits of the s_port field in network byte order.
+getservbyport() and getservbyport_r() also expect the input parameter port in the network byte order. See
+htons(3SOCKET) for more details on converting between host and network byte orders.
+To ensure that they all return consistent results, getservbyname(), getservbyname_r(), and netdir_getbyname()
+are implemented in terms of the same internal library function. This function obtains the system-wide source lookup
+policy based on the inet family entries in netconfig(4) and the services: entry in nsswitch.conf(4). Similarly, get<hy>
+servbyport(), getservbyport_r(), and netdir_getbyaddr() are implemented in terms of the same internal library
+function. If the inet family entries in netconfig(4) have a ``-'' in the last column for nametoaddr libraries, then the
+entry for services in nsswitch.conf will be used; otherwise the nametoaddr libraries in that column will be used, and
+nsswitch.conf will not be consulted.
+There is no analogue of getservent() and getservent_r() in the netdir functions, so these enumeration functions go
+straight to the services entry in nsswitch.conf. Thus enumeration may return results from a different source than that
+used by getservbyname(), getservbyname_r(), getservbyport(), and getservbyport_r().
+When compiling multithreaded applications, see Intro(3), Notes On Multithread Applications, for information
+about the use of the _REENTRANT flag.
+Use of the enumeration interfaces getservent() and getservent_r() is discouraged; enumeration may not be support<hy>
+ed for all database sources. The semantics of enumeration are discussed further in nsswitch.conf(4).

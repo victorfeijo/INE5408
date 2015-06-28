@@ -1,0 +1,109 @@
+<beginning of page>
+plgrp <-> observe and affect home lgroup and lgroup affinities of threads
+plgrp [-F] [-h] pid | core [/lwps] ...
+plgrp [-F] -a lgroup_list pid[/lwps] ...
+plgrp [-F] -H lgroup_list pid[/lwps] ...
+plgrp [-F] -A lgroup_list/none | weak |strong [,...] pid
+ [/lwps] ...
+plgrp displays or sets the home lgroup and lgroup affinities for one or more processes, threads, or LWPs.
+An lgroup represents the set of CPU and memory-like hardware devices that are at most some distance (latency)
+apart from each other. Each lgroup in the system is identified by a unique lgroup ID. The lgroups are organized in<hy>
+to a hierarchy to facilitate finding the nearest resources (see lgrpinfo(1) for more about lgroups and the lgroup hier<hy>
+archy).
+By default, each thread is assigned a home lgroup upon creation. When the system needs to allocate a CPU or mem<hy>
+ory resource for a thread, it searches the lgroup hierarchy from the thread's home lgroup for the nearest available re<hy>
+sources to the thread's home.
+Typically, the home lgroup for a thread is the lgroup for which the thread has the most affinity. Initially, the system
+chooses a home lgroup for each thread, but leaves the thread's affinity for that lgroup set to none. If a thread sets a
+stronger affinity for an lgroup in its processor set other than its home, the thread is rehomed to that lgroup as long as
+the thread is not bound to a CPU. The thread can be re-homed to the lgroup in its processor set with the next highest
+affinity when the affinity (if any) for its home lgroup is removed (set to none).
+The different levels of lgroup affinities and their semantics are fully described in lgrp_affinity_set(3LGRP).
+lgroup_list is a comma separated list of one or more of the following:
+ - lgroup_ID
+ - Range of lgroup_IDs specified as
+  <start lgroup_ID>-<end lgroup_ID>
+ - all
+ - root
+ - leaves
+The all keyword represents all lgroup IDs in the system. The root keyword represents the ID of the root lgroup. The
+leaves keyword represents the IDs of all leaf lgroups, that is, lgroups which do not have any children.
+plgrp takes one or more space separated processes or threads as arguments. Processes and threads can be specified
+in a manner similiar to the proc(1) tools. A process ID may be specified as an integer pid or /proc/pid. Shell expan<hy>
+sions can be used to specify processes when /proc/pid is used. For example, /proc/* can be used to specify all the
+processes in the system. If a process ID is given alone, then all the threads of the process are included as arguments
+to plgrp.
+A thread can be explicitly specified with its process ID and thread ID given together as pid/lwpid. Multiple threads
+of a process can be selected at once by using the hyphen (-) and comma(,). For example, pid/1,2,7-9 specifies threads
+1, 2, 7, 8, and 9 of the process with pid as its process ID.
+The following options are supported:
+-a lgroup_list
+Display lgroup affinities of specified processes or threads for the specified lgroup_list.
+-A lgroup_list/none|weak|strong[,...]
+Set affinity of specified processes or threads for the specified lgroup_list.
+A comma separated list of lgroups/affinity assignments can be given to set several affinities at once.
+<beginning of page>
+-F
+Force by grabbing the target process even if another process has control. Caution should be exercised when using the
+-F flag. Imposing two controlling processes on one victim process can lead to chaos. Safety is assured only when the
+primary controlling process (typically a debugger) has stopped the victim process, but isn't doing anything during
+the application of this proc tool. See WARNINGS for more details.
+-h
+Get home lgroup of specified processes and/or threads. If no options are specified, this is the default.
+-H lgroup_list
+Set home lgroup of specified processes and threads.
+This sets a strong affinity for the desired lgroup to rehome the threads. If more than one lgroup is specified, plgrp
+tries to home the threads to the lgroups in a round robin fashion.
+The following operands are supported:
+lwps Specifies thread. See USAGE.
+pid Specifies process ID. See USAGE.
+Example 1 Getting the Home lgroup for the Shell
+The following example gets the home lgroup for the shell:
+ % plgrp $$
+ PID/LWPID HOME
+ 3401/1 1
+Example 2 Setting the Home lgroup of Multiple Threads to the Root lgroup
+The following example sets the home lgroup of multiple threads to the root lgroup:
+ % plgrp -H root `pgrep firefox`
+  PID/LWPID HOME
+  918/1 1 => 0
+  934/1 2 => 0
+  934/2 1 => 0
+  934/3 2 => 0
+  934/625 1 => 0
+  934/626 2 => 0
+  934/624 2 => 0
+  934/623 2 => 0
+  934/630 1 => 0
+Example 3 Getting Two Threads' Affinities for lgroups 0-2
+The following example gets two threads' affinities for lgroups 1-2:
+ % plgrp -a 0-2 101398/1 101337/1
+ PID/LWPID HOME AFFINITY
+ 101398/1 1 0-2/none
+ 101337/1 1 0-2/none
+<beginning of page>
+Example 4 Setting lgroup Affinities
+The following example sets lgroup affinities:
+ % plgrp -A 0/weak,1/none,2/strong 101398
+ PID/LWPID HOME AFFINITY
+ 101398/1 1 => 2 0,2/none => 2/strong,0/weak
+The following exit values are returned:
+0 Successful completion.
+1 Syntax error. Nothing was changed.
+2 Non-fatal error or interrupt. Something might have changed.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wesu _ Interface StabilitySee below.
+The command syntax is Unstable. The output formats are Unstable.
+lgrpinfo(1), madv.so.1(1), pmadvise(1), pmap(1), proc(1), ps(1), prstat(1M), lgrp_affinity_get(3LGRP),
+lgrp_affinity_set(3LGRP), lgrp_home(3LGRP), liblgrp(3LIB), proc(4), attributes(5)
+Like the proc(1) tools, the plgrp utility stops its target processes while inspecting them and reports the results when
+invoked with any option.
+There are conditions under which processes can deadlock. A process can do nothing while it is stopped. Stopping a
+heavily used process in a production environment (even for a short amount of time) can cause severe bottlenecks and
+even hangs of these processes, making them to be unavailable to users. Thus, stopping a UNIX process in a produc<hy>
+tion environment should be avoided. See proc(1).
+A process that is stopped by this tool might be identified by issuing the following command:
+ /usr/bin/ps -eflL
+and looking for a T in the first column of the output. Certain processes, for example, sched, can show the T status by
+default most of the time.

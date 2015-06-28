@@ -1,0 +1,101 @@
+<beginning of page>
+mmap <-> check virtual mapping for memory mapped device
+#include <sys/types.h>
+#include <sys/cred.h>
+#include <sys/mman.h>
+#include <sys/ddi.h>
+int prefixmmap(dev_t dev, off_t off, int prot);
+This interface is obsolete. devmap(9E) should be used instead.
+dev Device whose memory is to be mapped.
+off Offset within device memory at which mapping begins.
+prot A bit field that specifies the protections this page of memory will receive. Possible settings are:
+PROT_READ Read access will be granted.
+PROT_WRITE Write access will be granted.
+PROT_EXEC Execute access will be granted.
+PROT_USER User-level access will be granted.
+PROT_ALL All access will be granted.
+Future releases of Solaris will provide this function for binary and source compatibility. However, for increased
+functionality, use devmap(9E) instead. See devmap(9E) for details.
+The mmap() entry point is a required entry point for character drivers supporting memory-mapped devices. A mem<hy>
+ory mapped device has memory that can be mapped into a process's address space. The mmap(2) system call, when
+applied to a character special file, allows this device memory to be mapped into user space for direct access by the
+user application.
+The mmap() entry point is called as a result of an mmap(2) system call, and also as a result of a page fault. mmap()
+is called to translate the offset off in device memory to the corresponding physical page frame number.
+The mmap() entry point checks if the offset off is within the range of pages exported by the device. For example, a
+device that has 512 bytes of memory that can be mapped into user space should not support offsets greater than 512.
+If the offset does not exist, then -1 is returned. If the offset does exist, mmap() returns the value returned by
+hat_getkpfnum(9F) for the physical page in device memory containing the offset off.
+hat_getkpfnum(9F) accepts a kernel virtual address as an argument. A kernel virtual address can be obtained by
+calling ddi_regs_map_setup(9F) in the driver's attach(9E) routine. The corresponding ddi_regs_map_free(9F)
+call can be made in the driver's detach(9E) routine. Refer to the example below mmap Entry Point for more infor<hy>
+mation.
+mmap() should only be supported for memory-mapped devices. See segmap(9E) for further information on memo<hy>
+ry-mapped device drivers.
+If a device driver shares data structures with the application, for example through exported kernel memory, and the
+driver gets recompiled for a 64-bit kernel but the application remains 32-bit, the binary layout of any data structures
+will be incompatible if they contain longs or pointers. The driver needs to know whether there is a model mismatch
+between the current thread and the kernel and take necessary action. ddi_mmap_get_model(9F) can be use to get
+the C Language Type Model which the current thread expects. In combination with ddi_model_convert_from(9F)
+<beginning of page>
+the driver can determine whether there is a data model mismatch between the current thread and the device driver.
+The device driver might have to adjust the shape of data structures before exporting them to a user thread which sup<hy>
+ports a different data model. See ddi_mmap_get_model(9F) for an example.
+If the protection and offset are valid for the device, the driver should return the value returned by
+hat_getkpfnum(9F), for the page at offset off in the device's memory. If not, -1 should be returned. Example 1
+mmap() Entry Point
+The following is an example of the mmap() entry point. If offset off is valid, hat_getkpfnum(9F) is called to obtain
+the page frame number corresponding to this offset in the device's memory. In this example, xsp<->>regp<->>csr is a
+kernel virtual address which maps to device memory. ddi_regs_map_setup(9F) can be used to obtain this address.
+For example, ddi_regs_map_setup(9F) can be called in the driver's attach(9E) routine. The resulting kernel virtual
+address is stored in the xxstate structure, which is accessible from the driver's mmap() entry point. See
+ddi_soft_state(9F). The corresponding ddi_regs_map_free(9F) call can be made in the driver's detach(9E) rou<hy>
+tine.
+ struct reg {
+   uint8_t csr;
+   uint8_t data;
+ };
+ struct xxstate {
+  ...
+   struct reg *regp
+  ...
+ };
+ struct xxstate *xsp;
+ ...
+ static int
+ xxmmap(dev_t dev, off_t off, int prot)
+ {
+  int  instance;
+  struct xxstate *xsp;
+  /* No write access */
+  if (prot & PROT_WRITE)
+    return (-1);
+  instance = getminor(dev);
+  xsp = ddi_get_soft_state(statep, instance);
+  if (xsp == NULL)
+    return (-1);
+  /* check for a valid offset */
+   if ( off is invalid )
+    return (-1);
+   return (hat_getkpfnum (xsp->regp->csr + off));
+ }
+See attributes(5) for a description of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Stability Level<hy>
+Obsolete
+mmap(2), attributes(5), attach(9E), detach(9E), devmap(9E), segmap(9E), ddi_btop(9F),
+ddi_get_soft_state(9F), ddi_mmap_get_model(9F), ddi_model_convert_from(9F), ddi_regs_map_free(9F),
+ddi_regs_map_setup(9F), ddi_soft_state(9F), devmap_setup(9F), getminor(9F), hat_getkpfnum(9F)
+Writing Device Drivers
+<beginning of page>
+For some devices, mapping device memory in the driver's attach(9E) routine and unmapping device memory in the
+driver's detach(9E) routine is a sizeable drain on system resources. This is especially true for devices with a large
+amount of physical address space.
+One alternative is to create a mapping for only the first page of device memory in attach(9E). If the device memory
+is contiguous, a kernel page frame number may be obtained by calling hat_getkpfnum(9F) with the kernel virtual
+address of the first page of device memory and adding the desired page offset to the result. The page offset may be
+obtained by converting the byte offset off to pages. See ddi_btop(9F).
+Another alternative is to call ddi_regs_map_setup(9F) and ddi_regs_map_free(9F) in mmap(). These function
+calls would bracket the call to hat_getkpfnum(9F).
+However, note that the above alternatives may not work in all cases. The existence of intermediate nexus devices
+with memory management unit translation resources that are not locked down may cause unexpected and undefined
+behavior.

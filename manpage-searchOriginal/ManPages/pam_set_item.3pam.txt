@@ -1,0 +1,65 @@
+<beginning of page>
+pam_set_item, pam_get_item <-> authentication information routines for PAM
+cc [ flag ... ] file ... -lpam [ library ... ]
+#include <security/pam_appl.h>
+int pam_set_item(pam_handle_t *pamh, int item_type,
+ const void *item);
+int pam_get_item(const pam_handle_t *pamh, int item_type,
+ void **item);
+The pam_get_item() and pam_set_item() functions allow applications and PAM service modules to access and to
+update PAM information as needed. The information is specified by item_type, and can be one of the following:
+PAM_AUSER The authenticated user name. Applications that are trusted to correctly identify the authenticated us<hy>
+er should set this item to the authenticated user name. See NOTES and pam_unix_cred(5).
+PAM_AUTHTOK The user authentication token.
+PAM_CONV The pam_conv structure.
+PAM_OLDAUTHTOK The old user authentication token.
+PAM_RESOURCE A semicolon-separated list of key=value pairs that represent the set of resource controls for ap<hy>
+plication by pam_setcred(3PAM) or pam_open_session(3PAM). See the individual service module definitions,
+such as pam_unix_cred(5), for interpretations of the keys and values.
+PAM_RHOST The remote host name.
+PAM_RUSER The rlogin/rsh untrusted remote user name.
+PAM_SERVICE The service name.
+PAM_TTY The tty name.
+PAM_USER The user name.
+PAM_USER_PROMPT The default prompt used by pam_get_user().
+PAM_REPOSITORY The repository that contains the authentication token information.
+The pam_repository structure is defined as:
+ struct pam_repository {
+  char *type; /* Repository type, e.g., files, */
+  /* nis, ldap */
+  void *scope; /* Optional scope information */
+  size_t scope_len; /* length of scope information */
+ };
+The item_type PAM_SERVICE can be set only by pam_start() and is read-only to both applications and service
+modules.
+<beginning of page>
+For security reasons, the item_type PAM_AUTHTOK and PAM_OLDAUTHTOK are available only to the module
+providers. The authentication module, account module, and session management module should treat PAM_AUTH<hy>
+TOK as the current authentication token and ignore PAM_OLDAUTHTOK. The password management module
+should treat PAM_OLDAUTHTOK as the current authentication token and PAM_AUTHTOK as the new authenti<hy>
+cation token.
+The pam_set_item() function is passed the authentication handle, pamh, returned by pam_start(), a pointer to the
+object, item, and its type, item_type. If successful, pam_set_item() copies the item to an internal storage area allo<hy>
+cated by the authentication module and returns PAM_SUCCESS. An item that had been previously set will be
+overwritten by the new value.
+The pam_get_item() function is passed the authentication handle, pamh, returned by pam_start(), an item_type,
+and the address of the pointer, item, which is assigned the address of the requested object. The object data is valid
+until modified by a subsequent call to pam_set_item() for the same item_type, or unless it is modified by any of the
+underlying service modules. If the item has not been previously set, pam_get_item() returns a null pointer. An item
+retrieved by pam_get_item() should not be modified or freed. The item will be released by pam_end().
+Upon success, pam_get_item() returns PAM_SUCCESS; otherwise it returns an error code. Refer to pam(3PAM)
+for information on error related return values.
+See attributes(5) for description of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability
+Stable _ MT-LevelMT-Safe with exceptions
+The functions in libpam(3LIB) are MT-Safe only if each thread within the multithreaded application uses its own
+PAM handle.
+libpam(3LIB), pam(3PAM), pam_acct_mgmt(3PAM), pam_authenticate(3PAM), pam_chauthtok(3PAM),
+pam_get_user(3PAM), pam_open_session(3PAM), pam_setcred(3PAM), pam_start(3PAM), attributes(5),
+pam_unix_cred(5)
+If the PAM_REPOSITORY item_type is set and a service module does not recognize the type, the service module
+does not process any information, and returns PAM_IGNORE. If the PAM_REPOSITORY item_type is not set, a
+service module performs its default action.
+PAM_AUSER is not intended as a replacement for PAM_USER. It is expected to be used to supplement PAM_US<hy>
+ER when there is an authenticated user from a source other than pam_authenticate(3PAM). Such sources could be
+sshd host-based authentication, kerberized rlogin, and su(1M).

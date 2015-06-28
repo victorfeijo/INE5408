@@ -1,0 +1,115 @@
+<beginning of page>
+ddi_dma_attr <-> DMA attributes structure
+#include <sys/ddidmareq.h>
+Solaris DDI specific (Solaris DDI)
+A ddi_dma_attr_t structure describes device- and DMA engine-specific attributes necessary to allocate DMA re<hy>
+sources for a device. The driver might have to extend the attributes with bus-specific information, depending on the
+bus to which the device is connected.
+ uint_t dma_attr_version; /* version number */
+ uint64_t dma_attr_addr_lo; /* low DMA address range */
+ uint64_t dma_attr_addr_hi; /* high DMA address range */
+ uint64_t dma_attr_count_max; /* DMA counter register */
+ uint64_t dma_attr_align; /* DMA address alignment */
+ uint_t dma_attr_burstsizes; /* DMA burstsizes */
+ uint32_t dma_attr_minxfer; /* min effective DMA size */
+ uint64_t dma_attr_maxxfer; /* max DMA xfer size */
+ uint64_t dma_attr_seg; /* segment boundary */
+ int dma_attr_sgllen; /* s/g list length */
+ uint32_t dma_attr_granular; /* granularity of device */
+ uint_t dma_attr_flags; /* DMA transfer flags */
+The dma_attr_version stores the version number of this DMA attribute structure. It should be set to DMA_AT<hy>
+TR_V0.
+The dma_attr_addr_lo and dma_attr_addr_hi fields specify the address range the device's DMA engine can ac<hy>
+cess. The dma_attr_addr_lo field describes the inclusive lower 64-bit boundary. The dma_attr_addr_hi describes
+the inclusive upper 64-bit boundary. The system ensures that allocated DMA resources are within the range speci<hy>
+fied. See ddi_dma_cookie(9S).
+The dma_attr_count_max describes an inclusive upper bound for the device's DMA counter register. For example,
+0xFFFFFF would describe a DMA engine with a 24-bit counter register. DMA resource allocation functions have
+to break up a DMA object into multiple DMA cookies if the size of the object exceeds the size of the DMA counter
+register.
+The dma_attr_align specifies alignment requirements for allocated DMA resources. This field can be used to force
+more restrictive alignment than imposed by dma_attr_burstsizes or dma_attr_minxfer, such as alignment at a
+page boundary. Most drivers set this field to 1, indicating byte alignment.
+The dma_attr_align only specifies alignment requirements for allocated DMA resources. The buffer passed to
+ddi_dma_addr_bind_handle(9F) or ddi_dma_buf_bind_handle(9F) must have an equally restrictive alignment
+(see ddi_dma_mem_alloc(9F)).
+The dma_attr_burstsizes field describes the possible burst sizes the DMA engine of a device can accept. The for<hy>
+mat of the data sizes is binary, encoded in terms of powers of two. When DMA resources are allocated, the system
+can modify the burstsizes value to reflect the system limits. The driver must use the allowable burstsizes to program
+the DMA engine. See ddi_dma_burstsizes(9F).
+The dma_attr_minxfer field describes the minimum effective DMA access size in units of bytes. DMA resources
+can be modified, depending on the presence and use of I/O caches and write buffers between the DMA engine and
+the memory object. This field is used to determine alignment and padding requirements for ddi_dma_mem_al<hy>
+loc(9F).
+The dma_attr_maxxfer field describes the maximum effective DMA access size in units of bytes.
+The dma_attr_seg field specifies segment boundary restrictions for allocated DMA resources. The system allocates
+DMA resources for the device so that the object does not span the segment boundary specified by dma_attr_seg.
+For example, a value of 0xFFFF means DMA resources must not cross a 64-Kbyte boundary. DMA resource alloca<hy>
+tion functions might have to break up a DMA object into multiple DMA cookies to enforce segment boundary re<hy>
+strictions. In this case, the transfer must be performed using scatter-gather I/O or multiple DMA windows.
+The dma_attr_sgllen field describes the length of the DMA scatter/gather list of a device. Possible values are as fol<hy>
+lows:
+<beginning of page>
+< 0 Device DMA engine is not constrained by the size, for example, withDMA chaining.
+= 0 Reserved.
+= 1 Device DMA engine does not support scatter/gather such as third party DMA.
+> 1 Device DMA engine uses scatter/gather. The dma_attr_sgllen value is the maximum number of entries in the
+list.
+The dma_attr_granular field describes the granularity of the device transfer size in units of bytes. When the system
+allocates DMA resources, the size of a single segment is a multiple of the device granularity. If dma_attr_sgllen is
+larger than 1 within a window, the sum of the sizes for a subgroup of segments is a multiple of the device granulari<hy>
+ty.
+All driver requests for DMA resources must be a multiple of the granularity of the device transfer size.
+The dma_attr_flags field can be set to a combination of:
+DDI_DMA_FORCE_PHYSICAL
+Some platforms, such as SPARC systems, support what is called Direct Virtual Memory Access (DVMA). On these
+platforms, the device is provided with a virtual address by the system in order to perform the transfer. In this case,
+the underlying platform provides an IOMMU, which translates accesses to these virtual addresses into the proper
+physical addresses. Some of these platforms also support DMA. DDI_DMA_FORCE_PHYSICAL indicates that
+the system should return physical rather than virtual I/O addresses if the system supports both. If the system does
+not support physical DMA, the return value from ddi_dma_alloc_handle(9F) is DDI_DMA_BADATTR. In this
+case, the driver has to clear DDI_DMA_FORCE_PHYSICAL and retry the operation.
+DDI_DMA_FLAGERR
+Using this value indicates that the driver is hardened: able to cope with the incorrect results of DMA operations that
+might result from an I/O fault. The value also indicates that the driver will use ddi_fm_dma_err_get(9F) to check
+DMA handles for faults on a regular basis.
+If a DMA error is detected during a DMA access to an area mapped by such a handle, the system should not panic if
+possible, but should instead mark the DMA handle as having faulted.
+This value is advisory: it tells the system that the driver can continue in the face of I/O faults. It does not guarantee
+that the system will not panic, as that depends on the nature of the fault and the capabilities of the system. It is quite
+legitimate for an implementation to ignore this flag and panic anyway.
+DDI_DMA_RELAXED_ORDERING
+This optional flag can be set if the DMA transactions associated with this handle are not required to observe strong
+DMA write ordering among themselves, nor with DMA write transactions of other handles.
+The flag allows the host bridge to transfer data to and from memory more efficiently and might result in better DMA
+performance on some platforms.
+Drivers for devices with hardware support, such as marking the bus transactions relaxed ordered, should not use this
+flag. Such drivers should use the hardware capability instead.
+Example 1 Initializing the ddi_dma_attr_t Structure
+Assume a device has the following DMA characteristics: <bu> Full 32-bit range addressable <bu> 24-bit DMA counter reg<hy>
+ister <bu> Byte alignment <bu> 4- and 8-byte burst sizes support <bu> Minimum effective transfer size of 1 bytes <bu> 64 Mbyte mi<hy>
+nus 1 (26-bit) maximum transfer size limit <bu> Maximum segment size of 32 Kbyte <bu> 17 scatter/gather list elements <bu>
+512-byte device transfer size granularity
+The corresponding ddi_dma_attr_t structure is initialized as follows:
+<beginning of page>
+ static ddi_dma_attr_t dma_attrs = {
+  DMA_ATTR_V0 /* version number */
+  (uint64_t)0x0, /* low address */
+  (uint64_t)0xffffffff, /* high address */
+  (uint64_t)0xffffff, /* DMA counter max */
+  (uint64_t)0x1 /* alignment */
+  0x0c, /* burst sizes */
+  0x1, /* minimum transfer size */
+  (uint64_t)0x3ffffff, /* maximum transfer size */
+  (uint64_t)0x7fff, /* maximum segment size */
+  17, /* scatter/gather list lgth */
+  512 /* granularity */
+  0 /* DMA flags */
+ };
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed
+attributes(5), ddi_dma_addr_bind_handle(9F), ddi_dma_alloc_handle(9F), ddi_dma_buf_bind_handle(9F),
+ddi_dma_burstsizes(9F), ddi_dma_mem_alloc(9F), ddi_dma_nextcookie(9F), ddi_fm_dma_err_get(9F),
+ddi_dma_cookie(9S)
+Writing Device Drivers

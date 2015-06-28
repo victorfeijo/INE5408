@@ -1,0 +1,81 @@
+<beginning of page>
+udp, UDP <-> Internet User Datagram Protocol
+#include <sys/socket.h>
+#include <netinet/in.h>
+s = socket(AF_INET, SOCK_DGRAM, 0);
+s = socket(AF_INET6, SOCK_DGRAM, 0);
+t = t_open("/dev/udp", O_RDWR);
+t = t_open("/dev/udp6", O_RDWR);
+UDP is a simple datagram protocol which is layered directly above the Internet Protocol ("IP") or the Internet Proto<hy>
+col Version 6 ("IPv6"). Programs may access UDP using the socket interface, where it supports the
+SOCK_DGRAM socket type, or using the Transport Level Interface ("TLI"), where it supports the connectionless
+(T_CLTS) service type.
+Within the socket interface, UDP is normally used with the sendto(), sendmsg(), recvfrom(), and recvmsg() calls
+(see send(3SOCKET) and recv(3SOCKET)). If the connect(3SOCKET) call is used to fix the destination for future
+packets, then the recv(3SOCKET) or read(2) and send(3SOCKET) or write(2) calls may be used.
+UDP address formats are identical to those used by the Transmission Control Protocol ("TCP"). Like TCP, UDP us<hy>
+es a port number along with an IPor IPv6 address to identify the endpoint of communication. The UDP port number
+space is separate from the TCP port number space, that is, a UDP port may not be "connected" to a TCP port. The
+bind(3SOCKET) call can be used to set the local address and port number of a UDP socket. The local IP or IPv6
+address may be left unspecified in the bind() call by using the special value INADDR_ANY for IP, or the unspeci<hy>
+fied address (all zeroes) for IPv6. If the bind() call is not done, a local IP or IPv6 address and port number will be
+assigned to the endpoint when the first packet is sent. Broadcast packets may be sent, assuming the underlying net<hy>
+work supports this, by using a reserved "broadcast address" This address is network interface dependent. Broadcasts
+may only be sent by the privileged user.
+Note that no two UDP sockets can be bound to the same port unless the bound IP addresses are different. IPv4 IN<hy>
+ADDR_ANY and IPv6 unspecified addresses compare as equal to any IPv4 or IPv6 address. For example, if a sock<hy>
+et is bound to INADDR_ANY or unspecified address and port X, no other socket can bind to port X, regardless of
+the binding address. This special consideration of INADDR_ANY and unspecified address can be changed using
+the SO_REUSEADDR socket option. If SO_REUSEADDR is set on a socket doing a bind, IPv4 INADDR_ANY
+and IPv6 unspecified address do not compare as equal to any IP address. This means that as long as the two sockets
+are not both bound to INADDR_ANY/unspecified address or the same IP address, the two sockets can be bound to
+the same port.
+If an application does not want to allow another socket using the SO_REUSEADDR option to bind to a port its
+socket is bound to, the application can set the socket level option SO_EXCLBIND on a socket. The option values of
+0 and 1 represent enabling and disabling the option, respectively. Once this option is enabled on a socket, no other
+socket can be bound to the same port.
+IPv6 does not support broadcast addresses; their function is supported by IPv6 multicast addresses.
+Options at the IP level may be used with UDP. See ip(7P) or ip6(7P). Additionally, there is one UDP-level option of
+interest to IPsec Key Management applications (see ipsec(7P)and pf_key(7P)):
+UDP_NAT_T_ENDPOINT
+If this boolean option is set, datagrams sent via this socket will have a non-ESP marker inserted between the UDP
+header and the data. Likewise, inbound packets that match the endpoint's local-port will be demultiplexed between
+ESP or the endpoint itself if a non-ESP marker is present. This option is only available on IPv4 sockets (AF_INET),
+and the application must have sufficient privilege to use PF_KEY sockets to also enable this option.
+There are a variety of ways that a UDP packet can be lost or corrupted, including a failure of the underlying commu<hy>
+nication mechanism. UDP implements a checksum over the data portion of the packet. If the checksum of a received
+packet is in error, the packet will be dropped with no indication given to the user. A queue of received packets is pro<hy>
+vided for each UDP socket. This queue has a limited capacity. Arriving datagrams which will not fit within its high-
+water capacity are silently discarded.
+UDP processes Internet Control Message Protocol ("ICMP") and Internet Control Message Protocol Version 6
+<beginning of page>
+("ICMP6") error messages received in response to UDP packets it has sent. See icmp(7P) and icmp6(7P).
+ICMP "source quench" messages are ignored. ICMP "destination unreachable," "time exceeded" and "parameter
+problem" messages disconnect the socket from its peer so that subsequent attempts to send packets using that socket
+will return an error. UDP will not guarantee that packets are delivered in the order they were sent. As well, duplicate
+packets may be generated in the communication process.
+ICMP6 "destination unreachable" packets are ignored unless the enclosed code indicates that the port is not in use
+on the target host, in which case, the application is notified. ICMP6 "parameter problem" notifications are similarly
+passed upstream. All other ICMP6 messages are ignored.
+read(2), write(2), bind(3SOCKET), connect(3SOCKET), recv(3SOCKET), send(3SOCKET), icmp(7P),
+icmp6(7P), inet(7P), inet6(7P), ip(7P), ipsec(7P), ip6(7P), pf_key(7P), tcp(7P)
+Postel, Jon, RFC 768, User Datagram Protocol, Network Information Center, SRI International, Menlo Park, Calif.,
+August 1980
+Huttunen, A., Swander, B., Volpe, V., DiBurro, L., Stenberg, M., RFC 3948, UDP Encapsulation of IPsec ESP Pack<hy>
+ets, The Internet Society, 2005.
+A socket operation may fail if:
+EISCONN A connect() operation was attempted on a socket on which a connect() operation had already been per<hy>
+formed, and the socket could not be successfully disconnected before making the new connection.
+EISCONN A sendto() or sendmsg() operation specifying an address to which the message should be sent was at<hy>
+tempted on a socket on which a connect() operation had already been performed.
+ENOTCONN A send() or write() operation, or a sendto() or sendmsg() operation not specifying an address to
+which the message should be sent, was attempted on a socket on which a connect() operation had not already been
+performed.
+EADDRINUSE A bind() operation was attempted on a socket with a network address/port pair that has already
+been bound to another socket.
+EADDRNOTAVAIL A bind() operation was attempted on a socket with a network address for which no network
+interface exists.
+EINVAL A sendmsg() operation with a non-NULL msg_accrights was attempted.
+EACCES A bind() operation was attempted with a "reserved" port number and the effective user ID of the process
+was not the privileged user.
+ENOBUFS The system ran out of memory for internal data structures.

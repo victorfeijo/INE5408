@@ -1,0 +1,152 @@
+<beginning of page>
+smf <-> service management facility
+The Solaris service management facility defines a programming model for providing persistently running applica<hy>
+tions called services. The facility also provides the infrastructure in which to run services. A service can represent a
+running application, the software state of a device, or a set of other services. Services are represented in the frame<hy>
+work by service instance objects, which are children of service objects. Instance objects can inherit or override the
+configuration of the parent service object, which allows multiple service instances to share configuration informa<hy>
+tion. All service and instance objects are contained in a scope that represents a collection of configuration informa<hy>
+tion. The configuration of the local Solaris instance is called the "localhost" scope, and is the only currently support<hy>
+ed scope.
+Each service instance is named with a fault management resource identifier (FMRI) with the scheme svc:. For exam<hy>
+ple, the syslogd(1M) daemon started at system startup is the default service instance named:
+ svc://localhost/system/system-log:default
+ svc:/system/system-log:default
+ system/system-log:default
+Many commands also allow FMRI abbreviations. See the svcs(1) man page for one such example.
+In the above example, 'default' is the name of the instance and 'system/system-log' is the service name. Service
+names can comprise multiple components separated by slashes (/). All components, except the last, compose the cat<hy>
+egory of the service. Site-specific services should be named with a category beginning with 'site'.
+A service instance is either enabled or disabled. All services can be enabled or disabled with the svcadm(1M) com<hy>
+mand.
+The list of managed service instances on a system can be displayed with the svcs(1) command.
+Service instances can have dependencies on a set of entities which can include services and files. Dependencies gov<hy>
+ern when the service is started and automatically stopped. When the dependencies of an enabled service are not sat<hy>
+isfied, the service is kept in the offline state. When its dependencies are satisfied, the service is started. If the start is
+successful, the service is transitioned to the online state.
+Whether a dependency is satisfied is determined by its grouping:
+require_all Satisfied when all cited services are running (online or degraded), or when all indicated files are present.
+require_any Satisfied when one of the cited services is running (online or degraded), or when at least one of the in<hy>
+dicated files is present.
+optional_all Satisfied if the cited services are running (online or degraded) or do not run without administrative ac<hy>
+tion (disabled, maintenance, not present, or offline waiting for dependencies which do not start without administra<hy>
+tive action).
+exclude_all Satisfied when all of the cited services are disabled, in the maintenance state, or when cited services or
+files are not present.
+Once running (online or degraded), if a service cited by a require_all, require_any, or optional_all dependency is
+stopped or refreshed, the SMF considers why the service was stopped and the restart_on attribute of the dependen<hy>
+cy to decide whether to stop the service.
+  | restart_on value
+ event | none error restart refresh
+ -------------------+------------------------------
+ stop due to error | no yes yes yes
+ non-error stop | no no yes yes
+ refresh | no no no yes
+A service is considered to have stopped due to an error if the service has encountered a hardware error or a software
+<beginning of page>
+error such as a core dump. For exclude_all dependencies, the service is stopped if the cited service is started and the
+restart_on attribute is not none.
+The dependencies on a service can be listed with svcs(1) or svccfg(1M), and modified with svccfg(1M).
+Each service is managed by a restarter. The master restarter, svc.startd(1M) manages states for the entire set of ser<hy>
+vice instances and their dependencies. The master restarter acts on behalf of its services and on delegated restarters
+that can provide specific execution environments for certain application classes. For instance, inetd(1M) is a delegat<hy>
+ed restarter that provides its service instances with an initial environment composed of a network connection as input
+and output file descriptors. Each instance delegated to inetd(1M) is in the online state. While the daemon of a partic<hy>
+ular instance might not be running, the instance is available to run.
+As dependencies are satisfied when instances move to the online state, svc.startd(1M) invokes start methods of oth<hy>
+er instances or directs the delegated restarter to do so. These operations might overlap.
+The current set of services and associated restarters can be examined using svcs(1). A description of the common
+configuration used by all restarters is given in smf_restarter(5).
+Each service or service instance must define a set of methods that start, stop, and, optionally, refresh the service. See
+smf_method(5) for a more complete description of the method conventions for svc.startd(1M) and similar
+fork(2)-exec(2) restarters.
+Administrative methods, such as for the capture of legacy configuration information into the repository, are dis<hy>
+cussed on the svccfg(1M) manual page.
+The methods for a service can be listed and modified using the svccfg(1M) command.
+Each service instance is always in a well-defined state based on its dependencies, the results of the execution of its
+methods, and its potential contracts events. The following states are defined:
+UNINITIALIZED This is the initial state for all service instances. Instances are moved to maintenance, offline, or a
+disabled state upon evaluation by svc.startd(1M) or the appropriate restarter.
+OFFLINE The instance is enabled, but not yet running or available to run. If restarter execution of the service start
+method or the equivalent method is successful, the instance moves to the online state. Failures might lead to a de<hy>
+graded or maintenance state. Administrative action can lead to the uninitialized state.
+ONLINE The instance is enabled and running or is available to run. The specific nature of the online state is appli<hy>
+cation-model specific and is defined by the restarter responsible for the service instance. Online is the expected oper<hy>
+ating state for a properly configured service with all dependencies satisfied. Failures of the instance can lead to a de<hy>
+graded or maintenance state. Failures of services on which the instance depends can lead to offline or degraded
+states.
+DEGRADED The instance is enabled and running or available to run. The instance, however, is functioning at a
+limited capacity in comparison to normal operation. Failures of the instance can lead to the maintenance state. Fail<hy>
+ures of services on which the instance depends can lead to offline or degraded states. Restoration of capacity should
+result in a transition to the online state.
+MAINTENANCE The instance is enabled, but not able to run. Administrative action (through svcadm clear) is re<hy>
+quired to move the instance out of the maintenance state. The maintenance state might be a temporarily reached state
+if an administrative operation is underway.
+DISABLED The instance is disabled. Enabling the service results in a transition to the offline state and eventually to
+the online state with all dependencies satisfied.
+LEGACY-RUN This state represents a legacy instance that is not managed by the service management facility. In<hy>
+stances in this state have been started at some point, but might or might not be running. Instances can only be ob<hy>
+served using the facility and are not transferred into other states.
+<beginning of page>
+States can also have transitions that result in a return to the originating state.
+The dependencies, methods, delegated restarter, and instance state mentioned above are represented as properties or
+property groups of the service or service instance. A service or service instance has an arbitrary number of property
+groups in which to store application data. Using property groups in this way allows the configuration of the applica<hy>
+tion to derive the attributes that the repository provides for all data in the facility. The application can also use the
+appropriate subset of the service_bundle(4) DTD to represent its configuration data within the framework.
+Property lookups are composed. If a property group-property combination is not found on the service instance, most
+commands and the high-level interfaces of libscf(3LIB) search for the same property group-property combination on
+the service that contains that instance. This allows common configuration among service instances to be shared.
+Composition can be viewed as an inheritance relationship between the service instance and its parent service.
+Properties are protected from modification by unauthorized processes. See smf_security(5).
+The general property group applies to all service instances. It includes the following properties:
+enabled (boolean) Specifies whether the instance is enabled. If this property is not present on an instance, SMF
+does not tell the instance's restarter about the existence of the restarter.
+restarter (fmri) The restarter for this service. See the Restarters section for more information. If this property is un<hy>
+set, the default system restarter is used.
+Historical data about each instance in the repository is maintained by the service management facility. This data is
+made available as read-only snapshots for administrative inspection and rollback. The following set of snapshot
+types might be available:
+initial Initial configuration of the instance created by the administrator or produced during package installation.
+last_import Configuration as prescribed by the manifest of the service that is taken during svccfg(1M) import oper<hy>
+ation. This snapshot provides a baseline for determining property customization.
+previous Current configuration captured when an administrative undo operation is performed.
+running The running configuration of the instance.
+start Configuration captured during a successful transition to the online state.
+The svccfg(1M) command can be used to interact with snapshots.
+Some property groups are marked as "non-persistent". These groups are not backed up in snapshots and their content
+is cleared during system boot. Such groups generally hold an active program state which does not need to survive
+system restart.
+The current state of each service instance, as well as the properties associated with services and service instances, is
+stored in a system repository managed by svc.configd(1M). This repository is transactional and able to provide pre<hy>
+vious versions of properties and property groups associated with each service or service instance.
+The repository for service management facility data is managed by svc.configd(1M).
+The information associated with a service or service instance that is stored in the configuration repository can be ex<hy>
+ported as XML-based files. Such XML files, known as service bundles, are portable and suitable for backup purpos<hy>
+es. Service bundles are classified as one of the following types:
+manifests Files that contain the complete set of properties associated with a specific set of services or service in<hy>
+stances.
+<beginning of page>
+profiles Files that contain a set of service instances and values for the enabled property (type boolean in the general
+property group) on each instance.
+Profiles can also contain configuration values for properties in services and instances. Template elements cannot be
+defined in a profile.
+Service bundles can be imported or exported from a repository using the svccfg(1M) command. See service_bun<hy>
+dle(4) for a description of the service bundle file format with guidelines for authoring service bundles.
+A service archive is an XML file that contains the description and persistent properties of every service in the reposi<hy>
+tory, excluding transient properties such as service state. This service archive is basically a 'svccfg export' for every
+service which is not limited to named services.
+An smf milestone is a service that aggregates a multiple service dependencies. Usually, a milestone does nothing
+useful itself, but declares a specific state of system-readiness on which other services can depend. One example is
+the name-services milestone, which simply depends upon the currently enabled name services.
+Startup programs in the /etc/rc?.d directories are executed as part of the corresponding run-level milestone:
+/etc/rcS.d milestone/single-user:default
+/etc/rc2.d milestone/multi-user:default
+/etc/rc3.d milestone/multi-user-server:default
+Execution of each program is represented as a reduced-functionality service instance named by the program's path.
+These instances are held in a special legacy-run state.
+These instances do not have an enabled property (type boolean in the general property group) and, generally, cannot
+be manipulated with the svcadm(1M) command. No error diagnosis or restart is done for these programs.
+svcs(1), inetd(1M), svcadm(1M), svccfg(1M), svc.configd(1M), svc.startd(1M), exec(2), fork(2), libscf(3LIB),
+strftime(3C), contract(4), service_bundle(4), smf_bootstrap(5), smf_method(5), smf_restarter(5), smf_securi<hy>
+ty(5)

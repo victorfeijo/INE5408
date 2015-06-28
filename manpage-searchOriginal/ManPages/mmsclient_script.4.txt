@@ -1,0 +1,124 @@
+<beginning of page>
+mmsclient_script <-> script file for mmsclient program
+mmsclient_script
+This man page describes the syntax of the script file that is driven by the mmsclient(1M) utility. This file contains a
+list of Media Management Protocol (MMP) commands that are used to communicate with a Media Management
+server.
+The MMP and the commands in the script file are based, in part, on IEEE 1244, the Media Management System
+(MMS) standards.
+In the script file, each MMP command must start with one of the following symbols as the first character:
+# Comment character
+Indicates the following characters document the file or command. Any character following the # character on the
+same line is ignored.
+@ Async command
+Indicates that the command on the next line is sent in async mode. Any character following the @ character on the
+same line is ignored. The MMP command to be performed must start on the next line. Commands that are not pre<hy>
+ceded with the @ character are sent in sync mode, that is, the mmsclient command waits for a response before con<hy>
+tinuing to the next MMP command in the file.
+$ Sync point
+Forces the mmsclient command to wait for a response to a previous async command. For example, if the script con<hy>
+tained an async command such as:
+ @task["Get volume Names"]
+...a subsequent command:
+ $Get volume Names
+...stops the script until the volume names are retrieved.
+> Interactive MMP prompt
+Displays a prompt on the display device and pauses the script. To respond to the prompt, type the requested informa<hy>
+tion, ending with the semicolon (;) character. The mmsclient utility then sends the information to the MMS server.
+To skip the MMP prompt, type the q character.
+% Pause the script
+The script stops until you press the Enter key.
+! Execute a command
+The mmsclient utility issues a call to system(3C) to invoke a command. Whatever command follows ! is run in the
+shell in which mmsclient is run. For example:
+ ! date
+See the shell commands in the example script below.
+Example 1 Example Script
+The following script, demo_example, demonstrates the special characters and some MMP commands. It is executed
+with default values when the command:
+<beginning of page>
+ # mmsclient -f demo _example
+...is run.
+ #mmsclient example script
+ #Send show commands in sync mode
+ show task["sync show command 1"]
+ report[DM] reportmode[namevalue]
+ number[1..2];
+ show task["sync show command 2"]
+ report[LM LIBRARY] reportmode[namevalue]
+ number[1..2];
+ #Pause the script and wait for someone to
+ #press Enter to continue
+ %
+ #send show commands in async mode
+ @
+ show task["async show command 1"]
+ report[DRIVE] reportmode[namevalue]
+ number[1..2];
+ @
+ show task["async show command 2"]
+ report[CARTRIDGE VOLUME] reportmode[namevalue]
+ number[1..2];
+ #set a sync point for the second async command,
+ #to stop the script until the response is complete
+ $async show command 2
+ #set a sync point for an unsent command and set
+ #a sync pont for a command that has already received a response.
+ #mmsclient does not stop for either one
+ $sync show command 1
+ #Start interactive MMP prompt.
+ #To continue, enter an MMP command or 'q'
+ >
+ #Register for a some events
+ notify task["notify test3"]
+ receive[tag["client connected"]
+ object[CONNECTION] action["add"]
+ match[streq(CONNECTION."Language" "MMP")]]
+ receive[tag["client disconnected"]
+ object[CONNECTION] action["delete"]
+ match[streq(CONNECTION."Language" "MMP")]]
+ receive[tag["DM connected"]
+ object[CONNECTION] action["add"]
+ match[streq(CONNECTION."Language" "DMP")]]
+ receive[tag["DM disconnected"]
+ object[CONNECTION] action["delete"]
+ match[streq(CONNECTION."Language" "DMP")]]
+ receive[tag["LM connected"]
+ object[CONNECTION] action["add"]
+ match[streq(CONNECTION."Language" "LMP")]]
+<beginning of page>
+ receive[tag["LM disconnected"]
+ object[CONNECTION] action["delete"]
+ match[streq(CONNECTION."Language" "LMP")]]
+ ;
+ #Pause the script
+ #Connect another mmsclient to see some events
+ #Press Enter key to continue
+ %
+ notify task["delete all CONNECTION events"]
+ cancel[object[CONNECTION]];
+ #Pause the script and wait.
+ #Connect another mmsclient to verify the events are cancelled.
+ #Press Enter key to continue
+ %
+ #Execute some simple shell commands
+ !echo Hello World
+ !uname -a
+ !hostname
+ #Pause the script and wait.
+ #Press Enter key to continue
+ %
+ #Send last command in async mode.
+ #mmsclient does not exit until it receives the responses
+ #for all pending commmands.
+ @
+ show task["async show command 3"]
+ report[APPLICATION] reportmode[namevalue];
+ @
+ show task["async show command 4"]
+ report[AI] reportmode[namevalue];
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wmmsu _ Interface StabilityVolatile
+mmsadm(1M), mmsclient(1M), mmsexplorer(1M), mmsinit(1M), system(3C), attributes(5)
+IEEE 1244, IEEE Storage Systems Standards, a set of MMS standards

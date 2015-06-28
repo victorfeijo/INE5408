@@ -1,0 +1,109 @@
+<beginning of page>
+setrctl, getrctl <-> set or get resource control values
+#include <rctl.h>
+int setrctl(const char *controlname, rctlblk_t *old_blk,
+ rctlblk_t *new_blk, uint_t flags);
+int getrctl(const char *controlname, rctlblk_t *old_blk,
+ rctlblk_t *new_blk, uint_t flags);
+The setrctl() and getrctl() functions provide interfaces for the modification and retrieval of resource control (rctl)
+values on active entities on the system, such as processes, tasks, or projects. All resource controls are unsigned
+64-bit integers; however, a collection of flags are defined that modify which rctl value is to be set or retrieved.
+Resource controls are restricted to three levels: basic controls that can be modified by the owner of the calling
+process, privileged controls that can be modified only by privileged callers, and system controls that are fixed for the
+duration of the operating system instance. Setting or retrieving each of these controls is performed by setting the
+privilege field of the resource control block to RCTL_BASIC, RCTL_PRIVILEGED, or RCTL_SYSTEM with
+rctlblk_set_privilege() (see rctlblk_set_value(3C)).
+For limits on collective entities such as the task or project, the process ID of the calling process is associated with
+the resource control value. This ID is available by using rctlblk_get_recipient_pid() (see rctlblk_set_value(3C)).
+These values are visible only to that process and privileged processes within the collective.
+The getrctl() function provides a mechanism for iterating through all of the established values on a resource control.
+The iteration is primed by calling getrctl() with old_blk set to NULL, a valid resource control block pointer in
+new_blk, and specifying RCTL_FIRST in the flags argument. Once a resource control block has been obtained, re<hy>
+peated calls to getrctl() with RCTL_NEXT in the flags argument and the obtained control in the old_blk argument
+will return the next resource control block in the sequence. The iteration reports the end of the sequence by failing
+and setting errno to ENOENT.
+The getrctl() function allows the calling process to get the current usage of a controlled resource using RCTL_US<hy>
+AGE as the flags value. The current value of the resource usage is placed in the value field of the resource control
+block specified by new_blk. This value is obtained with rctlblk_set_value(3C). All other members of the returned
+block are undefined and might be invalid.
+The setrctl() function allows the creation, modification, or deletion of action-value pairs on a given resource control.
+When passed RCTL_INSERT as the flags value, setrctl() expects new_blk to contain a new action-value pair for in<hy>
+sertion into the sequence. For RCTL_DELETE, the block indicated by new_blk is deleted from the sequence. For
+RCTL_REPLACE, the block matching old_blk is deleted and replaced by the block indicated by new_blk. When
+(flags & RCTL_USE_RECIPIENT_PID) is non-zero, setrctl() uses the process ID set by rctlblk_set_value(3C)
+when selecting the rctl value to insert, delete, or replace basic rctls. Otherwise, the process ID of the calling process
+is used.
+The kernel maintains a history of which resource control values have triggered for a particular entity, retrievable
+from a resource control block with the rctlblk_set_value(3C) function. The insertion or deletion of a resource con<hy>
+trol value at or below the currently enforced value might cause the currently enforced value to be reset. In the case
+of insertion, the newly inserted value becomes the actively enforced value. All higher values that have previously
+triggered will have their firing times zeroed. In the case of deletion of the currently enforced value, the next higher
+value becomes the actively enforced value.
+The various resource control block properties are described on the rctlblk_set_value(3C) manual page.
+Resource controls are inherited from the predecessor process or task. One of the exec(2) functions can modify the
+resource controls of a process by resetting their histories, as noted above for insertion or deletion operations.
+Upon successful completion, the setrctl() and getrctl() functions return 0. Otherwise they return <mi>1 and set errno to
+indicate the error.
+The setrctl() and getrctl() functions will fail if:
+EFAULT The controlname, old_blk, or new_blk argument points to an illegal address.
+EINVAL No resource control with the given name is known to the system, or the resource control block contains
+properties that are not valid for the resource control specified.
+<beginning of page>
+RCTL_USE_RECIPIENT_PID was used to set a process scope rctl and the process ID set by rctlblk_set_val<hy>
+ue(3C) does not match the process ID of calling process.
+ENOENT No value beyond the given resource control block exists.
+RCTL_USE_RECIPIENT_PID was used and the process ID set by rctlblk_set_value(3C) does not exist within
+the current task, project, or zone, depending on the resource control name.
+ESRCH No value matching the given resource control block was found for any of RCTL_NEXT,
+RCTL_DELETE, or RCTL_REPLACE.
+ENOTSUPP The resource control requested by RCTL_USAGE does not support the usage operation.
+The setrctl() function will fail if:
+EACCES The rctl value specified cannot be changed by the current process, including the case where the recipient
+process ID does not match the calling process and the calling process is unprivileged.
+EPERM An attempt to set a system limit was attempted.
+Example 1 Retrieve a rctl value.
+Obtain the lowest enforced rctl value on the rctl limiting the number of LWPs in a task.
+ #include <rctl.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+ #include <errno.h>
+ ...
+ rctlblk_t *rblk;
+ if ((rblk = (rctlblk_t *)malloc(rctlblk_size())) == NULL) {
+  (void) fprintf(stderr, "malloc failed: %s\n",
+  strerror(errno));
+  exit(1);
+ }
+ if (getrctl("task.max-lwps", NULL, rblk, RCTL_FIRST) == -1)
+  (void) fprintf(stderr, "failed to get rctl: %s\n",
+  strerror(errno));
+ else
+  (void) printf("task.max-lwps = %llu\n",
+  rctlblk_get_value(rblk));
+Resource control blocks are matched on the value and privilege fields. Resource control operations act on the first
+matching resource control block. Duplicate resource control blocks are not permitted. Multiple blocks of equal value
+and privilege need to be entirely deleted and reinserted, rather than replaced, to have the correct outcome. Resource
+control blocks are sorted such that all blocks with the same value that lack the RCTL_LOCAL_DENY flag precede
+those having that flag set.
+Only one RCPRIV_BASIC resource control value is permitted per process per control. Insertion of an
+RCPRIV_BASIC value will cause any existing RCPRIV_BASIC value owned by that process on the control to be
+deleted.
+The resource control facility provides the backend implementation for both setrctl()/getrctl() and setrlimit()/getr<hy>
+<beginning of page>
+limit(). The facility behaves consistently when either of these interfaces is used exclusively; when using both inter<hy>
+faces, the caller must be aware of the ordering issues above, as well as the limit equivalencies described in the fol<hy>
+lowing paragraph.
+The hard and soft process limits made available with setrlimit() and getrlimit() are mapped to the resource controls
+implementation. (New process resource controls will not be made available with the rlimit interface.) Because of
+the RCTL_INSERT and RCTL_DELETE operations, it is possible that the set of values defined on a resource
+control has more or fewer than the two values defined for an rlimit. In this case, the soft limit is the lowest priority
+resource control value with the RCTL_LOCAL_DENY flag set, and the hard limit is the resource control value
+with the lowest priority equal to or exceeding RCPRIV_PRIVILEGED with the RCTL_LOCAL_DENY flag set.
+If no identifiable soft limit exists on the resource control and setrlimit() is called, a new resource control value is
+created. If a resource control does not have the global RCTL_GLOBAL_LOWERABLE property set, its hard
+limit will not allow lowering by unprivileged callers.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelAsync-
+Signal-Safe
+rctladm(1M), getrlimit(2), errno(3C), rctlblk_set_value(3C), attributes(5), resource_controls(5)

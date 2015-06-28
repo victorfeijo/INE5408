@@ -1,0 +1,199 @@
+<beginning of page>
+dlpi <-> Data Link Provider Interface
+#include <sys/dlpi.h>
+SunOS STREAMS-based device drivers wishing to support the STREAMS TCP/IP and other STREAMS-based
+networking protocol suite implementations support Version 2 of the Data Link Provider Interface (DLPI). DLPI V2
+enables a data link service user to access and use any of a variety of conforming data link service providers without
+special knowledge of the provider's protocol. Specifically, the interface is intended to support Ethernet, X.25 LAPB,
+SDLC, ISDN LAPD, CSMA/CD, FDDI, token ring, token bus, Bisync, and other datalink-level protocols.
+The interface specifies access to the data link service provider in the form of M_PROTO and M_PCPROTO type
+STREAMS messages and does not define a specific protocol implementation. The interface defines the syntax and
+semantics of primitives exchanged between the data link user and the data link provider to attach a physical device
+with physical-level address to a stream, bind a datalink-level address to the stream, get implementation-specific in<hy>
+formation from the data link provider, exchange data with a peer data link user in one of three communication
+modes (connection, connectionless, acknowledged connectionless), enable/disable multicast group and promiscuous
+mode reception of datalink frames, get and set the physical address associated with a stream, and several other oper<hy>
+ations.
+Solaris conforms to The Open Group Technical Standard for DLPI, Version 2. For free access to this specification,
+point your browser to www.opengroup.org/pubs/catalog/c811.htm. Solaris also provides extensions to the DLPI stan<hy>
+dard, as detailed in this man page.
+Notification Support
+Enables DLPI consumers to register for notification when events of interest occur at the DLPI provider. The negoti<hy>
+ation can be performed on any attached DLPI stream, and begins with the DLPI consumer, sending a DL_NOTI<hy>
+FY_REQ to the provider, which is an M_PROTO message with the following payload:
+  typedef struct {
+  t_uscalar_t dl_primitive;
+  uint32_t dl_notifications;
+  uint32_t dl_timelimit;
+  } dl_notify_req_t;
+The dl_primitive field must be set to DL_NOTIFY_REQ; the dl_timelimit field is reserved for future use and must
+be set to zero. The dl_notifications field is a bitmask containing the event types the consumer is interested in receiv<hy>
+ing, and must be zero or more of:
+ DL_NOTE_LINK_DOWN Notify when link has gone down
+ DL_NOTE_LINK_UP Notify when link has come up
+ DL_NOTE_PHYS_ADDR Notify when address changes
+ DL_NOTE_SDU_SIZE Notify when MTU changes
+ DL_NOTE_SPEED Notify when speed changes
+ DL_NOTE_PROMISC_ON_PHYS Notify when DL_PROMISC_PHYS is set
+ DL_NOTE_PROMISC_OFF_PHYS Notify when DL_PROMISC_PHYS is cleared
+Consumers might find it useful to send a DL_NOTIFY_REQ message with no requested types to check if the DLPI
+provider supports the extension.
+Upon receiving the DL_NOTIFY_REQ, the DLPI provider must generate a DL_NOTIFY_ACK, which is an
+M_PROTO message with the following payload:
+  typedef struct {
+  t_uscalar_t dl_primitive;
+  uint32_t dl_notifications;
+  } dl_notify_ack_t;
+The dl_primitive field must be set to DL_NOTIFY_ACK. The dl_notifications field must include any notifications
+that the provider supports, along with any other unrequested notifications that the provider supports. However, re<hy>
+gardless of the notifications the provider supports, it is restricted to sending only DL_NOTIFY_IND messages (see
+below) that were requested in the DL_NOTIFY_REQ.
+Since there are additional notification types which are not yet available for public use, DLPI consumers and
+providers must take care when inspecting and setting the dl_notifications field. Specifically, consumers must be
+careful to only request the above notification types, and providers must be careful to not include any unrecognized
+notification types in the dl_notifications field when constructing the DL_NOTIFY_ACK. In addition, DL_NOTI<hy>
+<beginning of page>
+FY_IND's that are received with undocumented dl_notification or dl_data values must be ignored.
+DLPI consumers might receive a DL_ERROR_ACK message (with dl_error_primitive set to DL_NOTIFY_REQ) in
+response to the initial DL_NOTIFY_REQ message. This message indicates that the DLPI provider does not support
+the DLPI notification extension. Otherwise, the DLPI consumer receives a DL_NOTIFY_ACK and should expect to
+receive DL_NOTIFY_IND messages for any types that it requested that were still set in it. The DL_NOTIFY_IND
+is an M_PROTO message with the following payload:
+  typedef struct {
+  t_uscalar_t dl_primitive;
+  uint32_t dl_notification;
+  uint32_t dl_data;
+  t_uscalar_t dl_addr_length;
+  t_uscalar_t dl_addr_offset;
+  } dl_notify_ind_t;
+The dl_primitive field must be set to DL_NOTIFY_IND, and the dl_notification field must be set to the event type
+that has occurred (for example, DL_NOTE_LINK_DOWN). Only a single event type can be set in each DL_NOTI<hy>
+FY_IND.
+For the DL_NOTE_SPEED event type, dl_data must be set to the current interface speed in kilobits per second. For
+the DL_NOTE_PHYS_ADDR event type, dl_data must be set to DL_CURR_PHYS_ADDR. For the
+DL_NOTE_SDU_SIZE event type, dl_data must be set to the current MTU in bytes. Otherwise, dl_data must be
+set to zero.
+For the DL_NOTE_PHYS_ADDR event type, the dl_addr_length field must be set to the length of the address, and
+the dl_addr_offset field must be set to offset of the first byte of the address, relative to b_rptr (for example, if the
+address immediately follows the dl_notify_ind structure, dl_addr_offset is set to 'sizeof (dl_notify_ind)'). For all
+other event types, the dl_addr_length and dl_addr_offset fields must be set to zero by DLPI providers and ignored
+by DLPI consumers.
+In addition to generating DL_NOTIFY_IND messages when a requested event has occurred, the DLPI provider
+must initially generate one or more DL_NOTIFY_IND messages to notify the DLPI consumer of the the current
+state of the interface. For instance, if the consumer has requested DL_NOTE_LINK_UP |
+DL_NOTE_LINK_DOWN, the provider must send a DL_NOTIFY_IND containing the current state of the link (ei<hy>
+ther DL_NOTE_LINK_UP or DL_NOTE_LINK_DOWN) after sending the DL_NOTIFY_ACK.
+For the initial DL_NOTIFY_IND message, the DLPI provider is strongly recommended against sending
+DL_NOTE_LINK_DOWN, even if the interface is still initializing and is not yet ready to send or receive packets.
+Instead, either delaying the DL_NOTIFY_IND message until the interface is ready or optimistically reporting
+DL_NOTIFY_LINK_UP and subsequently reporting DL_NOTE_LINK_DOWN if the negotation fails is strongly
+preferred. This prevents DL_NOTIFY_IND consumers from needlessly triggering network failover operations and
+logging error messages during network interface initialization.
+The DLPI provider must continue to generate DL_NOTIFY_IND messages until it receives a new DL_NOTI<hy>
+FY_REQ message or the DLPI stream is detached (or closed). Further, a DLPI style 2 provider must keep track of
+the requested events after a DL_DETACH_REQ operation, and if a subsequent DL_ATTACH_REQ is received, it
+must send gratuitous DL_NOTIFY_IND messages to notify the consumer of the current state of the device, since
+the state might have changed while detached (or the consumer might have simply discarded its previous state).
+Passive Consumers of Aggregated Links
+Solaris link aggregations as configured by dladm(1M) export DLPI nodes for both the link aggregation, and individ<hy>
+ual links that comprises the aggregation, to allow observability of the aggregated links. To allow applications such as
+snoop(1M) to open those individual aggregated links while disallowing other consumers such as ip(7P), DL_PAS<hy>
+SIVE_REQ (a DLPI primitive), must be issued by snoop(1M) and similar applications.
+The DL_PASSIVE_REQ primitive is an M_PROTO message containing the following payload:
+ typedef struct {
+  t_uscalar_t dl_primitive;
+ } dl_passive_req_t;
+Issuing this primitive allows the consumer of a DLPI link to coexist with a link aggregation that also uses the link.
+Such a consumer is considered passive.
+<beginning of page>
+Consumers that don't use this primitive while an aggregation is using the link receive DL_SYSERR/EBUSY when
+issuing the following DLPI primitives:
+ DL_BIND_REQ
+ DL_ENABMULTI_REQ
+ DL_PROMISCON_REQ
+ DL_AGGR_REQ
+ DL_UNAGGR_REQ
+ DL_CONTROL_REQ
+ DL_SET_PHYS_ADDR_REQ
+A consumer that has not issued a DL_PASSIVE_REQ and has successfully issued one of the above primitives is
+considered active.
+The creation of a link aggregation using dladm(1M) fails if one of the links included in the aggregation has an ac<hy>
+tive consumer, but succeeds if the links do not have any DLPI consumers or only passive consumers.
+Raw Mode
+The DLIOCRAW ioctl function is used by some DLPI applications, most notably the snoop(1M) command. The
+DLIOCRAW command puts the stream into a raw mode, which, upon receive, causes the the full MAC-level packet
+to be sent upstream in an M_DATA message instead of it being transformed into the DL_UNITDATA_IND form
+normally used for reporting incoming packets. Packet SAP filtering is still performed on streams that are in raw
+mode. If a stream user wants to receive all incoming packets it must also select the appropriate promiscuous modes.
+After successfully selecting raw mode, the application is also allowed to send fully formatted packets to the provider
+as M_DATA messages for transmission. DLIOCRAW takes no arguments. Once enabled, the stream remains in this
+mode until closed.
+Native Mode
+Some DLPI providers are able to represent their link layer using more than one link-layer format. In this case, the
+default link-layer format can minimize impact to applications, but might not allow truly native link-layer headers to
+be sent or received. DLPI consumers who wish to use the native link-layer format can use DLIOCNATIVE to tran<hy>
+sition the stream. DLIOCNATIVE takes no arguments and returns the DLPI mac type associated with the new link-
+layer format upon success. Once enabled, the stream remains in this mode until closed. Note that DLIOCNA<hy>
+TIVE does not enable transition between dissimilar DLPI mac types and (aside from the link-layer format), the new
+DLPI mac type is guaranteed to be semantically identical. In particular, the SAP space and addressing format are
+not affected and the effect of DLIOCNATIVE is only visible when in raw mode, though any subsequent DL_IN<hy>
+FO_REQ requests generate responses with dl_mac_type set to the native DLPI type.
+Margin
+While a DLPI provider provides its maximum SDU via dl_max_sdu in DL_INFO_ACK messages, this value typi<hy>
+cally represents a standard maximum SDU for the provider's media (1500 for Ethernet for example), and not neces<hy>
+sarily the absolute maximum amount of data that the provider is able to transmit in a given data unit. The margin
+"is the extra amount of data in bytes that the provider can transmit beyond its advertised maximum SDU. For exam<hy>
+ple, if a DL_ETHER provider can handle packets whose payload section is no greater than 1522 bytes and its
+dl_max_sdu is set to 1500 (as is typical for Ethernet), then the margin would be 22. If a provider supports a non-zero
+margin, it implements the DLIOCMARGININFO ioctl, whose data is a t_uscalar_t representing the margin size.
+Some DL_ETHER DLPI providers support IEEE 802.1Q Virtual LANs (VLAN). For these providers, traffic for a
+particular VLAN can be accessed by opening a VLAN data-link.
+Unless raw mode is enabled, a DLPI stream bound to a VLAN data-link behaves no differently than a traditional
+DLPI stream. As with non-VLAN data-link access, data must be sent to a DLPI provider without link-layer headers
+(which are added by the provider) and received data is passed to interested DLPI consumers without link-layer head<hy>
+ers. As a result, DLPI consumers not require special-case logic to implement VLAN access.
+As per IEEE 802.1Q, all VLAN traffic is sent using Ether- Type 0x8100, meaning that in addition to directly open<hy>
+ing a VLAN data-link, all VLAN traffic for a given underline data-link can also be accessed by opening the underly<hy>
+ing data-link and binding to SAP 0x8100. Accordingly, all VLAN traffic (regardless of VLAN ID) can be sent and
+received by the DLPI consumer. However, even when raw mode is disabled, packets are received starting with their
+VLAN headers and must be sent to the DLPI provider with their VLAN headers already pre-pended (but without
+Ethernet headers). Because adhering to these semantics requires each DLPI consumer to have specialized knowl<hy>
+<beginning of page>
+edge of VLANs, VLANs should only be accessed in this way when the traditional VLAN access method is insuffi<hy>
+cient (for example, because access to all VLAN traffic, regardless of VLAN ID, is needed).
+Because all VLAN traffic is sent with SAP 0x8100, VLAN traffic not filtered at the physical
+(DL_PROMISC_PHYS) level is also visible if a DLPI consumer enables promiscuous mode of a stream at the
+DL_PROMISC_SAP level. As mentioned earlier, these packets are received starting with their VLAN headers if
+raw mode is not enabled.
+The IEEE 802.1Q standard defines eight classes of priority values used by QoS traffic control of Ethernet packets.
+Although the priority values are encoded in the 802.1Q tags, they can be used independently from VLANs. In par<hy>
+ticular, a special priority tagged packet (with VLAN ID zero but priority bits non-zero) does not belong to any
+VLAN.
+The priority value can be set on either a per-stream or per-packet basis. DLPI consumers can specify the per-stream
+priority using the DL_UDQOS_REQ request (the priority value remains unchanged until the next
+DL_UDQOS_REQ) and also specify the per-packet priority value using the b_band field of a M_DATA message or
+the dl_priority field of a DL_UNITDATA_REQ.
+When raw mode is enabled, the complete, unmodified MAC- level packet (including Ethernet and VLAN headers)
+is passed to interested DLPI consumers. Similarly, the entire MAC-level packet (including Ethernet and VLAN
+headers) must be sent to the DLPI provider for transmission. Note that the priority value specified in the b_band
+field can be overridden by encoding the priority value (if any) into the VLAN header.
+When raw mode is enabled, only packets with the correct VLAN ID are passed up to interested DLPI consumers.
+With the exception of priority-tagged packets, DLPI providers must strip off the VLAN headers (while retaining the
+preceding Ethernet headers) before sending up the packets. For priority-tagged packets, DLPI providers must use
+the reserved tag 0 to encode the VLAN TCI and send up the packets.
+On the transmit-side, DLPI consumers must send the packets down to the DLPI providers without the VLAN head<hy>
+ers (but with the Ethernet headers) unless certain QoS support is required. If QoS support is needed, the packet can
+have the VLAN header to indicate the priority value, however its VLAN ID must be zero. The DLPI providers then
+insert the VLAN tags or encode the VLAN tags using the priority value specified in the VLAN headers and send the
+packets.
+Files in or under /dev.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(5.5i) |cw(0i) lw(5.5i) |lw(0i) ATTRIBUTE TYPEATTRIBUTE VALUE _ T{ Interface Stability (Noti<hy>
+fication support/Passive mode behavior) T}Committed
+dladm(1M), snoop(1M), libdlpi(3LIB), gld(7D), ip(7P)
+A Solaris DLPI link name consists of a DLPI provider name followed by a numeric PPA (physical point of attach<hy>
+ment).
+The DLPI provider name must be between 1 and 16 characters in length, though names between 3 and 8 characters
+are preferred. The DLPI provider name can consist of any alphanumeric character (a-z, A-Z, 0-9), and the under<hy>
+score (_). The first and last character of the DLPI provider name cannot be a digit.
+The PPA must be a number between 0 and 4294967294 inclusive. Leading zeroes are not permitted.

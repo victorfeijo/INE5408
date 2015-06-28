@@ -1,0 +1,76 @@
+<beginning of page>
+lockf <-> record locking on files
+#include <unistd.h>
+int lockf(int fildes, int function, off_t size);
+The lockf() function allows sections of a file to be locked; advisory or mandatory write locks depending on the
+mode bits of the file (see chmod(2)). Calls to lockf() from other threads that attempt to lock the locked file section
+will either return an error value or be put to sleep until the resource becomes unlocked. All the locks for a process
+are removed when the process terminates. See fcntl(2) for more information about record locking.
+The fildes argument is an open file descriptor. The file descriptor must have O_WRONLY or O_RDWR permission
+in order to establish locks with this function call.
+The function argument is a control value that specifies the action to be taken. The permissible values for function
+are defined in <unistd.h> as follows:
+ #define F_ULOCK 0 /* unlock previously locked section */
+ #define F_LOCK 1 /* lock section for exclusive use */
+ #define F_TLOCK 2 /* test & lock section for exclusive use */
+ #define F_TEST 3 /* test section for other locks */
+All other values of function are reserved for future extensions and will result in an error if not implemented.
+F_TEST is used to detect if a lock by another process is present on the specified section. F_LOCK and F_TLOCK
+both lock a section of a file if the section is available. F_ULOCK removes locks from a section of the file.
+The size argument is the number of contiguous bytes to be locked or unlocked. The resource to be locked or un<hy>
+locked starts at the current offset in the file and extends forward for a positive size and backward for a negative size
+(the preceding bytes up to but not including the current offset). If size is zero, the section from the current offset
+through the largest file offset is locked (that is, from the current offset through the present or any future end-of-file).
+An area need not be allocated to the file in order to be locked as such locks may exist past the end-of-file.
+The sections locked with F_LOCK or F_TLOCK may, in whole or in part, contain or be contained by a previously
+locked section for the same process. Locked sections will be unlocked starting at the point of the offset through size
+bytes or to the end of file if size is (off_t) 0. When this situation occurs, or if this situation occurs in adjacent sec<hy>
+tions, the sections are combined into a single section. If the request requires that a new element be added to the table
+of active locks and this table is already full, an error is returned, and the new section is not locked.
+F_LOCK and F_TLOCK requests differ only by the action taken if the resource is not available. F_LOCK blocks
+the calling thread until the resource is available. F_TLOCK causes the function to return <mi>1 and set errno to EA<hy>
+GAIN if the section is already locked by another process.
+File locks are released on first close by the locking process of any file descriptor for the file.
+F_ULOCK requests may, in whole or in part, release one or more locked sections controlled by the process. When
+sections are not fully released, the remaining sections are still locked by the process. Releasing the center section of
+a locked section requires an additional element in the table of active locks. If this table is full, an errno is set to
+EDEADLK and the requested section is not released.
+An F_ULOCK request in which size is non-zero and the offset of the last byte of the requested section is the maxi<hy>
+mum value for an object of type off_t, when the process has an existing lock in which size is 0 and which includes
+the last byte of the requested section, will be treated as a request to unlock from the start of the requested section
+with a size equal to 0. Otherwise, an F_ULOCK request will attempt to unlock only the requested section.
+A potential for deadlock occurs if the threads of a process controlling a locked resource is put to sleep by requesting
+another process's locked resource. Thus calls to lockf() or fcntl(2) scan for a deadlock prior to sleeping on a locked
+resource. An error return is made if sleeping on the locked resource would cause a deadlock.
+Sleeping on a resource is interrupted with any signal. The alarm(2) function may be used to provide a timeout facili<hy>
+ty in applications that require this facility.
+Upon successful completion, 0 is returned. Otherwise, <mi>1 is returned and errno is set to indicate the error.
+The lockf() function will fail if:
+<beginning of page>
+EBADF The fildes argument is not a valid open file descriptor; or function is F_LOCK or F_TLOCK and fildes is
+not a valid file descriptor open for writing.
+EACCES or EAGAIN The function argument is F_TLOCK or F_TEST and the section is already locked by an<hy>
+other process.
+EDEADLK The function argument is F_LOCK and a deadlock is detected.
+EINTR A signal was caught during execution of the function.
+ECOMM The fildes argument is on a remote machine and the link to that machine is no longer active.
+EINVAL The function argument is not one of F_LOCK, F_TLOCK, F_TEST, or F_ULOCK; or size plus the
+current file offset is less than 0.
+EOVERFLOW The offset of the first, or if size is not 0 then the last, byte in the requested section cannot be repre<hy>
+sented correctly in an object of type off_t.
+The lockf() function may fail if:
+EAGAIN The function argument is F_LOCK or F_TLOCK and the file is mapped with mmap(2).
+EDEADLK or ENOLCK The function argument is F_LOCK, F_TLOCK, or F_ULOCK and the request would
+cause the number of locks to exceed a system-imposed limit.
+EOPNOTSUPP or EINVAL The locking of files of the type indicated by the fildes argument is not supported.
+Record-locking should not be used in combination with the fopen(3C), fread(3C), fwrite(3C) and other stdio func<hy>
+tions. Instead, the more primitive, non-buffered functions (such as open(2)) should be used. Unexpected results
+may occur in processes that do buffering in the user address space. The process may later read/write data which
+is/was locked. The stdio functions are the most common source of unexpected buffering.
+The alarm(2) function may be used to provide a timeout facility in applications requiring it.
+The lockf() function has a transitional interface for 64-bit file offsets. See lf64(5).
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Standard _ MT-LevelMT-Safe
+Intro(2), alarm(2), chmod(2), close(2), creat(2), fcntl(2), mmap(2), open(2), read(2), write(2), attributes(5),
+lf64(5), standards(5)

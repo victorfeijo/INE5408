@@ -1,0 +1,46 @@
+<beginning of page>
+dat_lmr_sync_rdma_read <-> synchronize local memory with RDMA read on non-coherent memory
+cc [ flag... ] file... -ldat [ library... ]
+#include <dat/udat.h>
+DAT_RETURN
+ dat_lmr_sync_rdma_read (
+ IN DAT_IA_HANDLE ia_handle,
+ IN const DAT_LMR_TRIPLET *local_segments,
+ IN DAT_VLEN num_segments
+ )
+ia_handle A handle for an open instance of the IA.
+local_segments An array of buffer segments.
+num_segments The number of segments in the local_segments argument.
+The dat_lmr_sync_rdma_read() function makes memory changes visible to an incoming RDMA Read operation.
+This operation guarantees consistency by locally flushing the non-coherent cache prior to it being retrieved by re<hy>
+mote peer RDMA read operations.
+The dat_lmr_sync_rdma_read() function is needed if and only if the Provider attribute specifies that this operation
+is needed prior to an incoming RDMA Read operation. The Consumer must call dat_lmr_sync_rdma_read() after
+modifying data in a memory range in this region that will be the target of an incoming RDMA Read operation. The
+dat_lmr_sync_rdma_read() function must be called after the Consumer has modified the memory range but before
+the RDMA Read operation begins. The memory range that will be accessed by the RDMA read operation must be
+supplied by the caller in the local_segments array. After this call returns, the RDMA Read operation can safely see
+the modified contents of the memory range. It is permissible to batch synchronizations for multiple RDMA Read op<hy>
+erations in a single call by passing a local_segments array that includes all modified memory ranges. The local_seg<hy>
+ments entries need not contain the same LMR and need not be in the same Protection Zone.
+If the Provider attribute specifying that this operation is required attempts to read from a memory range that is not
+properly synchronized using dat_lmr_sync_rdma_read(), the returned contents are undefined.
+DAT_SUCCESS The operation was successful.
+DAT_INVALID_HANDLE The DAT handle is invalid.
+DAT_INVALID_PARAMETER One of the parameters is invalid. For example, the address range for a local seg<hy>
+ment fell outside the boundaries of the corresponding Local Memory Region or the LMR handle was invalid.
+Determining when an RDMA Read will start and what memory range it will read is the Consumer's responsibility.
+One possibility is to have the Consumer that is modifying memory call dat_lmr_sync_rdma_read() and then post a
+Send DTO message that identifies the range in the body of the Send. The Consumer wanting to perform the RDMA
+Read can receive this message and know when it is safe to initiate the RDMA Read operation.
+This call ensures that the Provider receives a coherent view of the buffer contents upon a subsequent remote RDMA
+Read operation. After the call completes, the Consumer can be assured that all platform-specific buffer and cache
+updates have been performed, and that the LMR range has consistency with the Provider hardware. Any subsequent
+write by the Consumer can void this consistency. The Provider is not required to detect such access.
+The action performed on the cache before the RDMA Read depends on the cache type: <bu> I/O noncoherent cache will
+be invalidated. <bu> CPU noncoherent cache will be flushed.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+<beginning of page>
+Standard: uDAPL, 1.2 _ MT-LevelUnsafe
+dat_lmr_sync_rdma_write(3DAT), libdat(3LIB), attributes(5)

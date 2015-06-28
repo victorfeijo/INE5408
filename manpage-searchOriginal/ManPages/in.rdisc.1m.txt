@@ -1,0 +1,60 @@
+<beginning of page>
+in.rdisc, rdisc <-> network router discovery daemon
+/usr/sbin/in.rdisc [-a] [-f] [-s] [send-address] [receive-address]
+/usr/sbin/in.rdisc -r [-p preference] [-T interval]
+ [send-address] [receive-address]
+in.rdisc remains part of the software distribution of the Solaris Operating Environment. It is, however, not used by
+default. in.routed(1M) includes the functionality provided by in.rdisc. See routeadm(1M) for details of how to
+specify the IPV4 routing daemon.
+in.rdisc implements the ICMP router discovery protocol. The first form of the command is used on hosts and the
+second form is used on routers.
+in.rdisc can be invoked in either the first form (host mode) or second form (router mode).
+On a host, in.rdisc populates the network routing tables with default routes. On a router, advertises the router to all
+the hosts.
+in.rdisc is managed by the service management facility (SMF), by means of the service identifier:
+ svc:/network/routing/rdisc:default
+On a host, in.rdisc listens on the ALL_HOSTS (224.0.0.1) multicast address for ROUTER_ADVERTISE mes<hy>
+sages from routers. The received messages are handled by first ignoring those listed router addresses with which the
+host does not share a network. Among the remaining addresses, the ones with the highest preference are selected as
+default routers and a default route is entered in the kernel routing table for each one of them.
+Optionally, in.rdisc can avoid waiting for routers to announce themselves by sending out a few ROUTER_SOLIC<hy>
+ITATION messages to the ALL_ROUTERS (224.0.0.2) multicast address when it is started.
+A timer is associated with each router address. The address will no longer be considered for inclusion in the routing
+tables if the timer expires before a new advertise message is received from the router. The address will also be ex<hy>
+cluded from consideration if the host receives an advertise message with the preference being maximally negative or
+with a lifetime of zero.
+When in.rdisc is started on a router, it uses the SIOCGIFCONF ioctl(2) to find the interfaces configured into the
+system and it starts listening on the ALL_ROUTERS multicast address on all the interfaces that support multicast.
+It sends out advertise messages to the ALL_HOSTS multicast address advertising all its IP addresses. A few initial
+advertise messages are sent out during the first 30 seconds and after that it will transmit advertise messages approxi<hy>
+mately every 600 seconds.
+When in.rdisc receives a solicitation message, it sends an advertise message to the host that sent the solicitation
+message.
+When in.rdisc is terminated by a signal, it sends out an advertise message with the preference being maximally neg<hy>
+ative.
+Supported options and equivalent SMF service properties are listed below. SMF service properties are set using a
+command of the form:
+ # routeadm -m rdisc:default key=value
+-a Accept all routers independent of the preference they have in their advertise messages. Normally, in.rdisc only
+accepts (and enters in the kernel routing tables) the router or routers with the highest preference. Use of this option is
+equivalent to setting the accept_all property to true.
+-f Run in.rdisc forever even if no routers are found. Normally, in.rdisc gives up if it has not received any advertise
+message after soliciting three times, in which case it exits with a non-zero exit code. If -f is not specified in the first
+form then -s must be specified. For SMF execution, this option is required.
+<beginning of page>
+-r Act as a router, rather than a host. Use of this option is equivalent to setting the act_as_router property to true.
+-s Send three solicitation messages initially to quickly discover the routers when the system is booted. When -s is
+specified, in.rdisc exits with a non-zero exit code if it can not find any routers. This can be overridden with the -f op<hy>
+tion. This option is not compatible with SMF execution and is not supported for the rdisc service.
+-p preference Set the preference transmitted in the solicitation messages. The default is zero. Use of this option is
+equivalent to setting the preference property.
+-T interval Set the interval between transmitting the advertise messages. The default time is 600 seconds. Use of this
+option is equivalent to setting the transmit_interval property.
+The send-address and receive-address daemon options can be set by means of the send_address and receive_ad<hy>
+dress properties.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wroute
+in.routed(1M), routeadm(1M), svcadm(1M), ioctl(2), gateways(4), attributes(5), smf(5), icmp(7P), inet(7P)
+Deering, S.E., editor, ICMP Router Discovery Messages, RFC 1256, Network Information Center, SRI Internation<hy>
+al, Menlo Park, California, September 1991.

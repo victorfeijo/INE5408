@@ -1,0 +1,99 @@
+<beginning of page>
+madv.so.1 <-> madv library
+/usr/lib/madv.so.1
+The madv.so.1 shared object provides a means by which the VM advice can be selectively configured for a launched
+process (or processes) and its descendants. To enable madv.so.1, the following string needs to be present in the envi<hy>
+ronment (see ld.so.1(1)) along with one or more MADV environment variables:
+ LD_PRELOAD=$LD_PRELOAD:madv.so.1
+If the madv.so.1 shared object is specified in the LD_PRELOAD list, the following environment variables are read
+by the madv shared object to determine to which created process(es) to apply the specified advice.
+MADV=advice MADV specifies the VM advice to use for all heap, shared memory, and mmap regions in the
+process address space. This advice is applied to all created processes.
+Values for advice correspond to values in <sys/mman.h> used in madvise(3C) to specify memory access patterns:
+ normal
+ random
+ sequential
+ access_lwp
+ access_many
+ access_default
+MADVCFGFILE=config-file config-file is a text file which contains one or more madv configuration entries of the
+form:
+ exec-name exec-args:advice-opts
+Advice specified in config-file takes precedence over that specified by the MADV environment variable. When
+MADVCFGFILE is not set, advice is taken from file /etc/madv.conf if it exists.
+exec-name specifies the name of an application or executable. The corresponding advice is set for newly created pro<hy>
+cesses (see getexecname(3C)) that match the first exec-name found in the file.
+exec-name can be a full pathname, a base name, or a pattern string. See File Name Generation in sh(1) for a discus<hy>
+sion of pattern matching.
+exec-args is an optionally specified pattern string to match against arguments. Advice is set only if exec-args is not
+specified or occurs within the arguments to exec-name.
+advice-opts is a comma-separated list specifying the advice for various memory region(s):
+madv=advice Applies to all heap, shared memory, and mmap regions in the process address space.
+heap=advice The heap is defined to be the brk area (see brk(2)). Applies to the existing heap and for any additional
+heap memory allocated in the future.
+shm=advice
+ism=advice
+dism=advice Shared memory segments (see shmat(2)) attached using any flags, flag SHM_SHARE_MMU, or flag
+SHM_PAGEABLE respectively. Options ism and dism take precedence over option shm.
+map=advice
+mapshared=advice
+mapprivate=advice
+mapanon=advice Mappings established through mmap(2) using any flags, flag MAP_SHARED, flag MAP_PRI<hy>
+VATE, or flag MAP_ANON, respectively. Options mapshared, mapprivate, and mapanon take precedence over
+option map. Option mapanon takes precedence over mapshared and mapprivate.
+MADVERRFILE=pathname By default, error messages are logged via syslog(3C) using level LOG_ERR and fa<hy>
+cility LOG_USER. If MADVERRFILE contains a valid pathname (such as /dev/stderr), error messages will be
+<beginning of page>
+logged there instead.
+Example 1 Applying advice to all ISM segments
+The following configuration applies advice to all ISM segments for application /usr/bin/foo:
+ example$ LD_PRELOAD=$LD_PRELOAD:madv.so.1
+ example$ MADVCFGFILE=madvcfg
+ example$ export LD_PRELOAD MADVCFGFILE
+ example$ cat $MADVCFGFILE
+  /usr/bin/foo:ism=access_lwp
+Example 2 Setting advice for all applications with exception
+The following configuration sets advice for all applications with the exception of ls.
+ example$ LD_PRELOAD=$LD_PRELOAD:madv.so.1
+ example$ MADV=access_many
+ example$ MADVCFGFILE=madvcfg
+ example$ export LD_PRELOAD MADV MADVCFGFILE
+ example$ cat $MADVCFGFILE
+  ls:
+Example 3 Precedence rules (continuation from Example 2)
+Because MADVCFGFILE takes precedence over MADV, specifying '*' (pattern match all) for the exec-name of
+the last madv configuration entry would be equivalent to setting MADV. The following is equivalent to example 2:
+ example$ LD_PRELOAD=$LD_PRELOAD:madv.so.1
+ example$ MADVCFGFILE=madvcfg
+ example$ export LD_PRELOAD MADVCFGFILE
+ example$ cat $MADVCFGFILE
+  ls:
+  *:madv=access_many
+Example 4 Applying advice for different regions
+The following configuration applies one type of advice for mmap regions and different advice for heap and shared
+memory regions for a select set of applications with exec names that begin with foo:
+ example$ LD_PRELOAD=$LD_PRELOAD:madv.so.1
+ example$ MADVCFGFILE=madvcfg
+ example$ export LD_PRELOAD MADVCFGFILE
+ example$ cat $MADVCFGFILE
+  foo*:madv=access_many,heap=sequential,shm=access_lwp
+Example 5 Applying advice selectively
+The following configuration applies advice for the heap of applications beginning with ora that have ora1 as an ar<hy>
+gument:
+ example$ LD_PRELOAD=$LD_PRELOAD:madv.so.1
+ example$ MADVCFGFILE=madvcfg
+ example$ export LD_PRELOAD MADVCFGFILE
+ example$ cat $MADVCFGFILE
+  ora* ora1:heap=access_many
+<beginning of page>
+/etc/madv.conf Configuration file
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wesu (32-bit) _ SUNWesxu (64-bit) _ Interface StabilityUnstable
+cat(1), ld.so.1(1), proc(1), sh(1), brk(2), exec(2), fork(2), mmap(2), memcntl(2), shmat(2), getexecname(3C),
+madvise(3C), syslog(3C), proc(4), attributes(5)
+The advice is inherited. A child process has the same advice as its parent. On exec() (see exec(2)), the advice is
+set back to the default system advice unless different advice has been configured via the madv shared object.
+Advice is only applied to mmap regions explicitly created by the user program. Those regions established by the
+run-time linker or by system libraries making direct system calls (for example, libthread allocations for thread
+stacks) are not affected.

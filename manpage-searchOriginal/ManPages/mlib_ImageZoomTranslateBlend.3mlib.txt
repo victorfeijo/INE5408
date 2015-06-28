@@ -1,0 +1,105 @@
+<beginning of page>
+mlib_ImageZoomTranslateBlend <-> image scaling with alpha blending
+cc [ flag... ] file... -lmlib [ library... ]
+#include <mlib.h>
+mlib_status mlib_ImageZoomTranslateBlend(mlib_image *dst,
+ const mlib_image *src, mlib_d64 zoomx, mlib_d64 zoomy,
+ mlib_d64 tx, mlib_d64 ty, mlib_filter filter, mlib_edge edge,
+ mlib_blend blend, mlib_s32 alpha, mlib_s32 cmask);
+The mlib_ImageZoomTranslateBlend() function will enlarge or minify the source image by the X and Y zoom
+factors, with translation, and blend it with the destination image.
+It uses the following equation for coordinate mapping:
+ xd = zoomx*xs + tx
+ yd = zoomy*ys + ty
+where a point with coordinates (xs, ys) in the source image is mapped to a point with coordinates (xd, yd) in the des<hy>
+tination image.
+The center of the upper-left corner pixel of an image is located at (0.5, 0.5).
+The alpha blending is closely combined with the interpolation to achieve better performance. Part of alpha blending
+has to be performed before or together with the interpolation if the source image has an alpha channel. In that case,
+the color components of each neighboring source pixel which participates in the interpolation (src_r and etc.) have
+to be pre-multiplied by the alpha component of the same source pixel (src_a). After the interpolation, the overall al<hy>
+pha (alpha), the interpolated source alpha (interp_a) and the destination pixel's original alpha (dst_a, if any) are
+used to blend the interpolated source pixel (with components interp_r and etc.) with the destination pixel (with
+components dst_r and etc.).
+The MLIB_BLEND_GTK_SRC blending is similar to the SRC rule of the Porter-Duff rules for image composit<hy>
+ing. It is defined by
+ Cd = Cs
+ Ad = As
+in general, and by the following formula for this function:
+ if (interp_a != 0.0) {
+  if (dst_has_alpha) {
+   dst_r = interp_r/interp_a;
+   dst_g = interp_g/interp_a;
+   dst_b = interp_b/interp_a;
+   dst_a = interp_a;
+  } else {
+   dst_r = interp_r;
+   dst_g = interp_g;
+   dst_b = interp_b;
+   dst_a = 1.0; // implied
+  }
+ } else {
+  dst_r = 0;
+  dst_g = 0;
+  dst_b = 0;
+  dst_a = 0;
+ }
+The MLIB_BLEND_GTK_SRC_OVER or MLIB_BLEND_GTK_SRC_OVER2 blending is similar to the
+SRC_OVER rule of the Porter-Duff rules for image compositing. It is defined by
+ Cd = Cs + Cd*(1 - As)
+ Ad = As + Ad*(1 - As)
+<beginning of page>
+in general, and by the following formula for this function:
+ w = alpha*interp_a + (1 - alpha*interp_a)*dst_a;
+ if (w != 0.0) {
+  dst_r = (alpha*interp_r +
+   (1 - alpha*interp_a)*dst_a*dst_r)/w;
+  dst_g = (alpha*interp_g +
+   (1 - alpha*interp_a)*dst_a*dst_g)/w;
+  dst_b = (alpha*interp_b +
+   (1 - alpha*interp_a)*dst_a*dst_b)/w;
+  dst_a = w;
+ } else if (MLIB_BLEND_GTK_SRC_OVER) {
+  dst_r = 0;
+  dst_g = 0;
+  dst_b = 0;
+  dst_a = 0;
+ }
+where alpha, src_a, interp_a and dst_a are assumed to be in the range of [0.0, 1.0].
+For an image with 4 channels, the first or the fourth channel is considered the alpha channel if cmask equals 8 or 1,
+respectively. An image with 3 channels is considered to have no alpha channel, which is equivalent to having an al<hy>
+pha channel filled with all 1.0, or 0xff in case of MLIB_BYTE, if the general formulas for blending shown above
+are used.
+Both src and dst must be of type MLIB_BYTE. They can have either 3 or 4 channels.
+The src image cannot have width or height larger than 32767.
+The function takes the following arguments:
+dst Pointer to destination image.
+src Pointer to first source image.
+zoomx X zoom factor. zoomx > 0.0.
+zoomy Y zoom factor. zoomy > 0.0.
+tx X translation.
+ty Y translation.
+filter Type of resampling filter. It can be one of the following:
+ MLIB_NEAREST
+ MLIB_BILINEAR
+ MLIB_BICUBIC
+ MLIB_BICUBIC2
+edge Type of edge condition. It can be one of the following:
+ MLIB_EDGE_DST_NO_WRITE
+ MLIB_EDGE_DST_FILL_ZERO
+ MLIB_EDGE_OP_NEAREST
+<beginning of page>
+ MLIB_EDGE_SRC_EXTEND
+ MLIB_EDGE_SRC_EXTEND_INDEF
+ MLIB_EDGE_SRC_PADDED
+blend Type of alpha blending. It can be one of the following:
+ MLIB_BLEND_GTK_SRC
+ MLIB_BLEND_GTK_SRC_OVER
+ MLIB_BLEND_GTK_SRC_OVER2
+alpha Overall alpha for blending.
+cmask Channel mask to indicate the alpha channel.
+The function returns MLIB_SUCCESS if successful. Otherwise it returns MLIB_FAILURE.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed _ MT-LevelMT-Safe
+mlib_ImageZoomBlend(3MLIB), mlib_ImageZoomTranslateTableBlend(3MLIB), attributes(5)

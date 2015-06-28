@@ -1,0 +1,106 @@
+<beginning of page>
+bufmod <-> STREAMS Buffer Module
+#include <sys/bufmod.h>
+ioctl(fd, I_PUSH, "bufmod");
+bufmod is a STREAMS module that buffers incoming messages, reducing the number of system calls and the asso<hy>
+ciated overhead required to read and process them. Although bufmod was originally designed to be used in conjunc<hy>
+tion with STREAMS-based networking device drivers, the version described here is general purpose so that it can
+be used anywhere STREAMS input buffering is required.
+The behavior of bufmod depends on various parameters and flags that can be set and queried as described below un<hy>
+der IOCTLS. bufmod collects incoming M_DATA messages into chunks, passing each chunk upstream when the
+chunk becomes full or the current read timeout expires. It optionally converts M_PROTO messages to M_DATA
+and adds them to chunks as well. It also optionally adds to each message a header containing a timestamp, and a cu<hy>
+mulative count of messages dropped on the stream read side due to resource exhaustion or flow control. Thedefault
+settings of bufmod allow it to drop messages when flow control sets in or resources are exhausted; disabling headers
+and explicitly requesting no drops makes bufmod pass all messages through. Finally, bufmod is capable of truncat<hy>
+ing upstream messages to a fixed, programmable length.
+When a message arrives, bufmod processes it in several steps. The following paragraphs discuss each step in turn.
+Upon receiving a message from below, if the SB_NO_HEADER flag is not set, bufmod immediately timestamps it
+and saves the current time value for later insertion in the header described below.
+Next, if SB_NO_PROTO_CVT is not set, bufmod converts all leading M_PROTO blocks in the message to
+M_DATA blocks, altering only the message type field and leaving the contents alone.
+It then truncates the message to the current snapshot length, which is set with the SBIOCSSNAP ioctl described be<hy>
+low.
+Afterwards, if SB_NO_HEADER is not set, bufmod prepends a header to the converted message. This header is
+defined as follows.
+ struct sb_hdr {
+  uint_t sbh_origlen;
+  uint_t sbh_msglen;
+  uint_t sbh_totlen;
+  uint_t sbh_drops;
+ #if defined(_LP64) || defined(_I32LPx)
+  struct timeval32 sbh_timestamp;
+ #else
+  struct timeval sbh_timestamp;
+ #endif /* !_LP64 */
+ };
+The sbh_origlen field gives the message's original length before truncation in bytes. The sbh_msglen field gives the
+length in bytes of the message after the truncation has been done. sbh_totlen gives the distance in bytes from the
+start of the truncated message in the current chunk (described below) to the start of the next message in the chunk;
+the value reflects any padding necessary to insure correct data alignment for the host machine and includes the
+length of the header itself. sbh_drops reports the cumulative number of input messages that this instance of bufmod
+has dropped due to flow control or resource exhaustion. In the current implementation message dropping due to flow
+control can occur only if the SB_NO_DROPS flag is not set. (Note: this accounts only for events occurring within
+bufmod, and does not count messages dropped by downstream or by upstream modules.) The sbh_timestamp field
+contains the message arrival time expressed as a struct timeval.
+After preparing a message, bufmod attempts to add it to the end of the current chunk, using the chunk size and time<hy>
+out values to govern the addition. The chunk size and timeout values are set and inspected using the ioctl() calls de<hy>
+scribed below. If adding the new message would make the current chunk grow larger than the chunk size, bufmod
+closes off the current chunk, passing it up to the next module in line, and starts a new chunk. If adding the message
+would still make the new chunk overflow, the module passes it upward in an over-size chunk of its own. Otherwise,
+the module concatenates the message to the end of the current chunk.
+To ensure that messages do not languish forever in an accumulating chunk, bufmod maintains a read timeout.
+Whenever this timeout expires, the module closes off the current chunk and passes it upward. The module restarts
+<beginning of page>
+the timeout period when it receives a read side data message and a timeout is not currently active. These two rules
+insure that bufmod minimizes the number of chunks it produces during periods of intense message activity and that
+it periodically disposes of all messages during slack intervals, but avoids any timeout overhead when there is no ac<hy>
+tivity.
+bufmod handles other message types as follows. Upon receiving an M_FLUSH message specifying that the read
+queue be flushed, the module clears the currently accumulating chunk and passes the message on to the module or
+driver above. (Note: bufmod uses zero length M_CTL messages for internal synchronization and does not pass
+them through.) bufmod passes all other messages through unaltered to its upper neighbor, maintaining message or<hy>
+der for non high priority messages by passing up any accumulated chunk first.
+If the SB_DEFER_CHUNK flag is set, buffering does not begin until the second message is received within the
+timeout window.
+If the SB_SEND_ON_WRITE flag is set, bufmod passes up the read side any buffered data when a message is re<hy>
+ceived on the write side. SB_SEND_ON_WRITE and SB_DEFER_CHUNK are often used together.
+bufmod intercepts M_IOCTL messages for the ioctls described below. The module passes all other messages
+through unaltered to its lower neighbor. If SB_SEND_ON_WRITE is set, message arrival on the writer side suffices
+to close and transmit the current read side chunk.
+bufmod responds to the following ioctls.
+SBIOCSTIME Set the read timeout value to the value referred to by the struct timeval pointer given as argument.
+Setting the timeout value to zero has the side-effect of forcing the chunk size to zero as well, so that the module will
+pass all incoming messages upward immediately upon arrival. Negative values are rejected with an EINVAL error.
+SBIOCGTIME Return the read timeout in the struct timeval pointed to by the argument. If the timeout has been
+cleared with the SBIOCCTIME ioctl, return with an ERANGE error.
+SBIOCCTIME Clear the read timeout, effectively setting its value to infinity. This results in no timeouts being ac<hy>
+tive and the chunk being delivered when it is full.
+SBIOCSCHUNK Set the chunk size to the value referred to by the uint_t pointer given as argument. See Notes for a
+description of effect on stream head high water mark.
+SBIOCGCHUNK Return the chunk size in the uint_t pointed to by the argument.
+SBIOCSSNAP Set the current snapshot length to the value given in the uint_t pointed to by the ioctl's final argu<hy>
+ment. bufmod interprets a snapshot length value of zero as meaning infinity, so it will not alter the message. See
+Notes for a description of effect on stream head high water mark.
+SBIOCGSNAP Returns the current snapshot length in the uint_t pointed to by the ioctl's final argument.
+SBIOCSFLAGS Set the current flags to the value given in the uint_t pointed to by the ioctl's final argument. Possi<hy>
+ble values are a combination of the following.
+SB_SEND_ON_WRITE Transmit the read side chunk on arrival of a message on the write side.
+SB_NO_HEADER Do not add headers to read side messages.
+SB_NO_DROPS Do not drop messages due to flow control upstream.
+SB_NO_PROTO_CVT Do not convert M_PROTO messages into M_DATA.
+<beginning of page>
+SB_DEFER_CHUNK Begin buffering on arrival of the second read side message in a timeout interval.
+SBIOCGFLAGS Returns the current flags in the uint_t pointed to by the ioctl's final argument.
+dlpi(7P), pfmod(7M)
+Older versions of bufmod did not support the behavioral flexibility controlled by the SBIOCSFLAGS ioctl. Appli<hy>
+cations that wish to take advantage of this flexibility can guard themselves against old versions of the module by in<hy>
+voking the SBIOCGFLAGS ioctl and checking for an EINVAL error return.
+When buffering is enabled by issuing an SBIOCSCHUNK ioctl to set the chunk size to a non zero value, bufmod
+sends a SETOPTS message to adjust the stream head high and low water marks to accommodate the chunked mes<hy>
+sages.
+When buffering is disabled by setting the chunk size to zero, message truncation can have a significant influence on
+data traffic at the stream head and therefore the stream head high and low water marks are adjusted to new values ap<hy>
+propriate for the smaller truncated message sizes.
+bufmod does not defend itself against allocation failures, so that it is possible, although very unlikely, for the stream
+head to use inappropriate high and low water marks after the chunk size or snapshot length have changed.

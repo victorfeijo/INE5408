@@ -1,0 +1,83 @@
+<beginning of page>
+usb_pipe_reset <-> Abort queued requests from a USB pipe and reset the pipe
+#include <sys/usb/usba.h>
+void usb_pipe_reset(dev_info_t *dip,
+ usb_pipe_handle_t pipe_handle, usb_flags_t usb_flags,
+ void (*callback)(usb_pipe_handle_t cb_pipe_handle,
+ usb_opaque_t arg, int rval, usb_cb_flags_t flags),
+ usb_opaque_t callback_arg);
+Solaris DDI specific (Solaris DDI)
+dip Pointer to the device's dev_info structure.
+pipe_handle Handle of the pipe to reset. Cannot be the handle to the default control pipe.
+usb_flags USB_FLAGS_SLEEP is the only flag recognized. Wait for completion.
+callback Function called on completion if the USB_FLAGS_SLEEP flag is not specified. If NULL, no notification
+of completion is provided.
+callback_arg Second argument to callback function.
+Call usb_pipe_reset() to reset a pipe which is in an error state, or to abort a current request and clear the pipe. The
+usb_pipe_reset() function can be called on any pipe other than the default control pipe.
+A pipe can be reset automatically when requests sent to the pipe have the USB_ATTRS_AUTOCLEARING attribute
+specified. Client drivers see an exception callback with the USB_CB_STALL_CLEARED callback flag set in such
+cases.
+Stalls on pipes executing requests without the USB_ATTRS_AUTOCLEARING attribute set must be cleared by the
+client driver. The client driver is notified of the stall via an exception callback. The client driver must then call
+usb_pipe_reset() to clear the stall.
+The usb_pipe_reset() function resets a pipe as follows:
+ 1. Any polling activity is stopped if the pipe being reset is an interrupt or isochronous pipe.
+ 2. All pending requests are removed from the pipe. An exception callback, if specified beforehand, is executed
+ for each aborted request.
+ 3. The pipe is reset to the idle state.
+Requests to reset the default control pipe are not allowed. No action is taken on a pipe which is closing.
+If USB_FLAGS_SLEEP is specified in flags, this function waits for the action to complete before calling the call<hy>
+back handler and returning. If not specified, this function queues the request and returns immediately, and the speci<hy>
+fied callback is called upon completion.
+callback is the callback handler. It takes the following arguments:
+usb_pipe_handle_t cb_pipe_handle
+Handle of the pipe to reset.
+usb_opaque_t callback_arg
+Callback_arg specified to usb_pipe_reset().
+int rval
+Return value of the reset call.
+<beginning of page>
+usb_cb_flags_t callback_flags
+Status of the queueing operation. Can be:
+USB_CB_NO_INFO <em> Callback was uneventful.
+USB_CB_ASYNC_REQ_FAILED <em> Error starting asynchronous request.
+Status is returned to the caller via the callback handler's rval argument. Possible callback hander rval argument val<hy>
+ues are:
+USB_SUCCESS Pipe successfully reset.
+USB_INVALID_PIPE pipe_handle specifies a pipe which is closed or closing.
+USB_INVALID_ARGS dip or pipe_handle arguments are NULL. USB_FLAGS_SLEEP is clear and callback is
+NULL.
+USB_INVALID_CONTEXT Called from interrupt context with the USB_FLAGS_SLEEP flag set.
+USB_INVALID_PERM pipe_handle specifies the default control pipe.
+USB_FAILURE Asynchronous resources are unavailable. In this case, USB_CB_ASYNC_REQ_FAILED is passed
+in as the callback_flags arg to the callback hander.
+Exception callback handlers of interrupt-IN and isochronous-IN requests which are terminated by these commands
+are called with a completion reason of USB_CR_STOPPED_POLLING.
+Exception handlers of incomplete bulk requests are called with a completion reason of USB_CR_FLUSHED.
+Exception handlers of unstarted requests are called with USB_CR_PIPE_RESET.
+Note that messages mirroring the above errors are logged to the console logfile on error. This provides status for
+calls which could not otherwise provide status.
+May be called from user or kernel context regardless of arguments. May be called from any callback with the
+USB_FLAGS_SLEEP clear. May not be called from a callback executing in interrupt context if the
+USB_FLAGS_SLEEP flag is set.
+If the USB_CB_ASYNC_REQ_FAILED bit is clear in usb_cb_flags_t, the callback, if supplied, can block because
+it is executing in kernel context. Otherwise the callback cannot block. Please see usb_callback_flags(9S) for more
+information on callbacks.
+ void post_reset_handler(
+  usb_pipe_handle_t, usb_opaque_t, int, usb_cb_flags_t);
+ /*
+  * Do an asynchronous reset on bulk_pipe.
+  * Execute post_reset_handler when done.
+  */
+ usb_pipe_reset(dip, bulk_pipe, 0, post_reset_handler, arg);
+ /* Do a synchronous reset on bulk_pipe. */
+ usb_pipe_reset(dip, bulk_pipe, USB_FLAGS_SLEEP, NULL, NULL);
+See attributes(5) for descriptions of the following attributes:
+<beginning of page>
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ ArchitecturePCI-
+based systems _ Interface stabilityCommitted _ AvailabilitySUNWusb
+attributes(5), usb_get_cfg(9F), usb_pipe_bulk_xfer(9F), usb_pipe_close(9F), usb_get_status(9F),
+usb_pipe_ctrl_xfer(9F), usb_pipe_drain_reqs(9F), usb_pipe_get_state(9F), usb_pipe_intr_xfer(9F),
+usb_pipe_isoc_xfer(9F), usb_pipe_open(9F), usb_pipe_stop_intr_polling(9F), usb_pipe_stop_isoc_polling(9F),
+usb_callback_flags(9S)

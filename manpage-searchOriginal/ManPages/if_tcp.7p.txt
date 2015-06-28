@@ -1,0 +1,283 @@
+<beginning of page>
+if_tcp, if <-> general properties of Internet Protocol network interfaces
+A network interface is a device for sending and receiving packets on a network. It is usually a hardware device, al<hy>
+though it can be implemented in software. Network interfaces used by the Internet Protocol (IPv4 or IPv6) must be
+STREAMS devices conforming to the Data Link Provider Interface (DLPI). See dlpi(7P).
+An interface becomes available to IP when it is opened and the IP module is pushed onto the stream with the
+I_PUSH ioctl(2) command. (See streamio(7I)). The SIOCSLIFNAME ioctl(2) is issued to specify the name of the
+interface and to indicate whether it is IPv4 or IPv6. This may be initiated by the kernel at boot time or by a user pro<hy>
+gram after the system is running. Each interface must be assigned an IP address with the SIOCSLIFADDR ioctl()
+before it can be used. On interfaces where the network-to-link layer address mapping is static, only the network
+number is taken from the ioctl() request; the remainder is found in a hardware specific manner. On interfaces which
+provide dynamic network-to-link layer address mapping facilities (for example, Ethernets using arp(7P)), the entire
+address specified in the ioctl() is used. A routing table entry for destinations on the network of the interface is in<hy>
+stalled automatically when an interface's address is set.
+You cannot create IPMP IP interfaces using the procedure described above. Instead, use ifconfig(1M).
+The following ioctl() calls may be used to manipulate IP network interfaces. Unless specified otherwise, the request
+takes an lifreq structure as its parameter. This structure has the form:
+ struct lifreq {
+ #define LIFNAMSIZ 32
+  char lifr_name[LIFNAMSIZ]; /* if name, e.g. "le1" */
+  union {
+  int lifru_addrlen; /* for subnet/token etc */
+  uint_t lifru_ppa; /* SIOCSLIFNAME */
+  } lifr_lifru1;
+  union {
+  struct sockaddr_storage lifru_addr;
+  struct sockaddr_storage lifru_dstaddr;
+  struct sockaddr_storage lifru_broadaddr;
+  struct sockaddr_storage lifru_token; /* With lifr_addrlen */
+  struct sockaddr_storage lifru_subnet; /* With lifr_addrlen */
+  int lifru_index; /* interface index */
+  uint64_t lifru_flags; /* SIOC?LIFFLAGS */
+  int lifru_metric;
+  uint_t lifru_mtu;
+  int lif_muxid[2]; /* mux id's for arp & ip */
+  struct lif_nd_req lifru_nd_req;
+  struct lif_ifinfo_req lifru_ifinfo_req;
+  zoneid_t lifru_zone; /* SIOC[GS]LIFZONE */
+  } lifr_lifru;
+ #define lifr_addrlen lifr_lifru1.lifru_addrlen
+ #define lifr_ppa lifr_lifru1.lifru_ppa /* Driver's ppa */
+ #define lifr_addr lifr_lifru.lifru_addr /* address */
+ #define lifr_dstaddr lifr_lifru.lifru_dstaddr
+ #define lifr_broadaddr lifr_lifru.lifru_broadaddr /* broadcast addr. */
+ #define lifr_token lifr_lifru.lifru_token /* address token */
+ #define lifr_subnet lifr_lifru.lifru_subnet /* subnet prefix */
+ #define lifr_index lifr_lifru.lifru_index /* interface index */
+ #define lifr_flags lifr_lifru.lifru_flags /* flags */
+ #define lifr_metric lifr_lifru.lifru_metric /* metric */
+ #define lifr_mtu lifr_lifru.lifru_mtu /* mtu */
+ #define lifr_ip_muxid lifr_lifru.lif_muxid[0]
+ #define lifr_arp_muxid lifr_lifru.lif_muxid[1]
+ #define lifr_nd lifr_lifru.lifru_nd_req /* SIOCLIF*ND */
+ #define lifr_ifinfo lifr_lifru.lifru_ifinfo_req /* SIOC[GS]LIFLNKINFO */
+ #define lifr_zone lifr_lifru.lifru_zone /* SIOC[GS]LIFZONE */
+ };
+SIOCSLIFADDR Set interface address.
+<beginning of page>
+SIOCGLIFADDR Get interface address.
+SIOCSLIFDSTADDR Set point to point address for interface.
+SIOCGLIFDSTADDR Get point to point address for interface.
+SIOCSLIFFLAGS Set interface flags field. If the interface is marked down, any processes currently routing packets
+through the interface are notified.
+SIOCGLIFFLAGS Get interface flags.
+SIOCGLIFCONF Get interface configuration list. This request takes a lifconf structure (see below) as a value-re<hy>
+sult parameter. The lifc_family field can be set to AF_UNSPEC to retrieve both AF_INET and AF_INET6 inter<hy>
+faces. The lifc_len field should be set to the size of the buffer pointed to by lifc_buf.
+The lifc_flags field should usually be set to zero, but callers that need low-level knowledge of the underlying IP in<hy>
+terfaces that comprise an IPMP group can set it to LIFC_UNDER_IPMP to request that those interfaces be in<hy>
+cluded in the result. Upon success, lifc_len contains the length, in bytes, of the array of lifreq structures pointed to
+by lifc_req. For each lifreq structure, the lifr_name and lifr_addr fields are valid.
+SIOCGLIFNUM Get number of interfaces. This request returns an integer which is the number of interface de<hy>
+scriptions (struct lifreq) returned by the SIOCGLIFCONF ioctl (in other words, indicates how large lifc_len must
+be).
+This request takes a struct lifnum (see below) as a value-result parameter. The lifn_family field can be set to
+AF_UNSPEC to count both AF_INET and AF_INET6 interfaces. The lifn_flags field should usually be set to ze<hy>
+ro, but callers that need low-level knowledge of the underlying IP interfaces that comprise an IPMP group can set it
+to LIFC_UNDER_IPMP to request that those interfaces be included in the count.
+SIOCSLIFMTU Set the maximum transmission unit (MTU) size for interface. Place the request in the lifru_mtu
+field. The MTU can not exceed the physical MTU limitation (which is reported in the DLPI DL_INFO_ACK
+message).
+SIOCGLIFMTU Get the maximum transmission unit size for interface.
+SIOCSLIFMETRIC Set the metric associated with the interface. The metric is used by routing daemons such as
+in.routed(1M).
+SIOCGLIFMETRIC Get the metric associated with the interface.
+SIOCGLIFMUXID Get the ip and arp muxid associated with the interface.
+SIOCSLIFMUXID Set the ip and arp muxid associated with the interface.
+SIOCGLIFINDEX Get the interface index associated with the interface.
+SIOCSLIFINDEX Set the interface index associated with the interface.
+SIOCGLIFZONE Get the zone associated with the interface.
+<beginning of page>
+SIOCSLIFZONE Set the zone associated with the interface. Only applies for zones that use the shared-IP instance.
+SIOCLIFADDIF Add a new logical interface on a physical interface using an unused logical interface number.
+SIOCLIFREMOVEIF Remove a logical interface by specifying its IP address or logical interface name.
+SIOCSLIFTOKEN Set the address token used to form IPv6 link-local addresses and for stateless address autocon<hy>
+figuration.
+SIOCGLIFTOKEN Get the address token used to form IPv6 link-local addresses and for stateless address autocon<hy>
+figuration.
+SIOCSLIFSUBNET Set the subnet prefix associated with the interface.
+SIOCGLIFSUBNET Get the subnet prefix associated with the interface.
+SIOCSLIFLNKINFO Set link specific parameters for the interface.
+SIOCGLIFLNKINFO Get link specific parameters for the interface.
+SIOCLIFDELND Delete a neighbor cache entry for IPv6.
+SIOCLIFGETND Get a neighbor cache entry for IPv6.
+SIOCLIFSETND Set a neighbor cache entry for IPv6.
+SIOCSLIFUSESRC Set the interface from which to choose a source address. The lifr_index field has the interface
+index corresponding to the interface whose address is to be used as the source address for packets going out on the
+interface whose name is provided by lifr_name. If the lifr_index field is set to zero, the previous setting is cleared.
+See ifconfig(1M) for examples of the usesrc option.
+SIOCGLIFUSESRC Get the interface index of the interface whose address is used as the source address for pack<hy>
+ets going out on the interface provided by lifr_name field. The value is retrieved in the lifr_index field. See ifcon<hy>
+fig(1M) for examples of the usesrc option.
+SIOCGLIFSRCOF Get the interface configuration list for interfaces that use an address hosted on the interface pro<hy>
+vided by the lifs_ifindex field in the lifsrcof struct (see below), as a source address. The application sets lifs_maxlen
+to the size (in bytes) of the buffer it has allocated for the data. On return, the kernel sets lifs_len to the actual size re<hy>
+quired. Note, the application could set lifs_maxlen to zero to query the kernel of the required buffer size instead of
+estimating a buffer size. The application tests lifs_len <= lifs_maxlen -- if that's true, the buffer was big enough and
+the application has an accurate list. If it is false, it needs to allocate a bigger buffer and try again, and lifs_len pro<hy>
+vides a hint of how big to make the next trial. See ifconfig(1M) for examples of the usesrc option.
+SIOCTONLINK Test if the address is directly reachable, for example, that it can be reached without going through
+a router. This request takes an sioc_addrreq structure (see below) as a value-result parameter. The sa_addr field
+should be set to the address to test. The sa_res field will contain a non-zero value if the address is onlink.
+SIOCTMYADDR Test if the address is assigned to this node. This request takes an sioc_addrreq structure (see be<hy>
+low) as a value-result parameter. The sa_addr field should be set to the address to test. The sa_res field will contain
+a non-zero value if the address is assigned to this node.
+<beginning of page>
+SIOCTMYSITE Test if the address is part of the same site as this node. This request takes an sioc_addrreq struc<hy>
+ture (see below) as a value-result parameter. The sa_addr field should be set to the address to test. The sa_res field
+will contain a non-zero value if the address is in the same site.
+The structure used by SIOCGLIFCONF has the form:
+ struct lifconf {
+  sa_family_t lifc_family;
+  int lifc_flags; /* request specific
+  /* interfaces */
+  int lifc_len; /* size of assoc. buffer */
+  union {
+  caddr_t lifcu_buf;
+  struct lifreq *lifcu_req;
+  } lifc_lifcu;
+ #define lifc_buf lifc_lifcu.lifcu_buf /* buffer address */
+ #define lifc_req lifc_lifcu.lifcu_req /* array of structs returned */
+ };
+The structure used by SIOCGLIFNUM has the form:
+ struct lifnum {
+  sa_family_t lifn_family;
+  int lifn_flags; /* req. specf. interfaces */
+  int lifn_count; /* Result */
+ };
+The structure used by SIOCTONLINK, SIOCTMYADDR and SIOCTMYSITE has the form:
+ struct sioc_addrreq {
+  struct sockaddr_storage sa_addr; /* Address to test */
+  int sa_res; /* Result - 0/1 */
+ };
+The structure used by SIOCGLIFSRCOF has the form:
+  struct lifsrcof {
+  uint_t lifs_ifindex; /* addr on this interface */
+  /* used as the src addr */
+  size_t lifs_maxlen; /* size of buffer: input */
+  size_t lifs_len; /* size of buffer: output */
+  union {
+  caddr_t lifsu_buf;
+  struct lifreq *lifsu_req;
+  } lifs_lifsu;
+ #define lifs_buf lifs_lifsu.lifsu_buf /* buffer addr. */
+ #define lifs_req lifs_lifsu.lifsu_req /* array returned */
+ };
+The following ioctl() calls are maintained for compatibility but only apply to IPv4 network interfaces, since the data
+structures are too small to hold an IPv6 address. Unless specified otherwise, the request takes an ifreq structure as its
+parameter. This structure has the form:
+ struct ifreq {
+ #define IFNAMSIZ 16
+  char ifr_name[IFNAMSIZ]; /* interface name - e.g. "hme0" */
+  union {
+   struct sockaddr ifru_addr;
+<beginning of page>
+   struct sockaddr ifru_dstaddr;
+   struct sockaddr ifru_broadaddr;
+   short ifru_flags;
+   int ifru_metric;
+   int if_muxid[2]; /* mux id's for arp and ip */
+   int ifru_index;  /* interface index */
+  } ifr_ifru;
+ #define ifr_addr ifr_ifru.ifru_addr /* address */
+ #define ifr_dstaddr ifr_ifru.ifru_dstaddr /* other end of p-to-p link */
+ #define ifr_broadaddr ifr_ifru.ifru_broadaddr /* broadcast address */
+ #define ifr_flags ifr_ifru.ifru_flags /* flags */
+ #define ifr_index ifr_ifru.ifru_index /* interface index */
+ #define ifr_metric ifr_ifru.ifru_metric /* metric */
+ };
+SIOCSIFADDR Set interface address.
+SIOCGIFADDR Get interface address.
+SIOCSIFDSTADDR Set point to point address for interface.
+SIOCGIFDSTADDR Get point to point address for interface.
+SIOCSIFFLAGS Set interface flags field. If the interface is marked down, any processes currently routing packets
+through the interface are notified.
+SIOCGIFFLAGS Get interface flags.
+SIOCGIFCONF Get interface configuration list. This request takes an ifconf structure (see below) as a value-result
+parameter. The ifc_len field should be set to the size of the buffer pointed to by ifc_buf. Upon success, ifc_len will
+contain the length, in bytes, of the array of ifreq structures pointed to by ifc_req. For each ifreq structure, the
+ifr_name and ifr_addr fields are valid. Though IPMP IP interfaces are included in the array, underlying IP inter<hy>
+faces that comprise those IPMP groups are not.
+SIOCGIFNUM Get number of interfaces. This request returns an integer which is the number of interface descrip<hy>
+tions (struct ifreq) returned by the SIOCGIFCONF ioctl (in other words, indicates how large ifc_len must be).
+Though IPMP IP interfaces are included in the array, underlying IP interfaces that comprise those IPMP groups are
+not.
+SIOCSIFMTU Set the maximum transmission unit (MTU) size for interface. Place the request in the ifr_metric
+field. The MTU has to be smaller than physical MTU limitation (which is reported in the DLPI DL_INFO_ACK
+message).
+SIOCGIFMTU Get the maximum transmission unit size for interface. Upon success, the request is placed in the
+ifr_metric field.
+SIOCSIFMETRIC Set the metric associated with the interface. The metric is used by routine daemons such as
+in.routed(1M).
+SIOCGIFMETRIC Get the metric associated with the interface.
+<beginning of page>
+SIOCGIFMUXID Get the ip and arp muxid associated with the interface.
+SIOCSIFMUXID Set the ip and arp muxid associated with the interface.
+SIOCGIFINDEX Get the interface index associated with the interface.
+SIOCSIFINDEX Set the interface index associated with the interface.
+The ifconf structure has the form:
+ struct ifconf {
+  int ifc_len; /* size of assoc. buffer */
+  union {
+   caddr_t ifcu_buf;
+   struct ifreq *ifcu_req;
+  } ifc_ifcu;
+ #define ifc_buf ifc_ifcu.ifcu_buf /* buffer address */
+ #define ifc_req ifc_ifcu.ifcu_req /* array of structs returned */
+ };
+You can use the ifconfig(1M) command to display the IFF_ flags listed below (with the leading IFF_ prefix re<hy>
+moved). See the ifconfig(1M) manpage for a definition of each flag.
+ #define IFF_UP 0x0000000001 /* Address is up */
+ #define IFF_BROADCAST 0x0000000002 /* Broadcast address valid */
+ #define IFF_DEBUG 0x0000000004 /* Turn on debugging */
+ #define IFF_LOOPBACK 0x0000000008 /* Loopback net */
+ #define IFF_POINTOPOINT 0x0000000010 /* Interface is p-to-p */
+ #define IFF_NOTRAILERS 0x0000000020 /* Avoid use of trailers */
+ #define IFF_RUNNING 0x0000000040 /* Resources allocated */
+ #define IFF_NOARP 0x0000000080 /* No address res. protocol */
+ #define IFF_PROMISC 0x0000000100 /* Receive all packets */
+ #define IFF_ALLMULTI 0x0000000200 /* Receive all multicast pkts */
+ #define IFF_INTELLIGENT 0x0000000400 /* Protocol code on board */
+ #define IFF_MULTICAST 0x0000000800 /* Supports multicast */
+ #define IFF_MULTI_BCAST 0x0000001000 /* Multicast using broadcst. add. */
+ #define IFF_UNNUMBERED 0x0000002000 /* Non-unique address */
+ #define IFF_DHCPRUNNING 0x0000004000 /* DHCP controls interface */
+ #define IFF_PRIVATE 0x0000008000 /* Do not advertise */
+ #define IFF_NOXMIT 0x0000010000 /* Do not transmit pkts */
+ #define IFF_NOLOCAL 0x0000020000 /* No address - just on-link subnet */
+ #define IFF_DEPRECATED 0x0000040000 /* Address is deprecated */
+ #define IFF_ADDRCONF 0x0000080000 /* Addr. from stateless addrconf */
+ #define IFF_ROUTER 0x0000100000 /* Router on interface */
+ #define IFF_NONUD 0x0000200000 /* No NUD on interface */
+ #define IFF_ANYCAST 0x0000400000 /* Anycast address */
+ #define IFF_NORTEXCH 0x0000800000 /* Don't xchange rout. info */
+ #define IFF_IPV4 0x0001000000 /* IPv4 interface */
+ #define IFF_IPV6 0x0002000000 /* IPv6 interface */
+ #define IFF_NOFAILOVER 0x0008000000 /* in.mpathd test address */
+ #define IFF_FAILED 0x0010000000 /* Interface has failed */
+ #define IFF_STANDBY 0x0020000000 /* Interface is a hot-spare */
+ #define IFF_INACTIVE 0x0040000000 /* Functioning but not used */
+<beginning of page>
+ #define IFF_OFFLINE 0x0080000000 /* Interface is offline */
+ #define IFF_XRESOLV 0x0100000000 /* IPv6 external resolver */
+ #define IFF_COS_ENABLED 0x0200000000 /* If CoS marking is supported */
+ #define IFF_PREFERRED 0x0400000000 /* Prefer as source address */
+ #define IFF_TEMPORARY 0x0800000000 /* RFC3041 */
+ #define IFF_FIXEDMTU 0x1000000000 /* MTU set with SIOCSLIFMTU */
+ #define IFF_VIRTUAL 0x2000000000 /* Cannot send/receive pkts */
+ #define IFF_DUPLICATE 0x4000000000 /* Local address in use */
+ #define IFF_IPMP 0x8000000000 /* IPMP IP interface */
+EPERM Calling process has insufficient privileges.
+ENXIO The lifr_name member of the lifreq structure contains an invalid value.
+For SIOCGLIFSRCOF, the lifs_ifindex member of the lifsrcof structure contains an invalid value.
+For SIOCSLIFUSESRC, this error is returned if the lifr_index is set to an invalid value.
+EBADADDR Wrong address family or malformed address.
+EINVAL For SIOCSLIFMTU, this error is returned when the requested MTU size is invalid. This error indicates
+the MTU size is greater than the MTU size supported by the DLPI provider or less than 68 (for IPv4) or less than
+1280 (for IPv6).
+For SIOCSLIFUSESRC, this error is returned if either the lifr_index or lifr_name identify interfaces that are al<hy>
+ready part of an existing IPMP group.
+EEXIST For SIOCLIFADDIF, this error is returned if the lifr_name member in the lifreq structure corresponds to
+an interface that already has the PPA specified by lifr_ppa plumbed.
+ifconfig(1M), in.routed(1M), ioctl(2), streamio(7I), arp(7P), dlpi(7P), ip(7P), ip6(7P)

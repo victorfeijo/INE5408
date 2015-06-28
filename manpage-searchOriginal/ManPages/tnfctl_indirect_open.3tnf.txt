@@ -1,0 +1,74 @@
+<beginning of page>
+tnfctl_indirect_open, tnfctl_check_libs <-> control probes of another process where caller provides /proc functionality
+cc [ flag ... ] file ... -ltnfctl [ library ... ]
+#include <tnf/tnfctl.h>
+tnfctl_errcode_t tnfctl_indirect_open(void *prochandle,
+ tnfctl_ind_config_t *config, tnfctl_handle_t **ret_val);
+tnfctl_errcode_t tnfctl_check_libs(tnfctl_handle_t *hndl);
+The interfaces tnfctl_indirect_open() and tnfctl_check_libs() are used to control probes in another process where
+the libtnfctl(3TNF) client has already opened proc(4) on the target process. An example of this is when the client is
+a debugger. Since these clients already use /proc on the target, libtnfctl(3TNF) cannot use /proc directly. Therefore,
+these clients must provide callback functions that can be used to inspect and to update the target process. The target
+process must load libtnfprobe.so.1 (defined in <tnf/tnfctl.h> as macro TNFCTL_LIBTNFPROBE).
+The first argument prochandle is a pointer to an opaque structure that is used in the callback functions that inspect
+and update the target process. This structure should encapsulate the state that the caller needs to use /proc on the
+target process (the /proc file descriptor). The second argument, config, is a pointer to
+ typedef
+ struct tnfctl_ind_config {
+  int (*p_read)(void *prochandle, paddr_t addr, char *buf,
+      size_t size);
+  int (*p_write)(void *prochandle, paddr_t addr, char *buf,
+      size_t size);
+  pid_t (*p_getpid)(void *prochandle);
+  int (*p_obj_iter)(void *prochandle, tnfctl_ind_obj_f *func,
+      void *client_data);
+ } tnfctl_ind_config_t;
+The first field p_read is the address of a function that can read size bytes at address addr in the target image into the
+buffer buf. The function should return 0 upon success.. The second field p_write is the address of a function that can
+write size bytes at address addr in the target image from the buffer buf. The function should return 0 upon success.
+The third field p_getpid is the address of a function that should return the process id of the target process (prochan<hy>
+dle). The fourth field p_obj_iter is the address of a function that iterates over all load objects and the executable by
+calling the callback function func with client_data. If func returns 0, p_obj_iter should continue processing link ob<hy>
+jects. If func returns any other value, p_obj_iter should stop calling the callback function and return that value.
+p_obj_iter should return 0 if it iterates over all load objects.
+If a failure is returned by any of the functions in config, the error is propagated back as PREX_ERR_INTERNAL
+by the libtnfctl interface that called it.
+The definition of tnfctl_ind_obj_f is:
+ typedef int
+ tnfctl_ind_obj_f(void *prochandle,
+  const struct tnfctl_ind_obj_info *obj
+  void *client_data);
+ typedef struct tnfctl_ind_obj_info {
+  int objfd;   /* -1 indicates fd not available */
+  paddr_t text_base;  /* virtual addr of text segment */
+  paddr_t data_base;  /* virtual addr of data segment */
+  const char *objname;  /* null-term. pathname to loadobj */
+ } tnfctl_ind_obj_info_t;
+objfd should be the file descriptor of the load object or executable. If it is <mi>1, then objname should be an absolute
+pathname to the load object or executable. If objfd is not closed by libtnfctl, it should be closed by the load object
+iterator function. text_base and data_base are the addresses where the text and data segments of the load object are
+mapped in the target process.
+Whenever the target process opens or closes a dynamic object, the set of available probes may change. See
+dlopen(3C) and dlclose(3C). In indirect mode, call tnfctl_check_libs() when such events occur to make libtnfctl
+aware of any changes. In other modes this is unnecessary but harmless. It is also harmless to call tn<hy>
+<beginning of page>
+fctl_check_libs() when no such events have occurred.
+tnfctl_indirect_open() and tnfctl_check_libs() return TNFCTL_ERR_NONE upon success.
+The following error codes apply to tnfctl_indirect_open():
+TNFCTL_ERR_ALLOCFAIL A memory allocation failure occurred.
+TNFCTL_ERR_BUSY Internal tracing is being used.
+TNFCTL_ERR_NOLIBTNFPROBE libtnfprobe.so.1 is not loaded in the target process.
+TNFCTL_ERR_INTERNAL An internal error occurred.
+The following error codes apply to tnfctl_check_libs():
+TNFCTL_ERR_ALLOCFAIL A memory allocation failure occurred.
+TNFCTL_ERR_INTERNAL An internal error occurred.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Availability<hy>
+SUNWtnfc _ MT LevelMT-Safe
+prex(1), TNF_PROBE(3TNF), dlclose(3C), dlopen(3C), libtnfctl(3TNF), tnfctl_probe_enable(3TNF), tn<hy>
+fctl_probe_trace(3TNF), tracing(3TNF), proc(4), attributes(5)
+Linker and Libraries Guide
+tnfctl_indirect_open() should only be called after the dynamic linker has mapped in all the libraries (rtld sync
+point) and called only after the process is stopped. Indirect process probe control assumes the target process is
+stopped whenever any libtnfctl interface is used on it. For example, when used for indirect process probe control,
+tnfctl_probe_enable(3TNF) and tnfctl_probe_trace(3TNF) should be called only for a process that is stopped.

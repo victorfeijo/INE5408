@@ -1,0 +1,117 @@
+<beginning of page>
+devid_get, devid_compare, devid_deviceid_to_nmlist, devid_free, devid_free_nmlist, devid_get_minor_name, dev<hy>
+id_sizeof, devid_str_decode, devid_str_free, devid_str_encode, devid_valid <-> device ID interfaces for user applica<hy>
+tions
+cc [ flag... ] file... -ldevid [ library... ]
+#include <devid.h>
+int devid_get(int fd, ddi_devid_t *retdevid);
+void devid_free(ddi_devid_t devid);
+int devid_get_minor_name(int fd, char **retminor_name);
+int devid_deviceid_to_nmlist(char *search_path, ddi_devid_t devid,
+ char *minor_name, devid_nmlist_t **retlist);
+void devid_free_nmlist(devid_nmlist_t *list);
+int devid_compare(ddi_devid_t devid1, ddi_devid_t devid2);
+size_t devid_sizeof(ddi_devid_t devid);
+int devid_valid(ddi_devid_t devid);
+char *devid_str_encode(ddi_devid_t devid, char *minor_name);
+int devid_str_decode(char *devidstr, ddi_devid_t *retdevid,
+ char **retminor_name);
+void devid_str_free(char *str);
+These functions provide unique identifiers (device IDs) for devices. Applications and device drivers use these func<hy>
+tions to identify and locate devices, independent of the device's physical connection or its logical device name or
+number.
+The devid_get() function returns in retdevid the device ID for the device associated with the open file descriptor fd,
+which refers to any device. It returns an error if the device does not have an associated device ID. The caller must
+free the memory allocated for retdevid using the devid_free() function.
+The devid_free() function frees the space that was allocated for the returned devid by devid_get() and dev<hy>
+id_str_decode().
+The devid_get_minor_name() function returns the minor name, in retminor_name, for the device associated with
+the open file descriptor fd. This name is specific to the particular minor number, but is "instance number" specific.
+The caller of this function must free the memory allocated for the returned retminor_name string using dev<hy>
+id_str_free().
+The devid_deviceid_to_nmlist() function returns an array of devid_nmlist structures, where each entry matches the
+devid and minor_name passed in. If the minor_name specified is one of the special values (DEVID_MI<hy>
+NOR_NAME_ALL, DEVID_MINOR_NAME_ALL_CHR, or DEVID_MINOR_NAME_ALL_BLK) , then all
+minor names associated with devid which also meet the special minor_name filtering requirements are returned. The
+devid_nmlist structure contains the device name and device number. The last entry of the array contains a null point<hy>
+er for the devname and NODEV for the device number. This function traverses the file tree, starting at search_path.
+For each device with a matching device ID and minor name tuple, a device name and device number are added to
+the retlist. If no matches are found, an error is returned. The caller of this function must free the memory allocated
+for the returned array with the devid_free_nmlist() function. This function may take a long time to complete if
+called with the device ID of an unattached device.
+The devid_free_nmlist() function frees the memory allocated by the devid_deviceid_to_nmlist() function.
+The devid_compare() function compares two device IDs and determines both equality and sort order. The function
+returns an integer greater than 0 if the device ID pointed to by devid1 is greater than the device ID pointed to by dev<hy>
+id2. It returns 0 if the device ID pointed to by devid1 is equal to the device ID pointed to by devid2. It returns an in<hy>
+teger less than 0 if the device ID pointed to by devid1 is less than the device ID pointed to by devid2. This function
+is the only valid mechanism to determine the equality of two devids. This function may indicate equality for argu<hy>
+ments which by simple inspection appear different.
+<beginning of page>
+The devid_sizeof() function returns the size of devid in bytes.
+The devid_valid() function validates the format of a devid. It returns 1 if the format is valid, and 0 if invalid. This
+check may not be as complete as the corresponding kernel function ddi_devid_valid() (see ddi_devid_com<hy>
+pare(9F)).
+The devid_str_encode() function encodes a devid and minor_name into a null-terminated ASCII string, returning a
+pointer to that string. To avoid shell conflicts, the devid portion of the string is limited to uppercase and lowercase
+letters, digits, and the plus (+), minus (-), period (.), equals (=), underscore (_), tilde (~), and comma (,) characters. If
+there is an ASCII quote character in the binary form of a devid, the string representation will be in hex_id form, not
+ascii_id form. The comma (,) character is added for "id1," at the head of the string devid. If both a devid and a mi<hy>
+nor_name are non-null, a slash (/)is used to separate the devid from the minor_name in the encoded string. If mi<hy>
+nor_name is null, only the devid is encoded. If the devid is null then the special string "id0" is returned. Note that
+you cannot compare the returned string against another string with strcmp(3C) to determine devid equality. The
+string returned must be freed by calling devid_str_free().
+The devid_str_decode() function takes a string previously produced by the devid_str_encode() or ddi_dev<hy>
+id_str_encode() (see ddi_devid_compare(9F)) function and decodes the contained device ID and minor name, allo<hy>
+cating and returning pointers to the extracted parts via the retdevid and retminor_name arguments. If the special dev<hy>
+idstr "id0" was specified, the returned device ID and minor name will both be null. A non-null returned devid must
+be freed by the caller by the devid_free() function. A non-null returned minor name must be freed by calling dev<hy>
+id_str_free().
+The devid_str_free() function frees the character string returned by devid_str_encode() and the retminor_name ar<hy>
+gument returned by devid_str_decode().
+Upon successful completion, the devid_get(), devid_get_minor_name(), devid_str_decode(), and devid_devi<hy>
+ceid_to_nmlist() functions return 0. Otherwise, they return <mi>1.
+The devid_compare() function returns the following values:
+<mi>1 The device ID pointed to by devid1 is less than the device ID pointed to by devid2.
+0 The device ID pointed to by devid1 is equal to the device ID pointed to by devid2.
+1 The device ID pointed to by devid1 is greater than the device ID pointed to by devid2.
+The devid_sizeof() function returns the size of devid in bytes. If devid is null, the number of bytes that must be allo<hy>
+cated and initialized to determine the size of a complete device ID is returned.
+The devid_valid() function returns 1 if the devid is valid and 0 if the devid is invalid.
+The devid_str_encode() function returns NULL to indicate failure. Failure may be caused by attempting to encode
+an invalid string. If the return value is non-null, the caller must free the returned string by using the dev<hy>
+id_str_free() function. Example 1 Using devid_get(), devid_get_minor_name(), and devid_str_encode()
+The following example shows the proper use of devid_get(), devid_get_minor_name(), and devid_str_encode() to
+free the space allocated for devid, minor_name and encoded devid.
+ int fd;
+ ddi_devid_t devid;
+ char *minor_name, *devidstr;
+ if ((fd = open("/dev/dsk/c0t3d0s0", O_RDONLY|O_NDELAY)) < 0) {
+  ...
+ }
+ if (devid_get(fd, &devid) != 0) {
+  ...
+ }
+ if (devid_get_minor_name(fd, &minor_name) != 0) {
+  ...
+ }
+<beginning of page>
+ if ((devidstr = devid_str_encode(devid, minor_name)) == 0) {
+  ...
+ }
+ printf("devid %s\n", devidstr);
+ devid_str_free(devidstr);
+ devid_free(devid);
+ devid_str_free(minor_name);
+Example 2 Using devid_deviceid_to_nmlist() and devid_free_nmlist()
+The following example shows the proper use of devid_deviceid_to_nmlist() and devid_free_nmlist():
+ devid_nmlist_t *list = NULL;
+ int err;
+ if (devid_deviceid_to_nmlist("/dev/rdsk", devid,
+  minor_name, &list))
+  return (-1);
+ /* loop through list and process device names and numbers */
+ devid_free_nmlist(list);
+See attributes(5) for description of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelMT<mi>Safe
+_ Interface StabilityStable
+free(3C), libdevid(3LIB), attributes(5), ddi_devid_compare(9F)

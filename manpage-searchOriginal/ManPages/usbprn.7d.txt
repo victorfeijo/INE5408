@@ -1,0 +1,142 @@
+<beginning of page>
+usbprn <-> USB printer class driver
+#include <sys/usb/clients/printer/usb_printer.h>
+#include <sys/ecppio.h>
+usbprn@unit-address
+The usbprn driver is a USBA (Solaris USB Architecture) compliant client driver that supports the USB Printer
+Class 1.0 specification. The usbprn driver supports a subset of the ecpp(7D) parallel port driver functionality. How<hy>
+ever, unlike the STREAMS-based ecpp driver, usbprn is a character driver.
+The usbprn driver supports all USB printer-class compliant printers. For a list of recommended printers and USB
+parallel printer adapters, visit http://www.sun.com/io.
+The usbrpn driver includes support for communicating with many different printers. To use these printers, it may be
+nesessary to install and configure additional format conversion packages available in the Solaris distribution. Config<hy>
+uration of these conversion packages under the Solaris printing system can be simplified through the use of the
+printmgr(1M). This tool allows selection of printer manufacturer/model information while creating a print queue.
+For USB connected printers, it attempts to pre-select the the manufacturer and model information based on the 1284
+device id supplied by the printer.
+The usbprn driver also supports a ugen(7D) interface allowing raw access to the device, for example by
+libusb(3LIB) applications, by passing the drivers bound to each interface. Because a libusb application might
+change the state of the device, you should not access the device through the child interface drivers.
+With certain minor exceptions (outlined in the Notes sections below), the usbprn driver supports a subset of the
+ecpp(7D) ioctl interfaces:
+Configuration variables are set to their default values each time the USB printer device is attached. The write_time<hy>
+out period (defined in the ECPPIOC_SETPARMS ioctl description below) is set to 90 seconds. The mode is set to
+centronics mode (ECPP_CENTRONICS). Parameters can be changed through the ECPPIOC_SETPARMS ioctl and
+read through the ECPPIOC_GETPARMS ioctl. Each time the USB printer device is opened, the device is marked as
+busy and all further opens will return EBUSY. Once the device is open, applications can write to the device and the
+driver can send data and obtain device id and status. Note -
+Unlike the ecpp(7D) driver, usbprn resets configuration variables to their default values with each attach(9E). (The
+ecpp(7D) driver resets configuration variables with each open(2).)
+A write(2) operation returns the number of bytes successfully written to the device. If a failure occurs while a driver
+is transferring data to printer, the contents of the status bits are captured at the time of the error and can be retrieved
+by the application program using the ECPPIOC_GETERR ioctl(2) call. The captured status information is overwrit<hy>
+ten each time an ECPPIOC_TESTIO ioctl(2) occurs.
+The usbprn driver supports prnio(7I) interfaces. Note that the PRNIOC_RESET command has no effect on USB
+printers.
+The following ioctl(2) calls are supported for backward compatibility and are not recommended for new applica<hy>
+tions.
+ECPPIOC_GETPARMS Gets current transfer parameters. The argument is a pointer to struct ecpp_trans<hy>
+fer_parms. If parameters are not configured after the device is opened, the structure will be set to its default config<hy>
+uration. Note -
+Unlike the ecpp(7D) driver, only the ECPP_CENTRONICS mode is currently supported in usbprn.
+ECPPIOC_SETPARMS Sets transfer parameters. The argument is a pointer to a struct ecpp_transfer_parms. If a
+parameter is out of range, EINVAL is returned. If the peripheral or host device cannot support the requested mode,
+EPROTONOSUPPORT is returned.
+The transfer parameters structure is defined in <sys/ecppio.h>:
+ struct ecpp_transfer_parms {
+  int write_timeout;
+  int mode;
+<beginning of page>
+ };
+The write_timeout field, which specifies how long the driver will take to transfer 8192 bytes of data to the device, is
+set to a default value of 90 seconds. The write_timeout field must be greater than one second and less than 300 sec<hy>
+onds (five minutes.) Note -
+Unlike the ecpp(7D) driver, only the ECPP_CENTRONICS mode is currently supported in usbprn. Also, the se<hy>
+mantics of write_timeout in usbprn differ from ecpp(7D). Refer to ecpp(7D) for information.
+BPPIOC_TESTIO Tests the transfer readiness of a print device and checks status bits to determine if a write(2)
+will succeed. If status bits are set, a transfer will fail. If a transfer will succeed, zero is returned. If a transfer fails, the
+driver returns EIO and the state of the status bits are captured. The captured status can be retrieved using the BPPI<hy>
+OC_GETERR ioctl(2) call. BPPIOC_TESTIO and BPPIOC_GETERR are compatible to the ioctls specified in
+bpp(7D). Note -
+Unlike the ecpp(7D) driver, only the ECPP_CENTRONICS mode is currently supported in usbprn. Additionally,
+bus_error and timeout_occurred fields are not used in the usbprn interface. (In ecpp(7D), timeout_occurred is
+used.)
+BPPIOC_GETERR Get last error status. The argument is a pointer to a struct bpp_error_status. This structure
+indicates the status of all the appropriate status bits at the time of the most recent error condition during a write(2)
+call, or the status of the bits at the most recent BPPIOC_TESTIO ioctl(2) call.
+ struct bpp_error_status {
+  char timeout_occurred; /* not used */
+  char bus_error; /* not used */
+  uchar_t pin_status; /* status of pins which
+  /* could cause error */
+ };
+The pin_status field indicates possible error conditions. The error status structure bpp_error_status is defined in the
+include file <sys/bpp_io.h>. The valid bits for pin_status can be BPP_ERR_ERR, BPP_SLCT_ERR, and
+BPP_PE_ERR. A set bit indicates that the associated pin is asserted. Note -
+Unlike the ecpp(7D) driver, only the ECPP_CENTRONICS mode is currently supported in usbprn. Additionally,
+the bus_error and timeout_occurred fields are not used in the usbprn interface. (In ecpp(7D), timeout_occurred
+is used.) Unlike ecpp(7D), the BPP_BUSY_ERR status bit is not supported by USB printers.
+ECPPIOC_GETDEVID Gets the IEEE 1284 device ID from the peripheral. The argument is a pointer to a struct
+ecpp_device_id. Applications should set mode to ECPP_CENTRONICS. If another mode is used, the driver will re<hy>
+turn EPROTONOSUPPORT. len is the length of the buffer pointed to by addr. rlen is the actual length of the de<hy>
+vice ID string returned from the peripheral. If the returned rlen is greater than len, the application should call ECP<hy>
+PIOC_GETDEVID a second time with a buffer length equal to rlen.
+The 1284 device ID structure:
+ struct ecpp_device_id {
+  int mode; /* mode to use for reading device id */
+  int len; /* length of buffer */
+  int rlen; /* actual length of device id string */
+  char *addr; /* buffer address */
+Note -
+Unlike ecpp(7D), only the ECPP_CENTRONICS mode is currently supported in usbprn.
+ The read operation is not supported and returns EIO.
+EBUSY
+ The device has been opened and another open is attempted. An attempt has been made to unload the driver while
+one of the units is open.
+<beginning of page>
+EINVAL An unsupported IOCTL has been received. A ECPPIOC_SETPARMS ioctl(2) is attempted with an out of
+range value in the ecpp_transfer_parms structure.
+EIO The driver has received an unrecoverable device error, or the device is not responding, or the device has stalled
+when attempting an access. A write(2) or ioctl(2) did not complete due to a peripheral access. A read(2) system call
+has been issued.
+ENXIO The driver has received an open(2) request for a unit for which the attach failed.
+ENODEV The driver has received an open(2) request for a device that has been disconnected.
+EPROTONOSUPPORT The driver has received a ECPPIOC_SETPARMS ioctl(2) for a mode argument other than
+ECPP_CENTRONICS in the ecpp_transfer_parms structure.
+/kernel/drv/usbprn 32-bit x86 ELF kernel module
+/kernel/drv/amd64/usbprn 64-bit x86 ELF kernel module
+/kernel/drv/sparcv9/usbprn 64-bit SPARC ELF kernel module
+/dev/usb/*/*/* ugen(7D) nodes.
+/dev/printers/n Character special files
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ ArchitectureS<hy>
+PARC, x86, PCI-based systems _ AvailabilitySUNWusb
+cfgadm_usb(1M), printmgr(1M), ioctl(2), open(2), read(2), write(2), libusb(3LIB), attributes(5), bpp(7D),
+ecpp(7D), ugen(7D), usba(7D)prnio(7I), attach(9E)
+Writing Device Drivers
+Universal Serial Bus Specification 1.0 and 1.1
+USB Device Class Definition for Printing Devices 1.0
+System Administration Guide: Basic Administration
+http://www.sun.com/io
+In addition to being logged, the following messages may appear on the system console. All messages are formatted
+in the following manner:
+ Warning: <device path> (usbprn<instance num>): Error Message...
+Device was disconnected while open. Data may have been lost.
+The device has been hot-removed or powered off while it was open and a possible data transfer was in progress. The
+job may be aborted.
+<beginning of page>
+Cannot access <device>. Please reconnect.
+There was an error in accessing the printer during reconnect. Please reconnect the device.
+Device is not identical to the previous one on this port. Please disconnect and reconnect.
+A USB printer was hot-removed while open. A new device was hot-inserted which is not identical to the original
+USB printer. Please disconnect the USB device and reconnect the printer to the same port.
+Printer has been reconnected but data may have been lost.
+The printer that was hot-removed from its USB port has been re-inserted again to the same port. It is available for
+access but the job that was running prior to the hot-removal may be lost.
+The USB printer will be power managed if the device is closed.
+If a printer is hot-removed before a job completes, the job is terminated and the driver will return EIO. All subse<hy>
+quent opens will return ENODEV. If a printer is hot-removed, an LP reconfiguration may not be needed if a printer
+is re-inserted on the same port. If re-inserted on a different port, an LP reconfiguration may be required.
+The USB Parallel Printer Adapter is not hotpluggable. The printer should be connected to USB Parallel Printer
+Adapter before plugging the USB cable into host or hub port and should be removed only after disconnecting the
+USB cable of USB Parallel Printer Adapter from the host or hub port.

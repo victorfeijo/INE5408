@@ -1,0 +1,134 @@
+<beginning of page>
+pppoed <-> PPPoE server daemon
+ppoed [options]
+The pppoed daemon implements the server-side negotiation of PPPoE. When a client requests service from this dae<hy>
+mon, a copy of pppd(1M) is invoked to handle the actual PPP communication.
+At startup, options are read from the command line and the /etc/ppp/pppoe file. After these options have been read,
+options in the per-device /etc/ppp/pppoe.device files are read, using the device names specified on the command
+line or in /etc/ppp/pppoe. Device names are not permitted in the per-device files. It is not an error if any of these
+files are absent; missing files are ignored.
+Options are reread in the same order on SIGHUP. Except for the possibility of short delays due to the processing
+time, SIGHUP does not interfere with any client operations. Current status, including options read, is dumped to
+/tmp/pppoed.pid on SIGINT.
+The options are used to set up a list of services to be offered to PPPoE clients on the broadcast domains (Ethernet
+subnets) specified by the named devices. Option parsing is always in one of two modes, either global mode or ser<hy>
+vice mode. The initial mode at the beginning of each file (and the command line) is global mode. Options specified
+in global mode serve as default values for subsequently defined services. Service mode is entered by the service
+name option. In this mode, the named option is defined. Options that appear in this mode override any global mode
+definitions for the current service.
+The option parsing follows standard shell tokenizing rules, using whitespace to delimit tokens, quotes to enclose
+strings that can contain whitespace, and escape sequences for special characters. Environment variables are substi<hy>
+tuted using familiar $VAR and ${VAR} syntax and set using NEWVAR=string. Variables are both usable in subse<hy>
+quent options and provided to the pppd(1M) processes spawned for each client, but they are interpreted as they are
+encountered during option processing. Thus, all set variables are seen by all processes spawned; position in the con<hy>
+figuration files has no effect on this.
+The pppoed daemon supports the following options:
+client [except] client-list
+This option restricts the clients that may receive the service. If the except keyword is given, then the clients on the
+list cannot access the service, but others can. If this keyword is not given, then only the listed clients can access the
+service.
+This option can be specified more than once for a given service. For a given client, first match among all listed op<hy>
+tions encountered specifies the handling. If it matches an option with except specified, then access is denied. Other<hy>
+wise, it is granted. The client list within a service is prepended to any list specified in the global context.
+If no client options are given or if all options are specified with except, then all clients are permitted by default. If
+any client options without except are specified, then no clients are permitted by default.
+The client-list is a comma-separated list of client identifiers. The match is made if any client on the list matches;
+thus, these are logically "ORed" together. Each client identifier can be either a symbolic name (resolved through
+/etc/ethers or NIS, as defined by /etc/nsswitch.conf) or a hexadecimal Ethernet address in the format x:x:x:x:x:x.
+In the latter case, any byte of the address can be "*", which matches any value in that position. For example,
+40:0:1a:*:*:* matches Ethernet adapters from the manufacturer assigned block 40:0:1a.
+debug
+Increase debug logging detail level by one. The detail levels are 0 (no logging), 1 (errors only; the default), 2 (warn<hy>
+ings), 3 (informational messages), and 4 (debug messages). Log messages are written by default to syslog(3C) using
+facility daemon (see the log option below). When specified on the command line or in the global context of the
+/etc/ppp/pppoe file, this option also sets the daemon's default (non-service-related) detail level.
+device device-list
+Specify the devices on which the service is available. The device-list is a comma-separated list of logical device
+names (without the leading /dev/), such as hme0. This option is ignored if encountered in the per-device
+/etc/ppp/pppoe.device files.
+<beginning of page>
+extra string
+Specifies extra options to pppd(1M). It defaults to "plugin pppoe.so directtty" and usually does not need to be
+overridden.
+file path
+Suspends parsing of the current file, returns to global mode, and reads options from path. This file must be present
+and readable; if it is not, an error is logged. When the end of that file is reached, processing returns to the current file
+and the mode is reset to global again.
+The global mode options specified in files read by this command use the options set in the current file's global mode;
+this condition extends to any file included by those files. All files read are parsed as though the command line had
+specified this option, and thus inherit the command line's global modes.
+This option can be used to revert to global mode at any point in an option file by specifying file /dev/null.
+group name
+Specifies the group ID (symbolic or numeric) under which pppd is executed. If pppoed is not run as root, this op<hy>
+tion is ignored.
+log path
+Specifies an alternate debug logging file. Debug messages are sent to this file instead of syslog. The special name
+syslog is recognized to switch logging back to syslog. When specified on the command line or in the global context
+of the /etc/ppp/pppoe file, this option also sets the daemon's default (non-service-related) log file.
+nodebug
+Set debug logging detail level to 0 (no logging). When specified on the command line or in the global context of the
+/etc/ppp/pppoe file, this option also sets the daemon's default (non-service-related) detail level.
+nowildcard
+Specifies that the current service should not be included in response to clients requesting "any" service. The client
+must ask for this service by name. When specified on the command line or in the global context of the /etc/ppp/pp<hy>
+poe file, this option causes pppoed to ignore all wildcard service requests.
+path path
+Specifies the path to the pppd executable. Defaults to /usr/bin/pppd.
+pppd string
+Passes command-line arguments to pppd. It can be used to set the IP addresses or configure security for the session.
+The default value is the empty string.
+server string
+Specifies the PPPoE Access Concentrator name to be sent to the client. It defaults to "Solaris PPPoE".
+service name
+Closes any service being defined and begins definition of a new service. The same service name can be used without
+conflict on multiple devices. If the same service name is used on a single device, then the last definition encountered
+during parsing overrides all previous definitions.
+user name
+Specifies the user ID, symbolic or numeric, under which pppd is executed. If pppoed is not run as root, this option
+<beginning of page>
+is ignored.
+wildcard
+Specifies that the service should be included in responses to client queries that request "any" service, which is done
+by requesting a service name of length zero. When specified on the command line or in the global context of the
+/etc/ppp/pppoe file, this option causes pppoed to ignore all wildcard service requests. This is the default.
+Example 1 Configuring for Particular Services
+In the /etc/ppp/pppoe file:
+ service internet
+  device $DEV
+  pppd "proxyarp 192.168.1.1:"
+ service debugging
+  device hme0,$DEV
+  pppd "debug proxyarp 192.168.1.1:"
+You then invoke the daemon with:
+ example% /usr/lib/inet/pppoed DEV=eri0
+The lines in /etc/ppp/pppoe and the preceding command result in offering services "internet" and "debugging" (and
+responding to wildcard queries) on interface eri0, and offering only service "debugging" on interface hme0.
+The pppoed daemon responds to the following signals:
+SIGHUP Causes pppoed to reparse the original command line and all configuration files, and close and reopen any
+log files.
+SIGINT Causes a snapshot of the state of the pppoed daemon to be written to /tmp/pppoed.pid (where pid is the
+decimal process ID of the daemon).
+/usr/lib/inet/pppoed executable command
+/dev/sppptun Solaris PPP tunneling device driver
+/etc/ppp/pppoe main configuration option file
+/etc/ppp/pppoe.device per-device configuration option file
+/etc/ppp/pppoe-errors location of output from pppd's stderr
+/etc/ppp/pppoe.if list of Ethernet interfaces to be plumbed at boot time
+/tmp/pppoed.pid ASCII text file containing dumped pppoed state information
+See attributes(5) for descriptions of the following attributes:
+<beginning of page>
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUNW<hy>
+pppdt
+pppd(1M), pppoec(1M), sppptun(1M), sppptun(7M)
+Mamakos, L., et al. RFC 2516, A Method for Transmitting PPP Over Ethernet (PPPoE). Network Working Group.
+February 1999
+Because pppd is installed setuid root, this daemon need not be run as root. However, if it is not run as root, the user
+and group options are ignored.
+The Ethernet interfaces to be used must be plumbed for PPPoE using the sppptun(1M) utility before services can be
+offered.
+The daemon operate runs even if there are no services to offer. If you want to modify a configuration, it is not neces<hy>
+sary to terminate the daemon. Simply use pkill -HUP pppoed after updating the configuration files.
+The PPPoE protocol is far from perfect. Because it runs directly over Ethernet, there is no possibility of security and
+the MTU is limited to 1492 (violating RFC 1661's default value of 1500). It is also not possible to run the client and
+the server of a given session on a single machine with a single Ethernet interface for testing purposes. The client and
+server portions of a single session must be run on separate Ethernet interfaces with different MAC addresses.

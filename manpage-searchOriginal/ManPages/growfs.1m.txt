@@ -1,0 +1,80 @@
+<beginning of page>
+growfs <-> non-destructively expand a UFS file system
+/usr/sbin/growfs [-M mount-point] [newfs-options]
+ [raw-device]
+growfs non-destructively expands a mounted or unmounted UNIX file system (UFS) to the size of the file system's
+slice(s).
+Typically, disk space is expanded by first adding a slice to a metadevice, then running the growfs command. When
+adding space to a mirror, you expand each submirror before expanding the file system.
+growfs will ``write-lock'' (see lockfs(1M)) a mounted file system when expanding. The length of time the file sys<hy>
+tem is write-locked can be shortened by expanding the file system in stages. For instance, to expand a 1 Gbyte file
+system to 2 Gbytes, the file system can be grown in 16 Mbyte stages using the -s option to specify the total size of
+the new file system at each stage. The argument for -s is the number of sectors, and must be a multiple of the cylin<hy>
+der size. Note: The file system cannot be grown if a cylinder size of less than 2 is specified. Refer to the newfs(1M)
+man page for information on the options available when growing a file system.
+growfs displays the same information as mkfs during the expansion of the file system.
+If growfs is aborted, recover any lost free space by unmounting the file system and running the fsck command, or
+run the growfs command again.
+Note: If growfs is aborted and the file system is used before fsck is run on it, UFS metadata might be left in an in<hy>
+complete state, with the result that the file system would be corrupted. In such a circumstance, you would have to re<hy>
+store the file system from backups.
+Root privileges are required for all of the following options.
+-M mount-point The file system to be expanded is mounted on mount-point. File system locking (lockfs) will be
+used.
+newfs-options The options are documented in the newfs man page.
+raw-device Specifies the name of a raw metadevice or raw special device, residing in /dev/md/rdsk, or /dev/rdsk,
+respectively, including the disk slice, where you want the file system to be grown.
+Example 1 Expanding nonmetadevice slice for /export file system
+The following example expands a nonmetadevice slice for the /export file system. In this example, the existing slice,
+/dev/dsk/c1t0d0s3, is converted to a metadevice so additional slices can be concatenated.
+ # metainit -f d8 2 1 c1t0d0s3 1 c2t0d0s3
+ # umount /export
+Example 2 Associate /export with new metadevice
+Edit the /etc/vfstab file to change the entry for /export to the newly defined metadevice, d8.
+ # mount /export
+ # growfs -M /export /dev/md/rdsk/d8
+The first example starts by running the metainit command with the -f option to force the creation of a new concate<hy>
+nated metadevice d8, which consists of the existing slice /dev/dsk/c1t0d0s3 and a new slice /dev/dsk/c2t0d0s3.
+Next, the file system on /export must be unmounted. The /etc/vfstab file is edited to change the entry for /export to
+the newly defined metadevice name, rather than the slice name. After the file system is remounted, the growfs com<hy>
+mand is run to expand the file system. The file system will span the entire metadevice when growfs completes. The
+-M option enables the growfs command to expand a mounted file system. During the expansion, write access for
+/export is suspended until growfs unlocks the file system. Read access is not affected, though access times are not
+<beginning of page>
+kept when the lock is in effect.
+Example 3 Dynamic Expansion of /export file system
+The following example picks up from the previous one. Here, the /export file system mounted on metadevice d8 is
+dynamically expanded.
+ # metattach d8 c0t1d0s2
+ # growfs -M /export /dev/md/rdsk/d8
+This example begins by using the metattach command to dynamically concatenate a new slice, /dev/dsk/c0t1d0s2,
+to the end of an existing metadevice, d8. Next, the growfs command specifies that the mount-point is /export and
+that it is to be expanded onto the raw metadevice /dev/md/rdsk/d8. The file system will span the entire metadevice
+when growfs completes. During the expansion, write access for /export is suspended until growfs unlocks the file
+system. Read access is not affected, though access times are not kept when the lock is in effect.
+Example 4 Expanding mounted file system to existing mirror
+The following example expands a mounted file system /files, to an existing mirror, d80, which contains two submir<hy>
+rors, d9 and d10.
+ # metattach d9 c0t2d0s5
+ # metattach d10 c0t3d0s5
+ # growfs -M /files /dev/md/rdsk/d80
+In this example, the metattach command dynamically concatenates the new slices to each submirror. The metat<hy>
+tach command must be run for each submirror. The mirror will automatically grow when the last submirror is dy<hy>
+namically concatenated. The mirror will grow to the size of the smallest submirror. The growfs command then ex<hy>
+pands the file system. The growfs command specifies that the mount-point is /files and that it is to be expanded onto
+the raw metadevice /dev/md/rdsk/d80. The file system will span the entire mirror when the growfs command com<hy>
+pletes. During the expansion, write access for the file system is suspended until growfs unlocks the file system. Read
+access is not affected, though access times are not kept when the lock is in effect.
+The following exit values are returned:
+0 Successful completion.
+>0 An error occurred.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wmdu
+fsck(1M), lockfs(1M), mkfs(1M), metattach(1M), newfs(1M), attributes(5)
+Solaris Volume Manager Administration Guide
+Only UFS file systems (either mounted or unmounted) can be expanded using the growfs command. Once a file sys<hy>
+tem is expanded, it cannot be decreased in size. The following conditions prevent you from expanding file systems:
+When acct is activated and the accounting file is on the target device. When C2 security is activated and the logging
+file is on the target file system. When there is a local swap file in the target file system. When the file system is root
+(/), /usr, or swap.

@@ -1,0 +1,450 @@
+<beginning of page>
+dkio <-> disk control operations
+#include <sys/dkio.h>
+#include <sys/vtoc.h>
+Disk drivers support a set of ioctl(2) requests for disk controller, geometry, and partition information. Basic to these
+ioctl() requests are the definitions in <sys/dkio.h>.
+The following ioctl() requests set and/or retrieve the current disk controller, partitions, or geometry information on
+all architectures:
+DKIOCINFO
+The argument is a pointer to a dk_cinfo structure (described below). This structure tells the controller-type and at<hy>
+tributes regarding bad-block processing done on the controller.
+ /*
+  * Structures and definitions for disk I/O control commands
+  */
+ #define DK_DEVLEN 16 /* device name max length, */
+  /* including unit # and NULL */
+  /* Used for controller info */
+ struct dk_cinfo {
+  char dki_cname[DK_DEVLEN]; /* controller name */
+  /* (no unit #) */
+  ushort_t dki_ctype; /* controller type */
+  ushort_t dki_flags; /* flags */
+  ushort_t dki_cnum; /* controller number */
+  uint_t dki_addr; /* controller address */
+  uint_t dki_space; /* controller bus type */
+  uint_t dki_prio; /* interrupt priority */
+  uint_t dki_vec; /* interrupt vector */
+  char dki_dname[DK_DEVLEN]; /* drive name (no unit #) */
+  uint_t dki_unit; /* unit number */
+  uint_t dki_slave; /* slave number */
+  ushort_t dki_partition; /* partition number */
+  ushort_t dki_maxtransfer; /* maximum transfer size */
+  /* in DEV_BSIZE */
+  };
+  /*
+  * Controller types
+  */
+  #define DKC_UNKNOWN 0
+  #define DKC_CDROM 1 /* CD-ROM, SCSI or other */
+  #define DKC_WDC2880 2
+  #define DKC_XXX_0 3 /* unassigned */
+  #define DKC_XXX_1 4 /* unassigned */
+  #define DKC_DSD5215 5
+  #define DKC_ACB4000 7
+  #define DKC_XXX_2 9 /* unassigned */
+  #define DKC_NCRFLOPPY 10
+  #define DKC_SMSFLOPPY 12
+  #define DKC_SCSI_CCS 13 /* SCSI CCS compatible */
+  #define DKC_INTEL82072 14 /* native floppy chip */
+  #define DKC_MD 16 /* meta-disk (virtual-disk) */
+  /* driver */
+  #define DKC_INTEL82077 19 /* 82077 floppy disk */
+  /* controller */
+  #define DKC_DIRECT 20 /* Intel direct attached */
+  /* device (IDE) */
+  #define DKC_PCMCIA_MEM 21 /* PCMCIA memory disk-like */
+  /* type */
+  #define DKC_PCMCIA_ATA 22 /* PCMCIA AT Attached type */
+<beginning of page>
+  /*
+  * Sun reserves up through 1023
+  */
+  #define DKC_CUSTOMER_BASE 1024
+  /*
+  * Flags
+  */
+  #define DKI_BAD144 0x01 /* use DEC std 144 */
+  /* bad sector fwding */
+  #define DKI_MAPTRK 0x02 /* controller does */
+  /* track mapping */
+  #define DKI_FMTTRK 0x04 /* formats only full
+  /* track at a time*/
+  #define DKI_FMTVOL 0x08 /* formats only full */
+  /* volume at a time*/
+  #define DKI_FMTCYL 0x10 /* formats only full */
+  /* cylinders at a time*/
+  #define DKI_HEXUNIT 0x20 /* unit number printed as */
+  /* 3 hexdigits */
+  #define DKI_PCMCIA_PFD 0x40 /* PCMCIA pseudo-floppy */
+  /* memory card */
+DKIOCGAPART
+The argument is a pointer to a dk_allmap structure (described below). This ioctl() gets the controller's notion of the
+current partition table for disk drive.
+DKIOCSAPART
+The argument is a pointer to a dk_allmap structure (described below). This ioctl() sets the controller's notion of the
+partition table without changing the disk itself.
+ /*
+  * Partition map (part of dk_label)
+  */ struct dk_map {
+  daddr_t dkl_cylno; /* starting cylinder */
+  daddr_t dkl_nblk; /* number of blocks */
+  };
+ /*
+  * Used for all partitions
+  */
+ struct dk_allmap {
+  struct dk_map dka_map[NDKMAP];
+ };
+DKIOCGGEOM The argument is a pointer to a dk_geom structure (described below). This ioctl() gets the con<hy>
+troller's notion of the current geometry of the disk drive.
+DKIOCSGEOM The argument is a pointer to a dk_geom structure (described below). This ioctl() sets the con<hy>
+troller's notion of the geometry without changing the disk itself.
+DKIOCGVTOC The argument is a pointer to a vtoc structure (described below). This ioctl() returns the device's
+current volume table of contents (VTOC.) For disks larger than 1TB, DKIOCGEXTVTOC must be used instead.
+<beginning of page>
+DKIOCSVTOC The argument is a pointer to a vtoc structure (described below). This ioctl() changes the VTOC as<hy>
+sociated with the device. For disks larger than 1TB, DKIOCSEXTVTOC must be used instead.
+ struct partition {
+ ushort_t p_tag; /* ID tag of partition */
+ ushort_t p_flag; /* permission flags */
+ daddr_t p_start; /* start sector of partition */
+ long p_size; /* # of blocks in partition */
+ };
+If DKIOCSVTOC is used with a floppy diskette, the p_start field must be the first sector of a cylinder. To compute
+the number of sectors per cylinder, multiply the number of heads by the number of sectors per track.
+ struct vtoc {
+ unsigned long v_bootinfo[3]; /* info needed by mboot
+  /* (unsupported)*/
+ unsigned long v_sanity; /* to verify vtoc */
+  /* sanity */
+ unsigned long v_version; /* layout version */
+ char v_volume[LEN_DKL_VVOL]; /* volume name */
+ ushort_t v_sectorsz;
+  sector size in bytes*/
+ ushort_t v_nparts;
+  number of partitions*/
+ unsigned long v_reserved[10]; /* free space */
+ struct partition v_part[V_NUMPAR]; /* partition headers */
+ time_t timestamp[V_NUMPAR]; /* partition timestamp */
+  /* (unsupported) */
+ char v_asciilabel[LEN_DKL_ASCII]; /* compatibility */
+ };
+ /*
+ * Partition permission flags
+ */
+ #define V_UNMNT 0x01 /* Unmountable partition */
+ #define V_RONLY 0x10 /* Read only */
+ /*
+ * Partition identification tags
+ */
+ #define V_UNASSIGNED 0x00 /* unassigned partition */
+ #define V_BOOT 0x01 /* Boot partition */
+ #define V_ROOT 0x02 /* Root filesystem */
+ #define V_SWAP 0x03 /* Swap filesystem */
+ #define V_USR 0x04 /* Usr filesystem */
+ #define V_BACKUP 0x05 /* full disk */
+ #define V_VAR 0x07 /* Var partition */
+ #define V_HOME 0x08 /* Home partition */
+ #define V_ALTSCTR 0x09 /* Alternate sector partition */
+DKIOCGEXTVTOC
+The argument is a pointer to an extvtoc structure (described below). This ioctl returns the device's current volume
+table of contents (VTOC). VTOC is extended to support a disk up to 2TB in size. For disks larger than 1TB this ioctl
+must be used instead of DKIOCGVTOC.
+DKIOCSEXTVTOC
+The argument is a pointer to an extvtoc structure (described below). This ioctl changes the VTOC associated with
+the device. VTOC is extended to support a disk up to 2TB in size. For disks larger than 1TB this ioctl must be used
+instead of DKIOCSVTOC.
+<beginning of page>
+ struct extpartition {
+ ushort_t p_tag; /* ID tag of partition */
+ ushort_t p_flag; /* permission flags */
+ ushort_t p_pad[2]; /* reserved */
+ diskaddr_t p_start; /* start sector no of partition */
+ diskaddr_t p_size; /* # of blocks in partition */
+ };
+ struct extvtoc {
+ uint64_t v_bootinfo[3]; /* info needed by mboot (unsupported) */
+ uint64_t v_sanity; /* to verify vtoc sanity */
+ uint64_t v_version; /* layout version */
+ char v_volume[LEN_DKL_VVOL]; /* volume name */
+ ushort_t v_sectorsz; /* sector size in bytes */
+ ushort_t v_nparts; /* number of partitions */
+ ushort_t pad[2];
+ uint64_t v_reserved[10];
+ struct extpartition v_part[V_NUMPAR]; /* partition headers */
+ uint64_t timestamp[V_NUMPAR]; /* partition timestamp (unsupported)*/
+ char v_asciilabel[LEN_DKL_ASCII]; /* for compatibility */
+ };
+ Partition permissions flags and identification tags
+ are defined the same as vtoc structure.
+DKIOCEJECT
+If the drive supports removable media, this ioctl() requests the disk drive to eject its disk.
+DKIOCREMOVABLE
+The argument to this ioctl() is an integer. After successful completion, this ioctl() sets that integer to a non-zero val<hy>
+ue if the drive in question has removable media. If the media is not removable, the integer is set to 0.
+DKIOCHOTPLUGGABLE
+The argument to this ioctl() is an integer. After successful completion, this ioctl() sets that integer to a non-zero val<hy>
+ue if the drive in question is hotpluggable. If the media is not hotpluggable, the integer is set to 0.
+DKIOCSTATE
+This ioctl() blocks until the state of the drive, inserted or ejected, is changed. The argument is a pointer to a
+dkio_state, enum, whose possible enumerations are listed below. The initial value should be either the last reported
+state of the drive, or DKIO_NONE. Upon return, the enum pointed to by the argument is updated with the current
+state of the drive.
+ enum dkio_state {
+ DKIO_NONE, /* Return disk's current state */
+ DKIO_EJECTED, /* Disk state is 'ejected' */
+ DKIO_INSERTED /* Disk state is 'inserted' */
+ };
+DKIOCLOCK
+For devices with removable media, this ioctl() requests the disk drive to lock the door.
+DKIOCUNLOCK
+For devices with removable media, this ioctl() requests the disk drive to unlock the door.
+<beginning of page>
+DKIOCGMEDIAINFO
+The argument to this ioctl() is a pointer to a dk_minfo structure. The structure indicates the type of media or the
+command set profile used by the drive to operate on the media. The dk_minfo structure also indicates the logical
+media block size the drive uses as the basic unit block size of operation and the raw formatted capacity of the media
+in number of logical blocks.
+DKIOCGMEDIAINFOEXT
+The argument to this ioctl() is a pointer to a dk_minfo_ext structure. The structure indicates the type of media or the
+command set profile used by the drive to operate on the media. The dk_minfo_ext structure also indicates the logi<hy>
+cal media block size the drive uses as the basic unit block size of operation, the raw formatted capacity of the media
+in number of logical blocks and the physical block size of the media.
+ /*
+ * Used for media info or profile info
+ */
+ struct dk_minfo {
+ uint_t dki_media_type; /* Media type or profile info */
+ uint_t dki_lbsize; /* Logical blocksize of media */
+ diskaddr_t dki_capacity; /* Capacity as # of dki_lbsize blks */
+ };
+ /*
+ * Used for media info or profile info and physical blocksize
+ */
+ struct dk_minfo_ext {
+ uint_t dki_media_type; /* Media type or profile info */
+ uint_t dki_lbsize; /* Logical blocksize of media */
+ diskaddr_t dki_capacity; /* Capacity as # of dki_lbsize blks */
+ uint_t dki_pbsize; /* Physical blocksize of media */
+ };
+ /*
+ * Media types or profiles known
+ */
+ #define DK_UNKNOWN 0x00 /* Media inserted - type unknown */
+ /*
+ * SFF 8090 Specification Version 3, media types 0x01 - 0xfffe are
+ * retained to maintain compatibility with SFF8090. The following
+ * define the optical media type.
+ */
+ #define DK_MO_ERASABLE 0x03 /* MO Erasable */
+ #define DK_MO_WRITEONCE 0x04 /* MO Write once */
+ #define DK_AS_MO 0x05 /* AS MO */
+ #define DK_CDROM 0x08 /* CDROM */
+ #define DK_CDR 0x09 /* CD-R */
+ #define DK_CDRW 0x0A /* CD-RW */
+ #define DK_DVDROM 0x10 /* DVD-ROM */
+ #define DK_DVDR 0x11 /* DVD-R */
+ #define DK_DVDRAM 0x12 /* DVD_RAM or DVD-RW */
+ /*
+ * Media types for other rewritable magnetic media
+ */
+ #define DK_FIXED_DISK 0x10001 /* Fixed disk SCSI or otherwise */
+ #define DK_FLOPPY 0x10002 /* Floppy media */
+ #define DK_ZIP 0x10003 /* IOMEGA ZIP media */
+ #define DK_JAZ 0x10004 /* IOMEGA JAZ media */
+<beginning of page>
+If the media exists and the host can obtain a current profile list, the command succeeds and returns the dk_minfo
+structure with data representing that media.
+If there is no media in the drive, the command fails and the host returns an ENXIO error, indicating that it cannot
+gather the information requested.
+If the profile list is not available, the host attempts to identify the media-type based on the available information.
+If identification is not possible, the host returns media type DK_UNKNOWN. See NOTES for blocksize usage and
+capacity information.
+DKIOCSMBOOT
+The argument is a pointer to struct mboot.
+Copies the mboot information supplied in the argument to the absolute sector 0 of the device. Prior to copying the
+information, this ioctl() performs the following checks on the mboot data: <bu> Ensures that the signature field is set to
+0xAA55. <bu> Ensures that partitions do not overlap. <bu> On SPARC platforms, determines if the device is a removable
+media. If the above verification fails, errno is set to EINVAL and the ioctl() command fails.
+x86 Platforms <em> Upon successful write of mboot, the partition map structure maintained in the driver is updated. If
+the new Solaris partition is different from the previous one, the internal VTOC table maintained in the driver is set as
+follows:
+If _SUNOS_VTOC_8 is defined:
+Partition: 0. Start: 0. Capacity = Capacity of device.
+Partition: 2. Start: 0. Capacity = Capacity of device.
+If _SUNOS_VTOC_16 is defined:
+Partition: 2. Start: 0. Size = Size specified in mboot - 2 cylinders.
+Partition: 8. Start: 0. Size = Sectors/cylinder.
+Partition: 9. Start: Sectors/cylinder. Size = 2 * sectors/cylinder
+To determine if the Solaris partition has changed:
+If either offset or the size of the Solaris partition is different from the previous one then it shall be deemed to have
+changed. In all other cases, the internal VTOC info remains as before.
+SPARC Platforms <em> The VTOC label and mboot both occupy the same location, namely sector 0. As a result, fol<hy>
+lowing the successful write of mboot info, the internal VTOC table maintained in the driver is set as follows:
+Partition: 0. Start: 0. Size = Capacity of device.
+Partition: 2. Start: 0. Size = Capacity of device.
+See the NOTES section for usage of DKIOCSMBOOT when modifying Solaris partitions.
+DKIOCGETVOLCAP
+This ioctl provides information and status of available capabilities.
+vc_info is a bitmap and the valid flag values are:
+ DKV_ABR_CAP - Capable of application-based recovery
+ DKV_DMR_CAP - Ability to read specific copy of data when
+  multiple copies exist. For example, in a two
+  way mirror, this ioctl is used to read each
+  side of the mirror.
+vc_set is a bitmap and the valid flag values are:
+<beginning of page>
+ DKV_ABR_CAP - This flag is set if ABR has been set on a device
+  that supports ABR functionality.
+ DKV_DMR_CAP - Directed read has been enabled.
+These capabilities are not required to be persistent across a system reboot and their persistence depends upon the im<hy>
+plementation. For example, if the ABR capability for a DRL mirror simply clears the dirty-region list and subse<hy>
+quently stops updating this list, there is no reason for persistence because the VM recovery is a no-op. Conversely, if
+the ABR capability is applied to a non-DRL mirror to indicate that the VM should not perform a full recovery of the
+mirror following a system crash, the capability must be persistent so that the VM know whether or not to perform re<hy>
+covery.
+Return Errors:
+EINVAL Invalid device for this operation.
+ENOTSUP Functionality that is attempted to be set is not supported.
+DKIOCSETVOLCAP
+This ioctl sets the available capabilities for the device. If a capability flag is not set in vc_set, that capability is
+cleared.
+vc_info flags are ignored
+vc_set valid flags are:
+ DKV_ABR_CAP - Flag to set application-based recovery. A device can
+  successfully support ABR only if it is capable.
+ DKV_DMR_CAP - Flag to set directed read.
+ int
+ ioctl(int , DKIODMR, vol_directed_rd *);
+DKIODMR
+This ioctl allows highly available applications to perform round-robin reads from the underlying devices of a repli<hy>
+cated device.
+ vdr_offset - offset at which the read should occur.
+ vdr_nbytes - number of bytes to be read
+ vdr_bytesread - number of bytes successfully read by the kernel.
+ vdr_data - pointer to a user allocated buffer to return the
+  data read
+ vdr_side - side to be read. Initialized to DKV_SIDE_INIT
+ vdr_side_name - The volume name that has been read.
+ Valid vdr_flags are:
+  DKV_DMR_NEXT_SIDE (set by user)
+  DKV_DMR_DONE (return value)
+  DKV_DMR_ERROR (return value)
+  DKV_DMR_SUCCESS(return value)
+  DKV_DMR_SHORT(return value)
+The calling sequence is as follows: The caller sets the vdr_flags to DK_DMR_NEXT_SIDE and vdr_side to
+DKV_SIDE_INIT at the start. Subsequent calls should be made without any changes to these values. If they are
+changed the results of the ioctl are indeterminate.
+When DKV_SIDE_INIT is set, the call results in the kernel reading from the first side. The kernel updates vdr_side
+to indicate the side that was read, and vdr_side_name to contain the name of that side. vdr_data contains the data
+that was read. Therefore to perform a round-robin read all of the valid sides, there is no need for the caller to change
+the contents of vdr_side.
+<beginning of page>
+Subsequent ioctl calls result in reads from the next valid side until all valid sides have been read. On success, the
+kernel sets DKV_DMR_SUCCESS. The following table shows the values of vdr_flags that are returned when an er<hy>
+ror occurs:
+ vdr_flags | vdr_side | Notes
+ -------------|-------------------|----------------------------
+ DKV_DMR_ERROR| DKV_SIDE_INIT | No valid side to read
+ DKV_DMR_DONE | Not Init side | All valid sides read
+ DKV_DMR_SHORT| Any value | Bytes requested cannot
+  be read. vdr_bytesread
+  set to bytes actually
+  read.
+ Typical code fragment:
+ enable->vc_set |= DKV_ABR_SET;
+ retval = ioctl(filedes, DKIOSETVOLCAP, enable);
+ if (retval != EINVAL || retval != ENOTSUP) {
+  if (info->vc_set & DKV_DMR_SET) {
+  dr->vdr_flags |= DKV_DMR_NEXT_SIDE;
+  dr->vdr_side = DKV_SIDE_INIT;
+  dr->vdr_nbytes = 1024;
+  dr->vdr_offset = 0xff00;
+  do {
+  rval =ioctl(fildes, DKIODMR, dr);
+  if (rval != EINVAL) {
+  /* Process data */
+  }
+  } while (rval != EINVAL || dr->vdr_flags &
+  (DKV_DMR_DONE | DKV_DMR_ERROR | DKV_DMR_SHORT)
+  }
+ }
+Upon successful completion, the value returned is 0. Otherwise, -1 is returned and errno is set to indicate the error.
+The following ioctl() requests set and/or retrieve the current disk controller, partitions, or geometry information on
+the x86 architecture.
+DKIOCG_PHYGEOM
+The argument is a pointer to a dk_geom structure (described below). This ioctl() gets the driver's notion of the phys<hy>
+ical geometry of the disk drive. It is functionally identical to the DKIOCGGEOM ioctl().
+DKIOCG_VIRTGEOM
+The argument is a pointer to a dk_geom structure (described below). This ioctl() gets the controller's (and hence the
+driver's) notion of the virtual geometry of the disk drive. Virtual geometry is a view of the disk geometry maintained
+by the firmware in a host bus adapter or disk controller. If the disk is larger than 8 Gbytes, this ioctl fails because a
+CHS-based geometry is not relevant or useful for this drive.
+ /*
+ * Definition of a disk's geometry
+ */
+ */struct dk_geom {
+ unsigned shor dkg_ncyl; /* # of data cylinders */
+ unsigned shor dkg_acyl; /* # of alternate cylinders */
+ unsigned short dkg_bcyl; /* cyl offset (for fixed head */
+  /* area) */
+ unsigned short dkg_nhead; /* # of heads */
+ unsigned short dkg_obs1; /* obsolete */
+ unsigned short dkg_nsect; /* # of sectors per track*/
+<beginning of page>
+ unsigned short dkg_intrlv; /* interleave factor */
+ unsigned short dkg_obs2; /* obsolete */
+ unsigned short dkg_obs3; /* obsolete */
+ unsigned short dkg_apc; /* alternates per cylinder */
+  /* (SCSI only) */
+ unsigned short dkg_rpm; /* revolutions per min*/
+ unsigned short dkg_pcyl; /* # of physical cylinders */
+ unsigned short dkg_write_reinstruct; /* # sectors to skip, writes*/
+ unsigned short dkg_read_reinstruct; /* # sectors to skip, reads*/
+ unsigned short dkg_extra[7]; /* for compatible expansion*/
+ };
+DKIOCADDBAD
+This ioctl() forces the driver to re-examine the alternates slice and rebuild the internal bad block map accordingly. It
+should be used whenever the alternates slice is changed by any method other than the addbadsec(1M) or for<hy>
+mat(1M) utilities. DKIOCADDBAD can only be used for software remapping on IDE drives; SCSI drives use
+hardware remapping of alternate sectors.
+DKIOCPARTINFO
+The argument is a pointer to a part_info structure (described below). This ioctl() gets the driver's notion of the size
+and extent of the partition or slice indicated by the file descriptor argument.
+ /*
+  * Used by applications to get partition or slice information
+  */
+ struct part_info {
+ daddr_t p_start;
+ int p_length;
+  };
+DKIOCEXTPARTINFO
+The argument is a pointer to an extpart_info structure (described below). This ioctl gets the driver's notion of the
+size and extent of the partition or slice indicated by the file descriptor argument. On disks larger than 1TB, this ioctl
+must be used instead of DKIOCPARTINFO.
+ /*
+ * Used by applications to get partition or slice information
+ */
+ struct extpart_info {
+ diskkaddr_t p_start;
+ diskaddr_t p_length;
+ };
+DKIOCSETEXTPART
+This ioctl is used to update the in-memory copy of the logical drive information maintained by the driver. The ioctl
+takes no arguments. It causes a re-read of the partition information and recreation of minor nodes if required. Prior
+to updating the data structures, the ioctl ensures that the partitions do not overlap. Device nodes are created only for
+valid partition entries. If there is any change in the partition offset, size or ID from the previous read, the partition is
+deemed to have been changed and hence the device nodes are recreated. Any modification to any of the logical parti<hy>
+tions results in the recreation of all logical device nodes.
+addbadsec(1M), fdisk(1M), format(1M), ioctl(2), cdio(7I), cmdk(7D), fdio(7I), hdio(7I), sd(7D)
+Blocksize information provided in DKIOCGMEDIAINFO is the size (in bytes) of the device's basic unit of opera<hy>
+tion and can differ from the blocksize that the Solaris operating environment exports to the user. Capacity informa<hy>
+tion provided in the DKIOCGMEDIAINFO are for reference only and you are advised to use the values returned
+by DKIOCGGEOM or other appropriate ioctl for accessing data using the standard interfaces.
+<beginning of page>
+For x86 only: If the DKIOCSMBOOT command is used to modify the Solaris partitions, the VTOC information
+should also be set appropriately to reflect the changes to partition. Failure to do so leads to unexpected results when
+the device is closed and reopened fresh at a later time. This is because a default VTOC is assumed by driver when a
+Solaris partition is changed. The default VTOC persists until the ioctl DKIOCSVTOC is called to modify VTOC or
+the device is closed and reopened. At that point, the old valid VTOC is read from the disk if it is still available.

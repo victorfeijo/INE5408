@@ -1,0 +1,53 @@
+<beginning of page>
+stack_violation <-> determine stack boundary violation event
+#include <ucontext.h>
+int stack_violation(int sig, const siginfo_t *sip,
+ const ucontext_t *ucp);
+The stack_violation() function returns a boolean value indicating whether the signal, sig, and accompanying signal
+information, sip, and saved context, ucp, represent a stack boundary violation event or a stack overflow.
+The stack_violation() function returns 0 if the signal does not represent a stack boundary violation event and 1 if the
+signal does represent a stack boundary violation event.
+No errors are defined. Example 1 Set up a signal handler to run on an alternate stack.
+The following example sets up a signal handler for SIGSEGV to run on an alternate signal stack. For each signal it
+handles, the handler emits a message to indicate if the signal was produced due to a stack boundary violation.
+ #include <stdlib.h>
+ #include <unistd.h>
+ #include <ucontext.h>
+ #include <signal.h>
+ static void
+ handler(int sig, siginfo_t *sip, void *p)
+ {
+  ucontext_t *ucp = p;
+  const char *str;
+  if (stack_violation(sig, sip, ucp))
+  str = "stack violation.\n";
+  else
+  str = "no stack violation.\n";
+  (void) write(STDERR_FILENO, str, strlen(str));
+  exit(1);
+ }
+ int
+ main(int argc, char **argv)
+ {
+  struct sigaction sa;
+  stack_t altstack;
+  altstack.ss_size = SIGSTKSZ;
+  altstack.ss_sp = malloc(SIGSTKSZ);
+  altstack.ss_flags = 0;
+  (void) sigaltstack(&altstack, NULL);
+  sa.sa_sigaction = handler;
+  (void) sigfillset(&sa.sa_mask);
+  sa.sa_flags = SA_ONSTACK | SA_SIGINFO;
+  (void) sigaction(SIGSEGV, &sa, NULL);
+  /*
+  * The application is now set up to use stack_violation(3C).
+  */
+  return (0);
+ }
+<beginning of page>
+An application typically uses stack_violation() in a signal handler that has been installed for SIGSEGV using
+sigaction(2) with the SA_SIGINFO flag set and is configured to run on an alternate signal stack.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stabili<hy>
+tyEvolving _ MT-LevelAsync-Signal-Safe
+sigaction(2), sigaltstack(2), stack_getbounds(3C), stack_inbounds(3C), stack_setbounds(3C), attributes(5)

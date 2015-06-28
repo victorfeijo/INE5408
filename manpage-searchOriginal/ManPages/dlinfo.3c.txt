@@ -1,0 +1,151 @@
+<beginning of page>
+dlinfo <-> dynamic load information
+#include <dlfcn.h>
+#include <link.h>
+#include <limits.h>
+#include <sys/mman.h>
+int dlinfo(void *handle, int request, void *p);
+The dlinfo() function sets or extracts information from the runtime linker ld.so.1(1). This function is loosely mod<hy>
+eled after the ioctl(2) function. The request argument and a third argument of varying type are passed to dlinfo().
+The action taken by dlinfo() depends on the value of the request that is provided.
+The handle argument is either the value that is returned from a dlopen(3C) or dlmopen() call, or the special handle
+RTLD_SELF. A handle argument is required for all requests except RTLD_DI_CONFIGADDR,
+RTLD_DI_GETSIGNAL, and RTLD_DI_SETSIGNAL. If handle is the value that is returned from a dlopen() or
+dlmopen() call, the information returned by the dlinfo() call pertains to the specified object. If handle is the special
+handle RTLD_SELF, the information returned by the dlinfo() call pertains to the caller.
+The request argument can take the following values:
+RTLD_DI_ARGSINFO
+Obtain process argument information. The p argument is a pointer (Dl_argsinfo_t *p). The following elements from
+this structure are initialized:
+dla_argc The number of arguments passed to the process.
+dla_argv The argument array passed to the process.
+dla_envp The active environment variable array that is available to the process. This element initially points to the
+environment variable array that is made available to exec(2). This element can be updated should an alternative envi<hy>
+ronment be established by the process. See putenv(3C).
+dla_auxv The auxiliary vector array passed to the process.
+A process can be established from executing the runtime linker directly from the command line. See ld.so.1(1). The
+Dl_argsinfo_t information reflects the information that is made available to the application regardless of how the
+runtime linker has been invoked.
+RTLD_DI_CONFIGADDR
+Obtain the configuration file information. The p argument is a Dl_info_t pointer (Dl_info_t *p). The following ele<hy>
+ments from this structure are initialized:
+dli_fname The full name of the configuration file.
+dli_fbase The base address of the configuration file loaded into memory.
+RTLD_DI_LINKMAP
+Obtain the Link_map for the handle that is specified. The p argument points to a Link_map pointer (Link_map
+**p). The actual storage for the Link_map structure is maintained by ld.so.1.
+The Link_map structure includes the following members:
+  unsigned long l_addr; /* base address */
+  char *l_name; /* object name */
+  Elf32_Dyn *l_ld; /* .dynamic section */
+  Link_map *l_next; /* next link object */
+  Link_map *l_prev; /* previous link object */
+<beginning of page>
+  char *l_refname; /* filter reference name */
+l_addr The base address of the object loaded into memory.
+l_name The full name of the loaded object. This full name is the filename of the object as referenced by ld.so.1.
+l_ld Points to the SHT_DYNAMIC structure.
+l_next The next Link_map on the link-map list. Other objects on the same link-map list as the current object can be
+examined by following the l_next and l_prev members.
+l_prev The previous Link_map on the link-map list.
+l_refname If the object that is referenced is a filter, this member points to the name of the object being filtered. If
+the object is not a filter, this member is 0. See the Linker and Libraries Guide.
+RTLD_DI_LMID
+Obtain the ID for the link-map list upon which the handle is loaded. The p argument is a Lmid_t pointer (Lmid_t
+*p).
+RTLD_DI_MMAPCNT
+Determine the number of segment mappings for the handle that is specified, for use in a RTLD_DI_MMAPS re<hy>
+quest. The p argument is a uint_t pointer (uint_t *p). On return from a RTLD_DI_MMAPCNT request, the uint_t
+value that is pointed to by p contains the number of segment mappings that the associated object uses.
+To obtain the complete mapping information for an object, a mmapobj_result_t array for RTLD_DI_MMAPCNT
+entries must be provided. This array is assigned to the dlm_maps member, and the number of entries available in the
+arry are assigned to the dlm_acnt member. This initialized structure is then passed to a RTLD_DI_MMAPS re<hy>
+quest. See EXAMPLES.
+RTLD_DI_MMAPS
+Obtain segment mapping information for the handle that is specified. The p argument is a Dl_mapinfo_t pointer
+(Dl_mapinfo_t *p). This structure can be initialized from the mapping count obtained from a previous
+RTLD_DI_MMAPCNT request.
+Segment mapping information is provided in an array of mmapobj_result_t structures that originate from the
+mmapobj(2) of the associated object. The dlm_acnt member, typically initialized from a previous
+RTLD_DI_MMAPCNT request, indicates the number of enteries in a mmapobj_result_t array. This array is as<hy>
+signed to the dlm_maps member. This initialized structure is then passed to a RTLD_DI_MMAPS request, where
+the segment mapping information is copied to the mmapobj_result_t array. The dlm_rcnt member indicates the
+number of mmapobj_result_t element entries that are returned. See EXAMPLES.
+RTLD_DI_SERINFO
+Obtain the library search paths for the handle that is specified. The p argument is a Dl_serinfo_t pointer (Dl_serin<hy>
+fo_t *p). A user must first initialize the Dl_serinfo_t structure with a RTLD_DI_SERINFOSIZE request. See EX<hy>
+AMPLES.
+The returned Dl_serinfo_t structure contains dls_cnt Dl_serpath_t entries. Each entry's dlp_name member points
+to the search path. The corresponding dlp_info member contains one of more flags indicating the origin of the path.
+See the LA_SER_* flags that are defined in <link.h>.
+<beginning of page>
+RTLD_DI_SERINFOSIZE
+Initialize a Dl_serinfo_t structure for the handle that is specified, for use in a RTLD_DI_SERINFO request. Both
+the dls_cnt and dls_size members are returned. The dls_cnt member indicates the number of search paths that are
+applicable to the handle. The dls_size member indicates the total size of a Dl_serinfo_t buffer required to hold
+dls_cnt Dl_serpath_t entries and the associated search path strings. The p argument is a Dl_serinfo_t pointer
+(Dl_serinfo_t *p).
+To obtain the complete path information, a new Dl_serinfo_t buffer of size dls_size should be allocated. This new
+buffer should be initialized with the dls_cnt and dls_size entries. The initialized buffer is then passed to a
+RTLD_DI_SERINFO request. See EXAMPLES.
+RTLD_DI_ORIGIN
+Obtain the origin of the dynamic object that is associated with the handle. The p argument is a char pointer (char
+*p). The dirname(3C) of the associated object's realpath(3C), which can be no larger than {PATH_MAX}, is
+copied to the pointer p.
+RTLD_DI_GETSIGNAL
+Obtain the numeric signal number used by the runtime linker to kill the process in the event of a fatal runtime error.
+The p argument is an int pointer (int *p). The signal number is copied to the pointer p.
+By default, the signal used by the runtime linker to terminate a process is SIGKILL. See thr_kill(3C). This default
+can be changed by calling dlinfo() with RTLD_DI_SETSIGNAL or by setting the environment variable LD_SIG<hy>
+NAL. See ld.so.1(1).
+RTLD_DI_SETSIGNAL
+Provide a numeric signal number used by the runtime linker to kill the process in the event of a fatal runtime error.
+The p argument is an int pointer (int *p). The value pointed to by p is established as the terminating signal value.
+The current signal number used by the runtime linker to terminate a process can be obtained from dlinfo() using
+RTLD_DI_GETSIGNAL. Use of the RTLD_DI_SETSIGNAL option is equivalent to setting the environment
+variable LD_SIGNAL. See ld.so.1(1).
+The dlinfo() function returns <mi>1 if the request is invalid, the parameter p is NULL, or the Dl_serinfo_t structure is
+uninitialized for a RTLD_DI_SERINFO request. dlinfo() also returns <mi>1 if the handle argument does not refer to a
+valid object opened by dlopen(), or is not the special handle RTLD_SELF. Detailed diagnostic information is avail<hy>
+able with dlerror(3C). Example 1 Use dlinfo() to obtain library search paths.
+The following example demonstrates how a dynamic object can inspect the library search paths that would be used
+to locate a simple filename with dlopen(). For simplicity, error checking has been omitted.
+  Dl_serinfo_t _info, *info = &_info;
+  Dl_serpath_t *path;
+  uint_t cnt;
+  /* determine search path count and required buffer size */
+  dlinfo(RTLD_SELF, RTLD_DI_SERINFOSIZE, info);
+  /* allocate new buffer and initialize */
+  info = malloc(_info.dls_size);
+  info->dls_size = _info.dls_size;
+  info->dls_cnt = _info.dls_cnt;
+  /* obtain sarch path information */
+  dlinfo(RTLD_SELF, RTLD_DI_SERINFO, info);
+  path = &info->dls_serpath[0];
+  for (cnt = 1; cnt <= info->dls_cnt; cnt++, path++) {
+  (void) printf("%2d: %s\n", cnt, path->dls_name);
+<beginning of page>
+  }
+Example 2 Use dlinfo() to obtain segment information.
+The following example demonstrates how a dynamic object can inspect its segment mapping information. For sim<hy>
+plicity, error checking has been omitted
+  Dl_mapinfo_t mi;
+  uint_t cnt;
+  /* determine the number of segment mappings */
+  dlinfo(RTLD_SELF, RTLD_DI_MMAPCNT, &mi.dlm_acnt);
+  /* allocate the appropriate mapping array */
+  mi.dlm_maps = malloc(mi.dlm_acnt * sizeof (mmapobj_result_t));
+  /* obtain the mapping information */
+  dlinfo(RTLD_SELF, RTLD_DI_MMAPS, &mi);
+  for (cnt = 0; cnt < mi.dlm_rcnt; cnt++) {
+  (void) printf("addr=%x - memory size=%x\n",
+  mi.dlm_maps[cnt].mr_addr, mi.dlm_maps[cnt].mr_msize);
+  }
+The dlinfo() function is one of a family of functions that give the user direct access to the dynamic linking facilities.
+These facilities are available to dynamically-linked processes only. See the Linker and Libraries Guide.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stabili<hy>
+tyStable _ MT-LevelMT-Safe
+ld(1), ld.so.1(1), exec(2), ioctl(2), mmapobj(2), dirname(3C), dlclose(3C), dldump(3C), dlerror(3C),
+dlopen(3C), dlsym(3C), putenv(3C), realpath(3C), thr_kill(3C), attributes(5).
+Linker and Libraries Guide

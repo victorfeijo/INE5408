@@ -1,0 +1,96 @@
+<beginning of page>
+lfmt <-> display error message in standard format and pass to logging and monitoring services
+#include <pfmt.h>
+int lfmt(FILE *stream, long flags, char *format, ... /* arg*/);
+The lfmt() function retrieves a format string from a locale-specific message database (unless MM_NOGET is spec<hy>
+ified) and uses it for printf(3C) style formatting of args. The output is displayed on stream. If stream is NULL no
+output is displayed.
+The lfmt() function encapsulates the output in the standard error message format (unless MM_NOSTD is specified,
+in which case the output is like that of printf(). It forwards its output to the logging and monitoring facility, even if
+stream is NULL. Optionally, lfmt() displays the output on the console with a date and time stamp.
+If the printf() format string is to be retrieved from a message database, the format argument must have the follow<hy>
+ing structure:
+<catalog>:<msgnum>:<defmsg>.
+If MM_NOGET is specified, only the <defmsg> field must be specified.
+The <catalog> field indicates the message database that contains the localized version of the format string. This
+field is limited to 14 characters selected from a set of all characters values, excluding the null character (\0) and the
+ASCII codes for slash (/) and colon (:).
+The <msgnum> field is a positive number that indicates the index of the string into the message database.
+If the catalog does not exist in the locale (specified by the last call to setlocale(3C) using the LC_ALL or
+LC_MESSAGES categories), or if the message number is out of bound, lfmt() will attempt to retrieve the message
+from the C locale. If this second retrieval fails, lfmt() uses the <defmsg> field of the format argument.
+If <catalog> is omitted, lfmt() will attempt to retrieve the string from the default catalog specified by the last call to
+setcat(3C). In this case, the format argument has the following structure:
+:<msgnum>:<defmsg>.
+The lfmt() function will output the message
+Message not found!!\n
+as the format string if <catalog> is not a valid catalog name, if no catalog is specified (either explicitly or with set<hy>
+cat()), if <msgnum> is not a valid number, or if no message could be retrieved from the message databases and
+<defmsg> was omitted.
+The flags argument determines the type of output (whether the format should be interpreted as it is or be encapsulat<hy>
+ed in the standard message format) and the access to message catalogs to retrieve a localized version of format.
+The flags argument is composed of several groups, and can take the following values (one from each group):
+Output format control
+MM_NOSTD Do not use the standard message format but interpret format as a printf() format. Only catalog ac<hy>
+cess control flags, console display control and logging information should be specified if MM_NOSTD is used; all
+other flags will be ignored.
+MM_STD Output using the standard message format (default value is 0).
+Catalog access control
+MM_NOGET Do not retrieve a localized version of format. In this case, only the <defmsg> field of format is
+specified.
+<beginning of page>
+MM_GET Retrieve a localized version of format from <catalog>, using <msgid> as the index and <defmsg> as
+the default message (default value is 0).
+Severity (standard message format only)
+MM_HALT Generate a localized version of HALT, but donot halt the machine.
+MM_ERROR Generate a localized version of ERROR (default value is 0).
+MM_WARNING Generate a localized version of WARNING.
+MM_INFO Generate a localized version of INFO.
+Additional severities can be defined with the addsev(3C) function, using number-string pairs with numeric values in
+the range [5-255]. The specified severity is formed by the bitwise OR operation of the numeric value and other flags
+arguments.
+If the severity is not defined, lfmt() uses the string SEV=N where N is the integer severity value passed in flags.
+Multiple severities passed in flags will not be detected as an error. Any combination of severities will be summed
+and the numeric value will cause the display of either a severity string (if defined) or the string SEV=N (if unde<hy>
+fined).
+Action
+MM_ACTION Specify an action message. Any severity value is superseded and replaced by a localized version of
+TO FIX.
+Console display control
+MM_CONSOLE Display the message to the console in addition to the specified stream.
+MM_NOCONSOLE Do not display the message to the console in addition to the specified stream (default value is
+0).
+Logging information
+Major classification
+Identify the source of the condition. Identifiers are: MM_HARD (hardware), MM_SOFT (software), and
+MM_FIRM (firmware).
+Message source subclassification
+Identify the type of software in which the problem is spotted. Identifiers are: MM_APPL (application), MM_UTIL
+(utility), and MM_OPSYS (operating system).
+The lfmt() function displays error messages in the following format:
+ label: severity: text
+<beginning of page>
+If no label was defined by a call to setlabel(3C), the message is displayed in the format:
+ severity: text
+If lfmt() is called twice to display an error message and a helpful action or recovery message, the output may appear
+as follows:
+ label: severity: text
+ label: TO FIX: text
+Upon successful completion, lfmt() returns the number of bytes transmitted. Otherwise, it returns a negative value:
+<mi>1 Write the error to stream.
+<mi>2 Cannot log and/or display at console.
+Since lfmt() uses gettxt(3C), it is recommended that lfmt() not be used. Example 1 The following example
+ setlabel("UX:test");
+ lfmt(stderr, MM_ERROR|MM_CONSOLE|MM_SOFT|MM_UTIL,
+  "test:2:Cannot open file: %s\n", strerror(errno));
+displays the message to stderr and to the console and makes it available for logging:
+ UX:test: ERROR: Cannot open file: No such file or directory
+Example 2 The following example
+ setlabel("UX:test");
+ lfmt(stderr, MM_INFO|MM_SOFT|MM_UTIL,
+  "test:23:test facility is enabled\n");
+displays the message to stderr and makes it available for logging:
+ UX:test: INFO: test facility enabled
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelMT-Safe
+addsev(3C), gettxt(3C), pfmt(3C), printf(3C), setcat(3C), setlabel(3C), setlocale(3C), attributes(5), environ(5)

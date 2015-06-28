@@ -1,0 +1,82 @@
+<beginning of page>
+pthread_cond_wait, pthread_cond_timedwait, pthread_cond_reltimedwait_np <-> wait on a condition
+cc -mt [ flag... ] file... -lpthread [ library... ]
+#include <pthread.h>
+int pthread_cond_wait(pthread_cond_t *restrict cond,
+ pthread_mutex_t *restrict mutex);
+int pthread_cond_timedwait(pthread_cond_t *restrict cond,
+ pthread_mutex_t *restrict mutex,
+ const struct timespec *restrict abstime);
+int pthread_cond_reltimedwait_np(pthread_cond_t *cond,
+ pthread_mutex_t *mutex, const struct timespec *reltime);
+The pthread_cond_wait(), pthread_cond_timedwait(), and pthread_cond_reltimedwait_np() functions are used
+to block on a condition variable. They are called with mutex locked by the calling thread or undefined behavior will
+result.
+These functions atomically release mutex and cause the calling thread to block on the condition variable cond.
+Atomically here means ``atomically with respect to access by another thread to the mutex and then the condition
+variable." That is, if another thread is able to acquire the mutex after the about-to-block thread has released it, then a
+subsequent call to pthread_cond_signal() or pthread_cond_broadcast() in that thread behaves as if it were issued
+after the about-to-block thread has blocked.
+Upon successful return, the mutex has been locked and is owned by the calling thread. If mutex is a robust mutex
+where an owner terminated while holding the lock and the state is recoverable, the mutex is acquired even though
+the function returns an error value.
+When using condition variables there is always a boolean predicate, an invariant, associated with each condition wait
+that must be true before the thread should proceed. Spurious wakeups from the pthread_cond_wait(),
+pthread_cond_timedwait(), or pthread_cond_reltimedwait_np() functions could occur. Since the return from
+pthread_cond_wait(), pthread_cond_timedwait(), or pthread_cond_reltimedwait_np() does not imply anything
+about the value of this predicate, the predicate should always be reevaluated.
+The order in which blocked threads are awakened by pthread_cond_signal() or pthread_cond_broadcast() is de<hy>
+termined by the scheduling policy. See pthreads(5).
+The effect of using more than one mutex for concurrent pthread_cond_wait(), pthread_cond_timedwait(), or
+pthread_cond_reltimedwait_np() operations on the same condition variable will result in undefined behavior.
+A condition wait (whether timed or not) is a cancellation point. When the cancelability enable state of a thread is set
+to PTHREAD_CANCEL_DEFERRED, a side effect of acting upon a cancellation request while in a condition
+wait is that the mutex is reacquired before calling the first cancellation cleanup handler.
+A thread that has been unblocked because it has been canceled while blocked in a call to pthread_cond_wait() or
+pthread_cond_timedwait() does not consume any condition signal that may be directed concurrently at the condi<hy>
+tion variable if there are other threads blocked on the condition variable.
+The pthread_cond_timedwait() function is the same as pthread_cond_wait() except that an error is returned if the
+absolute time specified by abstime passes (that is, system time equals or exceeds abstime) before the condition cond
+is signaled or broadcast, or if the absolute time specified by abstime has already been passed at the time of the call.
+The abstime argument is of type struct timespec, defined in time.h(3HEAD). When such time-outs occur,
+pthread_cond_timedwait() will nonetheless release and reacquire the mutex referenced by mutex. The function
+pthread_cond_timedwait() is also a cancellation point.
+The pthread_cond_reltimedwait_np() function is a non-standard extension provided by the Solaris version of
+POSIX threads as indicated by the ``_np'' (non-portable) suffix. The pthread_cond_reltimedwait_np() function is
+the same as pthread_cond_timedwait() except that the reltime argument specifies a non-negative time relative to
+the current system time rather than an absolute time. The reltime argument is of type struct timespec, defined in
+time.h(3HEAD). An error value is returned if the relative time passes (that is, system time equals or exceeds the
+starting system time plus the relative time) before the condition cond is signaled or broadcast. When such timeouts
+occur, pthread_cond_reltimedwait_np() releases and reacquires the mutex referenced by mutex. The
+pthread_cond_reltimedwait_np() function is also a cancellation point.
+If a signal is delivered to a thread waiting for a condition variable, upon return from the signal handler the thread re<hy>
+<beginning of page>
+sumes waiting for the condition variable as if it was not interrupted, or it returns 0 due to spurious wakeup.
+Except in the case of ETIMEDOUT, EOWNERDEAD, or ENOTRECOVERABLE, all of these error checks act
+as if they were performed immediately at the beginning of processing for the function and cause an error return, in
+effect, prior to modifying the state of the mutex specified by mutex or the condition variable specified by cond.
+Upon successful completion, 0 is returned. Otherwise, an error value is returned to indicate the error.
+These functions will fail if:
+EPERM The mutex type is PTHREAD_MUTEX_ERRORCHECK or the mutex is a robust mutex, and the cur<hy>
+rent thread does not own the mutex.
+The pthread_cond_timedwait() function will fail if:
+ETIMEDOUT The absolute time specified by abstime to pthread_cond_timedwait() has passed.
+The pthread_cond_reltimedwait_np() function will fail if:
+EINVAL The value specified by reltime is invalid.
+ETIMEDOUT The relative time specified by reltime to pthread_cond_reltimedwait_np() has passed.
+These functions may fail if:
+EINVAL The value specified by cond, mutex, abstime, or reltime is invalid.
+EINVAL Different mutexes were supplied for concurrent operations on the same condition variable.
+If the mutex specified by mutex is a robust mutex (initialized with the robustness attribute PTHREAD_MU<hy>
+TEX_ROBUST), the pthread_cond_wait(), pthread_cond_timedwait(), and pthread_cond_reltimedwait_np()
+functions will, under the specified conditions, return the following error values. For complete information, see the
+pthread_mutex_lock(3C) and pthread_mutexattr_setrobust(3C) manual pages.
+EOWNERDEAD The last owner of this mutex died while holding the mutex, leaving the state it was protecting
+possibly inconsistent. The mutex is now owned by the caller.
+ENOTRECOVERABLE The mutex was protecting state that has now been left irrecoverable. The mutex has not
+been acquired.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Standard _ MT-LevelMT-Safe
+pthread_cond_signal(3C), pthread_cond_broadcast(3C), pthread_mutex_lock(3C), pthread_mutexattr_getro<hy>
+bust(3C), time.h(3HEAD), attributes(5), condition(5), pthreads(5), standards(5)

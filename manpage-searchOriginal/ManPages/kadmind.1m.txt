@@ -1,0 +1,108 @@
+<beginning of page>
+kadmind <-> Kerberos administration daemon
+/usr/lib/krb5/kadmind [-d] [-m] [-p port-number] [-r realm]
+ -x db_args]...
+kadmind runs on the master key distribution center (KDC), which stores the principal and policy databases. kad<hy>
+mind accepts remote requests to administer the information in these databases. Remote requests are sent, for exam<hy>
+ple, by kpasswd(1), gkadmin(1M), and kadmin(1M) commands, all of which are clients of kadmind. When you
+install a KDC, kadmind is set up in the init scripts to start automatically when the KDC is rebooted.
+kadmind requires a number of configuration files to be set up for it to work:
+/etc/krb5/kdc.conf
+The KDC configuration file contains configuration information for the KDC and the Kerberos administration sys<hy>
+tem. kadmind understands a number of configuration variables (called relations) in this file, some of which are
+mandatory and some of which are optional. In particular, kadmind uses the acl_file, dict_file, admin_keytab, and
+kadmind_port relations in the [realms] section. Refer to the kdc.conf(4) man page for information regarding the
+format of the KDC configuration file.
+/etc/krb5/kadm5.keytab
+kadmind requires a keytab (key table) containing correct entries for the kadmin/fqdn, kadmin/changepw and kad<hy>
+min/changepw principals for every realm that kadmind answers requests. The keytab can be created with the kad<hy>
+min.local(1M) or kdb5_util(1M) command. The location of the keytab is determined by the admin_keytab relation
+in the kdc.conf(4) file.
+/etc/krb5/kadm5.acl
+kadmind uses an ACL (access control list) to determine which principals are allowed to perform Kerberos adminis<hy>
+tration actions. The path of the ACL file is determined by the acl_file relation in the kdc.conf file. See kdc.conf(4).
+For information regarding the format of the ACL file, refer to kadm5.acl(4).
+The kadmind daemon will need to be restarted to reread the kadm5.acl file after it has been modified. You can do
+this, as root, with the following command:
+ # svcadm restart svc:/network/security/kadmin:default
+After kadmind begins running, it puts itself in the background and disassociates itself from its controlling terminal.
+kadmind can be configured for incremental database propagation. Incremental propagation allows slave KDC
+servers to receive principal and policy updates incrementally instead of receiving full dumps of the database. These
+settings can be changed in the kdc.conf(4) file:
+sunw_dbprop_enable = [true | false]
+Enable or disable incremental database propagation. Default is false.
+sunw_dbprop_master_ulogsize = N
+Specifies the maximum amount of log entries available for incremental propagation to the slave KDC servers. The
+maximum value that this can be is 2500 entries. Default value is 1000 entries.
+The kiprop/<hostname>@<REALM> principal must exist in the master's kadm5.keytab file to enable the slave to
+authenticate incremental propagation from the master. In the principal syntax above, <hostname> is the master
+KDC's host name and <REALM> is the realm in which the master KDC resides.
+Kerberos client machines can automatically migrate Unix users to the default Kerberos realm specified in the local
+krb5.conf(4), if the user does not have a valid kerberos account already. You achieve this by using the
+pam_krb5_migrate(5) service module for the service in question. The Kerberos service principal used by the client
+machine attempting the migration needs to be validated using the u privilege in kadm5.acl(4). When using the u
+<beginning of page>
+privilege, kadmind validates user passwords using PAM, specifically using a PAM_SERVICE name of k5migrate
+by calling pam_authenticate(3PAM) and pam_acct_mgmt(3PAM).
+A suitable PAM stack configuration example for k5migrate would look like:
+ k5migrate auth required pam_unix_auth.so.1
+ k5migrate account required pam_unix_account.so.1
+The following options are supported:
+-d
+Specifies that kadmind does not put itself in the background and does not disassociate itself from the terminal. In
+normal operation, you should use the default behavior, which is to allow the daemon to put itself in the background.
+-m
+Specifies that the master database password should be retrieved from the keyboard rather than from the stash file.
+When using -m, the kadmind daemon receives the password prior to putting itself in the background. If used in
+combination with the -d option, you must explicitly place the daemon in the background.
+-p port-number
+Specifies the port on which the kadmind daemon listens for connections. The default is controlled by the kad<hy>
+mind_port relation in the kdc.conf(4) file.
+-r realm
+Specifies the default realm that kadmind serves. If realm is not specified, the default realm of the host is used. kad<hy>
+mind answers requests for any realm that exists in the local KDC database and for which the appropriate principals
+are in its keytab.
+-x db_args
+Pass database-specific arguments to kadmind. Supported arguments are for LDAP and the Berkeley-db2 plug-in.
+These arguments are:
+binddn=binddn
+LDAP simple bind DN for authorization on the directory server. Overrides the ldap_kadmind_dn parameter setting
+in krb5.conf(4).
+bindpwd=bindpwd
+Bind password.
+dbname=name
+For the Berkeley-db2 plug-in, specifies a name for the Kerberos database.
+nconns=num
+Maximum number of server connections.
+port=num
+Directory server connection port.
+<beginning of page>
+/var/krb5/principal
+Kerberos principal database.
+/var/krb5/principal.ulog
+The update log file for incremental propagation.
+/var/krb5/principal.kadm5
+Kerberos administrative database containing policy information.
+/var/krb5/principal.kadm5.lock
+Kerberos administrative database lock file. This file works backwards from most other lock files (that is, kadmin ex<hy>
+its with an error if this file does not exist).
+/var/krb5/kadm5.dict
+Dictionary of strings explicitly disallowed as passwords.
+/etc/krb5/kadm5.acl
+List of principals and their kadmin administrative privileges.
+/etc/krb5/kadm5.keytab
+Keytab for kadmin principals: kadmin/fqdn, changepw/fqdn, and kadmin/changepw.
+/etc/krb5/kdc.conf
+KDC configuration information.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wkdcu _ Interface StabilityEvolving
+kpasswd(1), svcs(1), gkadmin(1M), kadmin(1M), kadmin.local(1M), kdb5_util(1M), kdb5_ldap_util(1M),
+kproplog(1M), svcadm(1M), pam_acct_mgmt(3PAM), pam_authenticate(3PAM), kadm5.acl(4), kdc.conf(4),
+krb5.conf(4), attributes(5), kerberos(5), krb5envvar(5), pam_krb5_migrate(5), smf(5)
+The Kerberos administration daemon (kadmind) is now compliant with the change-password standard mentioned in
+RFC 3244, which means it can now handle change-password requests from non-Solaris Kerberos clients.
+The kadmind service is managed by the service management facility, smf(5), under the service identifier:
+ svc:/network/security/kadmin
+Administrative actions on this service, such as enabling, disabling, or requesting restart, can be performed using sv<hy>
+cadm(1M). The service's status can be queried using the svcs(1) command.

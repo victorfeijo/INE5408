@@ -1,0 +1,261 @@
+<beginning of page>
+gld <-> Generic LAN Driver
+#include <sys/stropts.h>
+#include <sys/stream.h>
+#include <sys/dlpi.h>
+#include <sys/gld.h>
+Solaris architecture specific (Solaris DDI).
+GLD is a multi-threaded, clonable, loadable kernel module providing support for Solaris local area network (LAN)
+device drivers. LAN drivers in Solaris are STREAMS-based drivers that use the Data Link Provider Interface
+(DLPI) to communicate with network protocol stacks. These protocol stacks use the network drivers to send and re<hy>
+ceive packets on a local area network. A network device driver must implement and adhere to the requirements im<hy>
+posed by the DDI/DKI specification, STREAMS specification, DLPI specification, and programmatic interface of
+the device itself.
+GLD implements most STREAMS and DLPI functionality required of a Solaris LAN driver. Several Solaris net<hy>
+work drivers are implemented using GLD.
+A Solaris network driver implemented using GLD comprises two distinct parts: a generic component that deals with
+STREAMS and DLPI interfaces, and a device-specific component that deals with the particular hardware device.
+The device-specific module indicates its dependency on the GLD module and registers itself with GLD from within
+the driver's attach(9E) function. Once it is successfully loaded, the driver is DLPI-compliant. The device-specific
+part of the driver calls gld(9F) functions when it receives data or needs some service from GLD. GLD makes calls
+into the gld(9E) entry points of the device-specific driver through pointers provided to GLD by the device-specific
+driver when it registered itself with GLD. The gld_mac_info(9S) structure is the main data interface between GLD
+and the device-specific driver.
+The GLD facility currently supports devices of type DL_ETHER, DL_TPR, and DL_FDDI. GLD drivers are ex<hy>
+pected to process fully-formed MAC-layer packets and should not perform logical link control (LLC) handling.
+Note -
+Support for the DL_TPR and DL_FDDI media types in GLD is obsolete and may be removed in a future release of
+Solaris.
+In some cases, it may be necessary or desirable to implement a full DLPI-compliant driver without using the GLD
+facility. This is true for devices that are not IEEE 802-style LAN devices, or where a device type or DLPI service not
+supported by GLD is required.
+The name of the device-specific driver module must adhere to the naming constraints outlined in the NOTES section
+of dlpi(7P).
+For devices designated type DL_ETHER, GLD provides support for both Ethernet V2 and ISO 8802-3 (IEEE
+802.3) packet processing. Ethernet V2 enables a data link service user to access and use any of a variety of conform<hy>
+ing data link service providers without special knowledge of the provider's protocol. A service access point (SAP) is
+the point through which the user communicates with the service provider.
+SAP 0 denotes that the user wishes to use 802.3 mode. In transmission, GLD checks the destination SAP value of
+the DL_UNITDATA_REQ and the SAP value to which the stream is bound. If both are 0, the GLD computes the
+length of the packet payload and transmits 802.3 frames having that length in the MAC frame header type field.
+Such lengths will never exceed 1500.
+All frames received from the media that have a type field in the range [0-1500] are assumed to be 802.3 frames and
+are routed up all open streams that are in 802.3 mode, (those streams bound to a SAP value in of 0. If more than
+one stream is in 802.3 mode, the incoming frame is duplicated and routed up each such stream.
+Streams bound to a SAP value of 1536 or greater receive incoming packets whose Ethernet MAC header type
+value exactly matches the value of the SAP to which the stream is bound. SAP values in the range [1-1535] are un<hy>
+defined and should not be used. Note -
+Support for the DL_TPR and DL_FDDI media types in GLD is obsolete and may be removed in a future release of
+Solaris.
+<beginning of page>
+For media types DL_TPR and DL_FDDI, GLD implements minimal SNAP (Sub-Net Access Protocol) processing
+for SAP values of 1536 or greater. A SAP value of 0 denotes that the user wishes to use LLC mode. SAP values in
+the range [1-1535] have undefined semantics and should not be used.
+SNAP headers are carried under LLC headers with destination SAP 0xAA. For outgoing packets with SAP values
+greater than 1535, GLD creates an LLC+SNAP header that always looks like:
+``AA AA 03 00 00 00 XX XX''
+where ``XX XX'' represents the 16-bit SAP, corresponding to the Ethernet V2 style ``type.'' This is the only class
+of SNAP header that is processed - non-zero OUI fields, and LLC control fields other than 03 are considered to be
+LLC packets with SAP 0xAA.
+A DL_UNITDATA_REQ message specifying a destination SAP value of 0, passed down a stream bound to SAP 0,
+is assumed to contain an LLC packet and will not undergo SNAP processing.
+Incoming packets are examined to ascertain whether they fall into the format specified above. Packets that do will
+be passed to streams bound to the packet's 16-bit SNAP type, as well as being passed to any stream in LLC mode
+(those bound to a SAP value of 0). Note -
+Support for the DL_TPR media type in GLD is obsolete and may be removed in a future release of Solaris.
+For type DL_TPR devices, GLD implements minimal support for source routing. Source routing enables a station
+that is sending a packet across a bridged medium to specify (in the packet MAC header) routing information that de<hy>
+termines the route that the packet will take through the network.
+Functionally, the source routing support provided by GLD learns routes, solicits and responds to requests for infor<hy>
+mation about possible multiple routes and selects among the multiple routes that are available. It adds Routing Infor<hy>
+mation Fields to the MAC headers of outgoing packets and recognizes such fields in incoming packets.
+GLD's source routing support does not implement the full Route Determination Entity (RDE) specified in ISO
+8802-2 (IEEE 802.2) Section 9. However, it is designed to interoperate with any such implementations that may ex<hy>
+ist in the same (or a bridged) network.
+GLD implements both Style 1 and Style 2 providers. A physical point of attachment (PPA) is the point at which a
+system attaches itself to a physical communication medium. All communication on that physical medium funnels
+through the PPA. The Style 1 provider attaches the stream to a particular PPA based on the major/minor device that
+has been opened. The Style 2 provider requires the DLS user to explicitly identify the desired PPA using DL_AT<hy>
+TACH_REQ. In this case, open(9E) creates a stream between the user and GLD and DL_ATTACH_REQ subse<hy>
+quently associates a particular PPA with that stream. Style 2 is denoted by a minor number of zero. If a device node
+whose minor number is not zero is opened, Style 1 is indicated and the associated PPA is the minor number minus 1.
+In both Style 1 and Style 2 opens, the device is cloned.
+GLD implements the following DLPI primitives:
+The DL_INFO_REQ primitive requests information about the DLPI stream. The message consists of one M_PRO<hy>
+TO message block. GLD returns device-dependent values in the DL_INFO_ACK response to this request, based on
+information the GLD-based driver specified in the gld_mac_info(9S) structure passed to gld_register(). However
+GLD returns the following values on behalf of all GLD-based drivers: <bu> The version is DL_VERSION_2. <bu> The ser<hy>
+vice mode is DL_CLDLS <em> GLD implements connectionless-mode service. <bu> The provider style is DL_STYLE1
+or DL_STYLE2, depending on how the stream was opened.
+The DL_ATTACH_REQ primitive is called to associate a PPA with a stream. This request is needed for Style 2
+DLS providers to identify the physical medium over which the communication will transpire. Upon completion, the
+state changes from DL_UNATTACHED to DL_UNBOUND. The message consists of one M_PROTO message
+block. This request may not be issued when using the driver in Style 1 mode; streams opened using Style 1 are al<hy>
+ready attached to a PPA by the time the open completes.
+The DL_DETACH_REQ primitive requests to detach the PPA from the stream. This is only allowed if the stream
+was opened using Style 2.
+The DL_BIND_REQ and DL_UNBIND_REQ primitives bind and unbind a DLSAP to the stream. The PPA asso<hy>
+ciated with each stream will have been initialized upon completion of the processing of the DL_BIND_REQ. Multi<hy>
+ple streams may be bound to the same SAP; each such stream receives a copy of any packets received for that SAP.
+The DL_ENABMULTI_REQ and DL_DISABMULTI_REQ primitives enable and disable reception of individual
+<beginning of page>
+multicast group addresses. A set of multicast addresses may be iteratively created and modified on a per-stream basis
+using these primitives. The stream must be attached to a PPA for these primitives to be accepted.
+The DL_PROMISCON_REQ and DL_PROMISCOFF_REQ primitives enable and disable promiscuous mode on
+a per-stream basis, either at a physical level or at the SAP level. The DL Provider will route all received messages on
+the media to the DLS user until either a DL_DETACH_REQ or a DL_PROMISCOFF_REQ is received or the
+stream is closed. Physical level promiscuous mode may be specified for all packets on the medium or for multicast
+packets only. The stream must be attached to a PPA for these primitives to be accepted.
+The DL_UNITDATA_REQ primitive is used to send data in a connectionless transfer. Because this is an unac<hy>
+knowledged service, there is no guarantee of delivery. The message consists of one M_PROTO message block fol<hy>
+lowed by one or more M_DATA blocks containing at least one byte of data.
+The DL_UNITDATA_IND type is used when a packet is received and is to be passed upstream. The packet is put
+into an M_PROTO message with the primitive set to DL_UNITDATA_IND.
+The DL_PHYS_ADDR_REQ primitive returns the MAC address currently associated with the PPA attached to the
+stream, in the DL_PHYS_ADDR_ACK primitive. When using style 2, this primitive is only valid following a suc<hy>
+cessful DL_ATTACH_REQ.
+The DL_SET_PHYS_ADDR_REQ primitive changes the MAC address currently associated with the PPA attached
+to the stream. This primitive affects all other current and future streams attached to this device. Once changed, all
+streams currently or subsequently opened and attached to this device will obtain this new physical address. The new
+physical address will remain in effect until this primitive is used to change the physical address again or the driver is
+reloaded.
+The DL_GET_STATISTICS_REQ primitive requests a DL_GET_STATISTICS_ACK response containing statis<hy>
+tics information associated with the PPA attached to the stream. Style 2 streams must be attached to a particular PPA
+using DL_ATTACH_REQ before this primitive will be successful.
+GLD supports the DL_NOTE_LINK_UP, DL_NOTE_LINK_DOWN and DL_NOTE_SPEED notifications using
+the DL_NOTIFY_IND primitive. See dlpi(7P).
+GLD implements the DLIOCRAW ioctl described in dlpi(7P). For any other ioctl command, GLD passes it to the
+device-specific driver's gldm_ioctl() function as described in gld(9E).
+GLD-based drivers must include the header file <sys/gld.h>.
+GLD-based drivers must also specify a link dependency on "misc/gld". (See the -N option in ld(1)).
+GLD implements the open(9E) and close(9E) functions and the required STREAMS put(9E) and srv(9E) functions
+on behalf of the device-specific driver. GLD also implements the getinfo(9E) function for the driver.
+The mi_idname element of the module_info(9S) structure is a string specifying the name of the driver. This must
+exactly match the name of the driver module as it exists in the file system.
+The read-side qinit(9S) structure should specify the following elements as shown below:
+qi_putp NULL
+qi_srvp gld_rsrv
+qi_qopen gld_open
+qi_qclose gld_close
+The write-side qinit(9S) structure should specify the following elements as shown below:
+qi_putp gld_wput
+<beginning of page>
+qi_srvp gld_wsrv
+qi_qopen NULL
+qi_qclose NULL
+The devo_getinfo element of the dev_ops(9S) structure should specify gld_getinfo as the getinfo(9E) routine.
+The driver's attach(9E) function does all the work of associating the hardware-specific device driver with the GLD
+facility and preparing the device and driver for use.
+The attach(9E) function allocates a gld_mac_info(9S) (``macinfo'') structure using gld_mac_alloc(). The driver
+usually needs to save more information per device than is defined in the macinfo structure; it should allocate the ad<hy>
+ditional required data structure and save a pointer to it in the gldm_private member of the gld_mac_info(9S) struc<hy>
+ture.
+The attach(9E) routine must initialize the macinfo structure as described in gld_mac_info(9S) and then call
+gld_register() to link the driver with the GLD module. The driver should map registers if necessary and be fully ini<hy>
+tialized and prepared to accept interrupts before calling gld_register(). The attach(9E) function should add inter<hy>
+rupts but not enable the device to generate them. The driver should reset the hardware before calling gld_register()
+to ensure it is quiescent; the device must not be started or put into a state where it may generate an interrupt before
+gld_register() is called. That will be done later when GLD calls the driver's gldm_start() entry point described in
+gld(9E). Once gld_register() succeeds, the gld(9E) entry points may be called by GLD at any time.
+The attach(9E) routine should return DDI_SUCCESS if gld_register() succeeds. If gld_register() fails, it returns
+DDI_FAILURE and the attach(9E) routine should deallocate any resources it allocated before calling gld_regis<hy>
+ter() and then also return DDI_FAILURE. Under no circumstances should a failed macinfo structure be reused; it
+should be deallocated using gld_mac_free().
+The detach(9E) function should attempt to unregister the driver from GLD. This is done by calling gld_unregister()
+described in gld(9F). The detach(9E) routine can get a pointer to the needed gld_mac_info(9S) structure from the
+device's private data using ddi_get_driver_private(9F). gld_unregister() checks certain conditions that could re<hy>
+quire that the driver not be detached. If the checks fail, gld_unregister() returns DDI_FAILURE, in which case the
+driver's detach(9E) routine must leave the device operational and return DDI_FAILURE. If the checks succeed,
+gld_unregister() ensures that the device interrupts are stopped, calling the driver's gldm_stop() routine if necessary,
+unlinks the driver from the GLD framework, and returns DDI_SUCCESS. In this case, the detach(9E) routine
+should remove interrupts, deallocate any data structures allocated in the attach(9E) routine, using gld_mac_free() to
+deallocate the macinfo structure, and return DDI_SUCCESS. It is important to remove the interrupt before calling
+gld_mac_free().
+Solaris network drivers must implement statistics variables. GLD itself tallies some network statistics, but other sta<hy>
+tistics must be counted by each GLD-based driver. GLD provides support for GLD-based drivers to report a standard
+set of network driver statistics. Statistics are reported by GLD using the kstat(7D) and kstat(9S) mechanism. The
+DL_GET_STATISTICS_REQ DLPI command may also be used to retrieve the current statistics counters. All sta<hy>
+tistics are maintained as unsigned, and all are 32 bits unless otherwise noted.
+GLD maintains and reports the following statistics.
+rbytes64 Total bytes successfully received on the interface (64 bits).
+rbytes Total bytes successfully received on the interface.
+obytes64 Total bytes requested to be transmitted on the interface (64 bits).
+obytes Total bytes requested to be transmitted on the interface.
+ipackets64 Total packets successfully received on the interface (64 bits).
+<beginning of page>
+ipackets Total packets successfully received on the interface.
+opackets64 Total packets requested to be transmitted on the interface (64 bits).
+opackets Total packets requested to be transmitted on the interface.
+multircv Multicast packets successfully received, including group and functional addresses (long).
+multixmt Multicast packets requested to be transmitted, including group and functional addresses (long).
+brdcstrcv Broadcast packets successfully received (long).
+brdcstxmt Broadcast packets requested to be transmitted (long).
+unknowns Valid received packets not accepted by any stream (long).
+noxmtbuf Packets discarded on output because transmit buffer was busy, or no buffer could be allocated for transmit
+(long).
+blocked Times a received packet could not be put up a stream because the queue was flow controlled (long).
+xmtretry Times transmit was retried after having been delayed due to lack of resources (long).
+promisc Current ``promiscuous'' state of the interface (string).
+The device dependent driver counts the following statistics, keeping track of them in a private per-instance structure.
+When GLD is asked to report statistics, it calls the driver's gldm_get_stats() entry point, as described in gld(9E), to
+update the device-specific statistics in the gld_stats(9S) structure. GLD then reports the updated statistics using the
+named statistics variables below.
+ifspeed Current estimated bandwidth of the interface in bits per second (64 bits).
+media Current media type in use by the device (string).
+intr Times interrupt handler was called and claimed the interrupt (long).
+norcvbuf Times a valid incoming packet was known to have been discarded because no buffer could be allocated for
+receive (long).
+ierrors Total packets received that couldn't be processed because they contained errors (long).
+oerrors Total packets that weren't successfully transmitted because of errors (long).
+missed Packets known to have been dropped by the hardware on receive (long).
+uflo Times FIFO underflowed on transmit (long).
+<beginning of page>
+oflo Times receiver overflowed during receive (long).
+The following group of statistics applies to networks of type DL_ETHER; these are maintained by device-specific
+drivers of that type, as above.
+align_errors Packets received with framing errors (not an integral number of octets) (long).
+fcs_errors Packets received with CRC errors (long).
+duplex Current duplex mode of the interface (string).
+carrier_errors Times carrier was lost or never detected on a transmission attempt (long).
+collisions Ethernet collisions during transmit (long).
+ex_collisions Frames where excess collisions occurred on transmit, causing transmit failure (long).
+tx_late_collisions Times a transmit collision occurred late (after 512 bit times) (long).
+defer_xmts Packets without collisions where first transmit attempt was delayed because the medium was busy
+(long).
+first_collisions Packets successfully transmitted with exactly one collision.
+multi_collisions Packets successfully transmitted with multiple collisions.
+sqe_errors Times SQE test error was reported.
+macxmt_errors Packets encountering transmit MAC failures, except carrier and collision failures.
+macrcv_errors Packets received with MAC errors, except align, fcs, and toolong errors.
+toolong_errors Packets received larger than the maximum permitted length.
+runt_errors Packets received smaller than the minimum permitted length (long).
+The following group of statistics applies to networks of type DL_TPR; these are maintained by device-specific driv<hy>
+ers of that type, as above.
+line_errors Packets received with non-data bits or FCS errors.
+burst_errors Times an absence of transitions for five half-bit timers was detected.
+signal_losses Times loss of signal condition on the ring was detected.
+<beginning of page>
+ace_errors Times an AMP or SMP frame in which A is equal to C is equal to 0, was followed by another such SMP
+frame without an intervening AMP frame.
+internal_errors Times the station recognized an internal error.
+lost_frame_errors Times the TRR timer expired during transmit.
+frame_copied_errors Times a frame addressed to this station was received with the FS field A bit set to 1.
+token_errors Times the station acting as the active monitor recognized an error condition that needed a token trans<hy>
+mitted.
+freq_errors Times the frequency of the incoming signal differed from the expected frequency.
+The following group of statistics applies to networks of type DL_FDDI; these are maintained by device-specific
+drivers of that type, as above.
+mac_errors Frames detected in error by this MAC that had not been detected in error by another MAC.
+mac_lost_errors Frames received with format errors such that the frame was stripped.
+mac_tokens Number of tokens received (total of non-restricted and restricted).
+mac_tvx_expired Number of times that TVX has expired.
+mac_late Number of TRT expirations since this MAC was reset or a token was received.
+mac_ring_ops Number of times the ring has entered the ``Ring_Operational'' state from the ``Ring Not Opera<hy>
+tional'' state.
+/kernel/misc/gld loadable kernel module
+ld(1), kstat(7D), dlpi(7P), attach(9E), gld(9E), open(9E), gld(9F), gld_mac_info(9S), gld_stats(9S), kstat(9S)
+Writing Device Drivers
+Contrary to the DLPI specification, GLD returns the device's correct address length and broadcast address in
+DL_INFO_ACK even before the stream has been attached to a PPA.
+Promiscuous mode may only be entered by streams that are attached to a PPA.
+The physical address of a PPA may be changed by the superuser while other streams are bound to the same PPA.

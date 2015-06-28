@@ -1,0 +1,71 @@
+<beginning of page>
+tnfctl_probe_apply, tnfctl_probe_apply_ids <-> iterate over probes
+cc [ flag ... ] file ... -ltnfctl [ library ... ]
+#include <tnf/tnfctl.h>
+tnfctl_errcode_t tnfctl_probe_apply(tnfctl_handle_t *hndl,
+ tnfctl_probe_op_t probe_op, void *clientdata);
+tnfctl_errcode_t tnfctl_probe_apply_ids(tnfctl_handle_t *hndl,
+ ulong_t probe_count, ulong_t *probe_ids,
+ tnfctl_probe_op_t probe_op, void *clientdata);
+tnfctl_probe_apply() is used to iterate over the probes controlled by hndl. For every probe, the probe_op function is
+called:
+ typedef tnfctl_errcode_t (*tnfctl_probe_op_t)(
+  tnfctl_handle_t *hndl,
+  tnfctl_probe_t *probe_hndl,
+  void *clientdata);
+Several predefined functions are available for use as probe_op. These functions are described in tn<hy>
+fctl_probe_state_get(3TNF).
+The clientdata supplied in tnfctl_probe_apply() is passed in as the last argument of probe_op. The probe_hndl in
+the probe operation function can be used to query or change the state of the probe. See tn<hy>
+fctl_probe_state_get(3TNF). The probe_op function should return TNFCTL_ERR_NONE upon success. It can
+also return an error code, which will cause tnfctl_probe_apply() to stop processing the rest of the probes and return
+with the same error code. Note that there are five (5) error codes reserved that the client can use for its own seman<hy>
+tics. See ERRORS.
+The lifetime of probe_hndl is the same as the lifetime of hndl. It is good until hndl is closed by tnfctl_close(3TNF).
+Do not confuse a probe_hndl with hndl. The probe_hndl refers to a particular probe, while hndl refers to a process or
+the kernel. If probe_hndl is used in another libtnfctl(3TNF) interface, and it references a probe in a library that has
+been dynamically closed (see dlclose(3C)), then the error code TNFCTL_ERR_INVALIDPROBE will be re<hy>
+turned by that interface.
+tnfctl_probe_apply_ids() is very similar to tnfctl_probe_apply(). The difference is that probe_op is called only for
+probes that match a probe id specified in the array of integers referenced by probe_ids. The number of probe ids in
+the array should be specified in probe_count. Use tnfctl_probe_state_get() to get the probe_id that corresponds to
+the probe_handl.
+tnfctl_probe_apply() and tnfctl_probe_apply_ids() return TNFCTL_ERR_NONE upon success.
+The following errors apply to both tnfctl_probe_apply() and tnfctl_probe_apply_ids():
+TNFCTL_ERR_INTERNAL An internal error occurred.
+TNFCTL_ERR_USR1 Error code reserved for user.
+TNFCTL_ERR_USR2 Error code reserved for user.
+TNFCTL_ERR_USR3 Error code reserved for user.
+TNFCTL_ERR_USR4 Error code reserved for user.
+TNFCTL_ERR_USR5 Error code reserved for user.
+tnfctl_probe_apply() and tnfctl_probe_apply_ids() also return any error returned by the callback function
+probe_op.
+<beginning of page>
+The following errors apply only to tnfctl_probe_apply_ids():
+TNFCTL_ERR_INVALIDPROBE The probe handle is no longer valid. For example, the probe is in a library that
+has been closed by dlclose(3C).
+Example 1 Enabling Probes
+To enable all probes:
+ tnfctl_probe_apply(hndl, tnfctl_probe_enable, NULL);
+Example 2 Disabling Probes
+To disable the probes that match a certain pattern in the probe attribute string:
+ /* To disable all probes that contain the string "vm" */
+ tnfctl_probe_apply(hndl, select_disable, "vm");
+ static tnfctl_errcode_t
+ select_disable(tnfctl_handle_t *hndl, tnfctl_probe_t *probe_hndl,
+ void *client_data)
+ {
+  char *pattern = client_data;
+  tnfctl_probe_state_t probe_state;
+  tnfctl_probe_state_get(hndl, probe_hndl, &probe_state);
+  if (strstr(probe_state.attr_string, pattern)) {
+  tnfctl_probe_disable(hndl, probe_hndl, NULL);
+  }
+ }
+Note that these examples do not have any error handling code.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Availability<hy>
+SUNWtnfc _ MT-LevelMT-Safe
+prex(1), TNF_PROBE(3TNF), dlclose(3C), dlopen(3C), libtnfctl(3TNF), tnfctl_close(3TNF), tn<hy>
+fctl_probe_state_get(3TNF), tracing(3TNF), tnf_kernel_probes(4), attributes(5)
+Linker and Libraries Guide

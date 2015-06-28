@@ -1,0 +1,81 @@
+<beginning of page>
+TNF_DECLARE_RECORD, TNF_DEFINE_RECORD_1, TNF_DEFINE_RECORD_2, TNF_DE<hy>
+FINE_RECORD_3, TNF_DEFINE_RECORD_4, TNF_DEFINE_RECORD_5 <-> TNF type extension interface for
+probes
+cc [ flag ... ] file ...[ -ltnfprobe ] [ library ... ]
+#include <tnf/probe.h>
+TNF_DECLARE_RECORD(c_type, tnf_type);
+TNF_DEFINE_RECORD_1(c_type, tnf_type, tnf_member_type_1, c_member_name_1);
+TNF_DEFINE_RECORD_2(c_type, tnf_type, tnf_member_type_1, c_member_name_1,
+ tnf_member_type_2, c_member_name_2);
+TNF_DEFINE_RECORD_3(c_type, tnf_type, tnf_member_type_1, c_member_name_1,
+ tnf_member_type_2, c_member_name_2, tnf_member_type_3,
+ c_member_name_3);
+TNF_DEFINE_RECORD_4(c_type, tnf_type, tnf_member_type_1, c_member_name_1,
+ tnf_member_type_2, c_member_name_2, tnf_member_type_3,
+ c_member_name_3, tnf_member_type_4, c_member_name_4);
+TNF_DEFINE_RECORD_5(c_type, tnf_type, tnf_member_type_1, c_member_name_1,
+ tnf_member_type_2, c_member_name_2, tnf_member_type_3,
+ c_member_name_3,tnf_member_type_4, c_member_name_4,
+ tnf_member_type_5, c_member_name_5);
+This macro interface is used to extend the TNF (Trace Normal Form) types that can be used in
+TNF_PROBE(3TNF).
+There should be only one TNF_DECLARE_RECORD and one TNF_DEFINE_RECORD per new type being
+defined. The TNF_DECLARE_RECORD should precede the TNF_DEFINE_RECORD. It can be in a header
+file that multiple source files share if those source files need to use the tnf_type being defined. The TNF_DE<hy>
+FINE_RECORD should only appear in one of the source files.
+The TNF_DEFINE_RECORD macro interface defines a function as well as a couple of data structures. Hence,
+this interface has to be used in a source file (.c or .cc file) at file scope and not inside a function.
+Note that there is no semicolon after the TNF_DEFINE_RECORD interface. Having one will generate a compiler
+warning.
+Compiling with the preprocessor option -DNPROBE or with the preprocessor control statement #define NPROBE
+ahead of the #include <tnf/probe.h> statement, will stop the TNF type extension code from being compiled into the
+program.
+The c_type argument must be a C struct type. It is the template from which the new tnf_type is being created. Not
+all elements of the C struct need be provided in the TNF type being defined.
+The tnf_type argument is the name being given to the newly created type. Use of this interface uses the name space
+prefixed by tnf_type. If a new type called "xxx_type" is defined by a library, then the library should not use
+"xxx_type" as a prefix in any other symbols it defines. The policy on managing the type name space is the same as
+managing any other name space in a library; that is, prefix any new TNF types by the unique prefix that the rest of
+the symbols in the library use. This would prevent name space collisions when linking multiple libraries that define
+new TNF types. For example, if a library libpalloc.so uses the prefix "pal" for all symbols it defines, then it should
+also use the prefix "pal" for all new TNF types being defined.
+The tnf_member_type_n argument is the TNF type of the nth provided member of the C structure.
+The tnf_member_name_n argument is the name of the nth provided member of the C structure. Example 1 Defining
+and using a TNF type.
+The following example demonstrates how a new TNF type is defined and used in a probe. This code is assumed to
+be part of a fictitious library called "libpalloc.so" which uses the prefix "pal" for all it's symbols.
+<beginning of page>
+ #include <tnf/probe.h>
+ typedef struct pal_header {
+  long size;
+  char * descriptor;
+  struct pal_header *next;
+ } pal_header_t;
+ TNF_DECLARE_RECORD(pal_header_t, pal_tnf_header);
+ TNF_DEFINE_RECORD_2(pal_header_t, pal_tnf_header,
+  tnf_long, size,
+  tnf_string, descriptor)
+ /*
+  * Note: name space prefixed by pal_tnf_header should not
+  * be used by this client anymore.
+  */
+ void
+ pal_free(pal_header_t *header_p)
+ {
+  int state;
+  TNF_PROBE_2(pal_free_start, "palloc pal_free",
+  "sunw%debug entering pal_free",
+  tnf_long, state_var, state,
+  pal_tnf_header, header_var, header_p);
+  . . .
+ }
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Availability<hy>
+SUNWtnfd _ MT-LevelMT-Safe
+prex(1), tnfdump(1), TNF_PROBE(3TNF), tnf_process_disable(3TNF), attributes(5)
+It is possible to make a tnf_type definition be recursive or mutually recursive e.g. a structure that uses the "next" field
+to point to itself (a linked list). If such a structure is sent in to a TNF_PROBE(3TNF), then the entire linked list will
+be logged to the trace file (until the "next" field is NULL). But, if the list is circular, it will result in an infinite loop.
+To break the recursion, either do not include the "next" field in the tnf_type, or define the type of the "next" member
+as tnf_opaque.

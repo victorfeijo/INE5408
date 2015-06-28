@@ -1,0 +1,64 @@
+<beginning of page>
+copyb <-> copy a message block
+#include <sys/stream.h>
+mblk_t *copyb(mblk_t *bp);
+Architecture independent level 1 (DDI/DKI).
+bp Pointer to the message block from which data is copied.
+The copyb() function allocates a new message block, and copies into it the data from the block that bp denotes. The
+new block will be at least as large as the block being copied. copyb() uses the b_rptr and b_wptr members of bp to
+determine how many bytes to copy.
+If successful, copyb() returns a pointer to the newly allocated message block containing the copied data. Otherwise,
+it returns a NULL pointer.
+The copyb() function can be called from user, interrupt, or kernel context. Example 1 Using copyb
+For each message in the list, test to see if the downstream queue is full with the canputnext(9F) function (line 21).
+If it is not full, use copyb to copy a header message block, and dupmsg(9F) to duplicate the data to be retransmitted.
+If either operation fails, reschedule a timeout at the next valid interval.
+Update the new header block with the correct destination address (line 34), link the message to it (line 35), and send
+it downstream (line 36). At the end of the list, reschedule this routine.
+  1 struct retrans {
+  2 mblk_t *r_mp;
+  3 int r_address;
+  4 queue_t *r_outq;
+  5 struct retrans *r_next;
+  6 };
+  7
+  8 struct protoheader {
+  ...
+  9 int h_address;
+  ...
+ 10 };
+ 11
+ 12 mblk_t *header;
+ 13
+ 14 void
+ 15 retransmit(struct retrans *ret)
+ 16 {
+ 17 mblk_t *bp, *mp;
+ 18 struct protoheader *php;
+ 19
+ 20 while (ret) {
+ 21 if (!canputnext(ret->r_outq)) { /* no room */
+ 22 ret = ret->r_next;
+ 23 continue;
+ 24 }
+ 25 bp = copyb(header); /* copy header msg. block */
+ 26 if (bp == NULL)
+ 27 break;
+ 28 mp = dupmsg(ret->r_mp); /* duplicate data */
+ 29 if (mp == NULL) { /* if unsuccessful */
+ 30 freeb(bp); /* free the block */
+ 31 break;
+ 32 }
+ 33 php = (struct protoheader *)bp->b_rptr;
+<beginning of page>
+ 34 php->h_address = ret->r_address; /* new header */
+ 35 bp->bp_cont = mp; /* link the message */
+ 36 putnext(ret->r_outq, bp); /* send downstream */
+ 37 ret = ret->r_next;
+ 38 }
+ 39 /* reschedule */
+ 40 (void) timeout(retransmit, (caddr_t)ret, RETRANS_TIME);
+ 41 }
+allocb(9F), canputnext(9F), dupmsg(9F)
+Writing Device Drivers
+STREAMS Programming Guide

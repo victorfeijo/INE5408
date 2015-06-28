@@ -1,0 +1,97 @@
+<beginning of page>
+zones <-> Solaris application containers
+The zones facility in Solaris provides an isolated environment for running applications. Processes running in a zone
+are prevented from monitoring or interfering with other activity in the system. Access to other processes, network in<hy>
+terfaces, file systems, devices, and inter-process communication facilities are restricted to prevent interaction be<hy>
+tween processes in different zones.
+The privileges available within a zone are restricted to prevent operations with system-wide impact. See privi<hy>
+leges(5).
+You can configure and administer zones with the zoneadm(1M) and zonecfg(1M) utilities. You can specify the con<hy>
+figuration details a zone, install file system contents including software packages into the zone, and manage the run<hy>
+time state of the zone. You can use the zlogin(1) to run commands within an active zone. You can do this without
+logging in through a network-based login server such as in.rlogind(1M) or sshd(1M).
+The autobooting of zones is enabled and disabled by the zones service, identified by the FMRI:
+svc:/system/zones:default
+See zoneadm(1M). Note that a zone has an autoboot property, which can be set to true (always autoboot). Howev<hy>
+er, if the zones service is disabled, autoboot will not occur, regardless of the setting of the autoboot property for a
+given zone. See zonecfg(1M).
+An alphanumeric name and numeric ID identify each active zone. Alphanumeric names are configured using the
+zonecfg(1M) utility. Numeric IDs are automatically assigned when the zone is booted. The zonename(1) utility re<hy>
+ports the current zone name, and the zoneadm(1M) utility can be used to report the names and IDs of configured
+zones.
+A zone can be in one of several states:
+CONFIGURED Indicates that the configuration for the zone has been completely specified and committed to stable
+storage.
+INCOMPLETE Indicates that the zone is in the midst of being installed or uninstalled, or was interrupted in the
+midst of such a transition.
+INSTALLED Indicates that the zone's configuration has been instantiated on the system: packages have been in<hy>
+stalled under the zone's root path.
+READY Indicates that the "virtual platform" for the zone has been established. For instance, file systems have been
+mounted, devices have been configured, but no processes associated with the zone have been started.
+RUNNING Indicates that user processes associated with the zone application environment are running.
+SHUTTING_DOWN
+DOWN Indicates that the zone is being halted. The zone can become stuck in one of these states if it is unable to
+tear down the application environment state (such as mounted file systems) or if some portion of the virtual platform
+cannot be destroyed. Such cases require operator intervention.
+Processes running inside a zone (aside from the global zone) have restricted access to other processes. Only process<hy>
+es in the same zone are visible through /proc (see proc(4) or through system call interfaces that take process IDs
+such as kill(2) and priocntl(2). Attempts to access processes that exist in other zones (including the global zone) fail
+with the same error code that would be issued if the specified process did not exist.
+Processes running within a non-global zone are restricted to a subset of privileges, in order to prevent one zone from
+being able to perform operations that might affect other zones. The set of privileges limits the capabilities of privi<hy>
+leged users (such as the super-user or root user) within the zone. The list of privileges available within a zone can be
+displayed using the ppriv(1) utility. For more information about privileges, see privileges(5).
+The set of devices available within a zone is restricted, to prevent a process in one zone from interfering with pro<hy>
+cesses in other zones. For example, a process in a zone should not be able to modify kernel memory using
+<beginning of page>
+/dev/kmem, or modify the contents of the root disk. Thus, by default, only a few pseudo devices considered safe for
+use within a zone are available. Additional devices can be made available within specific zones using the
+zonecfg(1M) utility.
+The device and privilege restrictions have a number of effects on the utilities that can run in a non-global zone. For
+example, the eeprom(1M), prtdiag(1M), and prtconf(1M) utilities do not work in a zone since they rely on devices
+that are not normally available.
+A zone may be assigned a brand when it is initially created. A branded zone is one whose software does not match
+that software found in the global zone. The software may include Solaris software configured or laid out differently,
+or it may include non-Solaris software. The particular collection of software is called a "brand" (see brands(5)).
+Once installed, a zone's brand may not be changed unless the zone is first uninstalled.
+Each zone has its own section of the file system hierarchy, rooted at a directory known as the zone root. Processes
+inside the zone can access only files within that part of the hierarchy, that is, files that are located beneath the zone
+root. This prevents processes in one zone from corrupting or examining file system data associated with another
+zone. The chroot(1M) utility can be used within a zone, but can only restrict the process to a root path accessible
+within the zone.
+In order to preserve file system space, sections of the file system can be mounted into one or more zones using the
+read-only option of the lofs(7FS) file system. This allows the same file system data to be shared in multiple zones,
+while preserving the security guarantees supplied by zones.
+NFS and autofs mounts established within a zone are local to that zone; they cannot be accessed from other zones,
+including the global zone. The mounts are removed when the zone is halted or rebooted.
+A zone has its own port number space for TCP, UDP, and SCTP applications and typically one or more separate IP
+addresses (but some configurations of Trusted Extensions share IP address(es) between zones).
+For the IP layer (IP routing, ARP, IPsec, IP Filter, and so on) a zone can either share the configuration and state
+with the global zone (a shared-IP zone), or have its distinct IP layer configuration and state (an exclusive-IP zone).
+If a zone is to be connected to the same datalink, that is, be on the same IP subnet or subnets as the global zone, then
+it is appropriate for the zone to use the shared IP instance.
+If a zone needs to be isolated at the IP layer on the network, for instance being connected to different VLANs or dif<hy>
+ferent LANs than the global zone and other non-global zones, then for isolation reasons the zone should have its ex<hy>
+clusive IP.
+A shared-IP zone is prevented from doing certain things towards the network (such as changing its IP address or
+sending spoofed IP or Ethernet packets), but an exclusive-IP zone has more or less the same capabilities towards the
+network as a separate host that is connected to the same network interface. In particular, the superuser in such a zone
+can change its IP address and spoof ARP packets.
+The shared-IP zones are assigned one or more network interface names and IP addresses in zonecfg(1M). The net<hy>
+work interface name(s) must also be configured in the global zone.
+The exclusive-IP zones are assigned one or more network interface names in zonecfg(1M). The network interface
+names must be exclusively assigned to that zone, that is, it (or they) can not be assigned to some other running zone,
+nor can they be used by the global zone.
+The full IP-level functionality in the form of DHCP client, IPsec and IP Filter, is available in exclusive-IP zones
+and not in shared-IP zones.
+A zone is capable of emulating a 32-bit host identifier, which can be configured via zonecfg(1M), for the purpose of
+system consolidation. If a zone emulates a host identifier, then commands such as hostid(1) and sysdef(1M) as well
+as C interfaces such as sysinfo(2) and gethostid(3C) that are executed within the context of the zone will display or
+return the zone's emulated host identifier rather than the host machine's identifier.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu
+<beginning of page>
+hostid(1), zlogin(1), zonename(1), in.rlogind(1M), sshd(1M), sysdef(1M), zoneadm(1M), zonecfg(1M), kill(2),
+priocntl(2), sysinfo(2), gethostid(3C), getzoneid(3C), ucred_get(3C), proc(4), attributes(5), brands(5), privi<hy>
+leges(5), crgetzoneid(9F)

@@ -1,0 +1,111 @@
+<beginning of page>
+fgetattr, fsetattr, getattrat, setattrat <-> get and set system attributes
+#include <fcntl.h>
+#include <sys/types.h>
+#include <attr.h>
+#include <sys/nvpair.h>
+int fgetattr(int fildes, xattr_view_t view,nvlist_t **response);
+int fsetattr(int fildes, xattr_view_t view,nvlist_t *request)
+int getattrat(int fildes, xattr_view_t view, const char *filename,
+ nvlist_t **response);
+int setattrat(int fildes, xattr_view_t view, const char *filename,
+ nvlist_t *request);
+The fgetattr() function obtains an nvlist of system attribute information about an open file object specified by the
+file descriptor fildes, obtained from a successful open(2), creat(2), dup(2), fcntl(2), or pipe(2) function.
+The getattrat() function first opens the extended attribute file specified by filename in the already opened file direc<hy>
+tory object specified by fildes. It then retrieves an nvlist of system attributes and their values from filename.
+The response argument is allocated by either fgetattr() or getattrat(). The application must call
+nvlist_free(3NVPAIR) to deallocate the memory.
+Upon successful completion, the nvlist will contain one nvpair for each of the system attributes associated with view.
+The list of views and the attributes associated with each view are listed below. Not all underlying file systems sup<hy>
+port all views and all attributes. The nvlist will not contain an nvpair for any attribute not supported by the underly<hy>
+ing filesystem.
+The fsetattr() function uses the nvlist pointed to by request to update one or more of the system attribute's informa<hy>
+tion about an open file object specified by the file descriptor fildes, obtained from a successful open(), creat(),
+dup(), fcntl(), or pipe() function. The setattrat() function first opens the extended attribute file specified by filename
+in the already opened file directory object specified by fildes. It then uses the nvlist pointed to by request to update
+one or more of the system attributes of filename.
+If completion is not successful then no system attribute information is updated.
+The following chart lists the supported views, attributes, and data types for each view:
+tab(); cw(1.83i) cw(1.83i) cw(1.83i) lw(1.83i) lw(1.83i) lw(1.83i) ViewAttributeData type _ XAT<hy>
+TR_VIEW_READONLYA_FSIDuint64_value A_OPAQUEboolean_value A_AV_SCANSTAMPuint8_array[]
+XATTR_VIEW_READWRITEA_READONLYboolean_value A_HIDDENboolean_value A_SYSTEM<hy>
+boolean_value A_ARCHIVEboolean_value A_CRTIMEuint64_array[2] A_NOUNLINKboolean_value
+A_IMMUTABLEboolean_value A_APPENDONLYboolean_value A_NODUMPboolean_value A_AV_QUAR<hy>
+ANTINEDboolean_value A_AV_MODIFIEDboolean_value A_OWNERSIDT{ nvlist composed of uint32_val<hy>
+ue and string T} A_GROUPSIDT{ nvlist composed of uint32_value and string T}
+Upon successful completion, 0 is returned. Otherwise, -1 is returned and errno is set to indicate the error.
+The fgetattr(), getattrat(), fsetattr(), and setattrat(), functions will fail if:
+EBADF The fildes argument is not a valid open file descriptor.
+EINVAL The underlying file system does not support extended file attributes.
+EIO An error occurred while reading from the file system.
+The getattrat() and setattrat() functions will fail if:
+<beginning of page>
+EACCES Search permission or write permission for filename is denied.
+ENOENT The filename argument does not name an existing file in the extended attribute directory represented by
+fildes.
+EPERM There are insufficient privileges to manipulate attributes.
+Example 1 Obtain an nvlist of readonly system attributes for an open file object.
+Use fgetattr() to obtain an nvlist of the readonly system attributes for the open file object represented by file descrip<hy>
+tor fildes.
+ #include <fcntl.h>
+ #include <sys/types.h>
+ #include <attr.h>
+ #include <sys/nvpair.h>
+ nvlist_t *response;
+ nvpair_t *pair = NULL;
+ if (fgetattr(fildes, XATTR_VIEW_READONLY, &response)) {
+  exit(1);
+ }
+ while (pair = nvlist_next_nvpair(response, pair)) {
+  .
+  .
+  .
+ }
+ nvlist_free(response);
+Example 2 Set the A_READONLY system attribute on an open file object.
+Use fsetattr() to set the A_OPAQUE system attribute on the open file object represented by file descriptor fildes.
+ nvlist_t *request;
+ nvpair_t *pair = NULL;
+ if (nvlist_alloc(&request, NV_UNIQUE_NAME, 0) != 0) {
+  exit(1);
+ }
+ if (nvlist_add_boolean_value(request, A_READONLY, 1) != 0) {
+  exit(1);
+ }
+ if (fsetattr(fildes, XATTR_VIEW_READWRITE, request)) {
+  exit(1);
+ }
+Example 3 Obtain an nvlist of the read/write system attributes for a file.
+Use getattrat() to obtain an nvlist of the read/write system attributes for the file named xattrfile in the extended at<hy>
+tribute directory of the open file represented by file descriptor fildes.
+ nvlist_t *response;
+ nvpair_t *pair = NULL;
+ if (getattrat(fildes, XATTR_VIEW_READWRITE, "file", &response)) {
+  exit(1);
+ }
+ while (pair = nvlist_next_nvpair(response, pair)) {
+  .
+<beginning of page>
+  .
+  .
+ }
+ nvlist_free(response);
+Example 4 Set the A_APPENDONLY system attribute on a file.
+Use setattrat() to set the A_APPENDONLY system attribute on the file named file in the extended attribute direc<hy>
+tory of the open file represented by file descriptor fildes.
+ nvlist_t *request;
+ nvpair_t *pair = NULL;
+ if (nvlist_alloc(&request, NV_UNIQUE_NAME, 0) != 0) {
+  exit(1);
+ }
+ if (nvlist_add_boolean_value(request, A_APPENDONLY, 1) != 0) {
+  exit(1);
+ }
+ if (setattrat(fildes, XATTR_VIEW_READWRITE, "file", request)) {
+  exit(1);
+  }
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed _ MT-LevelSafe
+creat(2), dup(2), fcntl(2), fstat(2), fstatat(2), open(2), pipe(2), libnvpair(3LIB), attributes(5), fsattr(5)

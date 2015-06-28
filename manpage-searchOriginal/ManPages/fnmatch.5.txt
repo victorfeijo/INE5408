@@ -1,0 +1,97 @@
+<beginning of page>
+fnmatch <-> file name pattern matching
+The pattern matching notation described below is used to specify patterns for matching strings in the shell. Histori<hy>
+cally, pattern matching notation is related to, but slightly different from, the regular expression notation. For this rea<hy>
+son, the description of the rules for this pattern matching notation is based on the description of regular expression
+notation described on the regex(5) manual page.
+The following patterns matching a single character match a single character: ordinary characters, special pattern
+characters and pattern bracket expressions. The pattern bracket expression will also match a single collating ele<hy>
+ment.
+An ordinary character is a pattern that matches itself. It can be any character in the supported character set except for
+NUL, those special shell characters that require quoting, and the following three special pattern characters. Matching
+is based on the bit pattern used for encoding the character, not on the graphic representation of the character. If any
+character (ordinary, shell special, or pattern special) is quoted, that pattern will match the character itself. The shell
+special characters always require quoting.
+When unquoted and outside a bracket expression, the following three characters will have special meaning in the
+specification of patterns:
+? A question-mark is a pattern that will match any character.
+* An asterisk is a pattern that will match multiple characters, as described in Patterns Matching Multiple Charac<hy>
+ters, below.
+[ The open bracket will introduce a pattern bracket expression.
+The description of basic regular expression bracket expressions on the regex(5) manual page also applies to the pat<hy>
+tern bracket expression, except that the exclamation-mark character ( ! ) replaces the circumflex character (^) in its
+role in a non-matching list in the regular expression notation. A bracket expression starting with an unquoted cir<hy>
+cumflex character produces unspecified results.
+The restriction on a circumflex in a bracket expression is to allow implementations that support pattern matching us<hy>
+ing the circumflex as the negation character in addition to the exclamation-mark. A portable application must use
+something like [\^!] to match either character.
+When pattern matching is used where shell quote removal is not performed (such as in the argument to the find
+-name primary when find is being called using one of the exec functions, or in the pattern argument to the fn<hy>
+match(3C) function, special characters can be escaped to remove their special meaning by preceding them with a
+backslash character. This escaping backslash will be discarded. The sequence \\ represents one literal backslash. All
+of the requirements and effects of quoting on ordinary, shell special and special pattern characters will apply to es<hy>
+caping in this context.
+Both quoting and escaping are described here because pattern matching must work in three separate circumstances: <bu>
+Calling directly upon the shell, such as in pathname expansion or in a case statement. All of the following will
+match the string or file abc:
+tab(); lw(1.01i) lw(1.18i) lw(1.1i) lw(1.1i) lw(1.11i) lw(1.01i) lw(1.18i) lw(1.1i) lw(1.1i) lw(1.11i)
+abc"abc"a"b"ca\bca[b]c a["b"]ca[\b]ca["\b"]ca?ca*c
+The following will not:
+tab(); lw(1.83i) lw(1.83i) lw(1.83i) "a?c"a\*ca\[b]c
+<bu> Calling a utility or function without going through a shell, as described for find(1) and the function fnmatch(3C) <bu>
+Calling utilities such as find, cpio, tar or pax through the shell command line. In this case, shell quote removal is
+performed before the utility sees the argument. For example, in:
+find /bin -name e\c[\h]o -print
+<beginning of page>
+after quote removal, the backslashes are presented to find and it treats them as escape characters. Both precede ordi<hy>
+nary characters, so the c and h represent themselves and echo would be found on many historical systems (that have
+it in /bin). To find a file name that contained shell special characters or pattern characters, both quoting and escaping
+are required, such as:
+pax -r ... "*a\(\?"
+to extract a filename ending with a(?.
+Conforming applications are required to quote or escape the shell special characters (sometimes called metacharac<hy>
+ters). If used without this protection, syntax errors can result or implementation extensions can be triggered. For ex<hy>
+ample, the KornShell supports a series of extensions based on parentheses in patterns; see ksh(1)
+The following rules are used to construct patterns matching multiple characters from patterns matching a single
+character: <bu> The asterisk (*) is a pattern that will match any string, including the null string. <bu> The concatenation of
+patterns matching a single character is a valid pattern that will match the concatenation of the single characters or
+collating elements matched by each of the concatenated patterns. <bu> The concatenation of one or more patterns
+matching a single character with one or more asterisks is a valid pattern. In such patterns, each asterisk will match a
+string of zero or more characters, matching the greatest possible number of characters that still allows the remainder
+of the pattern to match the string.
+Since each asterisk matches zero or more occurrences, the patterns a*b and a**b have identical functionality.
+Examples:
+a[bc] matches the strings ab and ac.
+a*d matches the strings ad, abd and abcd, but not the string abc.
+a*d* matches the strings ad, abcd, abcdef, aaaad and adddd.
+*a*d matches the strings ad, abcd, efabcd, aaaad and adddd.
+The rules described so far in Patterns Matching Multiple Characters and Patterns Matching a Single Character
+are qualified by the following rules that apply when pattern matching notation is used for filename expansion. 1.
+The slash character in a pathname must be explicitly matched by using one or more slashes in the pattern; it cannot
+be matched by the asterisk or question-mark special characters or by a bracket expression. Slashes in the pattern are
+identified before bracket expressions; thus, a slash cannot be included in a pattern bracket expression used for file<hy>
+name expansion. For example, the pattern a[b/c]d will not match such pathnames as abd or a/d. It will only match a
+pathname of literally a[b/c]d. 2. If a filename begins with a period (.), the period must be explicitly matched by us<hy>
+ing a period as the first character of the pattern or immediately following a slash character. The leading period will
+not be matched by:
+<bu> the asterisk or question-mark special characters
+<bu> a bracket expression containing a non-matching list, such as:
+[!a]
+a range expression, such as:
+[%<mi>0]
+or a character class expression, such as:
+[[:punct:]]
+It is unspecified whether an explicit period in a bracket expression matching list, such as:
+[.abc]
+<beginning of page>
+can match a leading period in a filename. 3. Specified patterns are matched against existing filenames and path<hy>
+names, as appropriate. Each component that contains a pattern character requires read permission in the directory
+containing that component. Any component, except the last, that does not contain a pattern character requires search
+permission. For example, given the pattern:
+/foo/bar/x*/bam
+search permission is needed for directories / and foo, search and read permissions are needed for directory bar, and
+search permission is needed for each x* directory.
+If the pattern matches any existing filenames or pathnames, the pattern will be replaced with those filenames and
+pathnames, sorted according to the collating sequence in effect in the current locale. If the pattern contains an invalid
+bracket expression or does not match any existing filenames or pathnames, the pattern string is left unchanged.
+find(1), ksh(1), fnmatch(3C), regex(5)

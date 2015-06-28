@@ -1,0 +1,80 @@
+<beginning of page>
+socket <-> create an endpoint for communication
+cc [ flag ... ] file ... -lsocket -lnsl [ library ... ]
+#include <sys/types.h>
+#include <sys/socket.h>
+int socket(int domain, int type, int protocol);
+The socket() function creates an endpoint for communication and returns a descriptor.
+The domain argument specifies the protocol family within which communication takes place. The protocol family is
+generally the same as the address family for the addresses supplied in later operations on the socket. These families
+are defined in <sys/socket.h>.
+The currently supported protocol families are:
+PF_UNIX UNIX system internal protocols
+PF_INET Internet Protocol Version 4 (IPv4)
+PF_INET6 Internet Protocol Version 6 (IPv6)
+PF_NCA Network Cache and Accelerator (NCA) protocols
+The socket has the indicated type, which specifies the communication semantics. Currently defined types are:
+ SOCK_STREAM
+ SOCK_DGRAM
+ SOCK_RAW
+ SOCK_SEQPACKET
+ SOCK_RDM
+There must be an entry in the netconfig(4) file for at least each protocol family and type required. If a non-zero pro<hy>
+tocol has been specified but no exact match for the protocol family, type, and protocol is found, then the first entry
+containing the specified family and type with a protocol value of zero will be used.
+A SOCK_STREAM type provides sequenced, reliable, two-way connection-based byte streams. An out-of-band
+data transmission mechanism may be supported. A SOCK_DGRAM socket supports datagrams (connectionless,
+unreliable messages of a fixed (typically small) maximum length). A SOCK_SEQPACKET socket may provide a
+sequenced, reliable, two-way connection-based data transmission path for datagrams of fixed maximum length; a
+consumer may be required to read an entire packet with each read system call. This facility is protocol specific, and
+presently not implemented for any protocol family. SOCK_RAW sockets provide access to internal network inter<hy>
+faces. The types SOCK_RAW, which is available only to a user with the net_rawaccess privilege, and
+SOCK_RDM, for which no implementation currently exists, are not described here.
+The protocol parameter is a protocol-family-specific value which specifies a particular protocol to be used with the
+socket. Normally this value is zero, as commonly only a single protocol exists to support a particular socket type
+within a given protocol family. However, multiple protocols may exist, in which case a particular protocol may be
+specified in this manner.
+Sockets of type SOCK_STREAM are full-duplex byte streams, similar to pipes. A stream socket must be in a con<hy>
+nected state before any data may be sent or received on it. A connection to another socket is created with a con<hy>
+nect(3SOCKET) call. Once connected, data may be transferred using read(2) and write(2) calls or some variant of
+the send(3SOCKET) and recv(3SOCKET) calls. When a session has been completed, a close(2) may be performed.
+Out-of-band data may also be transmitted as described on the send(3SOCKET) manual page and received as de<hy>
+scribed on the recv(3SOCKET) manual page.
+The communications protocols used to implement a SOCK_STREAM insure that data is not lost or duplicated. If a
+piece of data for which the peer protocol has buffer space cannot be successfully transmitted within a reasonable
+length of time, then the connection is considered broken and calls will indicate an error with <mi>1 returns and with
+ETIMEDOUT as the specific code in the global variable errno. The protocols optionally keep sockets "warm" by
+<beginning of page>
+forcing transmissions roughly every minute in the absence of other activity. An error is then indicated if no response
+can be elicited on an otherwise idle connection for a extended period (for instance 5 minutes). A SIGPIPE signal is
+raised if a thread sends on a broken stream; this causes naive processes, which do not handle the signal, to exit.
+SOCK_SEQPACKET sockets employ the same system calls as SOCK_STREAM sockets. The only difference is
+that read(2) calls will return only the amount of data requested, and any remaining in the arriving packet will be
+discarded.
+SOCK_DGRAM and SOCK_RAW sockets allow datagrams to be sent to correspondents named in send<hy>
+to(3SOCKET) calls. Datagrams are generally received with recvfrom(3SOCKET), which returns the next datagram
+with its return address.
+An fcntl(2) call can be used to specify a process group to receive a SIGURG signal when the out-of-band data ar<hy>
+rives. It can also enable non-blocking I/O.
+The operation of sockets is controlled by socket level options. These options are defined in the file <sys/socket.h>.
+setsockopt(3SOCKET) and getsockopt(3SOCKET) are used to set and get options, respectively.
+Upon successful completion, a descriptor referencing the socket is returned. Otherwise, -1 is returned and errno is
+set to indicate the error.
+The socket() function will fail if:
+EACCES Permission to create a socket of the specified type or protocol is denied.
+EAGAIN There were insufficient resources available to complete the operation.
+EAFNOSUPPORT The specified address family is not supported by the protocol family.
+EMFILE The per-process descriptor table is full.
+ENOMEM Insufficient user memory is available.
+ENOSR There were insufficient STREAMS resources available to complete the operation.
+EPFNOSUPPORT The specified protocol family is not supported.
+EPROTONOSUPPORT The protocol type is not supported by the address family.
+EPROTOTYPE The socket type is not supported by the protocol.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelSafe
+nca(1), close(2), fcntl(2), ioctl(2), read(2), write(2), accept(3SOCKET), bind(3SOCKET), connect(3SOCKET),
+getsockname(3SOCKET), getsockopt(3SOCKET), in.h(3HEAD),listen(3SOCKET), recv(3SOCKET), setsock<hy>
+opt(3SOCKET), send(3SOCKET), shutdown(3SOCKET), socket.h(3HEAD), socketpair(3SOCKET), at<hy>
+tributes(5)
+Historically, AF_* was commonly used in places where PF_* was meant. New code should be careful to use PF_*
+as necessary.

@@ -1,0 +1,192 @@
+<beginning of page>
+acl <-> Access Control Lists
+Access control lists (ACLs) are discretionary access control mechanisms that grant and deny access to files and di<hy>
+rectories. Two different ACL models are supported in the Solaris release:POSIX-draft ACLs and NFSv4 ACLs.
+The older, POSIX-draft model is supported by the UFS file system. This model is based on a withdrawn ACL
+POSIX specification that was never standardized. It was subsequently withdrawn by the POSIX committee.
+The other model is based on the standards of the NFSv4 working group and is an approved standard from the Inter<hy>
+net Engineering Task Force (IETF). The ZFS file system uses the NFSv4 model, and provides richer semantics and
+finer grained permission capabilities than the POSIX-draft model.
+POSIX-draft ACLs provide an alternative security mechanism to basic UNIX file permissions in the Solaris release.
+Their purpose is to further restrict access to files and directories or to extend permissions to a particular user. ACLs
+can be used to change the permissions for the standard owner, group and other class bits of a file's mode. ACLs can
+give additional users and groups access to the file. A directory can also have a special kind of ACL called a default
+ACL, which defines ACL entries to be inherited by descendents of the directory. POSIX-draft ACLs have an ACL
+entry called mask. The mask defines the maximum permissions that can be granted to additional user and group en<hy>
+tries. Whenever a file is created or its mode is changed by chmod(1) or chmod(2), the mask is recomputed. It is re<hy>
+computed to be the group permission defined in the mode passed to chmod(2).
+The POSIX-draft ACL model uses the standard rwx model of traditional UNIX permissions.
+An ACL is represented as follows:
+ acl_entry[,acl_entry]...
+Each acl_entry contains one ACL entry. An ACL entry is represented by two or three colon-separated(:) fields.
+user:[uid]:perms If uid blank, it represents the file owner.
+group:[gid]:perms If gid is blank, it represents the owning group.
+other:perms Represents the file other class.
+mask:perms Defines the MAX permission to hand out.
+For example to give user joe read and write permissions, the ACL entry is specified as:
+ user:joe:rw-
+NFSv4 ACL model is based loosely on the Windows NT ACL model. NFSv4 ACLs provide a much richer ACL
+model than POSIX-draft ACLs.
+The major differences between NFSv4 and POSIX-draft ACLs are as follows: <bu> NFSv4 ACLs provide finer grained
+permissions than the rwx model. <bu> NFSv4 ACLs allow for both ALLOW and DENY entries. <bu> NFSv4 ACLs pro<hy>
+vide a rich set of inheritance semantics. POSIX ACLs also have inheritance, but with the NFSv4 model you can con<hy>
+trol the following inheritance features: <bu> Whether inheritance cascades to both files and directories or only to files or
+directories. <bu> In the case of directories, you can indicate whether inheritance is applied to the directory itself, to just
+one level of subdirectories, or cascades to all subdirectories of the directory. <bu> NFSv4 ACLs provide a mechanism
+for hooking into a system's audit trail. Currently, Solaris does not support this mechanism. <bu> NFSv4 ACLs enable
+adminstrators to specify the order in which ACL entries are checked. With POSIX-draft ACLs the file system re<hy>
+orders ACL entries into a well defined, strict access, checking order.
+POSIX-draft ACL semantics can be achieved with NFSv4 ACLs. However, only some NFSv4 ACLs can be translat<hy>
+ed to equivalent POSIX-draft ACLs.
+Permissions can be specified in three different chmod ACL formats: verbose, compact, or positional. The verbose
+<beginning of page>
+format uses words to indicate that the permissions are separated with a forward slash (/) character. Compact format
+uses the permission letters and positional format uses the permission letters or the hypen (-) to identify no permis<hy>
+sions.
+The permissions for verbose mode and their abbreviated form in parentheses for compact and positional mode are
+described as follows:
+read_data (r) Permission to read the data of the file
+list_directory (r) Permission to list the contents of a directory.
+write_data (w) Permission to modify a file's data anywhere in the file's offset range. This includes the ability to
+grow the file or write to any arbitrary offset.
+add_file (w) Permission to add a new file to a directory.
+append_data (p) The ability to modify the file's data, but only starting at EOF. Currently, this permission is not sup<hy>
+ported.
+add_subdirectory (p) Permission to create a subdirectory to a directory.
+read_xattr (R) The ability to read the extended attributes of a file or do a lookup in the extended attributes directory.
+write_xattr (W) The ability to create extended attributes or write to the extended attributes directory.
+execute (x) Permission to execute a file.
+read_attributes (a) The ability to read basic attributes (non-ACLs) of a file. Basic attributes are considered to be the
+stat level attributes. Allowing this access mask bit means that the entity can execute ls(1) and stat(2).
+write_attributes (A) Permission to change the times associated with a file or directory to an arbitrary value.
+delete (d) Permission to delete the file.
+delete_child (D) Permission to delete a file within a directory.
+read_acl (c) Permission to read the ACL.
+write_acl (C) Permission to write the ACL or the ability to execute chmod(1) or setfacl(1).
+write_owner (o) Permission to change the owner or the ability to execute chown(1) or chgrp(1).
+synchronize (s) Permission to access a file locally at the server with synchronous reads and writes. Currently, this
+permission is not supported.
+The following inheritance flags are supported by NFSv4:
+file_inherit (f) Inherit to all newly created files in a directory.
+<beginning of page>
+dir_inherit (d) Inherit to all newly created directories in a directory.
+inherit_only (i) Placed on a directory, but does not apply to the directory itself, only to newly created created files
+and directories. This flag requires file_inherit and or dir_inherit to indicate what to inherit.
+no_propagate (n) Placed on directories and indicates that ACL entries should only be inherited one level of the tree.
+This flag requires file_inherit and or dir_inherit to indicate what to inherit.
+successful_access (S)) Indicates if an alarm or audit record should be initiated upon successful accesses. Used with
+audit/alarm ACE types.
+failed_access (F) Indicates if an alarm or audit record should be initiated when access fails. Used with audit/alarm
+ACE types.
+inherited (I) ACE was inherited.
+- No permission granted.
+An NFSv4 ACL is expressed using the following syntax:
+ acl_entry[,acl_entry]...
+  owner@:<perms>[:inheritance flags]:<allow|deny>
+  group@:<perms>[:inheritance flags]:<allow|deny>
+  everyone@:<perms>[:inheritance flags]:<allow|deny>
+  user:<username>[:inheritance flags]:<allow|deny>
+  group:<groupname>[:inheritance flags]:<allow|deny>
+owner@ File owner
+group@ Group owner
+user Permissions for a specific user
+group Permissions for a specific group
+Permission and inheritance flags are separated by a / character.
+ACL specification examples:
+ user:fred:read_data/write_data/read_attributes:file_inherit:allow
+ owner@:read_data:allow,group@:read_data:allow,user:tom:read_data:deny
+Using the compact ACL format, permissions are specified by using 14 unique letters to indicate permissions.
+Using the positional ACL format, permissions are specified as positional arguments similar to the ls -V format. The
+hyphen (-), which indicates that no permission is granted at that position, can be omitted and only the required letters
+have to be specified.
+The letters above are listed in the order they would be specified in positional notation.
+<beginning of page>
+With these letters you can specify permissions in the following equivalent ways.
+ user:fred:rw------R------:file_inherit:allow
+Or you can remove the - and scrunch it together.
+ user:fred:rwR:file_inherit:allow
+The inheritance flags can also be specified in a more compact manner, as follows:
+ user:fred:rwR:f:allow
+ user:fred:rwR:f------:allow
+The Solaris command interface supports the manipulation of ACLs. The following Solaris utilities accommodate
+both ACL models:
+chmod The chmod utility has been enhanced to allow for the setting and deleting of ACLs. This is achieved by ex<hy>
+tending the symbolic-mode argument to support ACL manipulation. See chmod(1) for details.
+compress When a file is compressed any ACL associated with the original file is preserved with the compressed file.
+cp By default, cp ignores ACLs, unless the -p option is specified. When -p is specified the owner and group id, per<hy>
+mission modes, modification and access times, ACLs, and extended attributes if applicable are preserved.
+cpio ACLs are preserved when the -P option is specified.
+find Find locates files with ACLs when the -acl flag is specified.
+ls By default ls does not display ACL information. When the -v option is specified, a file's ACL is displayed.
+mv When a file is moved, all attributes are carried along with the renamed file. When a file is moved across a file
+system boundary, the ACLs are replicated. If the ACL information cannot be replicated, the move fails and the
+source file is not removed.
+pack When a file is packed, any ACL associated with the original file is preserved with the packed file.
+rcp rcp has been enhanced to support copying. A file's ACL is only preserved when the remote host supports ACLs.
+tar ACLs are preserved when the -p option is specified.
+unpack When a file with an ACL is unpacked, the unpacked file retains the ACL information.
+The primary interfaces required to access file system ACLs at the programmatic level are the acl_get() and acl_set()
+functions. These functions support both POSIX draft ACLs and NFSv4 ACLs.
+ int acl_get(const char *path, int flag, acl_t **aclp);
+ int facl_get(int fd, int flag, acl_t **aclp);
+<beginning of page>
+The acl_get(3SEC) and facl_get(3SEC) functions retrieves an ACL on a file whose name is given by path or refer<hy>
+enced by the open file descriptor fd. The flag argument specifies whether a trivial ACL should be retrieved. When
+the flag argument equals ACL_NO_TRIVIAL then only ACLs that are not trivial are retrieved. The ACL is re<hy>
+turned in the aclp argument.
+ void acl_free(acl_t *aclp)s;
+The acl_free() function frees up memory allocated for the argument aclp;.
+ int acl_set(const char *path, acl_t *aclp);
+ int facl_set(int fd, acl_t *aclp);
+The acl_set(3SEC) and facl_get(3SEC) functions are used for setting an ACL on a file whose name is given by path
+or referenced by the open file descriptor fd. The aclp argument specifies the ACL to set. The acl_set(3SEC) trans<hy>
+lates an POSIX-draft ACL into a NFSv4 ACL when the target file systems supports NFSv4 ACLs. No translation is
+performed when trying to set an NFSv4 ACL on a POSIX-draft ACL supported file system.
+ int acl_trivial(const char *path);
+The acl_trivial() function is used to determine whether a file has a trivial ACL. The trivialness of a file's ACL de<hy>
+pends on the type of ACL it is. For POSIX-draft ACLs, it implies the ACL has greater than MIN_ACL_ENTRIES.
+For NFSv4/ZFS style ACLs, it implies that the ACL has entries other than owner@, group@ and everyone@, in<hy>
+heritance flags are set, or the ACL is not ordered in a manner that meets POSIX access control requirements.
+ int acl_strip(const char *path, uid_t uid, gid_t gid, mode_t mode);
+The acl_strip() function removes all ACLs from a file and replaces them with a trivial ACL based off of the passed
+in argument mode. After replacing the ACL the owner and group of the file are set to the values specified in the uid
+and gid parameters.
+ int acl_fromtext(const char *path, acl_t **aclp);
+ char *acl_totext(acl_t *aclp, int flags);
+The acl_text() function converts an internal ACL representation pointed to by aclp into an external representation.
+See DESCRIPTION for details about external representation.
+The acl_fromtext() functions converts and external representation into an internal representation. See DESCRIP<hy>
+TION for details about external representation.
+The following examples demonstrate how the API can be used to perform basic operations on ACLs. Example 1
+Retrieving and Setting an ACL
+Use the following to retrieve an ACL and set it on another file:
+ error = acl_get("file", ACL_NO_TRIVIAL, &aclp);
+ if (error == 0 && aclp != NULL) {
+ error = acl_set("file2", aclp)
+ acl_free(aclp);
+ }
+ ...
+Example 2 Retrieving and Setting Any ACLs
+Use the following to retrieve any ACL, including trivial ACLs, and set it on another file:
+ error = acl_get("file3", 0, &aclp);
+ if (error == 0) {
+ error = acl_set("file4", aclp)
+<beginning of page>
+ acl_free(aclp);
+ }
+ ...
+Example 3 Determining if a File has a Trivial ACL
+Use the following to determine if a file has a trivial ACL:
+ istrivial = acl_trivial("file")
+ if (istrivial == 0)
+ printf("file %s has a trivial ACL0, file);
+ else
+ printf("file %s has a NON-trivial ACL0, file);
+ ...
+Example 4 Removing all ACLs from a File
+Use the following to remove all ACLs from a file, and set a new mode, owner, and group:
+ error = acl_strip("file", 10, 100, 0644);
+ ...
+chgrp(1), chmod(1), chown(1), cp(1), cpio(1), find(1), ls(1), mv(1), tar(1), setfacl(1), chmod(2),
+acl(2),stat(2),acl_get(3SEC), aclsort(3SEC), acl_fromtext(3SEC), acl_free(3SEC), acl_strip(3SEC), acl_triv<hy>
+ial(3SEC)

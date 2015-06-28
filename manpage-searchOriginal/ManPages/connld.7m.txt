@@ -1,0 +1,30 @@
+<beginning of page>
+connld <-> line discipline for unique stream connections
+#include </sys/steam.h>
+int ioctl(fd,I_PUSH,"connld");
+connld is a STREAMS-based module that provides unique connections between server and client processes. It can
+only be pushed (see streamio(7I)) onto one end of a STREAMS-based pipe that may subsequently be attached to a
+name in the file system name space with fattach(3C). After the pipe end is attached, a new pipe is created internally
+when an originating process attempts to open(2) or creat(2) the file system name. A file descriptor for one end of
+the new pipe is packaged into a message identical to that for the ioctl I_SENDFD (see streamio(7I)) and is trans<hy>
+mitted along the stream to the server process on the other end. The originating process is blocked until the server re<hy>
+sponds.
+The server responds to the I_SENDFD request by accepting the file descriptor through the I_RECVFD ioctl mes<hy>
+sage. When this happens, the file descriptor associated with the other end of the new pipe is transmitted to the origi<hy>
+nating process as the file descriptor returned from open(2) or creat(2).
+If the server does not respond to the I_SENDFD request, the stream that the connld module is pushed on becomes
+uni-directional because the server will not be able to retrieve any data off the stream until the I_RECVFD request
+is issued. If the server process exits before issuing the I_RECVFD request, the open(2) or the creat(2) invocation
+will fail and return -1 to the originating process.
+When the connld module is pushed onto a pipe, it ignores messages going back and forth through the pipe.
+On success, an open of connld returns 0. On failure, errno is set to the following values:
+EINVAL A stream onto which connld is being pushed is not a pipe or the pipe does not have a write queue pointer
+pointing to a stream head read queue.
+EINVAL The other end of the pipe onto which connld is being pushed is linked under a multiplexor.
+EPIPE connld is being pushed onto a pipe end whose other end is no longer there.
+ENOMEM An internal pipe could not be created.
+ENXIO An M_HANGUP message is at the stream head of the pipe onto which connld is being pushed.
+EAGAIN Internal data structures could not be allocated.
+ENFILE A file table entry could not be allocated.
+creat(2), open(2), fattach(3C), streamio(7I)
+STREAMS Programming Guide

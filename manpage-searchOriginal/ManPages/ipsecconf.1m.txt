@@ -1,0 +1,728 @@
+<beginning of page>
+ipsecconf <-> configure system wide IPsec policy
+/usr/sbin/ipsecconf
+/usr/sbin/ipsecconf -a file [-q]
+/usr/sbin/ipsecconf -c file
+/usr/sbin/ipsecconf -d [-i tunnel-name] {index, tunnel-name, index}
+/usr/sbin/ipsecconf -f [-i tunnel-name]
+/usr/sbin/ipsecconf -F
+/usr/sbin/ipsecconf -l [-i tunnel-name] [-n]
+/usr/sbin/ipsecconf -L [-n]
+The ipsecconf utility configures the IPsec policy for a host or for one of its tunnels. Once the policy is configured,
+all outbound and inbound datagrams are subject to policy checks as they exit and enter the host or tunnel. For the
+host policy, if no entry is found, no policy checks will be completed, and all the traffic will pass through. For a tun<hy>
+nel, if no entry is found and there is at least one entry for the tunnel, the traffic will automatically drop. The differ<hy>
+ence in behavior is because of the assumptions about IPsec tunnels made in many implementations. Datagrams that
+are being forwarded will not be subjected to policy checks that are added using this command. See ifconfig(1M)
+and dladm(1M) for information on how to protect forwarded packets. Depending upon the match of the policy en<hy>
+try, a specific action will be taken.
+This command can be run only by superuser.
+Each entry can protect traffic in either one direction (requiring a pair of entries) or by a single policy entry which in<hy>
+stalls the needed symmetric sadb rules.
+When the command is issued without any arguments, the list of file policy entries loaded are shown. To display the
+(spd p.e.s) use the -l option. Both will display the index number for the entry. To specify a single tunnel's SPD, use
+the -i option in combination with -l. To specify all SPDs, both host and for all tunnels, use -L.
+Note, since one file policy entry (FPE) can generate multiple SPD pol entries (SPEs), the list of FPEs may not show
+all the actual entries. However, it is still useful in determining what what rules have been added to get the spd into its
+current state.
+You can use the -d option with the index to delete a given policy in the system. If the -d option removes an FPE en<hy>
+try that produces multiple SPEs, only then SPD with the same policy index as the FPE will be removed. This can
+produce a situation where there may be SPEs when there are no FPEs.
+As with -l, -d can use the -i flag to indicate a tunnel. An alternate syntax is to specify a tunnel name, followed by a
+comma (,), followed by an index. For example, ip.tun0,1.
+With no options, the entries are displayed in the order that they were added, which is not necessarily the order in
+which the traffic match takes place.
+To view the order in which the traffic match will take place, use the -l option. The rules are ordered such that all by<hy>
+pass rules are checked first, then ESP rules, then AH rules. After that, they are checked in the order entered.
+Policy entries are not preserved across system restarts. Permanent policy entries should be added to /etc/in<hy>
+et/ipsecinit.conf. This file is read by the following smf(5) service:
+ svc:/network/ipsec/policy
+See NOTES for more information on managing IPsec security policy and SECURITY for issues in securing /etc/in<hy>
+et/ipsecinit.conf.
+ipsecconf supports the following options:
+<beginning of page>
+-a file
+Add the IPsec policy to the system as specified by each entry in the file. An IPsec configuration file contains one or
+more entries that specify the configuration. Once the policy is added, all outbound and inbound datagrams are sub<hy>
+ject to policy checks.
+Entries in the files are described in the section below. Examples can be found in the section below.
+Policy is latched for TCP/UDP sockets on which a connect(3SOCKET) or accept(3SOCKET) is issued. So, the ad<hy>
+dition of new policy entries may not affect such endpoints or sockets. However, the policy will be latched for a sock<hy>
+et with an existing non-null policy. Thus, make sure that there are no preexisting connections that will be subject to
+checks by the new policy entries.
+The feature of policy latching explained above may change in the future. It is not advisable to depend upon this fea<hy>
+ture.
+-c file
+Check the syntax of the configuration file and report any errors without making any changes to the policy. This op<hy>
+tion is useful when debugging configurations and when smf(5) reports a configuration error. See SECURITY.
+-d index
+Delete the host policy denoted by the index. The index is obtained by invoking ipsecconf without any arguments, or
+with the -l option. See DESCRIPTION for more information. Once the entry is deleted, all outbound and inbound
+datagrams affected by this policy entry will not be subjected to policy checks. Be advised that with connections for
+which the policy has been latched, packets will continue to go out with the same policy, even if it has been deleted. It
+is advisable to use the -l option to find the correct policy index.
+-d name,index
+Delete the policy entry denoted by index on a tunnel denoted by name. Since tunnels affect traffic that might origi<hy>
+nate off-node, latching does not apply as it does in the host policy case. Equivalent to: -d index -i name.
+-f
+Flush all the policies in the system. Constraints are similar to the -d option with respect to latching and host versus
+per-tunnel behavior.
+-F
+Flush all policies on all tunnels and also flush all host policies.
+-i name
+Specify a tunnel interface name for use with the -d, -f, or -l flags.
+-l
+Listing of a single policy table, defaulting to the host policy. When ipsecconf is invoked without any arguments, a
+complete list of policy entries with indexes added by the user since boot is displayed. The current table can differ
+from the previous one if, for example, a multi-homed entry was added or policy reordering occurred, or if a single
+rule entry generates two spd rules In the case of a multi-homed entry, all the addresses are listed explicitly. If a mask
+was not specified earlier but was instead inferred from the address, it will be explicitly listed here. This option is
+used to view policy entries in the correct order. The outbound and inbound policy entries are listed separately.
+-L
+Lists all policy tables, including host policy and all tunnel instances (including configured but unplumbed).
+If -i is specified, -L lists the policy table for a specific tunnel interface.
+<beginning of page>
+-n
+Show network addresses, ports, protocols in numbers. The -n option may only be used with the -l option.
+-q
+Quiet mode. Suppresses the warning message generated when adding policies.
+Each policy entry contains three parts specified as follows:
+ {pattern} action {properties}
+or
+ {pattern} action {properties} ["or" action {properties}]*
+Every policy entry begins on a new line and can span multiple lines. If an entry exceeds the length of a line, you
+should split it only within a "braced" section or immediately before the first (left-hand) brace of a braced section.
+Avoid using the backslash character (\). See EXAMPLES.
+The pattern section, as shown in the syntax above, specifies the traffic pattern that should be matched against the
+outbound and inbound datagrams. If there is a match, a specific action determined by the second argument will be
+taken, depending upon the properties of the policy entry.
+If there is an or in the rule (multiple action-properties for a given pattern), a transmitter will use the first action-prop<hy>
+erty pair that works, while a receiver will use any that are acceptable.
+pattern and properties are name-value pairs where name and value are separated by a <space>, <tab> or <newline>.
+Multiple name-value pairs should be separated by <space>, <tab> or <newline>. The beginning and end of the pat<hy>
+tern and properties are marked by { and } respectively.
+Files can contain multiple policy entries. An unspecified name-value pair in the pattern will be considered as a wild<hy>
+card. Wildcard entries match any corresponding entry in the datagram.
+One thing to remember is that UDP port 500 is always bypassed regardless of any policy entries. This is a require<hy>
+ment for in.iked(1M) to work.
+File can be commented by using a # as the first character. Comments may be inserted either at the beginning or the
+end of a line.
+The complete syntax of a policy entry is:
+ policy ::= { <pattern1> } <action1> { <properties1> } |
+  { <pattern2> } <action2> { <properties2> }
+  [ 'or' <action2> { <properties2>} ]*
+  pattern1 ::= <pattern_name_value_pair1>*
+  pattern2 ::= <pattern_name_value_pair2>*
+  action1 ::= apply | permit | bypass | pass
+  action2 ::= bypass | pass | drop | ipsec
+  properties1 ::= {<prop_name_value_pair1>}
+  properties2 ::= {<prop_name_value_pair2>}
+  pattern_name_value_pair1 ::=
+  saddr <address>/<prefix> |
+  src <address>/<prefix> |
+  srcaddr <address>/<prefix> |
+  smask <mask> |
+<beginning of page>
+  sport <port> |
+  daddr <address>/<prefix> |
+  dst <address>/<prefix> |
+  dstaddr <address>/<prefix> |
+  dmask <mask> |
+  dport <port> |
+  ulp <protocol> |
+  proto <protocol> |
+  type <icmp-type> |
+  type <number>-<number> |
+  code <icmp-code>
+  code <number>-<number>
+  tunnel <interface-name> |
+  negotiate <tunnel,transport>
+  pattern_name_value_pair2 ::=
+  raddr <address>/<prefix> |
+  remote <address>/<prefix> |
+  rport <port> |
+  laddr <address>/<prefix> |
+  local <address>/<prefix> |
+  lport <port> |
+  ulp <protocol> |
+  type <icmp-type> |
+  type <number>-<number> |
+  code <icmp-code> |
+  code <number>-<number>
+  proto <protocol> |
+  tunnel <interface-name> |
+  negotiate <tunnel,transport> |
+  dir <dir_val2>
+  address ::= <IPv4 dot notation> | <IPv6 colon notation> |
+  <String recognized by gethostbyname>|
+  <String recognized by getnetbyname>
+  prefix ::= <number>
+  mask ::= <0xhexdigit[hexdigit]> | <0Xhexdigit[hexdigit]> |
+  <IPv4 dot notation>
+  port ::= <number>| <String recognized by getservbyname>
+  protocol ::= <number>| <String recognized by getprotobyname>
+  prop_name_value_pair1 ::=
+  auth_algs <auth_alg> |
+  encr_algs <encr_alg> |
+  encr_auth_algs <auth_alg> |
+  sa <sa_val> |
+  dir <dir_val1>
+  prop_name_value_pair2 ::=
+  auth_algs <auth_alg> |
+  encr_algs <encr_alg> |
+  encr_auth_algs <auth_alg> |
+  sa <sa_val>
+  auth_alg ::= <auth_algname> ['(' <keylen> ')']
+  auth_algname ::= any | md5 | hmac-md5 | sha | sha1 | hmac-sha |
+  hmac-sha1 | hmac-sha256 | hmac-sha384 |
+  hmac-sha512 |<number>
+  encr_alg ::= <encr_algname> ['(' <keylen> ')']
+  encr_algname ::= any | aes | aes-cbc | des | des-cbc | 3des |
+  3des-cbc | blowfish | blowfish-cbc | <number>
+<beginning of page>
+  keylen ::= <number> | <number>'..' | '..'<number> | <number>'..' \
+  <number>
+  sa_val ::= shared | unique
+  dir_val1 ::= out | in
+  dir_val2 ::= out | in | both
+  number ::= < 0 | 1 | 2 ... 9> <number>
+  icmp-type ::= <number> | unreach | echo | echorep | squench |
+  redir | timex | paramprob | timest | timestrep |
+  inforeq | inforep | maskreq | maskrep | unreach6 |
+  pkttoobig6 | timex6 | paramprob6 | echo6 | echorep6 |
+  router-sol6 | router-ad6 | neigh-sol6 | neigh-ad6 |
+  redir6
+  icmp-code ::= <number> | net-unr | host-unr | proto-unr | port-unr |
+  needfrag | srcfail | net-unk | host-unk | isolate |
+  net-prohib | host-prohib | net-tos | host-tos |
+  filter-prohib | host-preced | cutoff-preced |
+  no-route6 | adm-prohib6 | addr-unr6 | port-unr6 |
+  hop-limex6 | frag-re-timex6 | err-head6 | unrec-head6 |
+  unreq-opt6
+Policy entries may contain the following (name value) pairs in the pattern field. Each (name value) pair may appear
+only once in given policy entry.
+laddr/plen
+local/plen
+The value that follows is the local address of the datagram with the prefix length. Only plen leading bits of the
+source address of the packet will be matched. plen is optional. Local means destination on incoming and source on
+outgoing packets. The source address value can be a hostname as described in getaddrinfo(3SOCKET) or a network
+name as described in getnetbyname(3XNET) or a host address or network address in the Internet standard dot nota<hy>
+tion. See inet_addr(3XNET). If a hostname is given and getaddrinfo(3SOCKET) returns multiple addresses for the
+host, then policy will be added for each of the addresses with other entries remaining the same.
+raddr/plen
+remote/plen
+The value that follows is the remote address of the datagram with the prefix length. Only plen leading bits of the re<hy>
+mote address of the packet will be matched. plen is optional. Remote means source on incoming packets and desti<hy>
+nation on outgoing packets. The remote address value can be a hostname as described in getaddrinfo(3SOCKET) or
+a network name as described in getnetbyname(3XNET) or a host address or network address in the Internet stan<hy>
+dard dot notation. See inet_addr(3XNET). If a hostname is given and getaddrinfo(3SOCKET) returns multiple ad<hy>
+dresses for the host, then policy will be added for each of the addresses with other entries remaining the same.
+src/plen
+srcaddr/plen
+saddr/plen
+The value that follows is the source address of the datagram with the prefix length. Only plen leading bits of the
+source address of the packet will be matched. plen is optional.
+The source address value can be a hostname as described in getaddrinfo(3SOCKET) or a network name as de<hy>
+scribed in getnetbyname(3XNET) or a host address or network address in the Internet standard dot notation. See in<hy>
+et_addr(3XNET).
+If a hostname is given and getaddrinfo(3SOCKET) returns multiple addresses for the host, then policy will be
+added for each of the addresses with other entries remaining the same.
+<beginning of page>
+daddr/plen
+dest/plen
+dstaddr/plen
+The value that follows is the destination address of the datagram with the prefix length. Only plen leading bits of the
+destination address of the packet will be matched. plen is optional.
+See saddr for valid values that can be given. If multiple source and destination addresses are found, then a policy en<hy>
+try that covers each source address-destination address pair will be added to the system.
+smask
+For IPv4 only. The value that follows is the source mask. If prefix length is given with saddr, this should not be giv<hy>
+en. This can be represented either in hexadecimal number with a leading 0x or 0X, for example, 0xffff0000,
+0Xffff0000 or in the Internet decimal dot notation, for example, 255.255.0.0 and 255.255.255.0. The mask should be
+contiguous and the behavior is not defined for non-contiguous masks.
+smask is considered only when saddr is given.
+For both IPv4 and IPv6 addresses, the same information can be specified as a slen value attached to the saddr pa<hy>
+rameter.
+dmask
+Analogous to smask.
+lport
+The value that follows is the local port of the datagram. This can be either a port number or a string searched with a
+NULL proto argument, as described in getservbyname(3XNET)
+rport
+The value that follows is the remote port of the datagram. This can be either a port number or a string searched with
+a NULL proto argument, as described in getservbyname(3XNET)
+sport
+The value that follows is the source port of the datagram. This can be either a port number or a string searched with
+a NULL proto argument, as described in getservbyname(3XNET)
+dport
+The value that follows is the destination port of the datagram. This can be either a port number or a string as de<hy>
+scribed in getservbyname(3XNET) searched with NULL proto argument.
+proto ulp
+The value that follows is the Upper Layer Protocol that this entry should be matched against. It could be a number or
+a string as described in getprotobyname(3XNET). If no smask or plen is specified, a plen of 32 for IPv4 or 128 for
+IPv6 will be used, meaning a host. If the ulp is icmp or ipv6-icmp, any action applying IPsec must be the same for
+all icmp rules.
+type num or num-num
+The value that follows is the ICMP type that this entry should be matched against. type must be a number from 0 to
+255, or one of the appropriate icmp-type keywords. Also, ulp must be present and must specify either icmp or
+ipv6-icmp. A range of types can be specified with a hyphen separating numbers.
+<beginning of page>
+code num or num-num
+The value that follows is the ICMP code that this entry should be matched against. The value following the keyword
+code must be a number from 0 to 254 or one of the appropriate icmp-code keywords. Also, type must be present. A
+range of codes can be specified with a hyphen separating numbers.
+tunnel name
+Specifies a tunnel network interface, as configured with ifconfig(1M). If a tunnel of name does not yet exist, the pol<hy>
+icy entries are added anyway, and joined with the tunnel state when it is created. If a tunnel is unplumbed, its policy
+entries disappear.
+negotiate tunnel
+negotiate transport
+For per-tunnel security, specify whether the IPsec SAs protecting the traffic should be tunnel-mode SAs or transport-
+mode SAs. If transport-mode SAs are specified, no addresses can appear in the policy entry. Transport-mode is back<hy>
+ward compatible with Solaris 9, and tunnel IPsec policies configured with ifconfig(1M) will show up as transport
+mode entries here.
+Policy entries may contain the following (name-value) pairs in the properties field. Each (name-value) pair may ap<hy>
+pear only once in a given policy entry.
+auth_algs
+An acceptable value following this implies that IPsec AH header will be present in the outbound datagram. Values
+following this describe the authentication algorithms that will be used while applying the IPsec AH on outbound
+datagrams and verified to be present on inbound datagrams. See RFC 2402.
+This entry can contain either a string or a decimal number.
+string
+This should be either MD5 or HMAC-MD5 denoting the HMAC-MD5 algorithm as described in RFC 2403, and
+SHA1, or HMAC-SHA1 or SHA or HMAC-SHA denoting the HMAC-SHA algorithm described in RFC 2404.
+You can use the ipsecalgs(1M) command to obtain the complete list of authentication algorithms.
+The string can also be ANY, which denotes no-preference for the algorithm. Default algorithms will be chosen
+based upon the SAs available at this time for manual SAs and the key negotiating daemon for automatic SAs. Strings
+are not case-sensitive.
+number
+A number in the range 1-255. This is useful when new algorithms can be dynamically loaded.
+If auth_algs is not present, the AH header will not be present in the outbound datagram, and the same will be veri<hy>
+fied for the inbound datagram.
+encr_algs
+An acceptable value following this implies that IPsec ESP header will be present in the outbound datagram. The val<hy>
+ue following this describes the encryption algorithms that will be used to apply the IPsec ESP protocol to outbound
+datagrams and verify it to be present on inbound datagrams. See RFC 2406.
+This entry can contain either a string or a decimal number. Strings are not case-sensitive.
+string
+Can be one of the following:
+tab(); cw(1.83i) cw(1.83i) cw(1.83i) lw(1.83i) lw(1.83i) lw(1.83i) string value:Algorithm Used:See RFC: _ DES or
+DES-CBCDES-CBC2405 3DES or 3DES-CBC3DES-CBC2451 BLOWFISH or BLOWFISH-CBCBLOWFISH-
+CBC2451 AES or AES-CBCAES-CBC2451
+<beginning of page>
+You can use the ipsecalgs(1M) command to obtain the complete list of authentication algorithms.
+The value can be NULL, which implies a NULL encryption, pursuant to RFC 2410. This means that the payload
+will not be encrypted. The string can also be ANY, which indicates no-preference for the algorithm. Default algo<hy>
+rithms will be chosen depending upon the SAs available at the time for manual SAs and upon the key negotiating
+daemon for automatic SAs. Strings are not case-sensitive.
+number
+A decimal number in the range 1-255. This is useful when new algorithms can be dynamically loaded.
+encr_auth_algs
+An acceptable value following encr_auth_algs implies that the IPsec ESP header will be present in the outbound
+datagram. The values following encr_auth_algs describe the authentication algorithms that will be used while ap<hy>
+plying the IPsec ESP protocol on outbound datagrams and verified to be present on inbound datagrams. See RFC
+2406. This entry can contain either a string or a number. Strings are case-insensitive.
+string
+Valid values are the same as the ones described for auth_algs above.
+number
+This should be a decimal number in the range 1-255. This is useful when new algorithms can be dynamically loaded.
+If encr_algs is present and encr_auth_algs is not present in a policy entry, the system will use an ESP SA regard<hy>
+less of whether the SA has an authentication algorithm or not.
+If encr_algs is not present and encr_auth_algs is present in a policy entry, null encryption will be provided, which
+is equivalent to encr_algs with NULL, for outbound and inbound datagrams.
+If both encr_algs and encr_auth_algs are not present in a policy entry, ESP header will not be present for outbound
+datagrams and the same will be verified for inbound datagrams.
+If both encr_algs and encr_auth_algs are present in a policy entry, ESP header with integrity checksum will be
+present on outbound datagrams and the same will be verified for inbound datagrams.
+For encr_algs, encr_auth_algs, and auth_algs a key length specification may be present. This is either a single val<hy>
+ue specifying the only valid key length for the algorithm or a range specifying the valid minimum and/or maximum
+key lengths. Minimum or maximum lengths may be omitted.
+dir
+Values following this decides whether this entry is for outbound or inbound datagram. Valid values are strings that
+should be one of the following:
+out
+This means that this policy entry should be considered only for outbound datagrams.
+in
+This means that this policy entry should be considered only for inbound datagrams.
+both
+This means that this policy entry should be considered for both inbound and outbound datagrams
+This entry is not needed when the action is "apply", "permit" or "ipsec". But if it is given while the action is "apply"
+or "permit", it should be "out" or "in" respectively. This is mandatory when the action is "bypass".
+<beginning of page>
+sa
+Values following this decide the attribute of the security association. Value indicates whether a unique security asso<hy>
+ciation should be used or any existing SA can be used. If there is a policy requirement, SAs are created dynamically
+on the first outbound datagram using the key management daemon. Static SAs can be created using ipseckey(1M).
+The values used here determine whether a new SA will be used/obtained. Valid values are strings that could be one
+of the following:
+unique
+Unique Association. A new/unused association will be obtained/used for packets matching this policy entry. If an
+SA that was previously used by the same 5 tuples, that is, {Source address, Destination address, Source port, Desti<hy>
+nation Port, Protocol (for example, TCP/UDP)} exists, it will be reused. Thus uniqueness is expressed by the 5 tu<hy>
+ples given above. The security association used by the above 5 tuples will not be used by any other socket. For in<hy>
+bound datagrams, uniqueness will not be verified.
+For tunnel-mode tunnels, unique is ignored. SAs are assigned per-rule in tunnel-mode tunnels. For transport-mode
+tunnels, unique is implicit, because the enforcement happens only on the outer-packet addresses and protocol value
+of either IPv4-in-IP or IPv6-in-IP.
+shared
+Shared association. If an SA exists already for this source-destination pair, it will be used. Otherwise a new SA will
+be obtained. This is the default.
+This is mandatory only for outbound policy entries and should not be given for entries whose action is "bypass". If
+this entry is not given for inbound entries, for example, when "dir" is in or "action" is permit, it will be assumed to
+be shared.
+Action follows the pattern and should be given before properties. It should be one of the following and this field is
+mandatory.
+ipsec
+Use IPsec for the datagram as described by the properties, if the pattern matches the datagram. If ipsec is given with<hy>
+out a dir spec , the pattern is matched to incoming and outgoing datagrams.
+apply
+Apply IPsec to the datagram as described by the properties, if the pattern matches the datagram. If apply is given,
+the pattern is matched only on the outbound datagram.
+permit
+Permit the datagram if the pattern matches the incoming datagram and satisfies the constraints described by the
+properties. If it does not satisfy the properties, discard the datagram. If permit is given, the pattern is matched only
+for inbound datagrams.
+bypass
+pass
+Bypass any policy checks if the pattern matches the datagram. dir in the properties decides whether the check is
+done on outbound or inbound datagrams. All the bypass entries are checked before checking with any other policy
+entry in the system. This has the highest precedence over any other entries. dir is the only field that should be
+present when action is bypass.
+drop
+Drop any packets that match the pattern.
+If the file contains multiple policy entries, for example, they are assumed to be listed in the order in which they are
+to be applied. In cases of multiple entries matching the outbound and inbound datagram, the first match will be tak<hy>
+<beginning of page>
+en. The system will reorder the policy entry, that is, add the new entry before the old entry, only when:
+The level of protection is "stronger" than the old level of protection.
+Currently, strength is defined as:
+ AH and ESP > ESP > AH
+The standard uses of AH and ESP were what drove this ranking of "stronger". There are flaws with this. ESP can
+be used either without authentication, which will allow cut-and-paste or replay attacks, or without encryption, which
+makes it equivalent or slightly weaker than AH. An administrator should take care to use ESP properly. See ipsece<hy>
+sp(7P) for more details.
+If the new entry has bypass as action, bypass has the highest precedence. It can be added in any order, and the sys<hy>
+tem will still match all the bypass entries before matching any other entries. This is useful for key management dae<hy>
+mons which can use this feature to bypass IPsec as it protects its own traffic.
+Entries with both AH (auth_algs present in the policy entry) and ESP (encr_auth_algs or encr_auth_algs present
+in the policy entry) protection are ordered after all the entries with AH and ESP and before any AH-only and ESP-
+only entries. In all other cases the order specified by the user is not modified, that is, newer entries are added at the
+end of all the old entries. See .
+A new entry is considered duplicate of the old entry if an old entry matches the same traffic pattern as the new entry.
+See for information on duplicates.
+If, for example, the policy file comes over the wire from an NFS mounted file system, an adversary can modify the
+data contained in the file, thus changing the policy configured on the machine to suit his needs. Administrators
+should be cautious about transmitting a copy of the policy file over a network.
+To prevent non-privileged users from modifying the security policy, ensure that the configuration file is writable only
+by trusted users.
+The configuration file is defined by a property of the policy smf(5) service. The default configuration file, is /etc/in<hy>
+et/ipsecinit.conf. This can be changed using the svcprop(1) command. See NOTES for more details.
+The policy description language supports the use of tokens that can be resolved by means of a name service, using
+functions such as gethostbyname(3NSL). While convenient, these functions are only secure as the name service the
+system is configured to use. Great care should be taken to secure the name service if it is used to resolve elements of
+the security policy.
+If your source address is a host that can be looked up over the network and your naming system itself is compro<hy>
+mised, then any names used will no longer be trustworthy.
+If the name switch is configured to use a name service that is not local to the system, bypass policy entries might be
+required to prevent the policy from preventing communication to the name service. See nsswitch.conf(4).
+Policy is latched for TCP/UDP sockets on which a connect(3SOCKET) or accept(3SOCKET) has been issued.
+Adding new policy entries will not have any effect on them. This feature of latching may change in the future. It is
+not advisable to depend upon this feature.
+The ipsecconf command can only be run by a user who has sufficient privilege to open the pf_key(7P) socket. The
+appropriate privilege can be assigned to a user with the Network IPsec Management profile. See profiles(1),
+rbac(5), prof_attr(4).
+Make sure to set up the policies before starting any communications, as existing connections may be affected by the
+addition of new policy entries. Similarly, do not change policies in the middle of a communication.
+Note that certain ndd tunables affect how policies configured with this tool are enforced; see ipsecesp(7P) for more
+details. Example 1 Protecting Outbound TCP Traffic With ESP and the AES Algorithm
+The following example specified that any TCP packet from spiderweb to arachnid should be encrypted with AES,
+and the SA could be a shared one. It does not verify whether or not the inbound traffic is encrypted.
+<beginning of page>
+ #
+ # Protect the outbound TCP traffic between hosts spiderweb
+ # and arachnid with ESP and use AES algorithm.
+ #
+ {
+  laddr spiderweb
+  raddr arachnid
+  ulp tcp
+  dir out
+ } ipsec {
+   encr_algs AES
+ }
+Example 2 Verifying Whether or Not Inbound Traffic is Encrypted
+Example 1 does not verify whether or not the inbound traffic is encrypted. The entry in this example protects in<hy>
+bound traffic:
+ #
+ # Protect the TCP traffic on inbound with ESP/DES from arachnid
+ # to spiderweb
+ #
+ {
+   laddr spiderweb
+   raddr arachnid
+   ulp tcp
+   dir in
+ } ipsec {
+   encr_algs AES
+ }
+sa can be absent for inbound policy entries as it implies that it can be a shared one. Uniqueness is not verified on in<hy>
+bound. Note that in both the above entries, authentication was never specified. This can lead to cut and paste attacks.
+As mentioned previously, though the authentication is not specified, the system will still use an ESP SA with en<hy>
+cr_auth_alg specified, if it was found in the SA tables.
+Example 3 Protecting All Traffic Between Two Hosts
+The following example protects both directions at once:
+ {
+   laddr spiderweb
+   raddr arachnid
+   ulp tcp
+ } ipsec {
+   encr_algs AES
+ }
+Example 4 Authenticating All Inbound Traffic to the Telnet Port
+This entry specifies that any inbound datagram to telnet port should come in authenticated with the SHA1 algorithm.
+Otherwise the datagram should not be permitted. Without this entry, traffic destined to port number 23 can come in
+clear. sa is not specified, which implies that it is shared. This can be done only for inbound entries. You need to have
+an equivalent entry to protect outbound traffic so that the outbound traffic is authenticated as well, remove the dir.
+ #
+ # All the inbound traffic to the telnet port should be
+ # authenticated.
+ #
+ {
+   lport telnet
+   dir in
+<beginning of page>
+ } ipsec {
+   auth_algs sha1
+ }
+Example 5 Verifying Inbound Traffic is Null-Encrypted
+The first entry specifies that any packet with address host-B should not be checked against any policies. The second
+entry specifies that all inbound traffic from network-B should be encrypted with a NULL encryption algorithm and
+the MD5 authentication algorithm. NULL encryption implies that ESP header will be used without encrypting the
+datagram. As the first entry is bypass it need not be given first in order, as bypass entries have the highest prece<hy>
+dence. Thus any inbound traffic will be matched against all bypass entries before any other policy entries.
+ #
+ # Make sure that all inbound traffic from network-B is NULL
+ # encrypted, but bypass for host-B alone from that network.
+ # Add the bypass first.
+ {
+ raddr host-B
+  dir in 
+ } bypass {}
+ # Now add for network-B.
+ {
+  raddr network-B/16
+  dir in
+ } ipsec {
+ encr_algs NULL
+ encr_auth_algs md5
+ }
+Example 6 Entries to Bypass Traffic from IPsec
+The first two entries provide that any datagram leaving the machine with source port 53 or coming into port number
+53 should not be subjected to IPsec policy checks, irrespective of any other policy entry in the system. Thus the lat<hy>
+ter two entries will be considered only for ports other than port number 53.
+ #
+ # Bypass traffic for port no 53
+  #
+ {lport 53} bypass {}
+ {rport 53} bypass {}
+ {raddr spiderweb } ipsec {encr_algs any sa unique}
+Example 7 Protecting Outbound Traffic
+  #
+  # Protect the outbound traffic from all interfaces.
+  #
+ {raddr spiderweb dir out} ipsec {auth_algs any sa unique}
+If the gethostbyname(3XNET) call for spiderweb yields multiple addresses, multiple policy entries will be added
+for all the source address with the same properties.
+ {
+  laddr arachnid
+  raddr spiderweb
+  dir in
+ } ipsec {auth_algs any sa unique}
+If the gethostbyname(3XNET) call for spiderweb and the gethostbyname(3XNET) call for arachnid yield multiple
+addresses, multiple policy entries will be added for each (saddr daddr) pair with the same properties. Use ipsecconf
+<beginning of page>
+-l to view all the policy entries added.
+Example 8 Bypassing Unauthenticated Traffic
+ #
+ # Protect all the outbound traffic with ESP except any traffic
+ # to network-b which should be authenticated and bypass anything
+ # to network-c
+ #
+ {raddr network-b/16 dir out} ipsec {auth_algs any}
+ {dir out} ipsec {encr_algs any}
+ {raddr network-c/16 dir out} bypass {} # NULL properties
+Note that bypass can be given anywhere and it will take precedence over all other entries. NULL pattern matches all
+the traffic.
+Example 9 Encrypting IPv6 Traffic with 3DES and MD5
+The following entry on the host with the link local address fe80::a00:20ff:fe21:4483 specifies that any outbound
+traffic between the hosts wtih IPv6 link-local addresses fe80::a00:20ff:fe21:4483 and fe80::a00:20ff:felf:e346 must
+be encrypted with 3DES and MD5.
+ {
+  laddr fe80::a00:20ff:fe21:4483
+  raddr fe80::a00:20ff:felf:e346
+  dir out
+ } ipsec {
+  encr_algs 3DES
+  encr_auth_algs MD5
+ }
+Example 10 Verifying IPv6 Traffic is Authenticated with SHA1
+The following two entries require that all IPv6 traffic to and from the IPv6 site-local network fec0:abcd::0/32 be au<hy>
+thenticated with SHA1.
+ {raddr fec0:abcd::0/32} ipsec { auth_algs SHA1 }
+Example 11 Key Lengths
+ # use aes at any key length
+ {raddr spiderweb} ipsec {encr_algs aes}
+ # use aes with a 192 bit key
+ {raddr spiderweb} ipsec {encr_algs aes(192)}
+ # use aes with any key length up to 192 bits
+ # i.e. 192 bits or less
+ {raddr spiderweb} ipsec {encr_algs aes(..192)}
+ # use aes with any key length of 192 or more
+ # i.e. 192 bits or more
+ {raddr spiderweb} ipsec {encr_algs aes(192..)}
+ #use aes with any key from 192 to 256 bits
+ {raddr spiderweb} ipsec {encr_algs aes(192..256)}
+ #use any algorithm with a key of 192 bits or longer
+ {raddr spiderweb} ipsec {encr_algs any(192..)}
+Example 12 Correct and Incorrect Policy Entries
+The following are examples of correctly formed policy entries:
+<beginning of page>
+ { raddr that_system rport telnet } ipsec { encr_algs 3des encr_auth_algs
+ sha1 sa shared}
+ {
+  raddr that_system
+  rport telnet
+ } ipsec {
+  encr_algs 3des
+  encr_auth_algs sha1
+  sa shared
+ }
+ { raddr that_system rport telnet } ipsec
+  { encr_algs 3des encr_auth_algs sha1 sa shared}
+ { raddr that_system rport telnet } ipsec
+  { encr_algs 3des encr_auth_algs sha1 sa shared} or ipsec
+  { encr_algs aes encr_auth_algs sha1 sa shared}
+...and the following is an incorrectly formed entry:
+ { raddr that_system rport telnet } ipsec
+  { encr_algs 3des encr_auth_algs sha1 sa shared}
+  or ipsec { encr_algs aes encr_auth_algs sha1 sa shared}
+In the preceding, incorrect entry, note that the third line begins with "or ipsec". Such an entry causes ipsecconf to
+return an error.
+Example 13 Allowing Neighbor Discovery to Occur in the Clear
+The following two entries require that all IPv6 traffic to and from the IPv6 site-local network fec0:abcd::0/32 be au<hy>
+thenticated with SHA1. The second entry allows neighbor discovery to operate correctly.
+ {raddr fec0:abcd::0/32} ipsec { auth_algs SHA1 }
+ {raddr fec0:abcd::0/32 ulp ipv6-icmp type 133-137 dir both }
+  pass { }
+Example 14 Using "or"
+The following entry allows traffic using the AES or Blowfish algorithms from the remote machine spiderweb:
+ {raddr spiderweb} ipsec {encr_algs aes} or ipsec {encr_algs blowfish}
+Example 15 Configuring a Tunnel to be Backward-Compatible with Solaris 9
+The following example is equivalent to "encr_algs aes encr_auth_algs md5" in ifconfig(1M):
+ {tunnel ip.tun0 negotiate transport} ipsec {encr_algs aes
+  encr_auth_algs md5}
+Example 16 Configuring a Tunnel to a VPN client with an Assigned Address
+The following example assumes a distinct "inside" network with its own topology, such that a client's default route
+goes "inside".
+<beginning of page>
+ # Unlike route(1m), the default route has to be spelled-out.
+ {tunnel ip.tun0 negotiate tunnel raddr client-inside/32
+ laddr 0.0.0.0/0} ipsec {encr_algs aes encr_auth_algs sha1}
+Example 17 Transit VPN router between Two Tunnelled Subnets and a Third
+The following example specifies a configuration for a VPN router that routes between two tunnelled subnets and a
+third subnet that is on-link. Consider remote-site A, remote-site B, and local site C, each with a /24 address alloca<hy>
+tion.
+ # ip.tun0 between me (C) and remote-site A.
+ # Cover remote-site A to remote-side B.
+ {tunnel ip.tun0 negotiate tunnel raddr A-prefix/24 laddr
+ B-prefix/24} ipsec {encr_algs 3des encr_auth_algs md5}
+ # Cover remote-site A traffic to my subnet.
+ {tunnel ip.tun0 negotiate tunnel raddr A-prefix/24 laddr
+ C-prefix/24} ipsec {encr_algs 3des encr_auth_algs md5}
+ # ip.tun1 between me (C) and remote-site B.
+ # Cover remote-site B to remote-site A.
+ {tunnel ip.tun1 negotiate tunnel raddr B-prefix/24 laddr
+ A-prefix/24} ipsec {encr_algs aes encr_auth_algs sha1}
+ # Cover remote-site B traffic to my subnet.
+ {tunnel ip.tun1 negotiate tunnel raddr B-prefix/24 laddr
+ C-prefix/24} ipsec {encr_algs aes encr_auth_algs md5}
+/var/run/ipsecpolicy.conf
+Cache of IPsec policies currently configured for the system, maintained by ipsecconf command. Do not edit this file.
+/etc/inet/ipsecinit.conf
+File containing IPsec policies to be installed at system restart by the policy smf(5) service. See NOTES for more in<hy>
+formation.
+/etc/inet/ipsecinit.sample
+Sample input file for ipseconf.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu _ Interface StabilityCommitted
+auths(1), profiles(1), svcprop(1), svcs(1), in.iked(1M), init(1M), ifconfig(1M), ipsecalgs(1M), ipseckey(1M), sv<hy>
+cadm(1M), svccfg(1M), gethostbyname(3NSL), accept(3SOCKET), connect(3SOCKET), gethostby<hy>
+name(3XNET), getnetbyname(3XNET), getprotobyname(3XNET), getservbyname(3XNET), getaddrin<hy>
+fo(3SOCKET), socket(3SOCKET), ike.config(4), nsswitch.conf(4), prof_attr(4), user_attr(4), attributes(5),
+rbac(5), smf(5), ipsecah(7P), ipsecesp(7P), pf_key(7P)
+Glenn, R. and Kent, S. RFC 2410, The NULL Encryption Algorithm and Its Use With IPsec. The Internet Society.
+1998.
+Kent, S. and Atkinson, R. RFC 2402, IP Authentication Header.The Internet Society. 1998.
+Kent, S. and Atkinson, R. RFC 2406, IP Encapsulating Security Payload (ESP). The Internet Society. 1998.
+Madsen, C. and Glenn, R. RFC 2403, The Use of HMAC-MD5-96 within ESP and AH. The Internet Society. 1998.
+<beginning of page>
+Madsen, C. and Glenn, R. RFC 2404, The Use of HMAC-SHA-1-96 within ESP and AH. The Internet Society. 1998.
+Madsen, C. and Doraswamy, N. RFC 2405, The ESP DES-CBC Cipher Algorithm With Explicit IV. The Internet So<hy>
+ciety. 1998.
+Pereira, R. and Adams, R. RFC 2451, The ESP CBC-Mode Cipher Algorithms. The Internet Society. 1998.
+Frankel, S. and Kelly, R. Glenn, The AES Cipher Algorithm and Its Use With IPsec. 2001.
+Bad "string" on line N.
+Duplicate "string" on line N.
+string refers to one of the names in pattern or properties. A Bad string indicates that an argument is malformed; a
+Duplicate string indicates that there are multiple arguments of a similar type, for example, multiple Source Address
+arguments.
+Interface name already selected
+Dual use of -i name and name,index for an index.
+Error before or at line N.
+Indicates parsing error before or at line N.
+Non-existent index
+Reported when the index for delete is not a valid one.
+spd_msg return: File exists
+Reported when there is already a policy entry that matches the traffic of this new entry.
+IPsec manual keys are managed by the service management facility, smf(5). The services listed below manage the
+components of IPsec. These services are delivered as follows:
+ svc:/network/ipsec/policy:default (enabled)
+ svc:/network/ipsec/ipsecalgs:default (enabled)
+ svc:/network/ipsec/manual-key:default (disabled)
+ svc:/network/ipsec/ike:default (disabled)
+The manual-key service is delivered disabled. The system administrator must create manual IPsec Security Associa<hy>
+tions (SAs), as described in ipseckey(1M), before enabling that service.
+The policy service is delivered enabled, but without a configuration file, so that, as a starting condition, packets are
+not protected by IPsec. After you create the configuration file /etc/inet/ipsecinit.conf, as described in this man page,
+and refresh the service (svcadm refresh, see below), the policy contained in the configuration file is applied. If there
+is an error in this file, the service enters maintenance mode.
+Services that are delivered disabled are delivered that way because the system administrator must create configura<hy>
+tion files for those services before enabling them. See ike.config(4) for the ike service.
+See ipsecalgs(1M) for the ipsecalgs service.
+The correct administrative procedure is to create the configuration file for each service, then enable each service us<hy>
+ing svcadm(1M).
+If the configuration needs to be changed, edit the configuration file then refresh the service, as follows:
+ example# svcadm refresh policy
+<beginning of page>
+The smf(5) framework will record any errors in the service-specific log file. Use any of the following commands to
+examine the logfile property:
+ example# svcs -l policy
+ example# svcprop policy
+ example# svccfg -s policy listprop
+The following property is defined for the policy service:
+ config/config_file
+This property can be modified using svccfg(1M) by users who have been assigned the following authorization:
+ solaris.smf.value.ipsec
+See auths(1), user_attr(4), rbac(5).
+The service needs to be refreshed using svcadm(1M) before the new property is effective. General non-modifiable
+properties can be viewed with the svcprop(1) command.
+ # svccfg -s ipsec/policy setprop config/config_file = /new/config_file
+ # svcadm refresh policy
+Administrative actions on this service, such as enabling, disabling, refreshing, and requesting restart can be per<hy>
+formed using svcadm(1M). A user who has been assigned the authorization shown below can perform these actions:
+ solaris.smf.manage.ipsec
+The service's status can be queried using the svcs(1) command.
+The ipsecconf command is designed to be managed by the policy smf(5) service. While the ipsecconf command can
+be run from the command line, this is discouraged. If the ipsecconf command is to be run from the command line,
+the policy smf(5) service should be disabled first. See svcadm(1M).

@@ -1,0 +1,124 @@
+<beginning of page>
+ndbm, dbm_clearerr, dbm_close, dbm_delete, dbm_error, dbm_fetch, dbm_firstkey, dbm_nextkey, dbm_open,
+dbm_store <-> database functions
+#include <ndbm.h>
+int dbm_clearerr(DBM *db);
+void dbm_close(DBM *db);
+int dbm_delete(DBM *db, datum key);
+int dbm_error(DBM *db);
+datum dbm_fetch(DBM *db, datum key);
+datum dbm_firstkey(DBM *db);
+datum dbm_nextkey(DBM *db);
+DBM *dbm_open(const char *file, int open_flags, mode_t file_mode);
+int dbm_store(DBM *db, datum key, datum content, int store_mode);
+These functions create, access and modify a database. They maintain key/content pairs in a database. The functions
+will handle large databases (up to a billion blocks) and will access a keyed item in one or two file system accesses.
+This package replaces the earlier dbm(3UCB) library, which managed only a single database.
+keys and contents are described by the datum typedef. A datum consists of at least two members, dptr and dsize.
+The dptr member points to an object that is dsize bytes in length. Arbitrary binary data, as well as ASCII character
+strings, may be stored in the object pointed to by dptr.
+The database is stored in two files. One file is a directory containing a bit map of keys and has .dir as its suffix. The
+second file contains all data and has .pag as its suffix.
+The dbm_open() function opens a database. The file argument to the function is the pathname of the database. The
+function opens two files named file.dir and file.pag. The open_flags argument has the same meaning as the flags ar<hy>
+gument of open(2) except that a database opened for write-only access opens the files for read and write access. The
+file_mode argument has the same meaning as the third argument of open(2).
+The dbm_close() function closes a database. The argument db must be a pointer to a dbm structure that has been
+returned from a call to dbm_open().
+The dbm_fetch() function reads a record from a database. The argument db is a pointer to a database structure that
+has been returned from a call to dbm_open(). The argument key is a datum that has been initialized by the applica<hy>
+tion program to the value of the key that matches the key of the record the program is fetching.
+The dbm_store() function writes a record to a database. The argument db is a pointer to a database structure that
+has been returned from a call to dbm_open(). The argument key is a datum that has been initialized by the applica<hy>
+tion program to the value of the key that identifies (for subsequent reading, writing or deleting) the record the pro<hy>
+gram is writing. The argument content is a datum that has been initialized by the application program to the value of
+the record the program is writing. The argument store_mode controls whether dbm_store() replaces any pre-exist<hy>
+ing record that has the same key that is specified by the key argument. The application program must set store_mode
+to either DBM_INSERT or DBM_REPLACE. If the database contains a record that matches the key argument and
+store_mode is DBM_REPLACE, the existing record is replaced with the new record. If the database contains a
+record that matches the key argument and store_mode is DBM_INSERT, the existing record is not replaced with the
+new record. If the database does not contain a record that matches the key argument and store_mode is either
+DBM_INSERT or DBM_REPLACE, the new record is inserted in the database.
+The dbm_delete() function deletes a record and its key from the database. The argument db is a pointer to a data<hy>
+base structure that has been returned from a call to dbm_open(). The argument key is a datum that has been initial<hy>
+ized by the application program to the value of the key that identifies the record the program is deleting.
+The dbm_firstkey() function returns the first key in the database. The argument db is a pointer to a database struc<hy>
+ture that has been returned from a call to dbm_open().
+The dbm_nextkey() function returns the next key in the database. The argument db is a pointer to a database struc<hy>
+<beginning of page>
+ture that has been returned from a call to dbm_open(). The dbm_firstkey() function must be called before calling
+dbm_nextkey(). Subsequent calls to dbm_nextkey() return the next key until all of the keys in the database have
+been returned.
+The dbm_error() function returns the error condition of the database. The argument db is a pointer to a database
+structure that has been returned from a call to dbm_open().
+The dbm_clearerr() function clears the error condition of the database. The argument db is a pointer to a database
+structure that has been returned from a call to dbm_open().
+These database functions support key/content pairs of at least 1024 bytes.
+The dbm_store() and dbm_delete() functions return 0 when they succeed and a negative value when they fail.
+The dbm_store() function returns 1 if it is called with a flags value of DBM_INSERT and the function finds an ex<hy>
+isting record with the same key.
+The dbm_error() function returns 0 if the error condition is not set and returns a non-zero value if the error condi<hy>
+tion is set.
+The return value of dbm_clearerr() is unspecified .
+The dbm_firstkey() and dbm_nextkey() functions return a key datum. When the end of the database is reached,
+the dptr member of the key is a null pointer. If an error is detected, the dptr member of the key is a null pointer and
+the error condition of the database is set.
+The dbm_fetch() function returns a content datum. If no record in the database matches the key or if an error condi<hy>
+tion has been detected in the database, the dptr member of the content is a null pointer.
+The dbm_open() function returns a pointer to a database structure. If an error is detected during the operation,
+dbm_open() returns a (DBM *)0.
+No errors are defined.
+The following code can be used to traverse the database:
+ for(key = dbm_firstkey(db); key.dptr != NULL; key = dbm_nextkey(db))
+The dbm_ functions provided in this library should not be confused in any way with those of a general-purpose
+database management system. These functions do not provide for multiple search keys per entry, they do not protect
+against multi-user access (in other words they do not lock records or files), and they do not provide the many other
+useful database functions that are found in more robust database management systems. Creating and updating data<hy>
+bases by use of these functions is relatively slow because of data copies that occur upon hash collisions. These func<hy>
+tions are useful for applications requiring fast lookup of relatively static information that is to be indexed by a single
+key.
+The dptr pointers returned by these functions may point into static storage that may be changed by subsequent calls.
+The dbm_delete() function does not physically reclaim file space, although it does make it available for reuse.
+After calling dbm_store() or dbm_delete() during a pass through the keys by dbm_firstkey() and dbm_nextkey(),
+the application should reset the database by calling dbm_firstkey() before again calling dbm_nextkey(). Example
+1 Using the Database Functions
+The following example stores and retrieves a phone number, using the name as the key. Note that this example does
+not include error checking.
+ #include <ndbm.h>
+ #include <stdio.h>
+ #include <fcntl.h>
+ #define NAME "Bill"
+ #define PHONE_NO "123-4567"
+ #define DB_NAME "phones"
+ main()
+<beginning of page>
+ {
+  DBM *db;
+  datum name = {NAME, sizeof (NAME)};
+  datum put_phone_no = {PHONE_NO, sizeof (PHONE_NO)};
+  datum get_phone_no;
+  /* Open the database and store the record */
+  db = dbm_open(DB_NAME, O_RDWR | O_CREAT, 0660);
+  (void) dbm_store(db, name, put_phone_no, DBM_INSERT);
+  /* Retrieve the record */
+  get_phone_no = dbm_fetch(db, name);
+  (void) printf("Name: %s, Phone Number: %s\n", name.dptr,
+  get_phone_no.dptr);
+  /* Close the database */
+  dbm_close(db);
+  return (0);
+ }
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Standard _ MT-LevelUnsafe
+ar(1), cat(1), cp(1), tar(1), open(2), dbm(3UCB), netconfig(4), attributes(5), standards(5)
+The .pag file will contain holes so that its apparent size may be larger than its actual content. Older versions of the
+UNIX operating system may create real file blocks for these holes when touched. These files cannot be copied by
+normal means ( cp(1), cat(1), tar(1), ar(1)) without filling in the holes.
+The sum of the sizes of a key/content pair must not exceed the internal block size (currently 1024 bytes). Moreover
+all key/content pairs that hash together must fit on a single block. dbm_store() will return an error in the event that a
+disk block fills with inseparable data.
+The order of keys presented by dbm_firstkey() and dbm_nextkey() depends on a hashing function.
+There are no interlocks and no reliable cache flushing; thus concurrent updating and reading is risky.
+The database files (file.dir and file.pag) are binary and are architecture-specific (for example, they depend on the ar<hy>
+chitecture's byte order.) These files are not guaranteed to be portable across architectures.

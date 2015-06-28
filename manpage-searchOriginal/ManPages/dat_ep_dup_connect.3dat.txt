@@ -1,0 +1,85 @@
+<beginning of page>
+dat_ep_dup_connect <-> establish a connection between the local Endpoint and a remote Endpoint
+cc [ flag... ] file... -ldat [ library... ]
+#include <dat/udat.h>
+DAT_RETURN
+ dat_ep_dup_connect (
+ IN DAT_EP_HANDLE ep_handle,
+ IN DAT_EP_HANDLE dup_ep_handle,
+ IN DAT_TIMEOUT timeout,
+ IN DAT_COUNT private_data_size,
+ IN const DAT_PVOID private_data,
+ IN DAT_QOS qos
+ )
+ep_handle Handle for an instance of an Endpoint.
+dup_ep_handle Connected local Endpoint that specifies a requested connection remote end.
+timeout: Duration of time, in microseconds, that Consumers wait for Connection establishment. The value of
+DAT_TIMEOUT_INFINITE represents no timeout, indefinite wait. Values must be positive.
+private_data_size Size of private_data. Must be nonnegative.
+private_data Pointer to the private data that should be provided to the remote Consumer as part of the Connection
+Request. If private_data_size is zero, then private_data can be NULL.
+qos Requested Quality of Service of the connection.
+The dat_ep_dup_connect() function requests that a connection be established between the local Endpoint and a re<hy>
+mote Endpoint. This operation is used by the active/client side Consumer of the connection model. The remote End<hy>
+point is identified by the dup_ep_handle. The remote end of the requested connection shall be the same as the re<hy>
+mote end of the dup_ep_handle. This is equivalent to requesting a connection to the same remote IA, Connection
+Qualifier, and connect_flags as used for establishing the connection on duplicated Endpoints and following the same
+redirections.
+Upon establishing the requested connection as part of the successful completion of this operation, the local Endpoint
+is bound to a Port Qualifier of the local IA. The Port Qualifier is passed to the remote side of the requested connec<hy>
+tion and is available to the remote Consumer in the Connection Request of the DAT_CONNECTION_RE<hy>
+QUEST_EVENT.
+The Consumer-provided private_data is passed to the remote side and is provided to the remote Consumer in the
+Connection Request. Consumers can encapsulate any local Endpoint attributes that remote Consumers need to know
+as part of an upper-level protocol. Providers can also provide a Provider on the remote side any local Endpoint at<hy>
+tributes and Transport-specific information needed for Connection establishment by the Transport.
+Upon successful completion of this operation, the local Endpoint is transferred into DAT_EP_STATE_AC<hy>
+TIVE_CONNECTION_PENDING.
+Consumers can request a specific value of qos. The Provider specifies which Quality of Service it supports in docu<hy>
+mentation and in the Provider attributes. If the local Provider or Transport does not support the requested qos, the
+operation fails and DAT_MODEL_NOT_SUPPORTED is returned synchronously. If the remote Provider does not
+support the requested qos, the local Endpoint is automatically transitioned into a DAT_EP_STATE_UNDISCON<hy>
+NECTED state, the connection is not established, and the event returned on the connect_evd_handle is DAT_CON<hy>
+NECTION_EVENT_NON_PEER_REJECTED. The same DAT_CONNECTION_EVENT_NON_PEER_RE<hy>
+JECTED event is returned if connection cannot be established for all reasons for not establishing the connection,
+except timeout, remote host not reachable, and remote peer reject. For example, remote host is not reachable, remote
+Consumer is not listening on the requested Connection Qualifier, Backlog of the requested Service Point is full, and
+Transport errors. In this case, the local Endpoint is automatically transitioned into a DAT_EP_STATE_UNDIS<hy>
+CONNECTED state.
+<beginning of page>
+The acceptance of the requested connection by the remote Consumer is reported to the local Consumer through a
+DAT_CONNECTION_EVENT_ESTABLISHED event on the connect_evd_handle of the local Endpoint.
+The rejection of the connection by the remote Consumer is reported to the local Consumer through a DAT_CON<hy>
+NECTION_EVENT_PEER_REJECTED event on the connect_evd_handle of the local Endpoint and the local
+Endpoint is automatically transitioned into a DAT_EP_STATE_UNDISCONNECTED state.
+When the Provider cannot reach the remote host or the remote host does not respond within the Consumer-requested
+timeout, a DAT_CONNECTION_EVENT_UNREACHABLE is generated on the connect_evd_handle of the End<hy>
+point. The Endpoint transitions into a DAT_EP_STATE_DISCONNECTED state.
+The local Endpoint is automatically transitioned into a DAT_EP_STATE_CONNECTED state when a Connection
+Request is accepted by the remote Consumer and the Provider completes the Transport-specific Connection estab<hy>
+lishment. The local Consumer is notified of the established connection through a DAT_CONNEC<hy>
+TION_EVENT_ESTABLISHED event on the connect_evd_handle of the local Endpoint.
+When the timeout expired prior to completion of the Connection establishment, the local Endpoint is automatically
+transitioned into a DAT_EP_STATE_UNDISCONNECTED state and the local Consumer through a DAT_CON<hy>
+NECTION_EVENT_TIMED_OUT event on the connect_evd_handle of the local Endpoint.
+DAT_SUCCESS The operation was successful.
+DAT_INSUFFICIENT_RESOURCES The operation failed due to resource limitations.
+DAT_INVALID_PARAMETER Invalid parameter.
+DAT_INVALID_HANDLE The ep_handle or dup_ep_handle parameter is invalid.
+DAT_INVALID_STATE A parameter is in an invalid state.
+DAT_MODEL_NOT_SUPPORTED The requested Model is not supported by the Provider. For example, request<hy>
+ed qos was not supported by the local Provider.
+It is up to the Consumer to negotiate outstanding RDMA Read incoming and outgoing with a remote peer. The out<hy>
+standing RDMA Read outgoing attribute should be smaller than the remote Endpoint outstanding RDMA Read in<hy>
+coming attribute. If this is not the case, connection establishment might fail.
+DAT API does not define a protocol on how remote peers exchange Endpoint attributes. The exchange of outstand<hy>
+ing RDMA Read incoming and outgoing attributes of EPs is left to the Consumer ULP. The Consumer can use Pri<hy>
+vate Data for it.
+If the Consumer does not care about posting RDMA Read operations or remote RDMA Read operations on the con<hy>
+nection, it can set the two outstanding RDMA Read attribute values to 0.
+If the Consumer does not set the two outstanding RDMA Read attributes of the Endpoint, the Provider is free to pick
+up any values as a default. The Provider is allowed to change these default values during connection setup.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Standard: uDAPL, 1.1, 1.2 _ MT-LevelUnsafe
+libdat(3LIB), attributes(5)

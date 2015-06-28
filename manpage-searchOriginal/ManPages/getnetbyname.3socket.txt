@@ -1,0 +1,105 @@
+<beginning of page>
+getnetbyname, getnetbyname_r, getnetbyaddr, getnetbyaddr_r, getnetent, getnetent_r, setnetent, endnetent <-> get net<hy>
+work entry
+cc [ flag ... ] file ... -lsocket -lnsl [ library ... ]
+#include <netdb.h>
+struct netent *getnetbyname(const char *name);
+struct netent *getnetbyname_r(const char *name, struct netent *result,
+ char *buffer, int buflen);
+struct netent *getnetbyaddr(long net, int type);
+struct netent *getnetbyaddr_r(long net, int type, struct netent *result,
+ char *buffer, int buflen);
+struct netent *getnetent(void);
+struct netent *getnetent_r(struct netent *result, char *buffer,
+ int buflen);
+int setnetent(int stayopen);
+int endnetent(void);
+These functions are used to obtain entries for networks. An entry may come from any of the sources for networks
+specified in the /etc/nsswitch.conf file. See nsswitch.conf(4).
+getnetbyname() searches for a network entry with the network name specified by the character string parameter
+name.
+getnetbyaddr() searches for a network entry with the network address specified by net. The parameter type speci<hy>
+fies the family of the address. This should be one of the address families defined in <sys/socket.h>. See the NOTES
+section below for more information.
+Network numbers and local address parts are returned as machine format integer values, that is, in host byte order.
+See also inet(3SOCKET).
+The netent.n_net member in the netent structure pointed to by the return value of the above functions is calculated
+by inet_network(). The inet_network() function returns a value in host byte order that is aligned based upon the in<hy>
+put string. For example:
+tab(); cw(2.75i) cw(2.75i) lw(2.75i) lw(2.75i) TextValue "10"0x0000000a "10.0"0x00000a00
+"10.0.1"0a000a0001 "10.0.1.28"0x0a000180
+Commonly, the alignment of the returned value is used as a crude approximate of pre-CIDR (Classless Inter-Domain
+Routing) subnet mask. For example:
+ in_addr_t addr, mask;
+ addr = inet_network(net_name);
+ mask= ~(in_addr_t)0;
+ if ((addr & IN_CLASSA_NET) == 0)
+  addr <<= 8, mask <<= 8;
+ if ((addr & IN_CLASSA_NET) == 0)
+  addr <<= 8, mask <<= 8;
+ if ((addr & IN_CLASSA_NET) == 0)
+  addr <<= 8, mask <<= 8;
+This usage is deprecated by the CIDR requirements. See Fuller, V., Li, T., Yu, J., and Varadhan, K. RFC 1519,
+Classless Inter-Domain Routing (CIDR): an Address Assignment and Aggregation Strategy. Network Working
+Group. September 1993.
+<beginning of page>
+The functions setnetent(), getnetent(), and endnetent() are used to enumerate network entries from the database.
+setnetent() sets (or resets) the enumeration to the beginning of the set of network entries. This function should be
+called before the first call to getnetent(). Calls to getnetbyname() and getnetbyaddr() leave the enumeration posi<hy>
+tion in an indeterminate state. If the stayopen flag is non-zero, the system may keep allocated resources such as open
+file descriptors until a subsequent call to endnetent().
+Successive calls to getnetent() return either successive entries or NULL, indicating the end of the enumeration.
+endnetent() may be called to indicate that the caller expects to do no further network entry retrieval operations; the
+system may then deallocate resources it was using. It is still allowed, but possibly less efficient, for the process to
+call more network entry retrieval functions after calling endnetent().
+The functions getnetbyname(), getnetbyaddr(), and getnetent() use static storage that is reused in each call, mak<hy>
+ing these routines unsafe for use in multi-threaded applications.
+The functions getnetbyname_r(), getnetbyaddr_r(), and getnetent_r() provide reentrant interfaces for these opera<hy>
+tions.
+Each reentrant interface performs the same operation as its non-reentrant counterpart, named by removing the ``_r''
+suffix. The reentrant interfaces, however, use buffers supplied by the caller to store returned results, and are safe for
+use in both single-threaded and multi-threaded applications.
+Each reentrant interface takes the same parameters as its non-reentrant counterpart, as well as the following addi<hy>
+tional parameters. The parameter result must be a pointer to a struct netent structure allocated by the caller. On suc<hy>
+cessful completion, the function returns the network entry in this structure. The parameter buffer must be a pointer to
+a buffer supplied by the caller. This buffer is used as storage space for the network entry data. All of the pointers
+within the returned struct netent result point to data stored within this buffer. See RETURN VALUES. The buffer
+must be large enough to hold all of the data associated with the network entry. The parameter buflen should give the
+size in bytes of the buffer indicated by buffer.
+For enumeration in multi-threaded applications, the position within the enumeration is a process-wide property
+shared by all threads. setnetent() may be used in a multi-threaded application but resets the enumeration position for
+all threads. If multiple threads interleave calls to getnetent_r(), the threads will enumerate disjointed subsets of the
+network database.
+Like their non-reentrant counterparts, getnetbyname_r() and getnetbyaddr_r() leave the enumeration position in
+an indeterminate state.
+Network entries are represented by the struct netent structure defined in <netdb.h>.
+The functions getnetbyname(), getnetbyname_r, getnetbyaddr, and getnetbyaddr_r() each return a pointer to a
+struct netent if they successfully locate the requested entry; otherwise they return NULL.
+The functions getnetent() and getnetent_r() each return a pointer to a struct netent if they successfully enumerate
+an entry; otherwise they return NULL, indicating the end of the enumeration.
+The functions getnetbyname(), getnetbyaddr(), and getnetent() use static storage, so returned data must be copied
+before a subsequent call to any of these functions if the data is to be saved.
+When the pointer returned by the reentrant functions getnetbyname_r(), getnetbyaddr_r(), and getnetent_r() is
+non-NULL, it is always equal to the result pointer that was supplied by the caller.
+The functions setnetent() and endnetent() return 0 on success.
+The reentrant functions getnetbyname_r(), getnetbyaddr_r and getnetent_r() will return NULL and set errno to
+ERANGE if the length of the buffer supplied by caller is not large enough to store the result. See Intro(2) for the
+proper usage and interpretation of errno in multi-threaded applications.
+/etc/networks network name database
+/etc/nsswitch.conf configuration file for the name service switch
+<beginning of page>
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelMT-Safe
+Intro(2), Intro(3), byteorder(3SOCKET), inet(3SOCKET), netdb.h(3HEAD), networks(4), nsswitch.conf(4), at<hy>
+tributes(5)
+Fuller, V., Li, T., Yu, J., and Varadhan, K. RFC 1519, Classless Inter-Domain Routing (CIDR): an Address Assign<hy>
+ment and Aggregation Strategy. Network Working Group. September 1993.
+The reentrant interfaces getnetbyname_r(), getnetbyaddr_r(), and getnetent_r() are included in this release on an
+uncommitted basis only, and are subject to change or removal in future minor releases.
+The current implementation of these functions only return or accept network numbers for the Internet address family
+(type AF_INET). The functions described in inet(3SOCKET) may be helpful in constructing and manipulating ad<hy>
+dresses and network numbers in this form.
+When compiling multi-threaded applications, see Intro(3), Notes On Multithread Applications, for information
+about the use of the _REENTRANT flag.
+Use of the enumeration interfaces getnetent() and getnetent_r() is discouraged; enumeration may not be supported
+for all database sources. The semantics of enumeration are discussed further in nsswitch.conf(4).

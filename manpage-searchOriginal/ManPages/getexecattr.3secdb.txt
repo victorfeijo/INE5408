@@ -1,0 +1,98 @@
+<beginning of page>
+getexecattr, free_execattr, setexecattr, endexecattr, getexecuser, getexecprof, match_execattr <-> get execution profile
+entry
+cc [ flag... ] file... -lsecdb -lsocket -lnsl [ library... ]
+#include <exec_attr.h>
+#include <secdb.h>
+execattr_t *getexecattr(void);
+void free_execattr(execattr_t *ep);
+void setexecattr(void);
+void endexecattr(void);
+execattr_t *getexecuser(const char *username, const char *type,
+ const char *id, int search_flag);
+execattr_t *getexecprof(const char *profname, const char *type,
+ const char *id, int search_flag);
+execattr_t *match_execattr(execattr_t *ep, char *profname,
+ char *type, char *id);
+The getexecattr() function returns a single exec_attr(4) entry. Entries can come from any of the sources specified in
+the nsswitch.conf(4) file.
+Successive calls to getexecattr() return either successive exec_attr entries or NULL. Because getexecattr() always
+returns a single entry, the next pointer in the execattr_t data structure points to NULL.
+The internal representation of an exec_attr entry is an execattr_t structure defined in <exec_attr.h> with the fol<hy>
+lowing members:
+ char *name; /* name of the profile */
+ char *type; /* type of profile */
+ char *policy; /* policy under which the attributes are */
+  /* relevant*/
+ char *res1; /* reserved for future use */
+ char *res2; /* reserved for future use */
+ char *id; /* unique identifier */
+ kva_t *attr; /* attributes */
+ struct execattr_s *next; /* optional pointer to next profile */
+The free_execattr() function releases memory. It follows the next pointers in the execattr_t structure so that the en<hy>
+tire linked list is released.
+The setexecattr() function "rewinds" to the beginning of the enumeration of exec_attr entries. Calls to getexecus<hy>
+er() can leave the enumeration in an indeterminate state. Therefore, setexecattr() should be called before the first
+call to getexecattr().
+The endexecattr() function can be called to indicate that exec_attr processing is complete; the library can then
+close any open exec_attr file, deallocate any internal storage, and so forth.
+The getexecuser() function returns a linked list of entries that match the type and id arguments and have a profile
+that has been assigned to the user specified by username, as described in passwd(4). Profiles for the user are ob<hy>
+tained from the list of default profiles in /etc/security/policy.conf (see policy.conf(4)) and the user_attr(4) data<hy>
+base. Only entries in the name service scope for which the corresponding profile entry is found in the prof_attr(4)
+database are returned.
+The getexecprof() function returns a linked list of entries that match the type and id arguments and have the profile
+specified by the profname argument. Only entries in the name service scope for which the corresponding profile en<hy>
+try is found in the prof_attr database are returned.
+Using getexecuser() and getexecprof(), programmers can search for any type argument, such as the manifest con<hy>
+stant KV_COMMAND. The arguments are logically AND-ed together so that only entries exactly matching all of
+<beginning of page>
+the arguments are returned. Wildcard matching applies if there is no exact match for an ID. Any argument can be as<hy>
+signed the NULL value to indicate that it is not used as part of the matching criteria. The search_flag controls
+whether the function returns the first match (GET_ONE), setting the next pointer to NULL or all matching entries
+(GET_ALL), using the next pointer to create a linked list of all entries that meet the search criteria. See EXAM<hy>
+PLES.
+Once a list of entries is returned by getexecuser() or getexecprof(), the convenience function match_execattr() can
+be used to identify an individual entry. It returns a pointer to the individual element with the same profile name (
+profname), type name ( type), and id. Function parameters set to NULL are not used as part of the matching criteria.
+In the event that multiple entries meet the matching criteria, only a pointer to the first entry is returned. The
+kva_match(3SECDB) function can be used to look up a key in a key-value array.
+Those functions returning data only return data related to the active policy. The getexecattr() function returns a
+pointer to a execattr_t if it successfully enumerates an entry; otherwise it returns NULL, indicating the end of the
+enumeration.
+The getexecattr(), getexecuser(), and getexecprof() functions all allocate memory for the pointers they return. This
+memory should be deallocated with the free_execattr() call. The match_execattr()( function does not allocate any
+memory. Therefore, pointers returned by this function should not be deallocated.
+Individual attributes may be referenced in the attr structure by calling the kva_match(3SECDB) function. Exam<hy>
+ple 1 Find all profiles that have the ping command.
+ if ((execprof=getexecprof(NULL, KV_COMMAND, "/usr/sbin/ping",
+  GET_ONE)) == NULL) {
+  /* do error */
+ }
+Example 2 Find the entry for the ping command in the Network Administration Profile.
+ if ((execprof=getexecprof("Network Administration", KV_COMMAND,
+  "/usr/sbin/ping", GET_ALL))==NULL) {
+  /* do error */
+ }
+Example 3 Tell everything that can be done in the Filesystem Security profile.
+ if ((execprof=getexecprof("Filesystem Security", KV_NULL, NULL,
+  GET_ALL))==NULL)) {
+  /* do error */
+ }
+Example 4 Tell if the tar utility is in a profile assigned to user wetmore. If there is no exact profile entry, the wild<hy>
+card (*), if defined, is returned.
+The following tells if the tar utility is in a profile assigned to user wetmore. If there is no exact profile entry, the
+wildcard (*), if defined, is returned.
+ if ((execprof=getexecuser("wetmore", KV_COMMAND, "/usr/bin/tar",
+  GET_ONE))==NULL) {
+  /* do error */
+ }
+/etc/nsswitch.conf configuration file lookup information for the name server switch
+/etc/user_attr extended user attributes
+/etc/security/exec_attr execution profiles
+/etc/security/policy.conf policy definitions
+<beginning of page>
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelMT-Safe
+getauthattr(3SECDB), getuserattr(3SECDB), kva_match(3SECDB), exec_attr(4), passwd(4), policy.conf(4),
+prof_attr(4), user_attr(4), attributes(5)

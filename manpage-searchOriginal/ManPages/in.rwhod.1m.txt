@@ -1,0 +1,58 @@
+<beginning of page>
+in.rwhod, rwhod <-> system status server
+/usr/sbin/in.rwhod [-m [ttl]]
+in.rwhod is the server which maintains the database used by the rwho(1) and ruptime(1) programs. Its operation is
+predicated on the ability to broadcast or multicast messages on a network.
+in.rwhod operates as both a producer and consumer of status information. As a producer of information it periodi<hy>
+cally queries the state of the system and constructs status messages which are broadcast or multicast on a network.
+As a consumer of information, it listens for other in.rwhod servers' status messages, validating them, then recording
+them in a collection of files located in the directory /var/spool/rwho.
+The rwho server transmits and receives messages at the port indicated in the rwho service specification, see ser<hy>
+vices(4). The messages sent and received are defined in /usr/include/protocols/rwhod.h and are of the form:
+ struct outmp {
+  char out_line[8]; /* tty name */
+  char out_name[8]; /* user id */
+  long out_time; /* time on */
+ };
+ struct whod {
+  char wd_vers;
+  char wd_type;
+  char wd_fill[2];
+  int wd_sendtime;
+  int wd_recvtime;
+  char wd_hostname[32];
+  int wd_loadav[3];
+  int wd_boottime;
+  struct whoent {
+  struct outmp we_utmp;
+  int we_idle;
+  } wd_we[1024 / sizeof (struct whoent)];
+  };
+All fields are converted to network byte order prior to transmission. The load averages are as calculated by the w(1)
+program, and represent load averages over the 1, 5, and 15 minute intervals prior to a server's transmission. The
+host name included is that returned by the uname(2) system call. The array at the end of the message contains infor<hy>
+mation about the users who are logged in to the sending machine. This information includes the contents of the
+utmpx(4) entry for each non-idle terminal line and a value indicating the time since a character was last received on
+the terminal line.
+Messages received by the rwho server are discarded unless they originated at a rwho server's port. In addition, if
+the host's name, as specified in the message, contains any unprintable ASCII characters, the message is discarded.
+Valid messages received by in.rwhod are placed in files named whod.hostname in the directory /var/spool/rwho.
+These files contain only the most recent message, in the format described above.
+Status messages are generated approximately once every 3 minutes.
+The following options are supported:
+-m [ ttl ] Use the rwho IP multicast address (224.0.1.3) when transmitting. Receive announcements both on this
+multicast address and on the IP broadcast address. If ttl is not specified in.rwhod multicasts on all interfaces but
+with the IP TimeToLive set to 1 (that is, packets are not forwarded by multicast routers.) If ttl is specified
+in.rwhod only transmits packets on one interface and setting the IP TimeToLive to the specified ttl.
+/var/spool/rwho/whod.* information about other machines
+See attributes(5) for descriptions of the following attributes:
+<beginning of page>
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wrcmds
+ruptime(1), rwho(1), w(1), uname(2), services(4), utmpx(4), attributes(5)
+This service can cause network performance problems when used by several hosts on the network. It is not run at
+most sites by default. If used, include the -m multicast option.
+This service takes up progressively more network bandwidth as the number of hosts on the local net increases. For
+large networks, the cost becomes prohibitive.
+in.rwhod should relay status information between networks. People often interpret the server dying as a machine
+going down.

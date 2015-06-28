@@ -1,0 +1,52 @@
+<beginning of page>
+pctx_capture, pctx_create, pctx_run, pctx_release <-> process context library
+cc [ flag... ] file... <mi>lpctx [ library... ]
+#include <libpctx.h>
+typedef void (pctx_errfn_t)(const char *fn, const char *fmt, va_list ap);
+pctx_t *pctx_create(const char *filename, char *const *argv, void *arg,
+ int verbose, pctx_errfn_t *errfn);
+pctx_t *pctx_capture(pid_t pid, void *arg, int verbose,
+ pctx_errfn_t *errfn);
+int pctx_run(pctx_t *pctx, uint_t sample, uint_t nsamples,
+ int (*tick)(pctx *, pid_t, id_t, void *));
+void pctx_release(pctx_t *pctx);
+This family of functions allows a controlling process (the process that invokes them) to create or capture controlled
+processes. The functions allow the occurrence of various events of interest in the controlled process to cause the
+controlled process to be stopped, and to cause callback routines to be invoked in the controlling process.
+There are two ways a process can be acquired by the process context functions. First, a named application can be in<hy>
+voked with the usual argv[] array using pctx_create(), which forks the caller and execs the application in the child.
+Alternatively, an existing process can be captured by its process ID using pctx_capture().
+Both functions accept a pointer to an opaque handle, arg; this is saved and treated as a caller-private handle that is
+passed to the other functions in the library. Both functions accept a pointer to a printf(3C)-like error routine errfn; a
+default version is provided if NULL is specified.
+A freshly-created process is created stopped; similarly, a process that has been successfully captured is stopped by
+the act of capturing it, thereby allowing the caller to specify the handlers that should be called when various events
+occur in the controlled process. The set of handlers is listed on the pctx_set_events(3CPC) manual page.
+Once the callback handlers have been set with pctx_set_events(), the application can be set running using pc<hy>
+tx_run(). This function starts the event handling loop; it returns only when either the process has exited, the number
+of time samples has expired, or an error has occurred (for example, if the controlling process is not privileged, and
+the controlled process has exec-ed a setuid program).
+Every sample milliseconds the process is stopped and the tick() routine is called so that, for example, the perfor<hy>
+mance counters can be sampled by the caller. No periodic sampling is performed if sample is 0.
+Once pctx_run() has returned, the process can be released and the underlying storage freed using pctx_release().
+Releasing the process will either allow the controlled process to continue (in the case of an existing captured process
+and its children) or kill the process (if it and its children were created using pctx_create()).
+Upon successful completion, pctx_capture() and pctx_create() return a valid handle. Otherwise, the functions print
+a diagnostic message and return NULL.
+Upon successful completion, pctx_run() returns 0 with the controlled process either stopped or exited (if the con<hy>
+trolled process has invoked exit(2).) If an error has occurred (for example, if the controlled process has exec-ed a
+set-ID executable, if certain callbacks have returned error indications, or if the process was unable to respond to
+proc(4) requests) an error message is printed and the function returns <mi>1.
+Within an event handler in the controlling process, the controlled process can be made to perform various system
+calls on its behalf. No system calls are directly supported in this version of the API, though system calls are executed
+by the cpc_pctx family of interfaces in libcpc such as cpc_pctx_bind_event(3CPC). A specially created agent
+LWP is used to execute these system calls in the controlled process. See proc(4) for more details.
+While executing the event handler functions, the library arranges for the signals SIGTERM, SIGQUIT, SIGABRT,
+and SIGINT to be blocked to reduce the likelihood of a keyboard signal killing the controlling process prematurely,
+thereby leaving the controlled process permanently stopped while the agent LWP is still alive inside the controlled
+process.
+See attributes(5) for descriptions of the following attributes:
+<beginning of page>
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stabili<hy>
+tyEvolving _ MT-LevelUnsafe
+fork(2), cpc(3CPC), pctx_set_events(3CPC), libpctx(3LIB), proc(4), attributes(5)

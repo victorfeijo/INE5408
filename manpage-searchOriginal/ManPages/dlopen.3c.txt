@@ -1,0 +1,131 @@
+<beginning of page>
+dlopen, dlmopen <-> gain access to an executable object file
+#include <dlfcn.h>
+#include <link.h>
+void * dlopen(const char *pathname, int mode);
+void * dlmopen(Lmid_t lmid, const char *pathname, int mode);
+The dlopen() function makes an executable object file available to a running process. dlopen() returns to the process
+a handle that the process can use on subsequent calls to dlsym(3C), dladdr(3C), dlinfo(3C), and dlclose(3C). The
+value of this handle should not be interpreted in any way by the process. The pathname argument is the path name
+of the object to be opened. A path name containing an embedded '/' is interpreted as an absolute path or relative to
+the current directory. Otherwise, the set of search paths currently in effect by the runtime linker are used to locate the
+specified file. See NOTES.
+The dlopen() function also loads any dependencies recorded within pathname. These dependencies are searched in
+the order in which the dependencies were loaded to locate any additional dependencies. This process continues until
+all the dependencies of pathname are loaded. This dependency tree is referred to as a group.
+If the value of pathname is 0, dlopen() provides a handle on a set of global symbol objects. These objects consist of
+the original program image file, any dependencies loaded at program startup, and any objects loaded using dlopen()
+with the RTLD_GLOBAL flag. Because the latter set of objects can change during process execution, the set identi<hy>
+fied by handle can also change dynamically.
+The mode argument describes how dlopen() operates on pathname with respect to the processing of reference relo<hy>
+cations. The mode also affects the scope of visibility of the symbols provided by pathname and its dependencies.
+This visibility can affect how the resulting handle is used.
+When an object is loaded, the object can contain references to symbols whose addresses are not known until the ob<hy>
+ject is loaded. These references must be relocated before the symbols can be accessed. References are categorized as
+either immediate or lazy. Immediate references are typically references to data items used by the object code. Im<hy>
+mediate references include pointers to functions and calls to functions made from position-dependent shared objects.
+Lazy references are typically calls to global functions that are made from position-independent shared objects. The
+mode argument governs when these references take place. The mode argument can be one of the following values:
+RTLD_LAZY Only immediate symbol references are relocated when the object is first loaded. Lazy references are
+not relocated until a given function is called for the first time. This value for mode should improve performance,
+since a process might not require all lazy references in any given object. This behavior mimics the normal loading of
+dependencies during process initialization. See NOTES.
+RTLD_NOW All necessary relocations are performed when the object is first loaded. This process might waste
+some processing if relocations are performed for lazy references that are never used. However, this mode ensures
+that when an object is loaded, all symbols referenced during execution are available. This behavior mimics the load<hy>
+ing of dependencies when the environment variable LD_BIND_NOW is in effect.
+See the Linker and Libraries Guide for more information about symbol references.
+The visibility of symbols that are available for relocation can be affected by mode. To specify the scope of visibility
+for symbols that are loaded with a dlopen() call, mode should be a bitwise-inclusive OR with one of the following
+values:
+RTLD_GLOBAL The object's global symbols are made available for the relocation processing of any other object.
+In addition, symbol lookup using dlopen(0, mode) and an associated dlsym() allows objects that are loaded with
+RTLD_GLOBAL to be searched.
+RTLD_LOCAL The object's globals symbols are only available for the relocation processing of other objects that
+include the same group.
+The program image file and any objects loaded at program startup have the mode RTLD_GLOBAL. The mode
+RTLD_LOCAL is the default mode for any objects that are acquired with dlopen(). A local object can be a depen<hy>
+dency of more then one group. Any object of mode RTLD_LOCAL that is referenced as a dependency of an object
+<beginning of page>
+of mode RTLD_GLOBAL is promoted to RTLD_GLOBAL. In other words, the RTLD_LOCAL mode is ig<hy>
+nored.
+Any object loaded by dlopen() that requires relocations against global symbols can reference the symbols in any
+RTLD_GLOBAL object. Objects of this mode are at least the program image file and any objects loaded at pro<hy>
+gram startup. A loaded object can also reference symbols from itself, and from any dependencies the object refer<hy>
+ences. However, the mode parameter can also be a bitwise-inclusive OR with one of the following values to affect
+the scope of symbol availability:
+RTLD_GROUP Only symbols from the associated group are made available for relocation. A group is established
+from the defined object and all the dependencies of that object. A group must be completely self-contained. All de<hy>
+pendency relationships between the members of the group must be sufficient to satisfy the relocation requirements of
+each object that defines the group.
+RTLD_PARENT The symbols of the object initiating the dlopen() call are made available to the objects obtained
+by dlopen(). This option is useful when hierarchical dlopen() families are created. Although the parent object can
+supply symbols for the relocation of this object, the parent object is not available to dlsym() through the returned
+handle.
+RTLD_WORLD Only symbols from RTLD_GLOBAL objects are made available for relocation.
+The default modes for dlopen() are both RTLD_WORLD and RTLD_GROUP. If an object is requires additional
+modes, the mode parameter can be the bitwise-inclusive OR of the required modes together with the default modes.
+The following modes provide additional capabilities outside of relocation processing:
+RTLD_NODELETE The specified object is tagged to prevent its deletion from the address space as part of a dl<hy>
+close().
+RTLD_NOLOAD The specified object is not loaded as part of the dlopen(). However, a valid handle is returned if
+the object already exists as part of the process address space. Additional modes can be specified as a bitwise-inclu<hy>
+sive OR with the present mode of the object and its dependencies. The RTLD_NOLOAD mode provides a means of
+querying the presence or promoting the modes of an existing dependency.
+The default use of a handle with dlsym() allows a symbol search to inspect all objects that are associated with the
+group of objects that are loaded from dlopen(). The mode parameter can also be a bitwise-inclusive OR with the fol<hy>
+lowing value to restrict this symbol search:
+RTLD_FIRST Use of this handle with dlsym(), restricts the symbol search to the first object associated with the
+handle.
+An object can be accessed from a process both with and without RTLD_FIRST. Although the object will only be
+loaded once, two different handles are created to provide for the different dlsym() requirements.
+The dlmopen() function is identical to dlopen(), except that an identifying link-map ID (lmid) is provided. This
+link-map ID informs the dynamic linking facilities upon which link-map list to load the object. See the Linker and
+Libraries Guide for details about link-maps.
+The lmid passed to dlmopen() identifies the link-map list on which the object is loaded. This parameter can be any
+valid Lmid_t returned by dlinfo() or one of the following special values:
+LM_ID_BASE Load the object on the applications link-map list.
+LM_ID_LDSO Load the object on the dynamic linkers (ld.so.1) link-map list.
+LM_ID_NEWLM Cause the object to create a new link-map list as part of loading. Objects that are opened on a
+new link-map list must express all of their dependencies.
+<beginning of page>
+The dlopen() function returns NULL if pathname cannot be found, cannot be opened for reading, or is not a shared
+object or a relocatable object. dlopen() also returns NULL if an error occurs during the process of loading pathname
+or relocating its symbolic references. See NOTES. Additional diagnostic information is available through dlerror().
+The dlopen() and dlmopen() functions are members of a family of functions that give the user direct access to the
+dynamic linking facilities. This family of functions is available only to dynamically-linked processes. See the Linker
+and Libraries Guide.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Standard _ MT<mi>LevelMT<mi>Safe
+ld(1), ld.so.1(1), dladdr(3C), dlclose(3C), dldump(3C), dlerror(3C), dlinfo(3C), dlsym(3C), attributes(5), stan<hy>
+dards(5)
+Linker and Libraries Guide
+If pathname has dependencies on other objects, these objects are automatically loaded by dlopen(). The directory
+search path used to find pathname and any dependencies can be affected by setting the environment variable
+LD_LIBRARY_PATH. Any LD_LIBRARY_PATH variable is analyzed once at process startup. The search path
+can also be affected from a runpath setting within the object from which the call to dlopen() originates. These search
+rules will only be applied to path names that do not contain an embedded '/'. Objects whose names resolve to the
+same absolute path name or relative path name can be opened any number of times using dlopen(). However, the ob<hy>
+ject that is referenced will only be loaded once into the address space of the current process.
+When loading shared objects, the application should open a specific version of the shared object. Do not rely on the
+version of the shared object pointed to by the symbolic link.
+When building objects to be loaded on a new link-map list, some precautions need to be taken. In general, all depen<hy>
+dencies must be included when building an object. Also, include /usr/lib/libmapmalloc.so.1 before /lib/libc.so.1
+when building an object.
+When an object is loaded on a new link-map list, the object is isolated from the main running program. Certain glob<hy>
+al resources are only usable from one link-map list. A few examples are the sbrk() based malloc(), libthread(), and
+the signal vectors. Care must be taken not to use any of these resources other than from the primary link-map list.
+These issues are discussed in further detail in the Linker and Libraries Guide.
+Some symbols defined in dynamic executables or shared objects can not be available to the runtime linker. The sym<hy>
+bol table created by ld for use by the runtime linker might contain only a subset of the symbols that are defined in
+the object.
+As part of loading a new object, initialization code within the object is called before the dlopen() returns. This ini<hy>
+tialization is user code, and as such, can produce errors that can not be caught by dlopen(). For example, an object
+loaded using RTLD_LAZY that attempts to call a function that can not be located results in process termination. Er<hy>
+roneous programming practices within the initialization code can also result in process termination. The runtime
+linkers debugging facility can offer help identifying these types of error. See the LD_DEBUG environment variable
+of ld.so.1(1).
+Loading relocatable objects is an expensive operation that requires converting the relocatable object into a shared
+object memory image. This capability may be useful in a debugging environment, but is not recommended for pro<hy>
+duction software.

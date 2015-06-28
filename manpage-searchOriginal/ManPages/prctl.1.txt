@@ -1,0 +1,208 @@
+<beginning of page>
+prctl <-> get or set the resource controls of running processes, tasks, and projects
+prctl [-P] [-t [basic | privileged | system]]
+ [-n name [-srx] [-v value] [-e | -d action] [-p pid]]
+ [-i idtype] id...
+The prctl utility allows the examination and modification of the resource controls associated with an active process,
+task, or project on the system. It allows access to the basic and privileged limits and the current usage on the
+specified entity.
+See resource_controls(5) for a description of the resource controls supported in the current release of the Solaris
+operating system.
+If none of the -s, -r, -x, -v, -d, or -e options are specified, the invocation is considered a get operation. Otherwise, it
+is considered a modify operation.
+The following options are supported:
+-d | -e action
+Disables (-d) or enables (-e) the specified action on the resource control value specified by -v, -t, and -p. If any of
+the -v, -t, or -p options are unspecified, they match any value, privilege, or recipient pid. For example, specifying on<hy>
+ly -v modifies the first resource control with matching value, matching any privilege and recipient pid. If no match<hy>
+ing resource control value is found, a new value is added as if -s were specified.
+Actions:
+all This action is only available with -d. It disables all actions. This fails on resource control values that have the de<hy>
+ny global flag.
+deny Indicates that the resource control attempts to deny granting the resource to the process, task, project, or zone
+on a request for resources in excess of the resource control value. deny actions can not be enabled if the resource
+control has the no-deny global flag. deny actions can not be disabled if the resource control has the deny global
+flag.
+signal This action is only available with -d. It deactivates the signal action.
+signal=signum In the signal=signum action, signum is a signal number (or string representation of a signal). Setting
+a signal action on a resource control with the no-local-action global flag fails. A limited set of signals can be sent.
+See NOTES for additional details.
+-i idtype
+Specifies the type of the id operands. Valid idtypes are process, task, project, or zone. Also allowed are pid, taskid,
+projid, and zoneid. The default id type, if the -i option is omitted, is process.
+For a modify operation, the entity to which id operands are members is the target entity. For instance, setting a
+project resource control on an -i process sets the resource control on the project to which each given process argu<hy>
+ment is a member.
+For a get operation, the resource controls are listed for all entities to which the id operands are members. For exam<hy>
+ple, -i task taskid lists the task, project, and zone resource controls for the task, and for the project and zone to
+which that task is a member.
+-n name
+Specifies the name of the resource control to get or set. If the name is unspecified, all resource controls are retrieved.
+-p pid
+When manipulating (using -s, -r, -x, -d, or -e) a basic task project, or zone resource control values, a recipient pid
+<beginning of page>
+can be specified using -p. When setting a new basic resource control or controls on a task, project, or zone, the -p
+option is required if the -i idtype option argument is not process.
+-P
+Display resource control values in space delimited format.
+-r
+Replaces the first resource control value (matching with the -t privilege) with the new value specified through the -v
+option.
+-s
+Set a new resource control value.
+This option requires the -v option.
+If you do not specify the -t option, basic privilege is used. If you want to set a basic task, process, or zone rctl, -p is
+required. If -e or -d are also specified, the action on the new rctl is set as well.
+For compatibility with prior releases, this option is implied if -v is specified, without any of -e, -d, -r, or -x.
+See resource_controls(5) for a description of unit modifiers and scaling factors you can use to express large values
+when setting a resource control value.
+-t [ basic | privileged | system ]
+Specifies which resource control type to set. Unless the "lowerable" flag is set for a resource control, only invoca<hy>
+tions by users (or setuid programs) who have privileges equivalent to those of root can modify privileged resource
+controls. See rctlblk_set_value(3C) for a description of the RCTL_GLOBAL_LOWERABLE flag. If the type is
+not specified, basic is assumed. For a get operation, the values of all resource control types, including system, are
+displayed if no type is specified.
+-v value
+Specifies the value for the resource control for a set operation. If no value is specified, then the modification (dele<hy>
+tion, action enabling or disabling) is carried out on the lowest-valued resource control with the given type.
+See resource_controls(5) for a description of unit modifiers and scaling factors you can use to express large values
+when setting a resource control value.
+-x
+Deletes the specified resource control value. If the delete option is not provided, the default operation of prctl is to
+modify a resource control value of matching value and privilege, or insert a new value with the given privilege. The
+matching criteria are discussed more fully in setrctl(2).
+If none of the -d, -e, -v, or -x options is specified, the invocation is considered a get operation.
+The following operand is supported:
+id The ID of the entity (process, task, project, or zone) to interrogate. If the invoking user's credentials are unprivi<hy>
+leged and the entity being interrogated possesses different credentials, the operation fails. If no id is specified, an er<hy>
+ror message is returned.
+Example 1 Displaying Current Resource Control Settings
+The following example displays current resource control settings for a task to which the current shell belongs:
+  example$ ps -o taskid -p $$
+<beginning of page>
+ TASKID
+ 8
+ example$ prctl -i task 8
+ 136150: /bin/ksh
+ NAME PRIVILEGE VALUE FLAG ACTION RECIPIENT
+ task.max-cpu-time
+  usage 8s
+  system 18.4Es inf none -
+ task.max-lwps
+  usage 39
+  system 2.15G max deny -
+ project.max-contracts
+  privileged 10.0K - deny -
+ project.max-locked-memory
+  usage 0B
+  privileged 508MB - deny -
+ project.max-port-ids
+  privileged 8.19K - deny -
+ project.max-shm-memory
+  privileged 508MB - deny -
+ project.max-shm-ids
+  privileged 128 - deny -
+ project.max-msg-ids
+  privileged 128 - deny -
+ project.max-sem-ids
+  privileged 128 - deny -
+ project.max-crypto-memory
+  usage 0B
+ privileged 508MB - deny -
+ project.max-tasks
+  usage 2
+  system 2.15G max deny -
+ project.max-lwps
+  usage 39
+  system 2.15G max deny -
+ project.cpu-shares
+  usage 1
+  privileged 1 - none -
+ zone.max-shm-memory
+  system 16.0EB max deny -
+ zone.max-shm-ids
+  system 16.8M max deny -
+ zone.max-sem-ids
+  system 16.8M max deny -
+ zone.max-msg-ids
+  system 16.8M max deny -
+ zone.max-lwps
+  system 2.15G max deny -
+ zone.cpu-shares
+  privileged 1 - none -
+ zone.max-locked-memory
+  usage 0B
+  privileged 508MB - deny -
+Example 2 Displaying, Replacing, and Verifying the Value of a Specific Control
+The following examples displays, replaces, and verifies the value of a specific control on an existing project:
+ example# prctl -n project.cpu-shares -i project group.staff
+ project: 10: group.staff
+ NAME PRIVILEGE VALUE FLAG ACTION RECIPIENT
+ project.cpu-shares
+  usage 1
+  privileged 1 - none -
+<beginning of page>
+  system 65.5K max none -
+ example# prctl -n project.cpu-shares -v 10 -r -i project group.staff
+ example# prctl -n project.cpu-shares -i project group.staff
+ project: 10: group.staff
+ NAME PRIVILEGE VALUE FLAG ACTION RECIPIENT
+ project.cpu-shares
+  usage 10
+  privileged 10 - none -
+  system 65.5K max none -
+Example 3 Adjusting Resources
+The following example uses the project.max-locked-memory resource.
+First, use id -p to find out which project the current shell is a member of:
+ /home/garfield> id -p
+  uid=77880(garfield) gid=10(staff) projid=10(group.staff)
+Using the target project, identify the resource limit value before the change:
+ /home/garfield> prctl -n project.max-locked-memory -i project \
+  group.staff
+  project 10: group.staff
+  project.max-locked-memory
+  privileged 256MB - deny -
+    system 16.0EB max deny -
+ current limit is 256 Megabytes.
+Next, adjust the project.max-locked-memory limit to 300 Megabytes for the target project:
+ # prctl -n project.max-locked-memory -v 300M -r -i project group.staff
+The resource limit value after the change shows a new value of 300 Megabytes:
+ # prctl -n project.max-locked-memory -i project group.staff
+  project 10:group.staff
+  project.max-locked-memory
+   usage 200MG
+  privileged 300MB - deny -
+   system 16.0EB max deny -
+Example 4 Modifying CPU Caps for a Project
+The prctl command can use the project.cpu-cap resource control (see resource_controls(5)) to set and modify
+CPU caps for a project. (The same resource control can be used in the /etc/project file. See project(4)) The follow<hy>
+ing command modifies the CPU cap to limit user.smith to three CPUs:
+ # prctl -r -t privileged -n project.cpu-cap -v 300 -i project user.smith
+<beginning of page>
+The prctl -r option, used above, is used to dynamically change a CPU cap for a project or zone. For example, the
+following command will change the cap set in the preceding command to 80 percent:
+ # prctl -r -t privileged -n project.cpu-cap -v 80 -i project user.smith
+To remove a CPU cap, enter:
+ # prctl -x -n project.cpu-cap $$
+Example 5 Modifying CPU Caps for a Zone
+The prctl command can use the zone.cpu-cap resource control (see resource_controls(5)) to set and modify CPU
+caps for a zone. (The same resource control can be manipulated using the zonecfg(1M) command.) The following
+command modifies the CPU cap to limit the global zone to 80 percent of a CPU:
+ # prctl -t privileged -n zone.cpu-cap -v 80 -i zone global
+The cap can be lowered to 50% using:
+ # prctl -r -t privileged -n zone.cpu-cap -v 50 -i zone global
+The following exit values are returned:
+0 Success.
+1 Fatal error encountered.
+2 Invalid command line options were specified.
+/proc/pid/* Process information and control files
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wesu _ Interface StabilitySee below.
+The command-line syntax is Committed. The human-readable output is Uncommitted. The parseable output is Com<hy>
+mitted.
+rctladm(1M), zonecfg(1M), setrctl(2), rctlblk_get_local_action(3C), project(4), attributes(5), resource_con<hy>
+trols(5)
+The valid signals that can be set on a resource control block allowing local actions are SIGABRT, SIGXRES,
+SIGHUP, SIGSTOP, SIGTERM, and SIGKILL. Additionally, CPU time related controls can issue the SIGX<hy>
+CPU signal, and file size related controls can send the SIGXFSZ signal.

@@ -1,0 +1,68 @@
+<beginning of page>
+pm_power_has_changed <-> Notify Power Management framework of autonomous power level change
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+int pm_power_has_changed(dev_info_t *dip, int component, int level);
+Solaris DDI specific (Solaris DDI)
+dip Pointer to the device dev_info structure
+component Number of the component that has changed power level
+level Power level to which the indicated component has changed
+The pm_power_has_changed(9) function notifies the Power Management framework that the power level of com<hy>
+ponent of dip has changed to level.
+Normally power level changes are initiated by the Power Management framework due to device idleness, or through
+a request to the framework from the driver via pm_raise_power(9F) or pm_lower_power(9F), but some devices
+may change power levels on their own. For the framework to track the power level of the device under these circum<hy>
+stances, the framework must be notified of autonomous power level changes by a call to pm_pow<hy>
+er_has_changed().
+Because of the asynchronous nature of these events, the Power Management framework might have called pow<hy>
+er(9E) between the device's autonomous power level change and the driver calling pm_power_has_changed(), or
+the framework may be in the process of changing the power level when pm_power_has_changed() is called. To
+handle these situations correctly, the driver should verify that the device is indeed at the level or set the device to the
+level if it doesn't support inquirying of power levels, before calling pm_power_has_changed(). In addition, the
+driver should prevent a power(9E) entry point from running in parallel with pm_power_has_changed(). Note -
+If this function is called as a result of entry into the driver's attach(9E), detach(9E) or power(9E) entry point, this
+function must be called from the same thread which entered attach(9E), detach(9E) or power(9E).
+The pm_power_has_changed() function returns:
+DDI_SUCCESS The power level of component was successfully updated to level.
+DDI_FAILURE Invalid component component or power level level.
+This function can be called from user or kernel context. This function can also be called from interrupt context, pro<hy>
+viding that it is not the first Power Management function called by the driver.
+A hypothetical driver might include this code to handle pm_power_has_changed(9):
+ static int
+ xxusb_intr(struct buf *bp)
+ {
+  ...
+  /*
+   * At this point the device has informed us that it has
+   * changed power level on its own. Inform this to framework.
+   * We need to take care of the case when framework has
+   * already called power() entry point and changed power level
+   * before we were able to inform framework of this change.
+  * Handle this by comparing the informed power level with
+   * the actual power level and only doing the call if they
+   * are same. In addition, make sure that power() doesn't get
+<beginning of page>
+   * run in parallel with this code by holding the mutex.
+   */
+  ASSERT(mutex_owned(&xsp->lock));
+  if (level_informed == *(xsp->level_reg_addr)) {
+   if (pm_power_has_changed(xsp->dip, XXUSB_COMPONENT,
+    level_informed) != DDI_SUCCESS) {
+    mutex_exit( &xsp->lock);
+    return(DDI_INTR_UNCLAIMED);
+   }
+  }
+  ....
+ }
+ xxdisk_power(dev_info *dip, int comp, int level)
+ {
+  mutex_enter( xsp->lock);
+  ...
+  ...
+ }
+See attributes(5) for a description of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed
+power.conf(4), pm(7D), attach(9E), detach(9E), power(9E), pm_busy_component(9F), pm_idle_compo<hy>
+nent(9F), pm_raise_power(9F), pm_lower_power(9F), pm(9P), pm-components(9P)
+Writing Device Drivers

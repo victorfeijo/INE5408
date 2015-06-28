@@ -1,0 +1,169 @@
+<beginning of page>
+kmdb <-> in situ kernel debugger
+SPARC
+ok boot [device-specifier] -k [-d] [boot-flags]
+ok boot [device-specifier] kmdb [-d] [boot-flags]
+x86
+kernel$ /platform/i86pc/kernel/$ISADIR/unix -k [-d] [boot-flags]
+mdb -K
+kmdb is an interactive kernel debugger which implements the user interface and functionality of mdb(1) in a live
+kernel context. kmdb provides features that allow for the control of kernel execution and for the inspection and
+modification of live kernel state. kmdb can be loaded at the beginning of a boot session or after the system is boot<hy>
+ed.
+This man page describes the features and functionality that are unique to kmdb or different in kmdb as compared to
+mdb(1). For more information on mdb(1) or further details on the features and functionality implemented by kmdb,
+see the mdb(1) man page and the Solaris Modular Debugger Guide.
+Boot-time Loading When requested, the kernel runtime linker (krtld) loads kmdb prior to the transfer of control to
+the kernel. If the -d flag is used, the debugger gains control of the system prior to the execution of the initial function
+in the 'unix' object. If -d is not used, kmdb is loaded but does not gain control until such time as it is explicitly en<hy>
+tered. See the Debugger Entry section below. For a list of the boot commands which cause kmdb to be loaded at
+boot, see the SYNOPSIS section above.
+Boot-loaded kmdb can be unloaded only by means of a system reboot.
+Some features of kmdb rely on the presence of kernel services and are not immediately available to boot-loaded
+kmdb. In particular, the loading and unloading of dmods is not available until the module subsystem is initialized.
+Requests are queued until they can be processed. Similarly, translation of virtual addresses to physical addresses is
+not be available until the VM system has been initialized. Attempted translations fail until translation facilities are
+available.
+Run-time Loading kmdb can also be loaded after the system has booted, using the -K flag to mdb(1). When load<hy>
+ed in this fashion, it will immediately gain control of the system. Run-time-loaded kmdb can be unloaded using the
+-U flag to mdb(1) or from within the debugger with the -u flag to the ::quit dcmd.
+Terminal types When loaded, kmdb attempts to determine the proper terminal type in use on the system console. If
+the system being debugged has an attached keyboard and local display that are both used for the system console,
+kmdb uses the terminal type appropriate for the machine: 'sun' for SPARC; 'sun-color' for x86. When a serial con<hy>
+sole is in use, boot-loaded kmdb defaults to a terminal type 'vt100'. Run-time-loaded kmdb defaults to the terminal
+type requested by mdb(1). mdb(1) requests the terminal type specified by the value of the TERM environment vari<hy>
+able unless overridden by the -T flag. ::term can be used to view the current terminal type.
+Debugger entry can be requested explicitly or implicitly. Implicit entry, encountered when breakpoints or other ex<hy>
+ecution control features are used, is discussed in the Execution Control section.
+The primary means for explicit debugger entry is with the keyboard abort sequence for systems with local consoles
+and the BREAK character for those with serial consoles. The abort sequence is STOP-A or Shift-Pause for SPARC
+systems with local consoles, and F1-A or Shift-Pause for x86 systems with local consoles. See kbd(1) for a discus<hy>
+sion of the abort sequence and for instructions on disabling it.
+A second way to request entry into the debugger is with the mdb(1) command. Invocations of mdb(1) with the -K
+flag after the debugger is loaded trigger debugger entry.
+If the kernel panics and kmdb is loaded, by default, the panic routine enters kmdb for live debugging. If a dump de<hy>
+vice is specified, and you enter ::cont, the debugger exits and a crash dump is performed. To prevent the kernel from
+entering kmdb when panicking, you can set the nopanicdebug variable to 1. Set the nopanicdebug variable to 1 us<hy>
+ing kmdb or including the following a line in /etc/system:
+<beginning of page>
+ set nopanicdebug = 1
+This can be useful if you want to keep kmdb loaded, but always want a panic to trigger a crash dump without enter<hy>
+ing the debugger.
+For the most part, the execution control facilities provided by kmdb for the kernel mirror those provided by the
+mdb(1) process target. Breakpoints (::bp), watchpoints (::wp), ::continue, and the various flavors of ::step can be
+used.
+In contrast to the unlimited user process watchpoints supplied by the kernel, kmdb is restricted to a set of CPU
+watchpoints that limit the number, size, and type of watchpoints allowed. The ::wp command does not allow a
+watchpoint to be created if it is incompatible with the watchpoints supported by the hardware.
+As with mdb(1), kmdb is installed with a number of subsystem-specific debugger modules, or dmods. The dmods
+are loaded and unloaded automatically with the loading and unloading of the subsystems that they support. The
+dmods can also be explicitly loaded and unloaded using ::load and ::unload.
+kmdb uses kernel facilities to load and unload dmods and must resume system execution to perform each requested
+action. When a dmod load or unload is complete, the system is stopped and the debugger is automatically re-entered.
+For a dmod load, processing is completed when the load of a requested dmod succeeds or fails. Status messages are
+provided in either case.
+Some functionality is specific to an individual processor type. An example of such functionality is the branch tracing
+provided by various x86 processors. Access to these processor-specific features is provided with processor-specific
+dcmds that are present only on systems that support them. The availability of processor-specific support is indicated
+in the output of the ::status dcmd. The debugger relies on the kernel to determine the processor type. Even though
+the debugger might provide support for a given processor type, the support is not exposed until the kernel has pro<hy>
+gressed to the point at which processor identification has completed.
+The debugger provides access to a set of macros that are precompiled into the debugger. Only the precompiled
+macros are available . Unlike with mdb(1), the $< dcmd may not be used to load macros from arbitrary locations.
+Use the $M command to list the available macros.
+This section lists dcmds that are unique to kmdb or those with behavior that differs in kmdb as compared to
+mdb(1).
+[address]::bp [+/-dDestT] [-c cmd] [-n count] sym ...
+address :b [cmd ...]
+Set a breakpoint at the specified locations. The ::bp dcmd sets a breakpoint at each address or symbol specified, in<hy>
+cluding an optional address specified by an explicit expression preceding the dcmd, and each string or immediate
+value following the dcmd. The arguments can be symbol names or immediate values denoting a particular virtual ad<hy>
+dress of interest.
+If a symbol name is specified, the name may refer to a symbol that cannot yet be evaluated. It might consist of an
+object name and function name in a load object that has not yet been opened. In such a case, the breakpoint is de<hy>
+ferred and is not active in the target until an object matching the given name is loaded. The breakpoint is automati<hy>
+cally enabled when the load object is opened.
+The -d, -D, -e, -s, -t, -T, -c, and -n options have the same meaning as they do for the ::evset dcmd. See mdb(1) for a
+description of ::evset. If the :b form of the dcmd is used, a breakpoint is set only at the virtual address specified by
+the expression preceding the dcmd. The arguments following the :b dcmd are concatenated together to form the call<hy>
+back string. If this string contains meta-characters, it must be quoted.
+::branches [-v]
+(x86 only)
+Display the last branches taken by the CPU. This dcmd is supported only on x86 systems, and is available only when
+processor-specific support is detected and enabled. The number and type of branches displayed is dependent on the
+capabilities of the branch tracing facilities provided by the CPU. When the -v option is used, the instructions prior to
+a given branch are displayed.
+<beginning of page>
+[function] ::call [arg [arg ...]]
+Call the specified function using the specified arguments. The called function must be listed as a function in the
+symbol table for a loaded module. String arguments are passed by reference. When the call completes, the return
+value of the function is displayed.
+This dcmd must be used with extreme caution. The kernel will not be resumed when the call is made. The function
+being called may not make any assumptions regarding the availability of any kernel services, and must not perform
+operations or calls that may block. The user must also beware of any side-effects introduced by the called function,
+as kernel stability might be affected.
+[addr] ::cpuregs [-c cpuid]
+Display the current general purpose register set for the specified CPU, in the format used by ::regs.
+[addr] ::cpustack [-c cpuid]
+Print a C stack backtrace for the specified CPU. The backtrace displayed is for the point at which the specified CPU
+entered or was stopped by the debugger.
+addr[,len] ::in [-L len]
+(x86 only)
+Read len bytes from the I/O port specified by addr. The value of the -L option, if provided, takes precedence over
+the value of the repeat count. The read length must be 1, 2, or 4 bytes, and the port address must have the same
+alignment as the length.
+addr[,len] ::out [-L len] value
+(x86 only)
+Write value to the len-byte I/O port specified by addr. The value of the -L option, if provided, takes precedence over
+the value of the repeat count. The write length must be 1, 2, or 4 bytes and the port address must have the same
+alignment as the length.
+::quit [-u]
+$q
+Causes the debugger to exit. When the -u option is used, the system is resumed and the debugger is unloaded. The -u
+option may not be used if the debugger was loaded at boot. When the -u option is not used, SPARC systems will exit
+to the boot PROM ok prompt. The go command can be used to re-enter the debugger. On x86 systems, a prompt is
+displayed that requests permission to reboot the machine.
+::step [over|out|branch]
+Step the target one instruction. The optional over argument is used to step over subroutine calls. When the optional
+out argument is specified, the target program continues until control returns from the current function.
+The optional branch argument is available only on x86 systems when processor-specific support is detected and en<hy>
+abled. When ::step branch is specified, the target program continues until the next branching instruction is encoun<hy>
+tered.
+On SPARC systems, the ::step dcmd may not be used to step 'ta' instructions. Similarly, it may not be used on x86
+systems to step 'int' instructions. If the step results in a trap that cannot be resolved by the debugger, a message to
+that effect is printed and the step will fail.
+cpuid::switch
+cpuid:x
+Use the specified CPU as the representative. Stack traces, general purpose register dumps, and similar functionality
+use the new representative CPU as the data source. Full execution control functionality is available on the new repre<hy>
+sentative CPU.
+<beginning of page>
+::term
+Display the current terminal type.
+addr[,len]::wp [+/-dDestT] [-rwx] [-pi] [-n count] [-c cmd]
+addr[,len]:a [cmd ...]
+addr[,len]:p [cmd ...]
+addr[,len]:w [cmd ...]
+Set a watchpoint at the specified address, interpreted by default as a virtual address. If the -p option is used, the ad<hy>
+dress is interpreted as a physical address. On x86 platforms, watchpoints can be set on I/O ports using the -i option.
+When the -i option is used, the address is interpreted as that of an I/O port.
+The length in bytes of the watched region can be set by specifying an optional repeat count preceding the dcmd. If
+no length is explicitly set, the default is one byte. The ::wp dcmd allows the watchpoint to be configured to trigger
+on any combination of read (-r option), write (-w option), or execute (-x option) access.
+The -d, -D, -e, -s, -t, -T, -c, and -n options have the same meaning as they do for the ::evset dcmd. See mdb(1) for a
+description of ::evset. The :a dcmd sets a read access watchpoint at the specified address. The :p dcmd sets an ex<hy>
+ecute access watchpoint at the specified address. The :w dcmd sets a write access watchpoint at the specified ad<hy>
+dress. The arguments following the :a, :p, and :w dcmds are concatenated together to form the callback string. If the
+string contains meta-characters, it must be quoted.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wckr (debugger) _ SUNWmdbr (dmods) _ Interface StabilityEvolving
+mdb(1), boot(1M), dumpadm(1M), kernel(1M), system(4), attributes(5)
+Solaris Modular Debugger Guide
+kbd(1)
+The memory region available to the debugger is allocated when the debugger is loaded, and is fixed at that point. If
+dcmds attempt to allocate more memory than is available, they will, if possible, be terminated. The debugger will at<hy>
+tempt to recover gracefully from an out-of-memory situation, but may be unable to, and may be forced to terminate
+the system. This constraint is especially acute on 32-bit x86 systems.
+System performance will be negatively impacted by the loading of kmdb, as the debugger will consume kernel
+memory and other limited system resources.

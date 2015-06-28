@@ -1,0 +1,111 @@
+<beginning of page>
+csx_RequestWindow, csx_ReleaseWindow <-> request or release window resources
+#include <sys/pccard.h>
+int32_t csx_RequestWindow(client_handle_t ch, window_handle_t *wh,
+ win_req_t *wr);
+int32_t csx_ReleaseWindow(window_handle_t wh);
+Solaris DDI Specific (Solaris DDI)
+ch Client handle returned from csx_RegisterClient(9F).
+wh Pointer to a window_handle_t structure.
+wr Pointer to a win_req_t structure.
+The function csx_RequestWindow() requests a block of system address space be assigned to a PC Card in a socket.
+The function csx_ReleaseWindow() releases window resources which were obtained by a call to csx_RequestWin<hy>
+dow(). No adapter or socket hardware is modified by this function.
+The csx_MapMemPage(9F) and csx_ModifyWindow(9F) functions use the window handle returned by csx_Re<hy>
+questWindow(). This window handle must be freed by calling csx_ReleaseWindow() when the client is done using
+this window.
+The PC Card Attribute or Common Memory offset for this window is set by csx_MapMemPage(9F).
+The structure members of win_req_t are:
+ uint32_t Socket; /* socket number */
+ uint32_t Attributes; /* window flags */
+ uint32_t Base.base; /* requested window */
+  /* base address */
+ acc_handle_t Base.handle; /* returned handle for
+  /* base of window */
+ uint32_t Size; /* window size requested */
+  /* or granted */
+ uint32_t win_params.AccessSpeed; /* window access speed */
+ uint32_t win_params.IOAddrLines; /* IO address lines decoded */
+ uint32_t ReqOffset; /* required window offest */
+The fields are defined as follows:
+Socket Not used in Solaris, but for portability with other Card Services implementations, it should be set to the logi<hy>
+cal socket number.
+Attributes This field is bit-mapped and is defined as follows:
+WIN_MEMORY_TYPE_IO
+Points to I/O space.
+WIN_MEMORY_TYPE_CM
+Points to common memory space.
+<beginning of page>
+WIN_MEMORY_TYPE_AM
+These bits select which type of window is being requested. One of these bits must be set.
+WIN_ENABLE
+The client must set this bit to enable the window.
+WIN_ACC_BIG_ENDIAN
+Describes device as big-endian.
+WIN_ACC_LITTLE_ENDIAN
+These bits describe the endian characteristics of the device as big endian or little endian, respectively. Even though
+most of the devices will have the same endian characteristics as their busses, there are examples of devices with an
+I/O processor that has opposite endian characteristics of the busses. When either of these bits are set, byte swapping
+will automatically be performed by the system if the host machine and the device data formats have opposite endian
+characteristics. The implementation may take advantage of hardware platform byte swapping capabilities.
+WIN_ACC_NEVER_SWAP
+When this is specified, byte swapping will not be invoked in the data access functions.
+The ability to specify the order in which the CPU will reference data is provided by the following Attributes bits,
+only one of which may be specified:
+WIN_ACC_STRICT_ORDER
+The data references must be issued by a CPU in program order. Strict ordering is the default behavior.
+WIN_ACC_UNORDERED_OK
+The CPU may re-order the data references. This includes all kinds of re-ordering (that is, a load followed by a store
+may be replaced by a store followed by a load).
+WIN_ACC_MERGING_OK
+The CPU may merge individual stores to consecutive locations. For example, the CPU may turn two consecutive
+byte stores into one halfword store. It may also batch individual loads. For example, the CPU may turn two consecu<hy>
+tive byte loads into one halfword load. This bit also implies re-ordering.
+WIN_ACC_LOADCACHING_OK
+The CPU may cache the data it fetches and reuse it until another store occurs. The default behavior is to fetch new
+data on every load. This bit also implies merging and re-ordering.
+WIN_ACC_STORECACHING_OK
+The CPU may keep the data in the cache and push it to the device (perhaps with other data) at a later time. The de<hy>
+fault behavior is to push the data right away. This bit also implies load caching, merging, and re-ordering.
+These values are advisory, not mandatory. For example, data can be ordered without being merged or cached, even
+though a driver requests unordered, merged and cached together.
+All other bits in the Attributes field must be set to 0.
+On successful return from csx_RequestWindow(), WIN_OFFSET_SIZE is set in the Attributes field when the
+client must specify card offsets to csx_MapMemPage(9F) that are a multiple of the window size.
+<beginning of page>
+Base.base This field must be set to 0 on calling csx_RequestWindow().
+Base.handle On successful return from csx_RequestWindow(), the Base.handle field contains an access handle
+corresponding to the first byte of the allocated memory window which the client must use when accessing the PC
+Card's memory space via the common access functions. A client must not make any assumptions as to the format of
+the returned Base.handle field value.
+Size On calling csx_RequestWindow(), the Size field is the size in bytes of the memory window requested. Size
+may be zero to indicate that Card Services should provide the smallest sized window available. On successful return
+from csx_RequestWindow(), the Size field contains the actual size of the window allocated.
+win_params.AccessSpeed This field specifies the access speed of the window if the client is requesting a memory
+window. The AccessSpeed field bit definitions use the format of the extended speed byte of the Device ID tuple. If
+the mantissa is 0 (noted as reserved in the PC Card 95 Standard), the lower bits are a binary code representing a
+speed from the following table:
+tab() box; lw(2.75i) |lw(2.75i) lw(2.75i) |lw(2.75i) CodeSpeed _ 0(Reserved - do not use). _ 1250 nsec _ 2200 nsec
+_ 3150 nsec _ 4100 nse _ 5-7(Reserved<em>do not use.)
+To request a window that supports the WAIT signal, OR-in the WIN_USE_WAIT bit to the AccessSpeed value be<hy>
+fore calling this function.
+It is recommended that clients use the csx_ConvertSpeed(9F) function to generate the appropriate AccessSpeed
+values rather than manually perturbing the AccessSpeed field.
+win_params.IOAddrLines If the client is requesting an I/O window, the IOAddrLines field is the number of I/O
+address lines decoded by the PC Card in the specified socket. Access to the I/O window is not enabled until csx_Re<hy>
+questConfiguration(9F) has been invoked successfully.
+ReqOffset This field is a Solaris-specific extension that can be used by clients to generate optimum window offsets
+passed to csx_MapMemPage(9F).
+CS_SUCCESS Successful operation.
+CS_BAD_ATTRIBUTE Attributes are invalid.
+CS_BAD_SPEED Speed is invalid.
+CS_BAD_HANDLE Client handle is invalid.
+CS_BAD_SIZE Window size is invalid.
+CS_NO_CARD No PC Card in socket.
+CS_OUT_OF_RESOURCE Unable to allocate window.
+CS_UNSUPPORTED_FUNCTION No PCMCIA hardware installed.
+These functions may be called from user or kernel context.
+<beginning of page>
+csx_ConvertSpeed(9F), csx_MapMemPage(9F), csx_ModifyWindow(9F), csx_RegisterClient(9F), csx_Re<hy>
+questConfiguration(9F)
+PC Card 95 Standard, PCMCIA/JEIDA

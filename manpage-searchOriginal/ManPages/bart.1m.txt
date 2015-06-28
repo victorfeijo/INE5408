@@ -1,0 +1,146 @@
+<beginning of page>
+bart <-> basic audit reporting tool
+/usr/bin/bart create [ -n] [-R root_directory]
+ [-r rules_file | -]
+/usr/bin/bart create [-n] [-R root_directory] -I
+ [file_name]...
+/usr/bin/bart compare [-i attribute ] [-p]
+ [-r rules_file | -] control-manifest test-manifest
+bart(1M) is a tool that performs a file-level check of the software contents of a system.
+You can also specify the files to track and the types of discrepancies to flag by means of a rules file, bart_rules. See
+bart_rules(4).
+The bart utility performs two basic functions:
+bart create The manifest generator tool takes a file-level snapshot of a system. The output is a catalog of file at<hy>
+tributes referred to as a manifest. See bart_manifest(4).
+You can specify that the list of files be cataloged in three ways. Use bart create with no options, specify the files by
+name on the command line, or create a rules file with directives that specify which the files to monitor. See
+bart_rules(4).
+By default, the manifest generator catalogs all attributes of all files in the root (/) file system. File systems mounted
+on the root file system are cataloged only if they are of the same type as the root file system.
+For example, /, /usr, and /opt are separate UFS file systems. /usr and /opt are mounted on /. Therefore, all three file
+systems are cataloged. However, /tmp, also mounted on /, is not cataloged because it is a TMPFS file system.
+Mounted CD-ROMs are not cataloged since they are HSFS file systems.
+bart compare The report tool compares two manifests. The output is a list of per-file attribute discrepancies. These
+discrepancies are the differences between two manifests: a control manifest and a test manifest.
+A discrepancy is a change to any attribute for a given file cataloged by both manifests. A new file or a deleted file in
+a manifest is reported as a discrepancy.
+The reporting mechanism provides two types of output: verbose and programmatic. Verbose output is localized and
+presented on multiple lines, while programmatic output is more easily parsable by other programs. See OUTPUT.
+By default, the report tool generates verbose output where all discrepancies are reported except for modified directo<hy>
+ry timestamps (dirmtime attribute).
+To ensure consistent and accurate comparison results, control-manifest and test-manifest must be built with the same
+rules file.
+Use the rules file to ignore specified files or subtrees when you generate a manifest or compare two manifests. Users
+can compare manifests from different perspectives by re-running the bart compare command with different rules
+files.
+The following options are supported:
+-i attribute ... Specify the file attributes to be ignored globally. Specify attributes as a comma separated list.
+This option produces the same behavior as supplying the file attributes to a global IGNORE keyword in the rules
+file. See bart_rules(4).
+-I [file_name...] Specify the input list of files. The file list can be specified at the command line or read from stan<hy>
+dard input.
+<beginning of page>
+-n Prevent computation of content signatures for all regular files in the file list.
+-p Display manifest comparison output in ``programmatic mode,'' which is suitable for programmatic parsing. The
+output is not localized.
+-r rules_file Use rules_file to specify which files and directories to catalog, and to define which file attribute discrep<hy>
+ancies to flag. If rules_file is -, then the rules are read from standard input. See bart_rules(4) for the definition of the
+syntax.
+-R root_directory Specify the root directory for the manifest. All paths specified by the rules, and all paths reported
+in the manifest, are relative to root_directory. Note -
+The root file system of any non-global zones must not be referenced with the -R option. Doing so might damage the
+global zone's file system, might compromise the security of the global zone, and might damage the non-global
+zone's file system. See zones(5).
+bart allows quoting of operands. This is particularly important for white-space appearing in subtree and subtree
+modifier specifications.
+The following operands are supported:
+control-manifest Specify the manifest created by bart create on the control system.
+test-manifest Specify the manifest created by bart create on the test system.
+The bart create and bart compare commands write output to standard output, and write error messages to standard
+error.
+The bart create command generates a system manifest. See bart_manifest(4).
+When the bart compare command compares two system manifests, it generates a list of file differences. By default,
+the comparison output is localized. However, if the -p option is specified, the output is generated in a form that is
+suitable for programmatic manipulation.
+ filename
+ attribute control:xxxx test:yyyy
+filename Name of the file that differs between control-manifest and test-manifest. For file names that contain embed<hy>
+ded whitespace or newline characters, see bart_manifest(4).
+attribute The name of the file attribute that differs between the manifests that are compared. xxxx is the attribute val<hy>
+ue from control-manifest, and yyyy is the attribute value from test-manifest. When discrepancies for multiple at<hy>
+tributes occur for the same file, each difference is noted on a separate line.
+The following attributes are supported:
+acl ACL attributes for the file. For a file with ACL attributes, this field contains the output from acltotext().
+all All attributes.
+contents Checksum value of the file. This attribute is only specified for regular files. If you turn off context checking
+or if checksums cannot be computed, the value of this field is -.
+<beginning of page>
+dest Destination of a symbolic link.
+devnode Value of the device node. This attribute is for character device files and block device files only.
+dirmtime Modification time in seconds since 00:00:00 UTC, January 1, 1970 for directories.
+gid Numerical group ID of the owner of this entry.
+lnmtime Creation time for links.
+mode Octal number that represents the permissions of the file.
+mtime Modification time in seconds since 00:00:00 UTC, January 1, 1970 for files.
+size File size in bytes.
+type Type of file.
+uid Numerical user ID of the owner of this entry.
+The following default output shows the attribute differences for the /etc/passwd file. The output indicates that the
+size, mtime, and contents attributes have changed.
+ /etc/passwd:
+  size control:74 test:81
+  mtime control:3c165879 test:3c165979
+  contents control:daca28ae0de97afd7a6b91fde8d57afa
+ test:84b2b32c4165887355317207b48a6ec7
+ filename attribute control-val test-val [attribute control-val test-val]*
+filename
+Same as filename in the default format.
+attribute control-val test-val
+A description of the file attributes that differ between the control and test manifests for each file. Each entry includes
+the attribute value from each manifest. See bart_manifest(4) for the definition of the attributes.
+Each line of the programmatic output describes all attribute differences for a single file.
+The following programmatic output shows the attribute differences for the /etc/passwd file. The output indicates that
+the size, mtime, and contents attributes have changed.
+ /etc/passwd size 74 81 mtime 3c165879 3c165979
+ contents daca28ae0de97afd7a6b91fde8d57afa 84b2b32c4165887355317207b48a6ec7
+<beginning of page>
+The manifest generator returns the following exit values:
+0 Success
+1 Non-fatal error when processing files; for example, permission problems
+>1 Fatal error; for example, invalid command-line options
+The report tool returns the following exit values:
+0 No discrepancies reported
+1 Discrepancies found
+>1 Fatal error executing comparison
+Example 1 Creating a Default Manifest Without Computing Checksums
+The following command line creates a default manifest, which consists of all files in the / file system. The -n option
+prevents computation of checksums, which causes the manifest to be generated more quickly.
+ bart create -n
+Example 2 Creating a Manifest for a Specified Subtree
+The following command line creates a manifest that contains all files in the /home/nickiso subtree.
+ bart create -R /home/nickiso
+Example 3 Creating a Manifest by Using Standard Input
+The following command line uses output from the find(1) command to generate the list of files to be cataloged. The
+find output is used as input to the bart create command that specifies the -I option.
+ find /home/nickiso -print | bart create -I
+Example 4 Creating a Manifest by Using a Rules File
+The following command line uses a rules file, rules, to specify the files to be cataloged.
+ bart create -r rules
+Example 5 Comparing Two Manifests and Generating Programmatic Output
+The following command line compares two manifests and produces output suitable for parsing by a program.
+ bart compare -p manifest1 manifest2
+Example 6 Comparing Two Manifests and Specifying Attributes to Ignore
+The following command line compares two manifests. The dirmtime, lnmtime, and mtime attributes are not com<hy>
+<beginning of page>
+pared.
+ bart compare -i dirmtime,lnmtime,mtime manifest1 manifest2
+Example 7 Comparing Two Manifests by Using a Rules File
+The following command line uses a rules file, rules, to compare two manifests.
+ bart compare -r rules manifest1 manifest2
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wbart _ Interface StabilityEvolving
+cksum(1), digest(1), find(1), bart_manifest(4), bart_rules(4), attributes(5)
+The file attributes of certain system libraries can be temporarily altered by the system as it boots. To avoid triggering
+false warnings, you should compare manifests only if they were both created with the system in the same state; that
+is, if both were created in single-user or both in multi-user.

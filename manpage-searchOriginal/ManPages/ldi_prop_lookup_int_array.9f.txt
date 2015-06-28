@@ -1,0 +1,133 @@
+<beginning of page>
+ldi_prop_lookup_int_array, ldi_prop_lookup_int64_array, ldi_prop_lookup_string_array, ldi_prop_lookup_string,
+ldi_prop_lookup_byte_array <-> Lookup property information
+#include <sys/sunldi.h>
+int ldi_prop_lookup_int_array(ldi_handle_t lh, uint_t flags, char *name,
+ int **datap, uint_t *nelementsp);
+int ldi_prop_lookup_int64_array(ldi_handle_t lh, uint_t flags, char *name,
+ int64_t **datap, uint_t *nelementsp);
+int ldi_prop_lookup_string_array(ldi_handle_t lh, uint_t flags,
+ char *name, char ***datap, uint_t *nelementsp);
+int ldi_prop_lookup_string(ldi_handle_t lh, uint_t flags, char *name,
+ char **datap);
+int ldi_prop_lookup_byte_array(ldi_handle_t lh, uint_t flags, char *name,
+ uchar_t **datap, uint_t *nelements);
+lh Layered handle.
+flags Possible flag values are some combination of:
+LDI_DEV_T_ANY Match the lookup request independent of the actual dev_t value that was used when the proper<hy>
+ty was created. The flag indicates any dev_t value (including DDI_DEV_T_NONE) associated with a possible prop<hy>
+erty match will satisfy the matching criteria.
+DDI_PROP_DONTPASS Do not pass request to parent device information node if the property is not found.
+DDI_PROP_NOTPROM Do not look at PROM properties (ignored on platforms that do not support PROM prop<hy>
+erties).
+name String containing the property name.
+nelements The address of an unsigned integer which, upon successful return, contains the number of elements ac<hy>
+counted for in the memory pointed at by datap. Depending on the interface you use, the elements are either integers,
+strings or bytes.
+datap
+ldi_prop_lookup_int_array()
+Pointer address to an array of integers which, upon successful return, point to memory containing the integer array
+property value.
+ldi_prop_lookup_int64_array()
+Pointer address to an array of 64-bit integers which, upon successful return, point to memory containing the integer
+array property value.
+ldi_prop_lookup_string_array()
+Pointer address to an array of strings which, upon successful return, point to memory containing the array of strings.
+The string array is formatted as an array of pointers to NULL terminated strings, much like the argv argument to ex<hy>
+ecve(2).
+<beginning of page>
+ldi_prop_lookup_string()
+Pointer address to a string which, upon successful return, points to memory containing the NULL terminated string
+value of the property.
+ldi_prop_lookup_byte_array()
+Pointer address to an array of bytes which, upon successful return, point to memory containing the property byte ar<hy>
+ray value.
+Solaris DDI specific (Solaris DDI).
+The property look up functions search for and, if found, return the value of a given property. Properties are searched
+for based on the dip and dev_t values associated with the layered handle, the property name, and type of the data (in<hy>
+teger, string, or byte).
+The property search order is as follows: 1. Search software properties created by the driver. 2. Search the software
+properties created by the system (or nexus nodes in the device info tree). 3. Search the driver global properties list.
+4. If DDI_PROP_NOTPROM is not set, search the PROM properties (if they exist). 5. If DDI_PROP_DONTPASS
+is not set, pass this request to the parent device information node of the device represented by the layered handle. 6.
+Return DDI_PROP_NOT_FOUND.
+Typically, the specific dev_t value associated with the device represented by the layered handle (ldi_handle_t) is
+used as a part of the property match criteria. This association is handled by the layered driver infrastructure on be<hy>
+half of the consumers of the ldi property look up functions.
+However, if the LDI_DEV_T_ANY flag is used, the ldi property lookup functions match the request regardless of
+the dev_t value associated with the property at the time of its creation. If a property was created with a dev_t set to
+DDI_DEV_T_NONE, then the only way to look up this property is with the LDI_DEV_T_ANY flag. PROM prop<hy>
+erties are always created with a dev_t set to DDI_DEV_T_NONE.
+name must always be set to the name of the property being looked up.
+For the ldi_prop_lookup_int_array(), ldi_prop_lookup_int64_array(), ldi_prop_lookup_string_array(),
+ldi_prop_lookup_string(), and ldi_prop_lookup_byte_array() functions, datap is the address of a pointer which,
+upon successful return, points to memory containing the value of the property. In each case *datap points to a differ<hy>
+ent type of property value. See the individual descriptions of the functions below for details on the different return
+values. nelementsp is the address of an unsigned integer which, upon successful return, contains the number of inte<hy>
+ger, string or byte elements accounted for in the memory pointed at by *datap.
+All of the property look up functions may block to allocate memory needed to hold the value of the property.
+When a driver has obtained a property with any look up function and is finished with that property, it must be freed
+by call ddi_prop_free(). ddi_prop_free() must be called with the address of the allocated property. For instance, if
+you call ldi_prop_lookup_int_array() with datap set to the address of a pointer to an integer, &my-int-ptr, the com<hy>
+panion free call is ddi_prop_free(my-int-ptr).
+Property look up functions are described below:
+ldi_prop_lookup_int_array()
+This function searches for and returns an array of integer property values. An array of integers is defined to *nele<hy>
+mentsp number of 4 byte long integer elements. datap should be set to the address of a pointer to an array of integers
+which, upon successful return, will point to memory containing the integer array value of the property.
+ldi_prop_lookup_int64_array()
+This function searches for and returns an array of integer property values. An array of integers is defined to *nele<hy>
+mentsp number of 8 byte long integer elements. datap should be set to the address of a pointer to an array of inte<hy>
+gers which, upon successful return, will point to memory containing the integer array value of the property This
+function does not search the PROM for 64-bit property values.
+<beginning of page>
+ldi_prop_lookup_string_array()
+This function searches for and returns a property that is an array of strings. datap should be set to an address of a
+pointer to an array of strings which, upon successful return, will point to memory containing the array of strings.
+The array of strings is formatted as an array of pointers to null-terminated strings, much like the argv argument to
+execve(2).
+ldi_prop_lookup_string()
+This function searches for and returns a property that is a null-terminated string. datap should be set to the address of
+a pointer to a string which, upon successful return, points to memory containing the string value of the property.
+ldi_prop_lookup_byte_array()
+This function searches for and returns a property that is an array of bytes. datap should be set to the address of a
+pointer to an array of bytes which, upon successful return, points to memory containing the byte array value of the
+property.
+ddi_prop_free()
+Frees the resources associated with a property previously allocated using ldi_prop_lookup_int_array(),
+ldi_prop_lookup_int64_array(), ldi_prop_lookup_string_array(), ldi_prop_lookup_string(), and
+ldi_prop_lookup_byte_array().
+The functions ldi_prop_lookup_int_array(), ldi_prop_lookup_int64_array(), ldi_prop_lookup_string_array(),
+ldi_prop_lookup_string(), and ldi_prop_lookup_byte_array() return the following values:
+DDI_PROP_SUCCESS Property found and returned.
+DDI_PROP_INVAL_ARG If an attempt is made to look up a property with a NULL ldi handle, name is NULL or
+name is a the null string.
+DDI_PROP_NOT_FOUND Property not found.
+DDI_PROP_UNDEFINED Prop explicitly undefined (see ddi_prop_undefine(9F)).
+DDI_PROP_CANNOT_DECODE Property value cannot be decoded.
+These functions may be called from user or kernel context.
+ Using ldi_prop_lookup_int64_array().
+  The following example demonstrates the use of
+  ldi_prop_lookup_int64_array().
+  int64_t *options;
+  uint_t noptions;
+  /*
+  * Get the data associated with the integer "options" property
+  * array, along with the number of option integers
+  */
+  if (ldi_prop_lookup_int64_array(lh,
+  LDI_DEV_T_ANY|DDI_PROP_NOTPROM, "options",
+  &options, &noptions) == DDI_PROP_SUCCESS) {
+  /*
+  * Process the options data from the property
+<beginning of page>
+  * we just received. Let's do "our thing" with data.
+  */
+  xx_process_options(options, noptions);
+  /*
+  * Free the memory allocated for the property data
+  */
+  ddi_prop_free(options);
+  }
+execve(2), ddi_prop_free(9F), ddi_prop_lookup(9F), ldi_prop_exists(9F) .
+Writing Device Drivers

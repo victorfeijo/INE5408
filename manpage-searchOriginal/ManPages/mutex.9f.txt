@@ -1,0 +1,80 @@
+<beginning of page>
+mutex, mutex_enter, mutex_exit, mutex_init, mutex_destroy, mutex_owned, mutex_tryenter <-> mutual exclusion lock
+routines
+#include <sys/ksynch.h>
+void mutex_init(kmutex_t *mp, char *name, kmutex_type_t type,
+ void *arg);
+void mutex_destroy(kmutex_t *mp);
+void mutex_enter(kmutex_t *mp);
+void mutex_exit(kmutex_t *mp);
+int mutex_owned(kmutex_t *mp);
+int mutex_tryenter(kmutex_t *mp);
+Solaris DDI specific (Solaris DDI).
+mp Pointer to a kernel mutex lock (kmutex_t).
+name Descriptive string. This is obsolete and should be NULL. (Non-NULL strings are legal, but they are a waste of
+kernel memory.)
+type Type of mutex lock.
+arg Type-specific argument for initialization routine.
+A mutex enforces a policy of mutual exclusion. Only one thread at a time may hold a particular mutex. Threads try<hy>
+ing to lock a held mutex will block until the mutex is unlocked.
+Mutexes are strictly bracketing and may not be recursively locked, meaning that mutexes should be exited in the op<hy>
+posite order they were entered, and cannot be reentered before exiting.
+mutex_init() initializes a mutex. It is an error to initialize a mutex more than once. The type argument should be set
+to MUTEX_DRIVER.
+arg provides type-specific information for a given variant type of mutex. When mutex_init() is called for driver mu<hy>
+texes, if the mutex is used by the interrupt handler, the arg should be the interrupt priority returned from ddi_in<hy>
+tr_get_pri(9F) or ddi_intr_get_softint_pri(9F). Note that arg should be the value of the interrupt priority cast by
+calling the DDI_INTR_PRI macro. If the mutex is never used inside an interrupt handler, the argument should be
+NULL.
+mutex_enter() is used to acquire a mutex. If the mutex is already held, then the caller blocks. After returning, the
+calling thread is the owner of the mutex. If the mutex is already held by the calling thread, a panic ensues.
+mutex_owned() should only be used in ASSERT() and may be enforced by not being defined unless the preproces<hy>
+sor symbol DEBUG is defined. Its return value is non-zero if the current thread (or, if that cannot be determined, at
+least some thread) holds the mutex pointed to by mp.
+mutex_tryenter() is very similar to mutex_enter() except that it doesn't block when the mutex is already held. mu<hy>
+tex_tryenter() returns non-zero when it acquired the mutex and 0 when the mutex is already held.
+mutex_exit() releases a mutex and will unblock another thread if any are blocked on the mutex.
+mutex_destroy() releases any resources that might have been allocated by mutex_init(). mutex_destroy() must be
+called before freeing the memory containing the mutex, and should be called with the mutex unheld (not owned by
+any thread). The caller must be sure that no other thread attempts to use the mutex.
+mutex_tryenter() returns a non-zero value on success and zero on failure.
+<beginning of page>
+mutex_owned() returns a non-zero value if the calling thread currently holds the mutex pointed to by mp, or when
+that cannot be determined, if any thread holds the mutex. Otherwise mutex_owned() returns zero.
+These functions can be called from user, kernel, or high-level interrupt context, except for mutex_init() and mu<hy>
+tex_destroy(), which can be called from user or kernel context only. Example 1 Initializing a Mutex
+A driver might do this to initialize a mutex that is part of its unit structure and used in its interrupt routine:
+ ddi_intr_get_pri(hdlp, &pri);
+ mutex_init(&un->un_lock, NULL, MUTEX_DRIVER, DDI_INTR_PRI(pri));
+ ddi_intr_add_handler(hdlp, xxintr, (caddr_t)un, NULL);
+Example 2 Calling a Routine with a Lock
+A routine that expects to be called with a certain lock held might have the following ASSERT:
+ xxstart(struct xxunit *un)
+ {
+   ASSERT(mutex_owned(&un->un_lock));
+ ...
+lockstat(1M), Intro(9F), condvar(9F), ddi_intr_alloc(9F), ddi_intr_add_handler(9F), ddi_intr_get_pri(9F),
+ddi_intr_get_softint_pri(9F), rwlock(9F), semaphore(9F)
+Writing Device Drivers
+Compiling with _LOCKTEST or _MPSTATS defined has no effect. To gather lock statistics, see lockstat(1M).
+The address of a kmutex_t lock must be aligned on an 8-byte boundary for 64-bit kernels, or a 4-byte boundary for
+32-bit kernels. Violation of this requirement will result in undefined behavior, including, but not limited to, failure of
+mutual exclusion or a system panic.
+To write scalable, responsive drivers that do not hang, panic or deadlock the system, follow these guidelines:
+ Never return from a driver entry point with a mutex held.
+ Never hold a mutex when calling a service that may block, for example kmem_alloc(9F) with KM_SLEEP or
+ delay(9F).
+ Always acquire mutexes in a consistent order. If a critical section acquires mutex A followed by B, and else<hy>
+ where in the driver mutex B is acquired before A, the driver can deadlock with one thread holding A and wait<hy>
+ ing for B and another thread holding B while waiting for A.
+ Always use a mutex to enforce exclusive access to data, not instruction paths.
+ Acquiring a lock in user context that is also acquired in interrupt context means that, as long as that lock is
+ held, the driver instance holding the lock is subject to all the rules and limitations of interrupt context.
+ In most cases, a mutex can and should be acquired and released within the same function.
+ Liberal use of debugging aids like ASSERT(mutex_owned(&mutex)) can help find callers of a function which
+ should be holding a mutex but are not. This means you need to test your driver compiled with DEBUG.
+ Do not use a mutex to set driver state. However, you should use a mutex to protect driver state data.
+ Use per-instance and automatic data where possible to reduce the amount of shared data. Per-instance data can
+ be protected by a per-instance lock to improve scalability and reduce contention with multiple hardware in<hy>
+ stances.
+ Avoid global data and global mutexes whenever possible.

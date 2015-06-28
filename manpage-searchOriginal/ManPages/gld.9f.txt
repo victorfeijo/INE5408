@@ -1,0 +1,78 @@
+<beginning of page>
+gld, gld_mac_alloc, gld_mac_free, gld_register, gld_unregister, gld_recv, gld_sched, gld_intr <-> Generic LAN Driver
+service routines
+#include <sys/gld.h>
+gld_mac_info_t *gld_mac_alloc(dev_info_t *dip);
+void gld_mac_free(gld_mac_info_t *macinfo);
+int gld_register(dev_info_t *dip, char *name, gld_mac_info_t *macinfo);
+int gld_unregister(gld_mac_info_t *macinfo);
+void gld_recv(gld_mac_info_t *macinfo, mblk_t *mp);
+void gld_sched(gld_mac_info_t *macinfo);
+uint_t gld_intr(caddr_t);
+void gld_linkstate(gld_mac_info_t *macinfo, int32_t newstate);
+Solaris architecture specific (Solaris DDI).
+macinfo Pointer to a gld_mac_info(9S) structure.
+dip Pointer to dev_info structure.
+name Device interface name.
+mp Pointer to a message block containing a received packet.
+newstate Media link state.
+gld_mac_alloc() allocates a new gld_mac_info(9S) structure and returns a pointer to it. Some of the GLD-private
+elements of the structure may be initialized before gld_mac_alloc() returns; all other elements are initialized to ze<hy>
+ro. The device driver must initialize some structure members, as described in gld_mac_info(9S), before passing the
+mac_info pointer to gld_register().
+gld_mac_free() frees a gld_mac_info(9S) structure previously allocated by gld_mac_alloc().
+gld_register() is called from the device driver's attach(9E) routine, and is used to link the GLD-based device driver
+with the GLD framework. Before calling gld_register() the device driver's attach(9E) routine must first use
+gld_mac_alloc() to allocate a gld_mac_info(9S) structure, and initialize several of its structure elements. See
+gld_mac_info(9S) for more information. A successful call to gld_register() performs the following actions: <bu> links
+the device-specific driver with the GLD system; <bu> sets the device-specific driver's private data pointer (using
+ddi_set_driver_private(9F)) to point to the macinfo structure; <bu> creates the minor device node.
+The device interface name passed to gld_register() must exactly match the name of the driver module as it exists in
+the filesystem.
+The driver's attach(9E) routine should return DDI_SUCCESS if gld_register() succeeds. If gld_register() returns
+DDI_FAILURE, the attach(9E) routine should deallocate any resources it allocated before calling gld_register()
+and then also return DDI_FAILURE.
+gld_unregister() is called by the device driver's detach(9E) function, and if successful, performs the following
+tasks: <bu> ensures the device's interrupts are stopped, calling the driver's gldm_stop() routine if necessary; <bu> removes
+the minor device node; <bu> unlinks the device-specific driver from the GLD system.
+If gld_unregister() returns DDI_SUCCESS, the detach(9E) routine should deallocate any data structures allocated
+in the attach(9E) routine, using gld_mac_free() to deallocate the macinfo structure, and return DDI_SUCCESS. If
+gld_unregister() returns DDI_FAILURE, the driver's detach(9E) routine must leave the device operational and re<hy>
+<beginning of page>
+turn DDI_FAILURE.
+gld_recv() is called by the driver's interrupt handler to pass a received packet upstream. The driver must construct
+and pass a STREAMS M_DATA message containing the raw packet. gld_recv() determines which STREAMS
+queues, if any, should receive a copy of the packet, duplicating it if necessary. It then formats a DL_UNITDA<hy>
+TA_IND message, if required, and passes the data up all appropriate streams.
+The driver should avoid holding mutex or other locks during the call to gld_recv(). In particular, locks that could be
+taken by a transmit thread may not be held during a call to gld_recv(): the interrupt thread that calls gld_recv() may
+in some cases carry out processing that includes sending an outgoing packet, resulting in a call to the driver's
+gldm_send() routine. If the gldm_send() routine were to try to acquire a mutex being held by the gldm_intr() rou<hy>
+tine at the time it calls gld_recv(), this could result in a panic due to recursive mutex entry.
+gld_sched() is called by the device driver to reschedule stalled outbound packets. Whenever the driver's
+gldm_send() routine has returned GLD_NORESOURCES, the driver must later call gld_sched() to inform the
+GLD framework that it should retry the packets that previously could not be sent. gld_sched() should be called as
+soon as possible after resources are again available, to ensure that GLD resumes passing outbound packets to the
+driver's gldm_send() routine in a timely way. (If the driver's gldm_stop() routine is called, the driver is absolved
+from this obligation until it later again returns GLD_NORESOURCES from its gldm_send() routine; however, ex<hy>
+tra calls to gld_sched() will not cause incorrect operation.)
+gld_intr() is GLD's main interrupt handler. Normally it is specified as the interrupt routine in the device driver's call
+to ddi_add_intr(9F). The argument to the interrupt handler (specified as int_handler_arg in the call to ddi_add_in<hy>
+tr(9F)) must be a pointer to the gld_mac_info(9S) structure. gld_intr() will, when appropriate, call the device driv<hy>
+er's gldm_intr() function, passing that pointer to the gld_mac_info(9S) structure. However, if the driver uses a
+high-level interrupt, it must provide its own high-level interrupt handler, and trigger a soft interrupt from within that.
+In this case, gld_intr() may be specified as the soft interrupt handler in the call to ddi_add_softintr().
+gld_linkstate() is called by the device driver to notify GLD of changes in the media link state. The newstate argu<hy>
+ment should be set to one of the following:
+GLD_LINKSTATE_DOWN The media link is unavailable.
+GLD_LINKSTATE_UP The media link is unavailable.
+GLD_LINKSTATE_UNKNOWN The status of the media link is unknown.
+If a driver calls gld_linkstate(), it must also set the GLD_CAP_LINKSTATE bit in the gldm_capabilties field of
+the gld_mac_info(9S) structure.
+gld_mac_alloc() returns a pointer to a new gld_mac_info(9S) structure.
+gld_register() and gld_unregister() return:
+DDI_SUCCESS on success.
+DDI_FAILURE on failure.
+gld_intr() returns a value appropriate for an interrupt handler.
+gld(7D), gld(9E), gld_mac_info(9S), gld_stats(9S), dlpi(7P), attach(9E), ddi_add_intr(9F).
+Writing Device Drivers

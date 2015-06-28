@@ -1,0 +1,87 @@
+<beginning of page>
+open <-> gain access to a device
+#include <sys/types.h>
+#include <sys/file.h>
+#include <sys/errno.h>
+#include <sys/open.h>
+#include <sys/cred.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+int prefixopen(dev_t *devp, int flag, int otyp,
+ cred_t *cred_p);
+#include <sys/file.h>
+#include <sys/stream.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+int prefixopen(queue_t *q, dev_t *devp, int oflag, int sflag,
+ cred_t *cred_p);
+Architecture independent level 1 (DDI/DKI). This entry point is required, but it can be nulldev(9F)
+devp Pointer to a device number.
+flag A bit field passed from the user program open(2) system call that instructs the driver on how to open the file.
+Valid settings are:
+FEXCL Open the device with exclusive access; fail all other attempts to open the device.
+FNDELAY Open the device and return immediately. Do not block the open even if something is wrong.
+FREAD Open the device with read-only permission, If ORed with FWRITE, allow both read and write access.
+FWRITE Open a device with write-only permission. If ORed with FREAD, allow both read and write access.
+otyp Parameter supplied for driver to determine how many times a device was opened and for what reasons. For
+OTYP_BLK and OTYP_CHR, the open() function can be called many times, but the close(9E) function is called
+only when the last reference to a device is removed. If the device is accessed through file descriptors, it is done by a
+call to close(2) or exit(2). If the device is accessed through memory mapping, it is done by a call to munmap(2) or
+exit(2). For OTYP_LYR, there is exactly one close(9E) for each open() operation that is called. This permits soft<hy>
+ware drivers to exist above hardware drivers and removes any ambiguity from the hardware driver regarding how a
+device is used.
+OTYP_BLK Open occurred through block interface for the device.
+OTYP_CHR Open occurred through the raw/character interface for the device.
+OTYP_LYR Open a layered process. This flag is used when one driver calls another driver's open() or close(9E)
+function. The calling driver ensures that there is one-layered close for each layered open. This flag applies to both
+block and character devices.
+<beginning of page>
+cred_p Pointer to the user credential structure.
+q A pointer to the read queue.
+devp Pointer to a device number. For STREAMS modules, devp always points to the device number associated with
+the driver at the end (tail) of the stream.
+oflag Valid oflag values are FEXCL, FNDELAY, FREAD, and FWRITEL <em> the same as those listed above for
+flag.. For STREAMS modules, oflag is always set to 0.
+sflag Valid values are as follows:
+CLONEOPEN Indicates that the open() function is called through the clone driver. The driver should return a
+unique device number.
+MODOPEN Modules should be called with sflag set to this value. Modules should return an error if they are called
+with sflag set to a different value. Drivers should return an error if they are called with sflag set to this value.
+0 Indicates a driver is opened directly, without calling the clone driver.
+cred_p Pointer to the user credential structure.
+The driver's open() function is called by the kernel during an open(2) or a mount(2) on the special file for the de<hy>
+vice. A device can be opened simultaneously by multiple processes and the open() driver operation is called for each
+open. Note that a device is referenced once its associated open(9E) function is entered, and thus open(9E) opera<hy>
+tions which have not yet completed will prevent close(9E) from being called. The function should verify that the mi<hy>
+nor number component of *devp is valid, that the type of access requested by otyp and flag is appropriate for the de<hy>
+vice, and, if required, check permissions using the user credentials pointed to by cred_p.
+The kernel provides open() close() exclusion guarantees to the driver at *devp, otyp granularity. This delays new
+open() calls to the driver while a last-reference close() call is executing. If the driver has indicated that an EINTR
+returns safe via the D_OPEN_RETURNS_EINTR cb_ops(9S) cb_flag, a delayed open() may be interrupted by a
+signal that results in an EINTR return.
+Last-reference accounting and open() close() exclusion typically simplify driver writing. In some cases, however,
+they might be an impediment for certain types of drivers. To overcome any impediment, the driver can change minor
+numbers in open(9E), as described below, or implement multiple minor nodes for the same device. Both techniques
+give the driver control over when close() calls occur and whether additional open() calls will be delayed while
+close() is executing.
+The open() function is passed a pointer to a device number so that the driver can change the minor number. This al<hy>
+lows drivers to dynamically create minor instances of the device. An example of this might be a pseudo-terminal
+driver that creates a new pseudo-terminal whenever it is opened. A driver that chooses the minor number dynamical<hy>
+ly, normally creates only one minor device node in attach(9E) with ddi_create_minor_node(9F). It then changes
+the minor number component of *devp using makedevice(9F) and getmajor(9F). The driver needs to keep track of
+available minor numbers internally. A driver that dynamically creates minor numbers might want to avoid returning
+the original minor number since returning the original minor will result in postponed dynamic opens when original
+minor close() call occurs.
+ *devp = makedevice(getmajor(*devp), new_minor);
+The open() function should return 0 for success, or the appropriate error number.
+close(2), exit(2), mmap(2), mount(2), munmap(2), open(2), Intro(9E), attach(9E), close(9E), ddi_create_mi<hy>
+nor_node(9F), getmajor(9F), getminor(9F), makedevice(9F), nulldev(9F), cb_ops(9S)
+<beginning of page>
+Writing Device Drivers
+STREAMS Programming Guide
+Do not attempt to change the major number.
+When a driver modifies the device number passed in, it must not change the major number portion of the device
+number. Unless CLONEOPEN is specified, the modified device number must map to the same driver instance indi<hy>
+cated by the driver's getinfo(9e) implementation. In other words, cloning across different drivers is not supported.
+Cloning across different instances of the same driver in only permitted if the driver specified in CLONE_DEV in
+ddi_create_minor_node(9F) is not supported.

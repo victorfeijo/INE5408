@@ -1,0 +1,99 @@
+<beginning of page>
+tnfctl_probe_state_get, tnfctl_probe_enable, tnfctl_probe_disable, tnfctl_probe_trace, tnfctl_probe_untrace, tn<hy>
+fctl_probe_connect, tnfctl_probe_disconnect_all <-> interfaces to query and to change the state of a probe
+cc [ flag ... ] file ... -ltnfctl [ library ... ]
+#include <tnf/tnfctl.h>
+tnfctl_errcode_t tnfctl_probe_state_get(tnfctl_handle_t *hndl,
+ tnfctl_probe_t *probe_hndl, tnfctl_probe_state_t *state);
+tnfctl_errcode_t tnfctl_probe_enable(tnfctl_handle_t *hndl,
+ tnfctl_probe_t *probe_hndl, void *ignored);
+tnfctl_errcode_t tnfctl_probe_disable(tnfctl_handle_t *hndl,
+ tnfctl_probe_t *probe_hndl, void *ignored);
+tnfctl_errcode_t tnfctl_probe_trace(tnfctl_handle_t *hndl,
+ tnfctl_probe_t *probe_hndl, void *ignored);
+tnfctl_errcode_t tnfctl_probe_untrace(tnfctl_handle_t *hndl,
+ tnfctl_probe_t *probe_hndl, void *ignored);
+tnfctl_errcode_t tnfctl_probe_disconnect_all(tnfctl_handle_t *hndl,
+ tnfctl_probe_t *probe_hndl, void *ignored);
+tnfctl_errcode_t tnfctl_probe_connect(tnfctl_handle_t *hndl,
+ tnfctl_probe_t *probe_hndl, const char *lib_base_name,
+ const char *func_name);
+tnfctl_probe_state_get() returns the state of the probe specified by probe_hndl in the process or kernel specified by
+hndl. The user will pass these in to an apply iterator. The caller must also allocate state and pass in a pointer to it.
+The semantics of the individual members of state are:
+id The unique integer assigned to this probe. This number does not change over the lifetime of this probe. A
+probe_hndl can be obtained by using the calls tnfctl_apply(), tanfctl_apply_ids(), or tnfctl_register_funcs().
+attr_string A string that consists of attribute value pairs separated by semicolons. For the syntax of this string, see
+the syntax of the detail argument of the TNF_PROBE(3TNF) macro. The attributes name, slots, keys, file, and
+line are defined for every probe. Additional user-defined attributes can be added by using the detail argument of the
+TNF_PROBE(3TNF) macro. An example of attr_string follows:
+ "name pageout;slots vnode pages_pageout ;
+ keys vm pageio io;file vm.c;line 25;"
+enabled B_TRUE if the probe is enabled, or B_FALSE if the probe is disabled. Probes are disabled by default. Use
+tnfctl_probe_enable() or tnfctl_probe_disable() to change this state.
+traced B_TRUE if the probe is traced, or B_FALSE if the probe is not traced. Probes in user processes are traced
+by default. Kernel probes are untraced by default. Use tnfctl_probe_trace() or tnfctl_probe_untrace() to change
+this state.
+new_probe B_TRUE if this is a new probe brought in since the last change in libraries. See dlopen(3C) or dl<hy>
+close(3C). Otherwise, the value of new_probe will be B_FALSE. This field is not meaningful for kernel probe
+control.
+obj_name The name of the shared object or executable in which the probe is located. This string can be freed, so
+the client should make a copy of the string if it needs to be saved for use by other libtnfctl interfaces. In kernel
+mode, this string is always NULL.
+<beginning of page>
+func_names A null-terminated array of pointers to strings that contain the names of functions connected to this
+probe. Whenever an enabled probe is encountered at runtime, these functions are executed. This array also will be
+freed by the library when the state of the probe changes. Use tnfctl_probe_connect() or tnfctl_probe_discon<hy>
+nect_all() to change this state.
+func_addrs A null-terminated array of pointers to addresses of functions in the target image connected to this probe.
+This array also will be freed by the library when the state of the probe changes.
+client_registered_data Data that was registered by the client for this probe by the creator function in tnfctl_regis<hy>
+ter_funcs(3TNF).
+tnfctl_probe_enable(), tnfctl_probe_disable(), tnfctl_probe_trace(), tnfctl_probe_untrace(), and tn<hy>
+fctl_probe_disconnect_all() ignore the last argument. This convenient feature permits these functions to be used in
+the probe_op field of tnfctl_probe_apply(3TNF) and tnfctl_probe_apply_ids(3TNF). tnfctl_probe_enable() en<hy>
+ables the probe specified by probe_hndl. This is the master switch on a probe. A probe does not perform any action
+until it is enabled.
+tnfctl_probe_disable() disables the probe specified by probe_hndl.
+tnfctl_probe_trace() turns on tracing for the probe specified by probe_hndl. Probes emit a trace record only if the
+probe is traced.
+tnfctl_probe_untrace() turns off tracing for the probe specified by probe_hndl. This is useful if you want to connect
+probe functions to a probe without tracing it.
+tnfctl_probe_connect() connects the function func_name which exists in the library lib_base_name, to the probe
+specified by probe_hndl. tnfctl_probe_connect() returns an error code if used on a kernel tnfctl handle.
+lib_base_name is the base name (not a path) of the library. If it is NULL, and multiple functions in the target
+process match func_name, one of the matching functions is chosen arbitrarily. A probe function is a function that is
+in the target's address space and is written to a certain specification. The specification is not currently published.
+tnf_probe_debug() is one function exported by libtnfprobe.so.1 and is the debug function that prex(1) uses. When
+the debug function is executed, it prints out the probe arguments and the value of the sunw%debug attribute of the
+probe to stderr.
+tnfctl_probe_disconnect_all() disconnects all probe functions from the probe specified by probe_hndl.
+Note that no libtnfctl call returns a probe handle (tnfctl_probe_t), yet each of the routines described here takes a
+probe_hndl as an argument. These routines may be used by passing them to one of the tnfctl_probe_apply(3TNF)
+iterators as the "op" argument. Alternatively, probe handles may be obtained and saved by a user's "op" function,
+and they can be passed later as the probe_hndl argument when using any of the functions described here.
+tnfctl_probe_state_get(), tnfctl_probe_enable(), tnfctl_probe_disable(), tnfctl_probe_trace(), tn<hy>
+fctl_probe_untrace(), tnfctl_probe_disconnect_all() and tnfctl_probe_connect() return TNFCTL_ERR_NONE
+upon success.
+The following error codes apply to tnfctl_probe_state_get():
+TNFCTL_ERR_INVALIDPROBE probe_hndl is no longer valid. The library that the probe was in could have
+been dynamically closed by dlclose(3C).
+The following error codes apply to tnfctl_probe_enable(), tnfctl_probe_disable(), tnfctl_probe_trace(), tn<hy>
+fctl_probe_untrace(), and tnfctl_probe_disconnect_all()
+TNFCTL_ERR_INVALIDPROBE probe_hndl is no longer valid. The library that the probe was in could have
+been dynamically closed by dlclose(3C).
+TNFCTL_ERR_BUFBROKEN Cannot do probe operations because tracing is broken in the target.
+<beginning of page>
+TNFCTL_ERR_NOBUF Cannot do probe operations until a buffer is allocated. See tnfctl_buffer_alloc(3TNF).
+This error code does not apply to kernel probe control.
+The following error codes apply to tnfctl_probe_connect():
+TNFCTL_ERR_INVALIDPROBE probe_hndl is no longer valid. The library that the probe was in could have
+been dynamically closed by dlclose(3C).
+TNFCTL_ERR_BADARG The handle is a kernel handle, or func_name could not be found.
+TNFCTL_ERR_BUFBROKEN Cannot do probe operations because tracing is broken in the target.
+TNFCTL_ERR_NOBUF Cannot do probe operations until a buffer is allocated. See tnfctl_buffer_alloc(3TNF).
+See attributes(5) for description of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Availability<hy>
+SUNWtnfc _ MT LevelMT-Safe
+prex(1), TNF_PROBE(3TNF), libtnfctl(3TNF), tnfctl_check_libs(3TNF), tnfctl_continue(3TNF), tn<hy>
+fctl_probe_apply(3TNF), tnfctl_probe_apply_ids(3TNF), tracing(3TNF), tnf_kernel_probes(4), attributes(5)

@@ -1,0 +1,110 @@
+<beginning of page>
+sendfile <-> send files over sockets or copy files to files
+cc [ flag... ] file... -lsendfile [ library... ]
+#include <sys/sendfile.h>
+ssize_t sendfile(int out_fd, int in_fd, off_t *off, size_t len);
+The sendfile() function copies data from in_fd to out_fd starting at offset off and of length len bytes. The in_fd argu<hy>
+ment should be a file descriptor to a regular file opened for reading. See open(2). The out_fd argument should be a
+file descriptor to a regular file opened for writing or to a connected AF_INET or AF_INET6 socket of
+SOCK_STREAM type. See socket(3SOCKET). The off argument is a pointer to a variable holding the input file
+pointer position from which the data will be read. After sendfile() has completed, the variable will be set to the off<hy>
+set of the byte following the last byte that was read. The sendfile() function does not modify the current file pointer
+of in_fd, but does modify the file pointer for out_fd if it is a regular file.
+The sendfile() function can also be used to send buffers by pointing in_fd to SFV_FD_SELF.
+Upon successful completion, sendfile() returns the total number of bytes written to out_fd and also updates the offset
+to point to the byte that follows the last byte read. Otherwise, it returns -1, and errno is set to indicate the error.
+The sendfile() function will fail if:
+EAFNOSUPPORT The implementation does not support the specified address family for socket.
+EAGAIN Mandatory file or record locking is set on either the file descriptor or output file descriptor if it points at
+regular files. O_NDELAY or O_NONBLOCK is set, and there is a blocking record lock. An attempt has been
+made to write to a stream that cannot accept data with the O_NDELAY or the O_NONBLOCK flag set.
+EBADF The out_fd or in_fd argument is either not a valid file descriptor, out_fd is not opened for writing. or in_fd is
+not opened for reading.
+EINVAL The offset cannot be represented by the off_t structure, or the length is negative when cast to ssize_t.
+EIO An I/O error occurred while accessing the file system.
+ENOTCONN The socket is not connected.
+EOPNOTSUPP The socket type is not supported.
+EPIPE The out_fd argument is no longer connected to the peer endpoint.
+EINTR A signal was caught during the write operation and no data was transferred.
+The sendfile() function has a transitional interface for 64-bit file offsets. See lf64(5). Example 1 Sending a Buffer
+Over a Socket
+The following example demonstrates how to send the buffer buf over a socket. At the end, it prints the number of
+bytes transferred over the socket from the buffer. It assumes that addr will be filled up appropriately, depending upon
+where to send the buffer.
+ int tfd;
+ off_t baddr;
+ struct sockaddr_in sin;
+ char buf[64 * 1024];
+ in_addr_t addr;
+ size_t len;
+<beginning of page>
+ tfd = socket(AF_INET, SOCK_STREAM, 0);
+ if (tfd == -1) {
+  perror("socket");
+  exit(1);
+ }
+ sin.sin_family = AF_INET;
+ sin.sin_addr.s_addr = addr; /* Fill in the appropriate address. */
+ sin.sin_port = htons(2345);
+ if (connect(tfd, (struct sockaddr *)&sin, sizeof(sin))<0) {
+  perror("connect");
+  exit(1);
+ }
+ baddr = (off_t)buf;
+ len = sizeof(buf);
+ while (len > 0) {
+  ssize_t res;
+  res = sendfile(tfd, SFV_FD_SELF, &baddr, len);
+  if (res == -1)
+  if (errno != EINTR) {
+  perror("sendfile");
+  exit(1);
+  } else continue;
+  len -= res;
+ }
+Example 2 Transferring Files to Sockets
+The following program demonstrates a transfer of files to sockets:
+ int ffd, tfd;
+ off_t off;
+ struct sockaddr_in sin;
+ in_addr_t addr;
+ int len;
+ struct stat stat_buf;
+ ssize_t len;
+ ffd = open("file", O_RDONLY);
+ if (ffd == -1) {
+  perror("open");
+  exit(1);
+ }
+ tfd = socket(AF_INET, SOCK_STREAM, 0);
+ if (tfd == -1) {
+  perror("socket");
+  exit(1);
+ }
+ sin.sin_family = AF_INET;
+ sin.sin_addr = addr; /* Fill in the appropriate address. */
+ sin.sin_port = htons(2345);
+ if (connect(tfd, (struct sockaddr *) &sin, sizeof(sin)) <0) {
+  perror("connect");
+  exit(1);
+ }
+ if (fstat(ffd, &stat_buf) == -1) {
+  perror("fstat");
+  exit(1);
+ }
+<beginning of page>
+ len = stat_buf.st_size;
+ while (len > 0) {
+  ssize_t res;
+  res = sendfile(tfd, ffd, &off, len);
+  if (res == -1)
+  if (errno != EINTR) {
+  perror("sendfile");
+  exit(1);
+  } else continue;
+  len -= res;
+ }
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stabili<hy>
+tyEvolving _ MT-LevelMT-Safe
+open(2), libsendfile(3LIB), sendfilev(3EXT), socket(3SOCKET), attributes(5), lf64(5)

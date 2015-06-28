@@ -1,0 +1,81 @@
+<beginning of page>
+lio_listio <-> list directed I/O
+#include <aio.h>
+int lio_listio(int mode, struct aiocb *restrict const list[],
+ int nent, struct sigevent *restrict sig);
+The lio_listio() function allows the calling process, LWP, or thread, to initiate a list of I/O requests within a single
+function call.
+The mode argument takes one of the values LIO_WAIT or LIO_NOWAIT declared in <aio.h> and determines
+whether the function returns when the I/O operations have been completed, or as soon as the operations have been
+queued. If the mode argument is LIO_WAIT, the function waits until all I/O is complete and the sig argument is ig<hy>
+nored.
+If the mode argument is LIO_NOWAIT, the function returns immediately, and asynchronous notification occurs, ac<hy>
+cording to the sig argument, when all the I/O operations complete. If sig is NULL, no asynchronous notification oc<hy>
+curs. If sig is not NULL, asynchronous notification occurs as specified in signal.h(3HEAD) when all the requests in
+list have completed.
+The I/O requests enumerated by list are submitted in an unspecified order.
+The list argument is an array of pointers to aiocb structures. The array contains nent elements. The array may con<hy>
+tain null elements, which are ignored.
+The aio_lio_opcode field of each aiocb structure specifies the operation to be performed. The supported operations
+are LIO_READ, LIO_WRITE, and LIO_NOP; these symbols are defined in <aio.h>. The LIO_NOP operation
+causes the list entry to be ignored. If the aio_lio_opcode element is equal to LIO_READ, then an I/O operation is
+submitted as if by a call to aio_read(3C) with the aiocbp equal to the address of the aiocb structure. If the
+aio_lio_opcode element is equal to LIO_WRITE, then an I/O operation is submitted as if by a call to
+aio_write(3C) with the aiocbp equal to the address of the aiocb structure.
+The aio_fildes member specifies the file descriptor on which the operation is to be performed.
+The aio_buf member specifies the address of the buffer to or from which the data is to be transferred.
+The aio_nbytes member specifies the number of bytes of data to be transferred.
+The members of the aiocb structure further describe the I/O operation to be performed, in a manner identical to that
+of the corresponding aiocb structure when used by the aio_read(3C) and aio_write(3C) functions.
+The nent argument specifies how many elements are members of the list, that is, the length of the array.
+The behavior of this function is altered according to the definitions of synchronized I/O data integrity completion
+and synchronized I/O file integrity completion if synchronized I/O is enabled on the file associated with aio_fildes.
+See fcntl.h(3HEAD) definitions of O_DSYNC and O_SYNC.
+For regular files, no data transfer will occur past the offset maximum established in the open file description associ<hy>
+ated with aiocbp<->>aio_fildes.
+If the mode argument has the value LIO_NOWAIT, and the I/O operations are successfully queued, lio_listio() re<hy>
+turns 0; otherwise, it returns <mi>1, and sets errno to indicate the error.
+If the mode argument has the value LIO_WAIT, and all the indicated I/O has completed successfully, lio_listio()
+returns 0; otherwise, it returns <mi>1, and sets errno to indicate the error.
+In either case, the return value only indicates the success or failure of the lio_listio() call itself, not the status of the
+individual I/O requests. In some cases, one or more of the I/O requests contained in the list may fail. Failure of an
+individual request does not prevent completion of any other individual request. To determine the outcome of each
+I/O request, the application must examine the error status associated with each aiocb control block. Each error sta<hy>
+tus so returned is identical to that returned as a result of an aio_read(3C) or aio_write(3C) function.
+The lio_listio() function will fail if:
+EAGAIN The resources necessary to queue all the I/O requests were not available. The error status for each request
+is recorded in the aio_error member of the corresponding aiocb structure, and can be retrieved using aio_er<hy>
+<beginning of page>
+ror(3C).
+EAGAIN The number of entries indicated by nent would cause the system-wide limit AIO_MAX to be exceeded.
+EINVAL The mode argument is an improper value, or the value of nent is greater than AIO_LISTIO_MAX.
+EINTR A signal was delivered while waiting for all I/O requests to complete during an LIO_WAIT operation. Note
+that, since each I/O operation invoked by lio_listio() may possibly provoke a signal when it completes, this error re<hy>
+turn may be caused by the completion of one (or more) of the very I/O operations being awaited. Outstanding I/O re<hy>
+quests are not canceled, and the application can use aio_fsync(3C) to determine if any request was initiated; aio_re<hy>
+turn(3C) to determine if any request has completed; or aio_error(3C) to determine if any request was canceled.
+EIO One or more of the individual I/O operations failed. The application can use aio_error(3C) to check the error
+status for each aiocb structure to determine the individual request(s) that failed.
+In addition to the errors returned by the lio_listio() function, if the lio_listio() function succeeds or fails with errors
+of EAGAIN, EINTR, or EIO, then some of the I/O specified by the list may have been initiated. If the lio_listio()
+function fails with an error code other than EAGAIN, EINTR, or EIO, no operations from the list have been initiat<hy>
+ed. The I/O operation indicated by each list element can encounter errors specific to the individual read or write
+function being performed. In this event, the error status for each aiocb control block contains the associated error
+code. The error codes that can be set are the same as would be set by a read(2) or write(2) function, with the follow<hy>
+ing additional error codes possible:
+EAGAIN The requested I/O operation was not queued due to resource limitations.
+ECANCELED The requested I/O was canceled before the I/O completed due to an explicit aio_cancel(3C) request.
+EFBIG The aiocbp<->>aio_lio_opcode is LIO_WRITE, the file is a regular file, aiocbp<->>aio_nbytes is greater than
+0, and the aiocbp<->>aio_offset is greater than or equal to the offset maximum in the open file description associated
+with aiocbp<->>aio_fildes.
+EINPROGRESS The requested I/O is in progress.
+EOVERFLOW The aiocbp<->>aio_lio_opcode is LIO_READ, the file is a regular file, aiocbp<->>aio_nbytes is
+greater than 0, and the aiocbp<->>aio_offset is before the end-of-file and is greater than or equal to the offset maxi<hy>
+mum in the open file description associated with aiocbp<->>aio_fildes.
+The lio_listio() function has a transitional interface for 64-bit file offsets. See lf64(5).
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed _ MT-LevelMT-Safe _ StandardSee standards(5).
+close(2), exec(2), exit(2), fork(2), lseek(2), read(2), write(2), aio_cancel(3C), aio_error(3C), aio_fsync(3C),
+aio_read(3C), aio_return(3C), aio_write(3C), aio.h(3HEAD), fcntl.h(3HEAD), siginfo.h(3HEAD), sig<hy>
+nal.h(3HEAD), attributes(5), lf64(5), standards(5)

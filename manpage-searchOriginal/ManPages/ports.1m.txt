@@ -1,0 +1,117 @@
+<beginning of page>
+ports <-> creates /dev entries and inittab entries for serial lines
+/usr/sbin/ports [-r rootdir]
+devfsadm(1M) is now the preferred command for /dev and /devices and should be used instead of ports.
+The ports command creates symbolic links in the /dev/term and /dev/cua directories to the serial-port character de<hy>
+vice files in /devices and adds new entries in /etc/inittab for non-system ports found. System-board ports are given
+single lower-case letters for names (such as a and b) while other ports are named numerically.
+ports searches the kernel device tree to find the serial devices attached to the system. It also checks /dev/term and
+/dev/cua to see what symbolic links to serial devices already exist. ports then performs the following: 1. Assigns
+new numbers (or letters for system-board ports) to ports that are attached to the system but do not have /dev/term
+and /dev/cua entries. The numbers or letters assigned are the lowest-unused numbers or letters. 2. Removes dan<hy>
+gling links: links from /dev/term and /dev/cua pointing to no-longer-existing ports. 3. Creates new /dev/term and
+/dev/cua links for new serial devices. 4. Invokes sacadm(1M) to make new port monitor entries for the new de<hy>
+vices. This is not done automatically for on-board ports; on workstations these ports are often not used for dial-in
+sessions, so a port-monitor for one of these ports must be created explicitly.
+If the configuration has not changed, ports exits without doing anything.
+ports considers devices with a node type of DDI_NT_SERIAL, DDI_NT_SERIAL_MB, DDI_NT_SERI<hy>
+AL_DO, or DDI_NT_SERIAL_MB_DO to be serial port devices. Devices with one of these node types must cre<hy>
+ate minor device names that obey the following conventions when calling ddi_create_minor_node(9F). <bu> The mi<hy>
+nor name for non-system port devices (DDI_NT_SERIAL) consists of an ASCII numeric string, where the first
+port on the device is named 0, the second named 1, the third named 2, up to the number of ports provided by the de<hy>
+vice. <bu> The minor name for non-system dialout devices (DDI_NT_SERIAL_DO) is the ASCII numeric port name,
+concatenated with ,cu. For example, the minor name for the first dialout port on the serial board is 0,cu. <bu> The minor
+name for system-board port devices (DDI_NT_SERIAL_MB) consists of a string containing a single ASCII lower<hy>
+case character, where the first port on the device is named a, the second is named b, the third is named c, for all ports
+on the device (or up through port z). <bu> The minor name for system-board dialout devices (DDI_NT_SERI<hy>
+AL_MB_DO) consists of the lowercase character port name, concatenated with ,cu. For example, the minor name
+for the first dialout port on the on-board serial device is a,cu.
+To prevent disks from attempting to automatically generate links for a device, drivers must specify a private node
+type and refrain from using one of the above node types when calling ddi_create_minor_node(9F).
+The following options are supported:
+-r rootdir Causes ports to presume that the /dev/term, /dev/cua, and /devices directories are found under rootdir,
+not directly under /. If this argument is specified, sacadm(1M) is not invoked, since it would update terminal admin<hy>
+istration files under /etc without regard to the rootdir.
+Example 1 Creating the Serial and Dialout Minor Device Nodes
+The following example creates the serial and dialout minor device nodes from the xkserial driver's attach(9E) func<hy>
+tion:
+ /*
+ * Create the minor number by combining the instance number
+ * with the port number.
+ */ #define XKNUMPORTS 8
+ #define XKMINORNUM(i, p) ((i) << 4 | (p))
+ #define XKMINORNUM_DO(i, p) ((i) << 4 | (p) | 0x80)
+ int
+ xkserialattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
+ {
+  int instance, portnum;
+  char name[8];
+  /* other stuff in attach... */
+  instance = ddi_get_instance(dip);
+  for (portnum = 0; portnum < XKNUMPORTS; portnum++) {
+  /*
+  * create the serial port device
+  */
+<beginning of page>
+  sprintf(name, "%d", portnum);
+  ddi_create_minor_node(dip, name, S_IFCHR,
+  XKMINORNUM(instance, portnum), DDI_NT_SERIAL, 0);
+  /*
+  * create the dialout device
+  */
+  sprintf(name,"%d,cu", portnum);
+  ddi_create_minor_node(dip, name, S_IFCHR,
+  XKMINORNUM_DO(instance, portnum), DDI_NT_SERIAL_DO, 0);
+  }
+ }
+Example 2 Installing the xkserial Port Driver on a Sun Fire 4800
+The following example installs the xkserial port driver on a Sun Fire 4800 (with the driver controlling the fictional
+XKSerial 8 port serial board), with these special files in /devices:
+ # ls -l /devices/ssm@0,0/pci@18,700000/pci@1/xkserial@f,800000/
+ crw-r----- 1 root sys 32, 16 Aug 29 00:02 xkserial@2000:0
+ crw-r----- 1 root sys 32, 144 Aug 29 00:02 xkserial@2000:0,cu
+ crw-r----- 1 root sys 32, 17 Aug 29 00:02 xkserial@2000:1
+ crw-r----- 1 root sys 32, 145 Aug 29 00:02 xkserial@2000:1,cu
+ crw-r----- 1 root sys 32, 18 Aug 29 00:02 xkserial@2000:2
+ crw-r----- 1 root sys 32, 146 Aug 29 00:02 xkserial@2000:2,cu
+ crw-r----- 1 root sys 32, 19 Aug 29 00:02 xkserial@2000:3
+ crw-r----- 1 root sys 32, 147 Aug 29 00:02 xkserial@2000:3,cu
+ crw-r----- 1 root sys 32, 20 Aug 29 00:02 xkserial@2000:4
+ crw-r----- 1 root sys 32, 148 Aug 29 00:02 xkserial@2000:4,cu
+ crw-r----- 1 root sys 32, 21 Aug 29 00:02 xkserial@2000:5
+ crw-r----- 1 root sys 32, 149 Aug 29 00:02 xkserial@2000:5,cu
+ crw-r----- 1 root sys 32, 22 Aug 29 00:02 xkserial@2000:6
+ crw-r----- 1 root sys 32, 150 Aug 29 00:02 xkserial@2000:6,cu
+ crw-r----- 1 root sys 32, 23 Aug 29 00:02 xkserial@2000:7
+ crw-r----- 1 root sys 32, 151 Aug 29 00:02 xkserial@2000:7,cu
+/dev/term contain symbolic links to the serial port device nodes in /devices
+ # ls -l /dev/term
+ /dev/term/0 -> ../../devices/[....]/xkserial@2000:0
+ /dev/term/1 -> ../../devices/[....]/xkserial@2000:1
+ /dev/term/2 -> ../../devices/[....]/xkserial@2000:2
+ /dev/term/3 -> ../../devices/[....]/xkserial@2000:3
+ /dev/term/4 -> ../../devices/[....]/xkserial@2000:4
+ /dev/term/5 -> ../../devices/[....]/xkserial@2000:5
+ /dev/term/6 -> ../../devices/[....]/xkserial@2000:6
+ /dev/term/7 -> ../../devices/[....]/xkserial@2000:7
+and /dev/cua contain symbolic links to the dialout port device nodes in /devices
+ # ls -l /dev/cua
+ /dev/cua/0 -> ../../devices/[....]/xkserial@2000:0,cu
+ /dev/cua/1 -> ../../devices/[....]/xkserial@2000:1,cu
+ /dev/cua/2 -> ../../devices/[....]/xkserial@2000:2,cu
+ /dev/cua/3 -> ../../devices/[....]/xkserial@2000:3,cu
+ /dev/cua/4 -> ../../devices/[....]/xkserial@2000:4,cu
+ /dev/cua/5 -> ../../devices/[....]/xkserial@2000:5,cu
+<beginning of page>
+ /dev/cua/6 -> ../../devices/[....]/xkserial@2000:6,cu
+ /dev/cua/7 -> ../../devices/[....]/xkserial@2000:7,cu
+/dev/term/n Logical serial port devices
+/dev/cua/n Logical dialout port devices
+/etc/inittab
+/etc/saf/*
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Availability SUN<hy>
+Wcsu
+add_drv(1M), devfsadm(1M), drvconfig(1M), pmadm(1M), sacadm(1M), attributes(5), devfs(7FS), attach(9E),
+ddi_create_minor_node(9F)
+

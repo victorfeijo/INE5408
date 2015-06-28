@@ -1,0 +1,293 @@
+<beginning of page>
+rpc_soc, authdes_create, authunix_create, authunix_create_default, callrpc, clnt_broadcast, clntraw_create,
+clnttcp_create, clntudp_bufcreate, clntudp_create, get_myaddress, getrpcport, pmap_getmaps, pmap_getport,
+pmap_rmtcall, pmap_set, pmap_unset, registerrpc, svc_fds, svc_getcaller, svc_getreq, svc_register, svc_unregister,
+svcfd_create, svcraw_create, svctcp_create, svcudp_bufcreate, svcudp_create, xdr_authunix_parms <-> obsolete li<hy>
+brary routines for RPC
+#define PORTMAP
+#include <rpc/rpc.h>
+AUTH *authdes_create(char *name, uint_t window,
+ struct sockaddr_in *syncaddr, des_block *ckey);
+AUTH *authunix_create(char *host, uid_t uid, gid_t gid,
+ int grouplen, gid_t *gidlistp);
+AUTH *authunix_create_default(void)
+callrpc(char *host, rpcprog_t prognum, rpcvers_t versnum,
+ rpcproc_t procnum, xdrproc_t inproc, char *in,
+ xdrproc_t outproc, char *out);
+enum clnt_stat_clnt_broadcast(rpcprog_t prognum, rpcvers_t versnum,
+ rpcproc_t procnum, xdrproc_t inproc, char *in,
+ xdrproc_t outproc, char *out, resultproc_teachresult);
+CLIENT *clntraw_create(rpcproc_t procnum, rpcvers_t versnum);
+CLIENT *clnttcp_create(struct sockaddr_in *addr,
+ rpcprog_t prognum, rpcvers_t versnum, int *fdp,
+ uint_t sendz, uint_t recvsz);
+CLIENT *clntudp_bufcreate(struct sockaddr_in *addr, rpcprog_t prognum,
+ rpcvers_t versnum, struct timeval wait,
+ int *fdp, uint_t sendz, uint_t recvsz);
+CLIENT *clntudp_create(struct sockaddr_in *addr,
+ rpcprog_t prognum, struct timeval wait, int *fdp);
+void get_myaddress(struct sockaddr_in *addr);
+ushort getrpcport(char *host, rpcprog_t prognum,
+ rpcvers_t versnum, rpcprot_t proto);
+struct pmaplist *pmap_getmaps(struct sockaddr_in *addr);
+ushort pmap_getport(struct sockaddr_in *addr,
+ rpcprog_t prognum, rpcvers_t versnum,
+ rpcprot_t protocol);
+enum clnt_stat pmap_rmtcall(struct sockaddr_in *addr,
+ rpcprog_t prognum, rpcvers_t versnum,
+ rpcproc_t progcnum, caddr_t in, xdrproct_t inproc,
+ caddr_t out, cdrproct_t outproc,
+ struct timeval tout, rpcport_t *portp);
+bool_t pmap_set(rpcprog_t prognum, rpcvers_t versnum,
+ rpcprot_t protocol, u_short port);
+bool_t pmap_unset(rpcprog_t prognum, rpcvers_t versnum);
+int svc_fds;
+struct sockaddr_in *svc_getcaller(SVCXPRT *xprt);
+void svc_getreq(int rdfds);
+SVCXPRT *svcfd_create(int fd, uint_t sendsz,
+<beginning of page>
+ uint_t recvsz);
+SVCXPRT *svcraw_create(void)
+SVCXPRT *svctcp_create(int fd, uint_t sendsz,
+ uint_t recvsz);
+SVCXPRT *svcudp_bufcreate(int fd, uint_t sendsz,
+ uint_t recvsz);
+SVCXPRT *svcudp_create(int fd);
+registerrpc(rpcprog_t prognum, rpcvers_t versnum, rpcproc_t procnum,
+ char *(*procname)(), xdrproc_t inproc, xdrproc_t outproc);
+bool_tsvc_register(SVCXPRT *xprt, rpcprog_t prognum, rpcvers_t versnum,
+ void (*dispatch(), int protocol);
+void svc_unregister(rpcprog_t prognum, rpcvers_t versnum);
+bool_t xdr_authunix_parms(XDR *xdrs, struct authunix_parms *supp);
+RPC routines allow C programs to make procedure calls on other machines across the network. First, the client calls
+a procedure to send a request to the server. Upon receipt of the request, the server calls a dispatch routine to perform
+the requested service, and then sends back a reply. Finally, the procedure call returns to the client.
+The routines described in this manual page have been superseded by other routines. The preferred routine is given
+after the description of the routine. New programs should use the preferred routines, as support for the older inter<hy>
+faces may be dropped in future releases.
+Transport independent RPC uses TLI as its transport interface instead of sockets.
+Some of the routines described in this section (such as clnttcp_create()) take a pointer to a file descriptor as one of
+the parameters. If the user wants the file descriptor to be a socket, then the application will have to be linked with
+both librpcsoc and libnsl. If the user passed RPC_ANYSOCK as the file descriptor, and the application is linked
+with libnsl only, then the routine will return a TLI file descriptor and not a socket.
+The following routines require that the header <rpc/rpc.h> be included. The symbol PORTMAP should be defined
+so that the appropriate function declarations for the old interfaces are included through the header files.
+authdes_create() authdes_create() is the first of two routines which interface to the RPC secure authentication sys<hy>
+tem, known as DES authentication. The second is authdes_getucred(), below. Note: the keyserver daemon key<hy>
+serv(1M) must be running for the DES authentication system to work.
+authdes_create(), used on the client side, returns an authentication handle that will enable the use of the secure au<hy>
+thentication system. The first parameter name is the network name, or netname, of the owner of the server process.
+This field usually represents a hostname derived from the utility routine host2netname(), but could also represent a
+user name using user2netname(). See secure_rpc(3NSL). The second field is window on the validity of the client
+credential, given in seconds. A small window is more secure than a large one, but choosing too small of a window
+will increase the frequency of resynchronizations because of clock drift. The third parameter syncaddr is optional.
+If it is NULL, then the authentication system will assume that the local clock is always in sync with the server's
+clock, and will not attempt resynchronizations. If an address is supplied, however, then the system will use the ad<hy>
+dress for consulting the remote time service whenever resynchronization is required. This parameter is usually the
+address of the RPC server itself. The final parameter ckey is also optional. If it is NULL, then the authentication sys<hy>
+tem will generate a random DES key to be used for the encryption of credentials. If it is supplied, however, then it
+will be used instead.
+This routine exists for backward compatibility only, and it is made obsolete by authdes_seccreate(). See se<hy>
+cure_rpc(3NSL).
+authunix_create() Create and return an RPC authentication handle that contains .UX authentication information.
+The parameter host is the name of the machine on which the information was created; uid is the user's user ID; gid
+is the user's current group ID; grouplen and gidlistp refer to a counted array of groups to which the user belongs.
+<beginning of page>
+It is not very difficult to impersonate a user.
+This routine exists for backward compatibility only, and it is made obsolete by authsys_create(). See
+rpc_clnt_auth(3NSL).
+authunix_create_default() Call authunix_create() with the appropriate parameters.
+This routine exists for backward compatibility only, and it is made obsolete by authsys_create_default(). See
+rpc_clnt_auth(3NSL).
+callrpc() Call the remote procedure associated with prognum, versnum, and procnum on the machine, host. The pa<hy>
+rameter inproc is used to encode the procedure's parameters, and outproc is used to decode the procedure's results;
+in is the address of the procedure's argument, and out is the address of where to place the result(s). This routine re<hy>
+turns 0 if it succeeds, or the value of enum clnt_stat cast to an integer if it fails. The routine clnt_perrno() is handy
+for translating failure statuses into messages. See rpc_clnt_calls(3NSL).
+You do not have control of timeouts or authentication using this routine. This routine exists for backward compati<hy>
+bility only, and is made obsolete by rpc_call(). See rpc_clnt_calls(3NSL).
+clnt_stat_clnt_broadcast() Like callrpc(), except the call message is broadcast to all locally connected broadcast
+nets. Each time the caller receives a response, this routine calls eachresult(), whose form is:
+ eachresult(char *out, struct sockaddr_in *addr);
+where out is the same as out passed to clnt_broadcast(), except that the remote procedure's output is decoded there;
+addr points to the address of the machine that sent the results. If eachresult() returns 0. clnt_broadcast() waits for
+more replies; otherwise it returns with appropriate status. If eachresult() is NULL, clnt_broadcast() returns with<hy>
+out waiting for any replies.
+Broadcast packets are limited in size to the maximum transfer unit of the transports involved. For Ethernet, the call<hy>
+ers argument size is approximately 1500 bytes. Since the call message is sent to all connected networks, it may po<hy>
+tentially lead to broadcast storms. clnt_broadcast() uses SB AUTH_SYS credentials by default. See
+rpc_clnt_auth(3NSL). This routine exists for backward compatibility only, and is made obsolete by rpc_broad<hy>
+cast(). See rpc_clnt_calls(3NSL).
+clntraw_create() This routine creates an internal, memory-based RPC client for the remote program prognum, ver<hy>
+sion versnum. The transport used to pass messages to the service is actually a buffer within the process's address
+space, so the corresponding RPC server should live in the same address space. See svcraw_create(). This allows
+simulation of RPC and acquisition of RPC overheads, such as round trip times, without any kernel interference.
+This routine returns NULL if it fails.
+This routine exists for backward compatibility only. It has the same functionality as clnt_raw_create(). See
+rpc_clnt_create(3NSL), which obsoletes it.
+clnttcp_create() This routine creates an RPC client for the remote program prognum, version versnum; the client
+uses TCP/IP as a transport. The remote program is located at Internet address addr. If addr->sin_port is 0, then it is
+set to the actual port that the remote program is listening on. The remote rpcbind service is consulted for this infor<hy>
+mation. The parameter *fdp is a file descriptor, which may be open and bound; if it is RPC_ANYSOCK, then this
+routine opens a new one and sets *fdp. Refer to the File Descriptor section for more information. Since TCP-based
+RPC uses buffered I/O, the user may specify the size of the send and receive buffers with the parameters sendsz and
+recvsz. Values of 0 choose suitable defaults. This routine returns NULL if it fails.
+This routine exists for backward compatibility only. clnt_create(), clnt_tli_create(), or clnt_vc_create() should be
+used instead. See rpc_clnt_create(3NSL).
+clntudp_bufcreate() Create a client handle for the remote program prognum, on versnum; the client uses UDP/IP
+as the transport. The remote program is located at the Internet address addr. If addr->sin_port is 0, it is set to port
+on which the remote program is listening on (the remote rpcbind service is consulted for this information). The pa<hy>
+rameter *fdp is a file descriptor, which may be open and bound. If it is RPC_ANYSOCK, then this routine opens a
+new one and sets *fdp. Refer to the File Descriptor section for more information. The UDP transport resends the
+<beginning of page>
+call message in intervals of wait time until a response is received or until the call times out. The total time for the
+call to time out is specified by clnt_call(). See rpc_clnt_calls(3NSL). If successful it returns a client handle, other<hy>
+wise it returns NULL. The error can be printed using the clnt_pcreateerror() routine. See rpc_clnt_create(3NSL).
+The user can specify the maximum packet size for sending and receiving by using sendsz and recvsz arguments for
+UDP-based RPC messages.
+If addr->sin_port is 0 and the requested version number versnum is not registered with the remote portmap service,
+it returns a handle if at least a version number for the given program number is registered. The version mismatch is
+discovered by a clnt_call() later (see rpc_clnt_calls(3NSL)).
+This routine exists for backward compatibility only. clnt_tli_create() or clnt_dg_create() should be used instead.
+See rpc_clnt_create(3NSL).
+clntudp_create() This routine creates an RPC client handle for the remote program prognum, version versnum; the
+client uses UDP/IP as a transport. The remote program is located at Internet address addr. If addr->sin_port is 0,
+then it is set to actual port that the remote program is listening on. The remote rpcbind service is consulted for this
+information. The parameter *fdp is a file descriptor, which may be open and bound; if it is RPC_ANYSOCK, then
+this routine opens a new one and sets *fdp. Refer to the File Descriptor section for more information. The UDP
+transport resends the call message in intervals of wait time until a response is received or until the call times out.
+The total time for the call to time out is specified by clnt_call(). See rpc_clnt_calls(3NSL). clntudp_create() re<hy>
+turns a client handle on success, otherwise it returns NULL. The error can be printed using the clnt_pcreateerror()
+routine. See rpc_clnt_create(3NSL).
+Since UDP-based RPC messages can only hold up to 8 Kbytes of encoded data, this transport cannot be used for
+procedures that take large arguments or return huge results.
+This routine exists for backward compatibility only. clnt_create(), clnt_tli_create(), or clnt_dg_create() should be
+used instead. See rpc_clnt_create(3NSL).
+get_myaddress() Places the local system's IP address into *addr, without consulting the library routines that deal
+with /etc/hosts. The port number is always set to htons(PMAPPORT).
+This routine is only intended for use with the RPC library. It returns the local system's address in a form compatible
+with the RPC library, and should not be taken as the system's actual IP address. In fact, the *addr buffer's host ad<hy>
+dress part is actually zeroed. This address may have only local significance and should not be assumed to be an ad<hy>
+dress that can be used to connect to the local system by remote systems or processes.
+This routine remains for backward compatibility only. The routine netdir_getbyname() should be used with the
+name HOST_SELF to retrieve the local system's network address as a netbuf structure. See netdir(3NSL).
+getrpcport() getrpcport() returns the port number for the version versnum of the RPC program prognum running
+on host and using protocol proto. getrpcport() returns 0 if the RPC system failed to contact the remote portmap
+service, the program associated with prognum is not registered, or there is no mapping between the program and a
+port.
+This routine exists for backward compatibility only. Enhanced functionality is provided by rpcb_getaddr(). See
+rpcbind(3NSL).
+pmaplist() A user interface to the portmap service, which returns a list of the current RPC program-to-port map<hy>
+pings on the host located at IP address addr. This routine can return NULL . The command `rpcinfo-p' uses this
+routine.
+This routine exists for backward compatibility only, enhanced functionality is provided by rpcb_getmaps(). See
+rpcbind(3NSL).
+pmap_getport() A user interface to the portmap service, which returns the port number on which waits a service
+that supports program prognum, version versnum, and speaks the transport protocol associated with protocol. The
+value of protocol is most likely IPPROTO_UDP or IPPROTO_TCP. A return value of 0 means that the mapping
+does not exist or that the RPC system failured to contact the remote portmap service. In the latter case, the global
+variable rpc_createerr contains the RPC status.
+<beginning of page>
+This routine exists for backward compatibility only, enhanced functionality is provided by rpcb_getaddr(). See
+rpcbind(3NSL).
+pmap_rmtcall() Request that the portmap on the host at IP address *addr make an RPC on the behalf of the caller
+to a procedure on that host. *portp is modified to the program's port number if the procedure succeeds. The defini<hy>
+tions of other parameters are discussed in callrpc() and clnt_call(). See rpc_clnt_calls(3NSL).
+This procedure is only available for the UDP transport.
+If the requested remote procedure is not registered with the remote portmap then no error response is returned and
+the call times out. Also, no authentication is done.
+This routine exists for backward compatibility only, enhanced functionality is provided by rpcb_rmtcall(). See
+rpcbind(3NSL).
+pmap_set() A user interface to the portmap service, that establishes a mapping between the triple [prognum, ver<hy>
+snum, protocol] and port on the machine's portmap service. The value of protocol may be IPPROTO_UDP or IP<hy>
+PROTO_TCP. Formerly, the routine failed if the requested port was found to be in use. Now, the routine only fails
+if it finds that port is still bound. If port is not bound, the routine completes the requested registration. This routine
+returns 1 if it succeeds, 0 otherwise. Automatically done by svc_register().
+This routine exists for backward compatibility only, enhanced functionality is provided by rpcb_set(). See
+rpcbind(3NSL).
+pmap_unset() A user interface to the portmap service, which destroys all mapping between the triple [prognum,
+versnum, all-protocols] and port on the machine's portmap service. This routine returns one if it succeeds, 0 other<hy>
+wise.
+This routine exists for backward compatibility only, enhanced functionality is provided by rpcb_unset(). See
+rpcbind(3NSL).
+svc_fds() A global variable reflecting the RPC service side's read file descriptor bit mask; it is suitable as a parame<hy>
+ter to the select() call. This is only of interest if a service implementor does not call svc_run(), but rather does his
+own asynchronous event processing. This variable is read-only , yet it may change after calls to svc_getreq() or any
+creation routines. Do not pass its address to select()! Similar to svc_fdset, but limited to 32 descriptors.
+This interface is made obsolete by svc_fdset. See rpc_svc_calls(3NSL).
+svc_getcaller() This routine returns the network address, represented as a struct sockaddr_in, of the caller of a pro<hy>
+cedure associated with the RPC service transport handle, xprt.
+This routine exists for backward compatibility only, and is obsolete. The preferred interface is svc_getrpccaller().
+See rpc_svc_reg(3NSL), which returns the address as a struct netbuf.
+svc_getreq() This routine is only of interest if a service implementor does not call svc_run(), but instead imple<hy>
+ments custom asynchronous event processing. It is called when the select() call has determined that an RPC request
+has arrived on some RPC file descriptors; rdfds is the resultant read file descriptor bit mask. The routine returns
+when all file descriptors associated with the value of rdfds have been serviced. This routine is similar to svc_getre<hy>
+qset() but is limited to 32 descriptors.
+This interface is made obsolete by svc_getreqset()
+svcfd_create() Create a service on top of any open and bound descriptor. Typically, this descriptor is a connected
+file descriptor for a stream protocol. Refer to the File Descriptor section for more information. sendsz and recvsz in<hy>
+dicate sizes for the send and receive buffers. If they are 0, a reasonable default is chosen.
+This interface is made obsolete by svc_fd_create() (see rpc_svc_create(3NSL)).
+<beginning of page>
+svcraw_create() This routine creates an internal, memory-based RPC service transport, to which it returns a point<hy>
+er. The transport is really a buffer within the process's address space, so the corresponding RPC client should live in
+the same address space; see clntraw_create(). This routine allows simulation of RPC and acquisition of RPC over<hy>
+heads (such as round trip times), without any kernel interference. This routine returns NULL if it fails.
+This routine exists for backward compatibility only, and has the same functionality of svc_raw_create(). See
+rpc_svc_create(3NSL), which obsoletes it.
+svctcp_create() This routine creates a TCP/IP-based RPC service transport, to which it returns a pointer. The
+transport is associated with the file descriptor fd, which may be RPC_ANYSOCK, in which case a new file descrip<hy>
+tor is created. If the file descriptor is not bound to a local TCP port, then this routine binds it to an arbitrary port. Re<hy>
+fer to the File Descriptor section for more information. Upon completion, xprt->xp_fd is the transport's file de<hy>
+scriptor, and xprt->xp_port is the transport's port number. This routine returns NULL if it fails. Since TCP-based
+RPC uses buffered I/O, users may specify the size of buffers; values of 0 choose suitable defaults.
+This routine exists for backward compatibility only. svc_create(), svc_tli_create(), or svc_vc_create() should be
+used instead. See rpc_svc_create(3NSL).
+svcudp_bufcreate() This routine creates a UDP/IP-based RPC service transport, to which it returns a pointer. The
+transport is associated with the file descriptor fd. If fd is RPC_ANYSOCK then a new file descriptor is created. If
+the file descriptor is not bound to a local UDP port, then this routine binds it to an arbitrary port. Upon completion,
+xprtxp_fd is the transport's file descriptor, and xprt->xp_port is the transport's port number. Refer to the File De<hy>
+scriptor section for more information. This routine returns NULL if it fails.
+The user specifies the maximum packet size for sending and receiving UDP-based RPC messages by using the
+sendsz and recvsz parameters.
+This routine exists for backward compatibility only. svc_tli_create(), or svc_dg_create() should be used instead.
+See rpc_svc_create(3NSL).
+svcudp_create() This routine creates a UDP/IP-based RPC service transport, to which it returns a pointer. The
+transport is associated with the file descriptor fd, which may be RPC_ANYSOCK, in which case a new file descrip<hy>
+tor is created. If the file descriptor is not bound to a local UDP port, then this routine binds it to an arbitrary port.
+Upon completion, xprt->xp_fd is the transport's file descriptor, and xprt->xp_port is the transport's port number.
+This routine returns NULL if it fails.
+Since UDP-based RPC messages can only hold up to 8 Kbytes of encoded data, this transport cannot be used for
+procedures that take large arguments or return huge results.
+This routine exists for backward compatibility only. svc_create(), svc_tli_create(), or svc_dg_create() should be
+used instead. See rpc_svc_create(3NSL).
+registerrpc() Register program prognum, procedure procname, and version versnum with the RPC service package.
+If a request arrives for program prognum, version versnum, and procedure procnum, procname is called with a point<hy>
+er to its parameter(s). procname should return a pointer to its static result(s). inproc is used to decode the parameters
+while outproc is used to encode the results. This routine returns 0 if the registration succeeded, <mi>1 otherwise.
+svc_run() must be called after all the services are registered.
+This routine exists for backward compatibility only, and it is made obsolete by rpc_reg().
+svc_register() Associates prognum and versnum with the service dispatch procedure, dispatch. If protocol is 0, the
+service is not registered with the portmap service. If protocol is non-zero, then a mapping of the triple [prognum,
+versnum, protocol] to xprt->xp_port is established with the local portmap service (generally protocol is 0, IP<hy>
+PROTO_UDP or IPPROTO_TCP). The procedure dispatch has the following form:
+ dispatch(struct svc_req *request, SVCXPRT *xprt);
+The svc_register() routine returns one if it succeeds, and 0 otherwise.
+<beginning of page>
+This routine exists for backward compatibility only. Enhanced functionality is provided by svc_reg().
+svc_unregister() Remove all mapping of the double [prognum, versnum] to dispatch routines, and of the triple
+[prognum, versnum, all-protocols] to port number from portmap.
+This routine exists for backward compatibility. Enhanced functionality is provided by svc_unreg().
+xdr_authunix_parms() Used for describing UNIX credentials. This routine is useful for users who wish to generate
+these credentials without using the RPC authentication package.
+This routine exists for backward compatibility only, and is made obsolete by xdr_authsys_parms(). See
+rpc_xdr(3NSL).
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelUnsafe
+keyserv(1M), rpcbind(1M), rpcinfo(1M), netdir(3NSL), netdir_getbyname(3NSL), rpc(3NSL),
+rpc_clnt_auth(3NSL), rpc_clnt_calls(3NSL), rpc_clnt_create(3NSL), rpc_svc_calls(3NSL), rpc_svc_cre<hy>
+ate(3NSL), rpc_svc_err(3NSL), rpc_svc_reg(3NSL), rpc_xdr(3NSL), rpcbind(3NSL), secure_rpc(3NSL), se<hy>
+lect(3C), xdr_authsys_parms(3NSL), libnsl(3LIB), librpcsoc(3LIBUCB), attributes(5)
+These interfaces are unsafe in multithreaded applications. Unsafe interfaces should be called only from the main
+thread.

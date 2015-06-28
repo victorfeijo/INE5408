@@ -1,0 +1,70 @@
+<beginning of page>
+pam_start, pam_end <-> PAM authentication transaction functions
+cc [ flag ... ] file ... -lpam [ library ... ]
+#include <security/pam_appl.h>
+int pam_start(const char *service, const char *user,
+ const struct pam_conv *pam_conv, pam_handle_t **pamh);
+int pam_end(pam_handle_t *pamh, int status);
+The pam_start() function is called to initiate an authentication transaction. It takes as arguments the name of the
+current service, service, the name of the user to be authenticated, user, the address of the conversation structure,
+pam_conv, and the address of a variable to be assigned the authentication handle pamh. Upon successful completion,
+pamh refers to a PAM handle for use with subsequent calls to the authentication library.
+The pam_conv structure contains the address of the conversation function provided by the application. The underly<hy>
+ing PAM service module invokes this function to output information to and retrieve input from the user. The
+pam_conv structure has the following entries:
+ struct pam_conv {
+  int (*conv)(); /* Conversation function */
+  void *appdata_ptr; /* Application data */
+ };
+ int conv(int num_msg, const struct pam_message **msg,
+  struct pam_response **resp, void *appdata_ptr);
+The conv() function is called by a service module to hold a PAM conversation with the application or user. For win<hy>
+dow applications, the application can create a new pop-up window to be used by the interaction.
+The num_msg parameter is the number of messages associated with the call. The parameter msg is a pointer to an
+array of length num_msg of the pam_message structure.
+The pam_message structure is used to pass prompt, error message, or any text information from the authentication
+service to the application or user. It is the responsibility of the PAM service modules to localize the messages. The
+memory used by pam_message has to be allocated and freed by the PAM modules. The pam_message structure
+has the following entries:
+ struct pam_message{
+  int msg_style;
+  char *msg;
+ };
+The message style, msg_style, can be set to one of the following values:
+PAM_PROMPT_ECHO_OFF Prompt user, disabling echoing of response.
+PAM_PROMPT_ECHO_ON Prompt user, enabling echoing of response.
+PAM_ERROR_MSG Print error message.
+PAM_TEXT_INFO Print general text information.
+The maximum size of the message and the response string is PAM_MAX_MSG_SIZE as defined in <securi<hy>
+ty/pam.appl.h>.
+The structure pam_response is used by the authentication service to get the user's response back from the applica<hy>
+tion or user. The storage used by pam_response has to be allocated by the application and freed by the PAM mod<hy>
+ules. The pam_response structure has the following entries:
+<beginning of page>
+ struct pam_response{
+  char *resp;
+  int resp_retcode; /* currently not used, */
+  /* should be set to 0 */
+  };
+It is the responsibility of the conversation function to strip off NEWLINE characters for
+PAM_PROMPT_ECHO_OFF and PAM_PROMPT_ECHO_ON message styles, and to add NEWLINE charac<hy>
+ters (if appropriate) for PAM_ERROR_MSG and PAM_TEXT_INFO message styles.
+The appdata_ptr argument is an application data pointer which is passed by the application to the PAM service
+modules. Since the PAM modules pass it back through the conversation function, the applications can use this
+pointer to point to any application-specific data.
+The pam_end() function is called to terminate the authentication transaction identified by pamh and to free any
+storage area allocated by the authentication module. The argument, status, is passed to the cleanup(|) function stored
+within the pam handle, and is used to determine what module-specific state must be purged. A cleanup function is
+attached to the handle by the underlying PAM modules through a call to pam_set_data(3PAM) to free module-spe<hy>
+cific data.
+Refer to Solaris Security for Developers Guide for information about providing authentication, account manage<hy>
+ment, session management, and password management through PAM modules.
+Refer to the RETURN VALUES section on pam(3PAM).
+See attributes(5) for description of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability
+Stable _ MT-LevelMT-Safe with exceptions
+libpam(3LIB), pam(3PAM), pam_acct_mgmt(3PAM), pam_authenticate(3PAM), pam_chauthtok(3PAM),
+pam_open_session(3PAM), pam_setcred(3PAM), pam_set_data(3PAM), pam_strerror(3PAM), attributes(5)
+Solaris Security for Developers Guide
+The interfaces in libpam are MT-Safe only if each thread within the multithreaded application uses its own PAM
+handle.

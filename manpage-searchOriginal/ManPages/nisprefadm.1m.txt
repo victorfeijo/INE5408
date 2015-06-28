@@ -1,0 +1,117 @@
+<beginning of page>
+nisprefadm <-> NIS+ utility to set server preferences for NIS+ clients
+/usr/bin/nisprefadm -a {-L | -G} [-o opt-string]
+ [-d domain] [-C client] server...
+/usr/bin/nisprefadm -m {-L | -G} [-o opt-string]
+ [-d domain] [-C client] oldserver=newserver...
+/usr/bin/nisprefadm -r {-L | -G} [-o opt-string]
+ [-d domain] [-C client] server...
+/usr/bin/nisprefadm -u {-L | -G} [-o opt-string]
+ [-d domain] [-C client] server...
+/usr/bin/nisprefadm -x {-L | -G} [-d domain] [-C client]
+/usr/bin/nisprefadm -l {-L | -G} [-d domain] [-C client]
+/usr/bin/nisprefadm -F
+nisprefadm defines which servers are to be preferred by NIS+ clients. This information is used by nis_cachem<hy>
+gr(1M) to control the order in which it selects which server to use for a particular domain. On a client system, the
+cache manager first looks for a local preferred server list in /var/nis. If it doesn't find one, it looks for an entry with
+its host name in the NIS+ table. Finally, if it doesn't find it there, it looks for an entry for its subnet.
+By default, nis_cachemgr puts all servers that are on the same subnet as the client system (that is, local servers) are
+on the preferred server list. In some cases this default preferred server list is inadequate. For example, if all of the
+servers for a domain are remote, but some are closer than others, the cache manager should try to select the closer
+one. Because the cache manager has no reliable way to determine the distance to remote servers, nisprefadm is used
+to provide this information.
+The preferred server information is stored either globally in a NIS+ table (with the -G option) or locally in a file,
+/var/nis/client_info (with the -L option). It is preferable to store the information globally so that it can be used by
+all clients on a subnet. The nis_cachemgr process on a client machine reloads the preferred server information peri<hy>
+odically, depending on the machine's setup. If the local file is used, the information is reloaded every 12 hours. If the
+global table is used, the information is reloaded based on the TTL value of the client information table. This TTL
+value can be changed using nischttl(1). If you want your changes to take effect immediately, use the nisprefadm -F
+command. When changing local information (-L), nisprefadm automatically forces nis_cachemgr to reload the in<hy>
+formation.
+The cache manager assigns weights to all of the servers on the preferred list. By default, local servers (that is, servers
+on the same subnet) are given a weight of 0. Other servers are given the weight, "infinite". This can be changed by
+using the nisprefadm command and giving a weight in parentheses after the server name. When selecting a server
+for a domain, the cache manager first tries to contact the servers with the lowest weight. If it doesn't get a response,
+it tries the servers with the next lowest weight, and so on. If it fails to get a response from any of the preferred
+servers, it tries to contact the non-preferred servers.
+The use of weights gives fine control over the server selection process, but care must be given to avoid assigning too
+many different weights. For example, if weights 0, 1, 2, and 3 are used, but all of the servers with weight 0, 1, and 2,
+are unavailable, then there will be a noticeable delay in selecting a server. This is because the cache manager waits 5
+seconds for a response at each weight level before moving on to the next one. As a general rule, one or two weight
+levels provides a good balance of server selection control and performance.
+When specifying a server name, it is not necessary to fully qualify the name. When the cache manager tries to access
+a domain, it compares the list of servers for the domain with the list of preferred servers. It will find a match if a pre<hy>
+ferred server name is a prefix of the name of a server for the domain. If a domain is served by two servers with the
+same prefix, the preferred server name must include enough of the domain name to distinguish the two.
+The nis_cachemgr(1M) process automatically adds local servers (same subnet as the client) to the preferred server
+list with a weight of 0. Thus, it is not necessary to specify them, though it does no harm.
+If you specify a weight for a server, you probably should quote the parentheses to avoid having the shell interpret
+them. The following command illustrates this:
+ example% nisprefadm -G -a -C client1 "srv1(2)"
+<beginning of page>
+In general, nis_cachemgr does a fairly good job of selecting servers on its own. Therefore, the use of nisprefadm is
+not usually necessary. Some situations in which it is recommended are:
+No local servers, many remote servers
+In this case, nis_cachemgr needs to choose one of the remote servers. Because it doesn't have information on which
+is closest, it sends a ping to all of them and then selects the one that responds fastest. This may not always select the
+best server. If some of the servers are closer to the client than the others, they should be listed as preferred servers so
+that nis_cachemgr will try them first. This reduces the amount of network traffic for selecting a server.
+Very remote servers
+In some networks there are NIS+ servers that are only reachable through very slow network connections. It is usual<hy>
+ly best to avoid unnecessary traffic over that connection. If the pref_type=pref_only option is set along with pre<hy>
+ferred servers, then only the preferred servers are contacted for domains they serve. The non-preferred servers are
+not tried at all; even if all of the preferred servers are unavailable. For domains that are not served by any of the pre<hy>
+ferred servers, the pref_only option is ignored.
+In the SYNOPSIS, when several options are surrounded by braces (that is, by `{' and `}') one of the options must be
+specified.
+-a Add the specified servers to the preferred server list.
+-C client Store the preferred server information with the key, client. The client can be either a hostname or a subnet
+number. When a hostname is specified, the preferred server information applies to that host only. When a subnet is
+specified, the preferred server information applies to all clients on that subnet. The cache manager searches for host
+specific entries first. It only searches for subnet entries if no host entry is found. If this option is not specified, then
+the hostname of the machine on which the command is run is used.
+-d domain Specify the domain to which the command is to apply.
+-F Tells nis_cachemgr(1M) to refresh its preferred server information. The program periodically does this anyway,
+but this option forces it to do the refresh immediately. When updating the local information, nis_cachemgr automat<hy>
+ically refreshes the preferred server information.
+This option must be executed as root.
+-l List the current preferred server information.
+-L | -G Store the preferred server information locally in the file, /var/nis/client_info (the -L option), or globally in a
+NIS+ table client.info.org-dir.domain (the -G option). If the information is stored locally, then it only applies to the
+system on which the command is run. If it is stored globally then it can apply to all systems on a subnet (depending
+on the value of the -C option).
+The -L option must be run as root.
+-m Modify the preferred server list. The server specified by oldserver is replaced by newserver. This is typically
+used to change the weight for a server.
+-o Specify additional options to control server selection. Currently the only valid option is pref_type, which can have
+a value of either all (the default) or pref_only. If the value is all, then the cache manager tries to contact non-pre<hy>
+ferred servers if all of the preferred servers fail to respond. If pref_only is specified, then it won't try non-preferred
+servers. The only exception to this is when a domain is not served by any of the preferred servers. In this case, the
+cache manager ignores the option. This is to avoid requiring that preferred servers be defined for every domain.
+<beginning of page>
+-r Remove the specified servers from the preferred server list.
+-u Clear the list of preferred servers and then add the specified servers to the preferred server list.
+-x Remove the preferred server information completely.
+nisprefadm returns the following values:
+0 On success.
+1 On failure.
+Example 1 Using nisprefadm
+This command sets the preferred server list for the system on which it is run:
+ example% nisprefadm -L -a srv1 srv2
+The information is stored in a file, /var/nis/client_info, so it will only affect this one system.
+The following command has the same effect, but the information is stored in a NIS+ table in the default domain.
+ example% nisprefadm -G -a srv1 srv2
+As a system administrator, you might want to set the preferred server information for a client system other than the
+one you are running the command on. The following command sets the preferred server information for a client sys<hy>
+tem named client1:
+ example% nisprefadm -G -a -C client1 srv1 srv2
+It is common for all client systems on a subnet to use the same set of preferred servers. The following command sets
+a preferred server list that applies to all clients on subnet, 192.85.18.0:
+ example% nisprefadm -G -a -C 192.85.18.0 srv1 srv2
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu
+nischttl(1), nis_cachemgr(1M), attributes(5)
+NIS+ might not be supported in future releases of the Solaris Operating system. Tools to aid the migration from
+NIS+ to LDAP are available in the current Solaris release. For more information, visit http://www.sun.com/directo<hy>
+ry/nisplus/transition.html.

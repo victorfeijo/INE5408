@@ -1,0 +1,155 @@
+<beginning of page>
+pool_conf_alloc, pool_conf_close, pool_conf_commit, pool_conf_export, pool_conf_free, pool_conf_info,
+pool_conf_location, pool_conf_open, pool_conf_remove, pool_conf_rollback, pool_conf_status, pool_conf_update,
+pool_conf_validate <-> manipulate resource pool configurations
+cc [ flag... ] file... -lpool [ library... ]
+#include <pool.h>
+pool_conf_t *pool_conf_alloc(void);
+int pool_conf_close(pool_conf_t *conf);
+int pool_conf_commit(pool_conf_t *conf, int active);
+int pool_conf_export(pool_conf_t *conf, const char *location,
+ pool_export_format_t format);
+void pool_conf_free(pool_conf_t *conf);
+char *pool_conf_info(const pool_conf_t *conf, int flags);
+const char *pool_conf_location(pool_conf_t *conf);
+int pool_conf_open(pool_conf_t *conf, const char *location,
+ int flags);
+int pool_conf_remove(pool_conf_t *conf);
+int pool_conf_rollback(pool_conf_t *conf);
+pool_conf_state_t pool_conf_status(const pool_conf_t *conf);
+int pool_conf_update(const pool_conf_t *conf, int *changed);
+int pool_conf_validate(pool_conf_t *conf,
+ pool_valid_level_t level);
+These functions enable the access and creation of configuration files associated with the pools facility. Since the
+pool configuration is an opaque type, an initial configuration is obtained with pool_conf_alloc() and released with
+pool_conf_free() when the configuration is no longer of interest. The conf argument for each function refers to the
+target configuration to which the operation applies.
+The pool_conf_close() function closes the given configuration, releasing associated resources.
+The pool_conf_commit() function commits changes made to the given pool_conf_t to permanent storage. If the ac<hy>
+tive flag is non-zero, the state of the system will be configured to match that described in the supplied pool_conf_t.
+If configuring the system fails, pool_conf_commit() will attempt to restore the system to its previous state.
+The pool_conf_export() function saves the given configuration to the specified location. The only currently support<hy>
+ed value of format is POX_NATIVE, which is the format native to libpool, the output of which can be used as input
+to pool_conf_open().
+The pool_conf_info() function returns a string describing the entire configuration. The string is allocated with mal<hy>
+loc(3C). The caller is responsible for freeing the returned string. If the flags option is non-zero, the string returned
+also describes the sub-elements (if any) contained in the configuration.
+The pool_conf_location() function returns the location string provided to pool_conf_open() for the given
+pool_conf_t.
+The pool_conf_open() function creates a pool_conf_t given a location at which the configuration is stored. The
+valid flags are a bitmap of the following:
+PO_RDONLY Open for reading only.
+PO_RDWR Open read-write.
+<beginning of page>
+PO_CREAT Create a configuration at the given location if it does not exist. If it does, truncate it.
+PO_DISCO Perform `discovery'. This option only makes sense when used in conjunction with PO_CREAT, and
+causes the returned pool_conf_t to contain the resources and components currently active on the system.
+The use of this flag is deprecated. PO_CREAT always performs discovery. If supplied, this flag is ignored.
+PO_UPDATE Use when opening the dynamic state file, which is the configuration at pool_dynamic_loca<hy>
+tion(3POOL), to ensure that the contents of the dynamic state file are updated to represent the current state of the
+system.
+The use of this flag is deprecated. The dynamic state is always current and does not require updating. If supplied,
+this flag is ignored.
+A call to pool_conf_open() with the pool dynamic location and write permission will hang if the dynamic location
+has already been opened for writing.
+The pool_conf_remove() function removes the configuration's permanent storage. If the configuration is still open,
+it is first closed.
+The pool_conf_rollback() function restores the configuration state to that held in the configuration's permanent stor<hy>
+age. This will either be the state last successfully committed (using pool_conf_commit()) or the state when the con<hy>
+figuration was opened if there have been no successfully committed changes since then.
+The pool_conf_status() function returns the status of a configuration, which can be one of the following values:
+POF_INVALID The configuration is not in a suitable state for use.
+POF_VALID The configuration is in a suitable state for use.
+The pool_conf_update() function updates the library snapshot of kernel state. If changed is non-null, it is updated to
+identify which types of configuration elements changed during the update. To check for change, treat the changed
+value as a bitmap of possible element types.
+A change is defined for the different element classes as follows:
+POU_SYSTEM A property on the system element has been created, modified, or removed.
+POU_POOL A property on a pool element has been created, modified, or removed. A pool has changed a resource
+association.
+POU_PSET A property on a pset element has been created, modified, or removed. A pset's resource composition
+has changed.
+POU_CPU A property on a CPU element has been created, modified, or removed.
+The pool_conf_validate() function checks the validity of the contents of the given configuration. The validation can
+be at several (increasing) levels of strictness:
+POV_LOOSE Performs basic internal syntax validation.
+POV_STRICT Performs a more thorough syntax validation and internal consistency checks.
+<beginning of page>
+POV_RUNTIME Performs an estimate of whether attempting to commit the given configuration on the system
+would succeed or fail. It is optimistic in that a successful validation does not guarantee a subsequent commit opera<hy>
+tion will be successful; it is conservative in that a failed validation indicates that a subsequent commit operation on
+the current system will always fail.
+Upon successful completion, pool_conf_alloc() returns an initialized pool_conf_t pointer. Otherwise it returns
+NULL and pool_error(3POOL) returns the pool-specific error value.
+Upon successful completion, pool_conf_close(), pool_conf_commit(), pool_conf_export(), pool_conf_open(),
+pool_conf_remove(), pool_conf_rollback(), pool_conf_update(), and pool_conf_validate() return 0. Otherwise
+they return -1 and pool_error() returns the pool-specific error value.
+The pool_conf_status() function returns either POF_INVALID or POF_VALID.
+The pool_conf_alloc() function will fail if:
+POE_SYSTEM There is not enough memory available to allocate the configuration. Check errno for the specific
+system error code.
+POE_INVALID_CONF The configuration is invalid.
+The pool_conf_close() function will fail if:
+POE_BADPARAM The supplied configuration's status is not POF_VALID.
+POE_SYSTEM The configuration's permanent store cannot be closed. Check errno for the specific system error
+code.
+The pool_conf_commit() function will fail if:
+POE_BADPARAM The supplied configuration's status is not POF_VALID or the active flag is non-zero and the
+system could not be modified.
+POE_SYSTEM The permanent store could not be updated. Check errno for the specific system error code.
+POE_INVALID_CONF The configuration is not valid for this system.
+POE_ACCESS The configuration was not opened with the correct permissions.
+POE_DATASTORE The update of the permanent store has failed and the contents could be corrupted. Check for a
+.bak file at the datastore location if manual recovery is required.
+The pool_conf_export() function will fail if:
+POE_BADPARAM The supplied configuration's status is not POF_VALID or the requested export format is not
+supported.
+POE_DATASTORE The creation of the export file failed. A file might have been created at the specified location
+but the contents of the file might not be correct.
+The pool_conf_info() function will fail if:
+POE_BADPARAM The supplied configuration's status is not POF_VALID or flags is neither 0 nor 1.
+<beginning of page>
+POE_SYSTEM There is not enough memory available to allocate the buffer used to build the information string.
+Check errno for the specific system error code.
+POE_INVALID_CONF The configuration is invalid.
+The pool_conf_location() function will fail if:
+POE_BADPARAM The supplied configuration's status is not POF_VALID.
+The pool_conf_open() function will fail if:
+POE_BADPARAM The supplied configuration's status is already POF_VALID.
+POE_SYSTEM There is not enough memory available to store the supplied location, or the pools facility is not ac<hy>
+tive. Check errno for the specific system error code.
+POE_INVALID_CONF The configuration to be opened is at pool_dynamic_location(3POOL) and the configura<hy>
+tion is not valid for this system.
+The pool_conf_remove() function will fail if:
+POE_BADPARAM The supplied configuration's status is not POF_VALID.
+POE_SYSTEM The configuration's permanent storage could not be removed. Check errno for the specific system
+error code.
+The pool_conf_rollback() function will fail if:
+POE_BADPARAM The supplied configuration's status is not POF_VALID.
+POE_SYSTEM The permanent store could not be accessed. Check errno for the specific system error code.
+The pool_conf_update() function will fail if:
+POE_BADPARAM The supplied configuration's status is not POF_VALID or the configuration is not the dynamic
+configuration.
+POE_DATASTORE The kernel snapshot cannot be correctly unpacked.
+POE_INVALID_CONF The configuration contains uncommitted transactions.
+POE_SYSTEM A system error occurred during snapshot retrieval and update.
+The pool_conf_validate() function will fail if:
+POE_BADPARAM The supplied configuration's status is not POF_VALID.
+POE_INVALID_CONF The configuration is invalid.
+Example 1 Create the configuration at the specified location.
+<beginning of page>
+ #include <pool.h>
+ #include <stdio.h>
+ ...
+ pool_conf_t *pool_conf;
+ pool_conf = pool_conf_alloc();
+ char *input_location = "/tmp/poolconf.example";
+ if (pool_conf_open(pool_conf, input_location,
+  PO_RDONLY) < 0) {
+  fprintf(stderr, "Opening pool configuration %s
+  failed\n", input_location);
+ }
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ CSIEnabled _ In<hy>
+terface StabilityUncommitted _ MT-LevelSafe
+libpool(3LIB), pool_error(3POOL), attributes(5)

@@ -1,0 +1,122 @@
+<beginning of page>
+sigwait <-> wait until a signal is posted
+#include <signal.h>
+int sigwait(sigset_t *set);
+cc [ flag ... ] file ... -D_POSIX_PTHREAD_SEMANTICS [ library...]
+#include <signal.h>
+int sigwait(const sigset_t *set, int *sig);
+The sigwait() function selects a signal in set that is pending on the calling thread. If no signal in set is pending, sig<hy>
+wait() blocks until a signal in set becomes pending. The selected signal is cleared from the set of signals pending on
+the calling thread and the number of the signal is returned, or in the standard-conforming version (see standards(5))
+placed in sig. The selection of a signal in set is independent of the signal mask of the calling thread. This means a
+thread can synchronously wait for signals that are being blocked by the signal mask of the calling thread . To ensure
+that only the caller receives the signals defined in set, all threads should have signals in set masked including the
+calling thread.
+If more than one thread is using sigwait() to wait for the same signal, no more than one of these threads returns from
+sigwait() with the signal number. If more than a single thread is blocked in sigwait() for a signal when that signal is
+generated for the process, it is unspecified which of the waiting threads returns from sigwait(). If the signal is gener<hy>
+ated for a specific thread, as by pthread_kill(3C), only that thread returns.
+Should any of the multiple pending signals in the range SIGRTMIN to SIGRTMAX be selected, it will be the low<hy>
+est numbered one. The selection order between realtime and non-realtime signals, or between multiple pending non-
+realtime signals, is unspecified.
+Upon successful completion, the default version of sigwait() returns a signal number; the standard-conforming ver<hy>
+sion returns 0 and stores the received signal number at the location pointed to by sig. Otherwise, the default version
+returns -1 and sets errno to indicate an error; the standard-conforming version returns an error number to indicate the
+error.
+The sigwait() function will fail if:
+EFAULT The set argument points to an invalid address.
+EINTR The wait was interrupted by an unblocked, caught signal.
+EINVAL The set argument contains an unsupported signal number.
+Example 1 Creating a thread to handle receipt of a signal
+The following sample C code creates a thread to handle the receipt of a signal. More specifically, it catches the asyn<hy>
+chronously generated signal, SIGINT.
+ /********************************************************************
+ *
+ * compile with -D_POSIX_PTHREAD_SEMANTICS switch;
+ * required by sigwait()
+ *
+ * sigint thread handles delivery of signal. uses sigwait() to wait
+ * for SIGINT signal.
+ *
+ ********************************************************************/
+ #include <pthread.h>
+ #include <stdlib.h>
+ #include <stdio.h>
+ #include <string.h>
+ #include <unistd.h>
+ #include <signal.h>
+ #include <synch.h>
+<beginning of page>
+ static void *threadTwo(void *);
+ static void *threadThree(void *);
+ static void *sigint(void *);
+ sigset_t signalSet;
+ void *
+ main(void)
+ {
+  pthread_t t;
+  pthread_t t2;
+  pthread_t t3;
+  sigfillset ( &signalSet );
+  /*
+  * Block signals in initial thread. New threads will
+  * inherit this signal mask.
+  */
+  pthread_sigmask ( SIG_BLOCK, &signalSet, NULL );
+  printf("Creating threads\n");
+  pthread_create(&t, NULL, sigint, NULL);
+  pthread_create(&t2, NULL, threadTwo, NULL);
+  pthread_create(&t3, NULL, threadThree, NULL);
+  printf("##################\n");
+  printf("press CTRL-C to deliver SIGINT to sigint thread\n");
+  printf("##################\n");
+  pthread_exit((void *)0);
+ }
+ static void *
+ threadTwo(void *arg)
+ {
+  printf("hello world, from threadTwo [tid: %d]\n",
+  pthread_self());
+  printf("threadTwo [tid: %d] is now complete and exiting\n",
+  pthread_self());
+  pthread_exit((void *)0);
+ }
+ static void *
+ threadThree(void *arg)
+ {
+  printf("hello world, from threadThree [tid: %d]\n",
+  pthread_self());
+  printf("threadThree [tid: %d] is now complete and exiting\n",
+  pthread_self());
+  pthread_exit((void *)0);
+ }
+ void *
+ sigint(void *arg)
+ {
+  int sig;
+  int err;
+  printf("thread sigint [tid: %d] awaiting SIGINT\n",
+  pthread_self());
+  /*
+  /* use standard-conforming sigwait() -- 2 args: signal set, signum
+  */
+  err = sigwait ( &signalSet, &sig );
+<beginning of page>
+  /* test for SIGINT; could catch other signals */
+  if (err || sig != SIGINT)
+  abort();
+  printf("\nSIGINT signal %d caught by sigint thread [tid: %d]\n",
+  sig, pthread_self());
+  pthread_exit((void *)0);
+ }
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed _ MT-LevelAsync-Signal-Safe _ StandardSee standards(5).
+sigaction(2), sigpending(2), sigprocmask(2), sigsuspend(2), pthread_create(3C), pthread_kill(3C), pthread_sig<hy>
+mask(3C), signal.h(3HEAD), attributes(5), standards(5)
+The sigwait() function cannot be used to wait for signals that cannot be caught (see sigaction(2)). This restriction is
+silently imposed by the system.
+Solaris 2.4 and earlier releases provided a sigwait() facility as specified in POSIX.1c Draft 6. The final POSIX.1c
+standard changed the interface as described above. Support for the Draft 6 interface is provided for compatibility on<hy>
+ly and may not be supported in future releases. New applications and libraries should use the standard-conforming
+interface.

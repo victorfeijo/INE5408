@@ -1,0 +1,193 @@
+<beginning of page>
+rdist <-> remote file distribution program
+rdist [-b] [-D] [-h] [-i] [-n] [-q] [-R] [-a] [-K] [-x]
+ [-PN | -PO] [-k realm] [-v] [-w] [-y]
+ [-d macro = value] [-f distfile] [-m host]...
+rdist [-b] [-D] [-h] [-i] [-n] [-q] [-R] [-a] [-K] [-x]
+ [-PN | -PO] [-k realm] [-v] [-w] [-y] -c pathname...
+ [login @] hostname [: destpath]
+The rdist utility maintains copies of files on multiple hosts. It preserves the owner, group, mode, and modification
+time of the master copies, and can update programs that are executing. (rdist does not propagate ownership or mode
+changes when the file contents have not changed.) Normally, a copy on a remote host is updated if its size or modifi<hy>
+cation time differs from the original on the local host. With the -y option (younger mode), only the modification
+times are checked, not the size. See OPTIONS below.
+There are two forms of the rdist command. In the first form shown in the SYNOPSIS section above, rdist reads the
+indicated distfile for instructions on updating files and/or directories. If distfile is `<mi>', the standard input is used. If no
+-f option is present, rdist first looks in its working directory for distfile, and then for Distfile, for instructions.
+The second form shown in SYNOPSIS uses the -c option and specifies paths as command line options.
+The user can opt for a secure session of rdist which uses Kerberos V5 for authentication. Encryption of the data be<hy>
+ing transferred is also possible. The rdist session can be kerberized using any of the following Kerberos specific op<hy>
+tions : -a, -PN or -PO, -x, and -k realm. Some of these options (-a, -x, -PN or -PO, and -f or -F) can also be speci<hy>
+fied in the [appdefaults] section of krb5.conf(4). The usage of these options and the expected behavior is discussed
+in the OPTIONS section below. If Kerberos authentication is used, authorization to the account is controlled by rules
+in krb5_auth_rules(5). If this authorization fails, fallback to normal rdist using rhosts occurs only if the -PO option
+is used explicitly on the command line or is specified in krb5.conf(4). Also notice that the -PN or -PO, -x, and -k
+realm options are just supersets of the -a option. In order to use the non-secure version of rdist across machines,
+each host machine must have a /etc/host.equiv file, or the user must have an entry in the .rhosts file in the home di<hy>
+rectory. See hosts.equiv(4) for more information.
+The following options are supported:
+-a
+This option explicitly enables Kerberos authentication and trusts the .k5login file for access-control. If the authoriza<hy>
+tion check by in.rshd(1M) on the server-side succeeds and if the .k5login file permits access, the user is allowed to
+carry out the rdist transfer.
+-b
+Binary comparison. Performs a binary comparison and updates files if they differ, rather than merely comparing
+dates and sizes.
+-c pathname ...[login@]hostname[:destpath]
+Copies each pathname to the named host; if destpath is specified, it does not update any pathname on the named
+host. (Relative filenames are taken as relative to your home directory.) If the `login@' prefix is given, the update is
+performed with the user ID of login. If the `:destpath' is given, the remote file is installed as that pathname.
+-d macro=value
+Defines macro to have value. This option is used to define or override macro definitions in the distfile. value can be
+the empty string, one name, or a list of names surrounded by parentheses and separated by white space.
+-D
+Enables debugging.
+-f distfile
+Uses the description file distfile. A `<mi>' as the distfile argument denotes the standard input.
+<beginning of page>
+-h
+Follows symbolic links. Copies the file that the link points to rather than the link itself.
+-i
+Ignores unresolved links. rdist normally tries to maintain the link structure of files being transferred and warn the
+user if all the links cannot be found.
+-k realm
+Causes rdist to obtain tickets for the remote host in realm instead of the remote host's realm as determined by
+krb5.conf(4).
+-K
+This option explicitly disables Kerberos authentication. It can be used to override the autologin variable in
+krb5.conf(4).
+-m host
+Limits which machines are to be updated. Multiple -m arguments can be given to limit updates to a subset of the
+hosts listed in the distfile.
+-n
+Prints the commands without executing them. This option is useful for debugging a distfile.
+-PO
+-PN
+Explicitly requests new (-PN) or old (-PO) version of the Kerberos "rcmd" protocol. The new protocol avoids many
+security problems prevalant in the old one and is regarded much more secure, but is not interoperable with older
+(MIT/SEAM) servers. The new protocol is used by default, unless explicitly specified using these options or through
+krb5.conf(4). If Kerberos authorization fails when using the old "rcmd" protocol, there is fallback to regular, non-
+kerberized rdist. This is not the case when the new, more secure "rcmd" protocol is used.
+-q
+Quiet mode. Does not display the files being updated on the standard output.
+-R
+Removes extraneous files. If a directory is being updated, removes files on the remote host that do not correspond to
+those in the master (local) directory. This is useful for maintaining truly identical copies of directories.
+-v
+Verifies that the files are up to date on all the hosts. Any files that are out of date are displayed, but no files are updat<hy>
+ed, nor is any mail sent.
+-w
+Whole mode. The whole file name is appended to the destination directory name. Normally, only the last component
+of a name is used when renaming files. This preserves the directory structure of the files being copied, instead of
+flattening the directory structure. For instance, renaming a list of files such as dir1/dir2 to dir3 would create files
+dir3/dir1 and dir3/dir2 instead of dir3 and dir3. When the -w option is used with a filename that begins with ~, ev<hy>
+erything except the home directory is appended to the destination name.
+<beginning of page>
+-x
+Causes the information transferred between hosts to be encrypted. Notice that the command is sent unencrypted to
+the remote system. All subsequent transfers are encrypted.
+-y
+Younger mode. Does not update remote copies that are younger than the master copy, but issues a warning message
+instead. Only modification times are checked. No comparison of size is made.
+NEWLINE, TAB, and SPACE characters are all treated as white space; a mapping continues across input lines until
+the start of the next mapping: either a single filename followed by a `->' or the opening parenthesis of a filename list.
+Comments begin with # and end with a NEWLINE.
+The distfile contains a sequence of entries that specify the files to be copied, the destination files to be copied, the
+destination hosts, and what operations to perform to do the updating. Each entry has one of the following formats:
+ variable_name '=' name_list
+ [ label: ] source_list '->' destination_list command_list
+ [ label: ] source_list '::' time_stamp_file command_list
+The first format is used for defining variables. The second format is used for distributing files to other hosts. The
+third format is used for making lists of files that have been changed since some given date. The source list specifies a
+list of files and/or directories on the local host that are to be used as the master copy for distribution. The destination
+list is the list of hosts to which these files are to be copied. Each file in the source list is added to a list of changes if
+the file is out of date on the host that is being updated (second format) or if the file is newer than the time stamp file
+(third format). Labels are optional. They are used to identify a command for partial updates. The colon (:) is used af<hy>
+ter an optional label, while the double colon (::) is used for making lists of files that have been changed since a cer<hy>
+tain date (specified by the date/time of the time_stamp file). Typically, only notify is used with the '::' format of the
+command line.
+rdist has a limited macro facility. Macros are only expanded in filename or hostname lists, and in the argument lists
+of certain primitives. Macros cannot be used to stand for primitives or their options, or the `->' or `::' symbols.
+A macro definition is a line of the form:
+ macro = value
+A macro reference is a string of the form:
+ ${macro}
+although (as with make(1S)) the braces can be omitted if the macro name consists of just one character.
+For the kerberized rdist session, each user might have a private authorization list in a file .k5login in their home di<hy>
+rectory. Each line in this file should contain a Kerberos principal name of the form principal/instance@realm. If
+there is a ~/.k5login file, then access is granted to the account if and only if the originater user is authenticated to one
+of the principals named in the ~/.k5login file. Otherwise, the originating user is granted access to the account if and
+only if the authenticated principal name of the user can be mapped to the local account name using the authenticat<hy>
+ed-principal-name <->> local-user-name mapping rules. The .k5login file (for access control) comes into play only
+when Kerberos authentication is being done.
+The shell meta-characters: [, ], {, }, * and ? are recognized and expanded (on the local host only) just as they are
+with csh(1). Metacharacters can be escaped by prepending a backslash.
+The ~ character is also expanded in the same way as with csh; however, it is expanded separately on the local and
+destination hosts.
+File names that do not begin with `/' or `~' are taken to be relative to user's home directory on each destination
+host; they are not relative to the current working directory. Multiple file names must be enclosed within parentheses.
+<beginning of page>
+The following primitives can be used to specify actions rdist is to take when updating remote copies of each file.
+install [-b] [-h] [-i] [-R] [-v] [-w] [-y] [newname]
+Copy out of date files and directories (recursively). If no newname operand is given, the name of the local file is giv<hy>
+en to the remote host's copy. If absent from the remote host, parent directories in a filename's path are created. To
+help prevent disasters, a non-empty directory on a target host is not replaced with a regular file or a symbolic link by
+rdist. However, when using the -R option, a non-empty directory is removed if the corresponding filename is com<hy>
+pletely absent on the master host.
+The options for install have the same semantics as their command line counterparts, but are limited in scope to a
+particular map. The login name used on the destination host is the same as the local host unless the destination name
+is of the format login@host. In that case, the update is performed under the username login.
+notify address...
+Send mail to the indicated email address of the form:
+user@host
+that lists the files updated and any errors that might have occurred. If an address does not contain a `@host' suffix,
+rdist uses the name of the destination host to complete the address.
+except filename ...
+Omit from updates the files named as arguments.
+except_pat pattern ...
+Omit from updates the filenames that match each regular-expression pattern (see ed(1) for more information on reg<hy>
+ular expressions). Note that `\' and `$' characters must be escaped in the distfile. Shell variables can also be used
+within a pattern, however shell filename expansion is not supported.
+special [filename] ... "command-line"
+Specify a Bourne shell, sh(1) command line to execute on the remote host after each named file is updated. If no file<hy>
+name argument is present, the command-line is performed for every updated file, with the shell variable FILE set to
+the file's name on the local host. The quotation marks allow command-line to span input lines in the distfile; multiple
+shell commands must be separated by semicolons (;).
+The default working directory for the shell executing each command-line is the user's home directory on the remote
+host.
+The rdist command is IPv6-enabled. See ip6(7P). IPv6 is not currently supported with Kerberos V5 authentication.
+Example 1 A Sample distfile
+The following sample distfile instructs rdist to maintain identical copies of a shared library, a shared-library initial<hy>
+ized data file, several include files, and a directory, on hosts named hermes and magus. On magus, commands are
+executed as super-user. rdist notifies merlin@druid whenever it discovers that a local file has changed relative to a
+timestamp file. (Parentheses are used when the source or destination list contains zero or more names separated by
+white-space.)
+ HOSTS = ( hermes root@magus )
+ FILES = ( /usr/local/lib/libcant.so.1.1
+  /usrlocal/lib/libcant.sa.1.1 /usr/local/include/{*.h}
+  /usr/local/bin )
+ (${FILES}) -> (${HOSTS})
+  install <mi>R ;
+ ${FILES} :: /usr/local/lib/timestamp
+<beginning of page>
+  notify merlin@druid ;
+~/.rhosts User's trusted hosts and users
+/etc/host.equiv system trusted hosts and users
+/tmp/rdist* Temporary file for update lists
+$HOME/.k5login File containing Kerberos principals that are allowed access
+/etc/krb5/krb5.conf Kerberos configuration file
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wrcmdc
+csh(1), ed(1), make(1S), sh(1), in.rshd(1M), stat(2), hosts.equiv(4), krb5.conf(4), attributes(5),
+krb5_auth_rules(5), ip6(7P)
+A complaint about mismatch of rdist version numbers might really stem from some problem with starting your
+shell, for example, you are in too many groups.
+The super-user does not have its accustomed access privileges on NFS mounted file systems. Using rdist to copy to
+such a file system might fail, or the copies might be owned by user "nobody".
+Source files must reside or be mounted on the local host.
+There is no easy way to have a special command executed only once after all files in a directory have been updated.
+Variable expansion only works for name lists; there should be a general macro facility.
+rdist aborts on files that have a negative modification time (before Jan 1, 1970).
+There should be a "force" option to allow replacement of non-empty directories by regular files or symlinks. A
+means of updating file modes and owners of otherwise identical files is also needed.

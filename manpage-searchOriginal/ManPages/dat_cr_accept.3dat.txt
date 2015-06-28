@@ -1,0 +1,56 @@
+<beginning of page>
+dat_cr_accept <-> establishes a Connection between the active remote side requesting Endpoint and the passive side
+local Endpoint
+cc [ flag... ] file... -ldat [ library... ]
+#include <dat/udat.h>
+DAT_RETURN
+ dat_cr_accept (
+ IN DAT_CR_HANDLE cr_handle,
+ IN DAT_EP_HANDLE ep_handle,
+ IN DAT_COUNT private_data_size,
+ IN const DAT_PVOID private_data
+ )
+cr_handle Handle to an instance of a Connection Request that the Consumer is accepting.
+ep_handle Handle for an instance of a local Endpoint that the Consumer is accepting the Connection Request on. If
+the local Endpoint is specified by the Connection Request, the ep_handle shall be DAT_HANDLE_NULL.
+private_data_size Size of the private_data, which must be nonnegative.
+private_data Pointer to the private data that should be provided to the remote Consumer when the Connection is es<hy>
+tablished. If private_data_size is zero, then private_data can be NULL.
+The dat_cr_accept() function establishes a Connection between the active remote side requesting Endpoint and the
+passive side local Endpoint. The local Endpoint is either specified explicitly by ep_handle or implicitly by a Connec<hy>
+tion Request. In the second case, ep_handle is DAT_HANDLE_NULL.
+Consumers can specify private data that is provided to the remote side upon Connection establishment.
+If the provided local Endpoint does not satisfy the requested Connection Request, the operation fails without any ef<hy>
+fect on the local Endpoint, Pending Connection Request, private data, or remote Endpoint.
+The operation is asynchronous. The successful completion of the operation is reported through a Connection Event
+of type DAT_CONNECTION_EVENT_ESTABLISHED on the connect_evd of the local Endpoint.
+If the Provider cannot complete the Connection establishment, the connection is not established and the Consumer is
+notified through a Connection Event of type DAT_CONNECTION_EVENT_ACCEPT_COMPLETION_ER<hy>
+ROR on the connect_evd of the local Endpoint. It can be caused by the active side timeout expiration, transport er<hy>
+ror, or any other reason. If Connection is not established, Endpoint transitions into Disconnected state and all posted
+Recv DTOs are flushed to its recv_evd_handle.
+This operation, if successful, also destroys the Connection Request instance. Use of the handle of the destroyed
+cr_handle in any consequent operation fails.
+DAT_SUCCESS The operation was successful.
+DAT_INVALID_HANDLE The cr_handle or ep_handle parameter is invalid.
+DAT_INVALID_PARAMETER The private_data_size or private_data parameter is invalid, out of range, or a
+combination of parameters was invalid
+Consumers should be aware that Connection establishment might fail in the following cases: If the accepting End<hy>
+point has an outstanding RDMA Read outgoing attribute larger than the requesting remote Endpoint or outstanding
+RDMA Read incoming attribute, or if the outstanding RDMA Read incoming attribute is smaller than the requesting
+remote Endpoint or outstanding RDMA Read outgoing attribute.
+Consumers should set the accepting Endpoint RDMA Reads as the target (incoming) to a number larger than or
+equal to the remote Endpoint RDMA Read outstanding as the originator (outgoing), and the accepting Endpoint RD<hy>
+<beginning of page>
+MA Reads as the originator to a number smaller than or equal to the remote Endpoint RDMA Read outstanding as
+the target. DAT API does not define a protocol on how remote peers exchange Endpoint attributes. The exchange of
+outstanding RDMA Read incoming and outgoing attributes of EPs is left to the Consumer ULP. Consumer can use
+Private Data for it.
+If the Consumer does not care about posting RDMA Read operations or remote RDMA Read operations on the con<hy>
+nection, it can set the two outstanding RDMA Read attribute values to 0.
+If the Consumer does not set the two outstanding RDMA Read attributes of the Endpoint, the Provider is free to pick
+up any value for default. The Provider can change these default values during connection setup.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Standard: uDAPL, 1.1, 1.2 _ MT-LevelUnsafe
+libdat(3LIB), attributes(5)

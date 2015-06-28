@@ -1,0 +1,218 @@
+<beginning of page>
+iconv <-> code conversion function
+#include <iconv.h>
+extern size_t iconv(iconv_t cd, const char **restrict inbuf,
+ size_t *restrict inbytesleft, char **restrict outbuf,
+ size_t *restrict outbytesleft);
+#include <iconv.h>
+size_t iconv(iconv_t cd, char **restrict inbuf,
+ size_t *restrict inbytesleft, char **restrict outbuf,
+ size_t *restrict outbytesleft);
+The iconv() function converts the sequence of characters from one code set, in the array specified by inbuf, into a
+sequence of corresponding characters in another code set, in the array specified by outbuf. The code sets are those
+specified in the iconv_open() call that returned the conversion descriptor, cd. The inbuf argument points to a variable
+that points to the first character in the input buffer and inbytesleft indicates the number of bytes to the end of the buf<hy>
+fer to be converted. The outbuf argument points to a variable that points to the first available byte in the output buffer
+and outbytesleft indicates the number of the available bytes to the end of the buffer.
+For state-dependent encodings, the conversion descriptor cd is placed into its initial shift state by a call for which in<hy>
+buf is a null pointer, or for which inbuf points to a null pointer. When iconv() is called in this way, and if outbuf is
+not a null pointer or a pointer to a null pointer, and outbytesleft points to a positive value, iconv() will place, into the
+output buffer, the byte sequence to change the output buffer to its initial shift state. If the output buffer is not large
+enough to hold the entire reset sequence, iconv() will fail and set errno to E2BIG. Subsequent calls with inbuf as
+other than a null pointer or a pointer to a null pointer cause the conversion to take place from the current state of the
+conversion descriptor.
+If a sequence of input bytes does not form a valid character in the specified code set, conversion stops after the pre<hy>
+vious successfully converted character. If the input buffer ends with an incomplete character or shift sequence, con<hy>
+version stops after the previous successfully converted bytes. If the output buffer is not large enough to hold the en<hy>
+tire converted input, conversion stops just prior to the input bytes that would cause the output buffer to overflow. The
+variable pointed to by inbuf is updated to point to the byte following the last byte successfully used in the conver<hy>
+sion. The value pointed to by inbytesleft is decremented to reflect the number of bytes still not converted in the input
+buffer. The variable pointed to by outbuf is updated to point to the byte following the last byte of converted output
+data. The value pointed to by outbytesleft is decremented to reflect the number of bytes still available in the output
+buffer. For state-dependent encodings, the conversion descriptor is updated to reflect the shift state in effect at the
+end of the last successfully converted byte sequence.
+If iconv() encounters a character in the input buffer that is legal, but for which an identical character does not exist
+in the target code set, iconv() performs an implementation-defined conversion on this character.
+The iconv() function updates the variables pointed to by the arguments to reflect the extent of the conversion and re<hy>
+turns the number of non-identical conversions performed. If the entire string in the input buffer is converted, the val<hy>
+ue pointed to by inbytesleft will be 0. If the input conversion is stopped due to any conditions mentioned above, the
+value pointed to by inbytesleft will be non-zero and errno is set to indicate the condition. If an error occurs iconv()
+returns (size_t) <mi>1 and sets errno to indicate the error.
+The iconv() function will fail if:
+EILSEQ Input conversion stopped due to an input byte that does not belong to the input code set.
+E2BIG Input conversion stopped due to lack of space in the output buffer.
+EINVAL Input conversion stopped due to an incomplete character or shift sequence at the end of the input buffer.
+The iconv() function may fail if:
+EBADF The cd argument is not a valid open conversion descriptor.
+Example 1 Using the iconv() Functions
+<beginning of page>
+The following example uses the iconv() functions:
+ #include <stdio.h>
+ #include <errno.h>
+ #include <string.h>
+ #include <iconv.h>
+ #include <stdlib.h>
+ /*
+  * For state-dependent encodings, changes the state of the
+  * conversion descriptor to initial shift state. Also, outputs
+  * the byte sequence to change the state to initial state.
+  * This code is assuming the iconv call for initializing the
+  * state will not fail due to lack of space in the output buffer.
+  */
+ #define INIT_SHIFT_STATE(cd, fptr, ileft, tptr, oleft) \
+  { \
+  fptr = NULL; \
+  ileft = 0; \
+  tptr = to; \
+  oleft = BUFSIZ; \
+  (void) iconv(cd, &fptr, &ileft, &tptr, &oleft); \
+  (void) fwrite(to, 1, BUFSIZ - oleft, stdout); \
+  }
+ int
+ main(int argc, char **argv)
+ {
+  iconv_t cd;
+  char from[BUFSIZ], to[BUFSIZ];
+  char *from_code, *to_code;
+  char *tptr;
+  const char *fptr;
+  size_t ileft, oleft, num, ret;
+  if (argc != 3) {
+  (void) fprintf(stderr,
+  "Usage: %s from_codeset to_codeset\\n", argv[0]);
+  return (1);
+  }
+  from_code = argv[1];
+  to_code = argv[2];
+  cd = iconv_open((const char *)to_code, (const char *)from_code);
+  if (cd == (iconv_t)-1) {
+  /*
+  * iconv_open failed
+  */
+  (void) fprintf(stderr,
+  "iconv_open(%s, %s) failed\\n", to_code, from_code);
+  return (1);
+  }
+  ileft = 0;
+  while ((ileft +=
+  (num = fread(from + ileft, 1, BUFSIZ - ileft, stdin))) > 0) {
+  if (num == 0) {
+  /*
+  * Input buffer still contains incomplete character
+  * or sequence. However, no more input character.
+  */
+  /*
+<beginning of page>
+  * Initializes the conversion descriptor and outputs
+  * the sequence to change the state to initial state.
+  */
+  INIT_SHIFT_STATE(cd, fptr, ileft, tptr, oleft);
+  (void) iconv_close(cd);
+  (void) fprintf(stderr, "Conversion error\\n");
+  return (1);
+  }
+  fptr = from;
+  for (;;) {
+  tptr = to;
+  oleft = BUFSIZ;
+  ret = iconv(cd, &fptr, &ileft, &tptr, &oleft);
+  if (ret != (size_t)-1) {
+  /*
+  * iconv succeeded
+  */
+  /*
+  * Outputs converted characters
+  */
+  (void) fwrite(to, 1, BUFSIZ - oleft, stdout);
+  break;
+  }
+  /*
+  * iconv failed
+  */
+  if (errno == EINVAL) {
+  /*
+  * Incomplete character or shift sequence
+  */
+  /*
+  * Outputs converted characters
+  */
+  (void) fwrite(to, 1, BUFSIZ - oleft, stdout);
+  /*
+  * Copies remaining characters in input buffer
+  * to the top of the input buffer.
+  */
+  (void) memmove(from, fptr, ileft);
+  /*
+  * Tries to fill input buffer from stdin
+  */
+  break;
+  } else if (errno == E2BIG) {
+  /*
+  * Lack of space in output buffer
+  */
+  /*
+  * Outputs converted characters
+  */
+  (void) fwrite(to, 1, BUFSIZ - oleft, stdout);
+  /*
+  * Tries to convert remaining characters in
+  * input buffer with emptied output buffer
+  */
+  continue;
+  } else if (errno == EILSEQ) {
+  /*
+  * Illegal character or shift sequence
+<beginning of page>
+  */
+  /*
+  * Outputs converted characters
+  */
+  (void) fwrite(to, 1, BUFSIZ - oleft, stdout);
+  /*
+  * Initializes the conversion descriptor and
+  * outputs the sequence to change the state to
+  * initial state.
+  */
+  INIT_SHIFT_STATE(cd, fptr, ileft, tptr, oleft);
+  (void) iconv_close(cd);
+  (void) fprintf(stderr,
+  "Illegal character or sequence\\n");
+  return (1);
+  } else if (errno == EBADF) {
+  /*
+  * Invalid conversion descriptor.
+  * Actually, this shouldn't happen here.
+  */
+  (void) fprintf(stderr, "Conversion error\\n");
+  return (1);
+  } else {
+  /*
+  * This errno is not defined
+  */
+  (void) fprintf(stderr, "iconv error\\n");
+  return (1);
+  }
+  }
+  }
+  /*
+  * Initializes the conversion descriptor and outputs
+  * the sequence to change the state to initial state.
+  */
+  INIT_SHIFT_STATE(cd, fptr, ileft, tptr, oleft);
+  (void) iconv_close(cd);
+  return (0);
+ }
+/usr/lib/iconv/*.so
+conversion modules for 32-bit
+/usr/lib/iconv/sparcv9/*.so
+conversion modules for 64-bit sparc
+/usr/lib/iconv/amd64/*.so
+conversion modules for 64-bit amd64
+/usr/lib/iconv/geniconvtbl/binarytables/*.bt
+conversion binary tables
+See attributes(5) for descriptions of the following attributes:
+<beginning of page>
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Standard _ MT-LevelMT-Safe
+geniconvtbl(1), iconv(1), iconv_close(3C), iconv_open(3C), geniconvtbl(4), attributes(5), iconv(5), iconv_uni<hy>
+code(5), standards(5)

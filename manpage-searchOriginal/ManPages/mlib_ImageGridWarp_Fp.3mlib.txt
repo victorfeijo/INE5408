@@ -1,0 +1,97 @@
+<beginning of page>
+mlib_ImageGridWarp_Fp <-> grid-based image warp
+cc [ flag... ] file... -lmlib [ library... ]
+#include <mlib.h>
+mlib_status mlib_ImageGridWarp_Fp(mlib_image *dst, const mlib_image *src,
+ const mlib_f32 *xWarpPos, const mlib_f32 *yWarpPos,
+ mlib_d64 postShiftX, mlib_d64 postShiftY,
+ mlib_s32 xStart, mlib_s32 xStep, mlib_s32 xNumCells,
+ mlib_s32 yStart, mlib_s32 yStep, mlib_s32 yNumCells,
+ mlib_filter filter, mlib_edge edge);
+The mlib_ImageGridWarp_Fp() function performs a regular grid-based image warp on a floating-point image. The
+images must have the same type, and the same number of channels. The images can have 1, 2, 3, or 4 channels. The
+data type of the images can be MLIB_FLOAT or MLIB_DOUBLE. The two images may have different sizes.
+The image pixels are assumed to be centered at .5 coordinate points. For example, the upper-left corner pixel of an
+image is located at (0.5, 0.5).
+For each pixel in the destination image, its center point D is, first, backward mapped to a point S in the source im<hy>
+age; then the source pixels with their centers surrounding point S are selected to do one of the interpolations speci<hy>
+fied by the filter parameter to generate the pixel value for point D.
+The mapping from destination pixels to source positions is described by bilinear interpolation between a rectilinear
+grid of points with known mappings.
+Given a destination pixel coordinate (x, y) that lies within a cell having corners at (x0, y0), (x1, y0), (x0, y1) and
+(x1, y1), with source coordinates defined at each respective corner equal to (sx0, sy0), (sx1, sy1), (sx2, sy2) and
+(sx3, sy3), the source position (sx, sy) that maps onto (x, y) is given by the formulas:
+  xfrac = (x - x0)/(x1 - x0)
+  yfrac = (y - y0)/(y1 - y0)
+  s = sx0 + (sx1 - sx0)*xfrac
+  t = sy0 + (sy1 - sy0)*xfrac
+  u = sx2 + (sx3 - sx2)*xfrac
+  v = sy2 + (sy3 - sy2)*xfrac
+  sx = s + (u - s)*yfrac - postShiftX
+  sy = t + (v - t)*yfrac - postShiftY
+In other words, the source x and y values are interpolated horizontally along the top and bottom edges of the grid
+cell, and the results are interpolated vertically:
+  (x0, y0) -> (x1, y0) ->
+  (sx0, sy0) (sx1, sy1)
+  +------------+---------+
+  | /| |
+  | (s, t) | |
+  | | |
+  | | |
+  | | |
+  | | |
+  | (x, y) -> | |
+  | (sx, sy)--+ |
+  | | |
+  | | |
+  | | (u, v) |
+  | |/ |
+  +------------+---------+
+  (x0, y1) -> (x1, y1) ->
+  (sx2, sy2) (sx3, sy3)
+<beginning of page>
+The results of above interpolation are shifted by (-postShiftX, -postShiftY) to produce the source pixel coordinates.
+The destination pixels that lie outside of any grid cells are kept intact. The grid is defined by a set of equal-sized
+cells. The grid starts at (xStart, yStart). Each cell has width equal to xStep and height equal to yStep, and there are
+xNumCells cells horizontally and yNumCells cells vertically.
+The degree of warping within each cell is defined by the values in xWarpPos and yWarpPos parameters. Each of
+these parameters must contain (xNumCells + 1)*(yNumCells + 1) values, which, respectively, contain the source X
+and source Y coordinates that map to the upper-left corner of each cell in the destination image. The cells are enu<hy>
+merated in row-major order. That is, all the grid points along a row are enumerated first, then the grid points for the
+next row are enumerated, and so on.
+For example, suppose xNumCells is equal to 2 and yNumCells is equal to 1. Then the order of the data in the
+xWarpPos would be:
+  x00, x10, x20, x01, x11, x21
+and in the yWarpPos:
+  y00, y10, y20, y01, y11, y21
+for a total of (2 + 1)*(1 + 1) = 6 elements in each table.
+The function takes the following arguments:
+dst Pointer to destination image.
+src Pointer to source image.
+xWarpPos A float array of length (xNumCells + 1)*(yNumCells + 1) containing horizontal warp positions at the
+grid points, in row-major order.
+yWarpPos A float array of length (xNumCells + 1)*(yNumCells + 1) containing vertical warp positions at the grid
+points, in row-major order.
+postShiftX The displacement to apply to source X positions.
+postShiftY The displacement to apply to source Y positions.
+xStart The minimum X coordinate of the grid.
+xStep The horizontal spacing between grid cells.
+xNumCells The number of grid cell columns.
+yStart The minimum Y coordinate of the grid.
+yStep The vertical spacing between grid cells.
+yNumCells The number of grid cell rows.
+<beginning of page>
+filter Type of resampling filter. It can be one of the following:
+ MLIB_NEAREST
+ MLIB_BILINEAR
+ MLIB_BICUBIC
+ MLIB_BICUBIC2
+edge Type of edge condition. It can be one of the following:
+ MLIB_EDGE_DST_NO_WRITE
+ MLIB_EDGE_SRC_PADDED
+The function returns MLIB_SUCCESS if successful. Otherwise it returns MLIB_FAILURE.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed _ MT-LevelMT-Safe
+mlib_ImageGridWarp(3MLIB), mlib_ImageGridWarpTable(3MLIB), mlib_ImageGridWarpT<hy>
+able_Fp(3MLIB), attributes(5)

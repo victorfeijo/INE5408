@@ -1,0 +1,74 @@
+<beginning of page>
+usb_alloc_request, usb_alloc_ctrl_req, usb_free_ctrl_req, usb_alloc_bulk_req, usb_free_bulk_req, usb_alloc_in<hy>
+tr_req, usb_free_intr_req, usb_alloc_isoc_req, usb_free_isoc_req <-> Allocate and free USB transfer requests
+#include <sys/usb/usba.h>
+usb_ctrl_req_t *usb_alloc_ctrl_req(dev_info_t *dip, size_t len,
+ usb_flags_t flags);
+void usb_free_ctrl_req(usb_ctrl_req_t *request);
+usb_bulk_req_t *usb_alloc_bulk_req(dev_info_t dip, size_t len,
+ usb_flags_t flags);
+void usb_free_bulk_req(usb_bulk_req_t *request);
+usb_intr_req_t *usb_alloc_intr_req(dev_info_t *dip, size_t len,
+ usb_flags_t flags);
+void usb_free_intr_req(usb_intr_req_t *request);
+usb_isoc_req_t *usb_alloc_isoc_req(dev_info_t *dip,
+ uint_t isoc_pkts_count, size_t len, usb_flags_t flags);
+void usb_free_isoc_req(usb_isoc_req_t *request);
+Solaris DDI specific (Solaris DDI)
+For usb_alloc_ctrl_req(), usb_alloc_bulk_req() and usb_alloc_intr_req():
+dip Pointer to the device's dev_info structure.
+len Length of data for this request.
+flags Only USB_FLAGS_SLEEP is recognized. Wait for resources if not immediately available.
+For usb_alloc_isoc_req():
+dip Pointer to the device's dev_info structure.
+isoc_pkts_count Number of isochronous packet descriptors to associate with this request. Must be greater than zero.
+len Length of data for this isochronous request.
+flags Only USB_FLAGS_SLEEP is recognized. Wait for resources if not immediately available.
+For usb_free_ctrl_req(), usb_free_bulk_req(), usb_free_intr_req() and usb_free_isoc_req():
+request Pointer to the request structure to be freed. Can be NULL.
+The usb_alloc_ctrl_req(), usb_alloc_bulk_req(), usb_alloc_intr_req(), and usb_alloc_isoc_req() functions allo<hy>
+cate control, bulk, interrupt, or isochronous requests. Optionally, these functions can also allocate an mblk of the
+specified length to pass data associated with the request. (For guidelines on mblk data allocation, see the manpage
+for the relevant transfer function).
+The usb_alloc_isoc_req() function also allocates a number of isochronous packet descriptors (usb_isoc_pkt_de<hy>
+scr_t) specified by isoc_pkts_count to the end of the request proper (usb_isoc_req_t). See usb_isoc_request(9S) for
+more information on isochronous packet descriptors.
+<beginning of page>
+These functions always succeed when the USB_FLAGS_SLEEP flag is set, provided that they are given valid args
+and are not called from interrupt context.
+The usb_free_ctrl_req(), usb_free_bulk_req(), usb_free_intr_req(), and usb_free_isoc_req() functions free their
+corresponding request. If the request's data block pointer is non-zero, the data block is also freed. For isoc requests,
+the array of packet descriptors is freed.
+For usb_alloc_ctrl_req(), usb_alloc_bulk_req(), usb_alloc_intr_req() and usb_alloc_isoc_req():
+On success: returns a pointer to the appropriate usb_xxx_request_t.
+On failure: returns NULL. Fails because the dip argument is invalid, USB_FLAGS_SLEEP is not set and memory is
+not available or because USB_FLAGS_SLEEP is set but the call was made in interrupt context.
+For usb_free_ctrl_req(), usb_free_bulk_req(), usb_free_intr_req() and usb_free_isoc_req(): None.
+The allocation routines can always be called from kernel and user context. They may be called from interrupt con<hy>
+text only if USB_FLAGS_SLEEP is not specified.
+The free routines may be called from kernel, user, and interrupt context.
+  /* This allocates and initializes an asynchronous control
+  * request which will pass no data. Asynchronous requests
+  * are used when they cannot block the calling thread.
+  */
+  usb_ctrl_req_t *ctrl_req;
+  if ((ctrl_req = usb_alloc_ctrl_req(dip, 0, 0)) == NULL) {
+  return (FAILURE);
+  }
+  /* Now initialize. */
+  ctrl_req->ctrl_bmRequestType = USB_DEV_REQ_DEV_TO_HOST |
+  USB_DEV_REQ_STANDARD | USB_DEV_REQ_RCPT_DEV;
+  ctrl_req->ctrl_bRequest = (uint8_t)USB_REQ_GET_STATUS;
+  ...
+  ...
+  ctrl_req->ctrl_callback = normal_callback;
+  ctrl_req->ctrl_exc_callback = exception_callback;
+  ...
+  ...
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ ArchitecturePCI-
+based systems _ Interface stabilityCommitted _ AvailabilitySUNWusb
+attributes(5), usb_get_current_frame_number(9F), usb_get_max_pkts_per_isoc_request(9F),
+usb_pipe_get_max_bulk_transfer_size(9F), usb_pipe_bulk_xfer(9F), usb_pipe_ctrl_xfer(9F), usb_pipe_in<hy>
+tr_xfer(9F), usb_pipe_isoc_xfer(9F), usb_bulk_request(9S), usb_ctrl_request(9S), usb_intr_request(9S),
+usb_isoc_request(9S)

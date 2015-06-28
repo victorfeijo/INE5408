@@ -1,0 +1,93 @@
+<beginning of page>
+tsalarm <-> Alarm device driver
+tsalarm@0:ctl
+The tsalarm driver is a Multi-threaded, loadable non-STREAMS pseudo driver that manages ALOM alarms. The
+tsalarm driver provides an interface through which alarm relays can be controlled on SUNW,Netra-240 and
+SUNW,Netra-440 platforms.
+The alarm hardware differs depending on platform. The Netra 240 and 440 platforms features four dry contact alarm
+relays which are controlled by ALOM. You can set each alarm to "on" or "off" by using ioctl interfaces provided
+from the host. The four alarms are labeled as "critical," "major," "minor," and "user." The user alarm is set by a user
+application depending on system condition. LED's in front of the box provide a visual indication of the four alarms.
+The number of alarms and their meanings/labels may vary across platforms.
+The interface provided by the tsalarm driver comprises ioctls that enable applications to manipulate the alarm mod<hy>
+ule. The alarm module is accessed via two device nodes: i) /dev/lom and /dev/tsalarm:ctl.
+The following ioctls are supported by the /dev/lom and /dev/tsalarm:ctl devices:
+TSIOCALCTL - Turn an alarm on or off.
+The argument is a pointer to the ts_aldata_t/lom_aldata_t structure. This structure is described below. alarm_no
+member is an integer which specifies the alarm to which the command is to be applied. The alarm_state/state
+structure member indicates the state to which the alarm should be set (where 0 == off). An error (EINVAL) is re<hy>
+turned if either an invalid alarm_no or invalid alarm_state is provided.
+TSIOCALSTATE - Get the state of the alarms.
+The argument is a pointer to the ts_aldata_t/lom_aldata_t structure. This structure is described below. alarm_no
+member is an integer which indicates the alarm to which the command will be applied. The alarm_state member
+holds the alarm's current state and is filled in by the driver. A zero indicates that the alarm is off. An error (EIN<hy>
+VAL) is returned if an invalid alarm_no is provided. The structures and definitions for the values are defined below.
+Alarm values:
+ The following old style values are defined in <lom.io.h>
+  #define ALARM_NUM_0 0 /* number of zero'th alarm */
+  #define ALARM_NUM_1 1 /* number of first alarm */
+  #define ALARM_NUM_2 2 /* number of second alarm */
+  #define ALARM_NUM_3 3 /* number of third alarm */
+  Alarm values defined in <lom.io.h>
+  #define ALARM_OFF 0 /* Turn off alarm */
+  #define ALARM_ON 1 /* Turn on alarm */
+Alarm Data Structure:
+ This structure is defined in <lom.io.h>
+  typedef struct {
+  int alarm_no; /* alarm to apply command to */
+  int alarm_state; /* state of alarm (0 == off) */
+  } ts_aldata_t;
+<beginning of page>
+Use the following LOM interfaces to get and set the alarms. These definitions are included in <lom_io.h>
+  #define ALARM_CRITICAL 0 /* number of critical alarm */
+  #define ALARM_MAJOR 1 /* number of major alarm */
+  #define ALARM_MINOR 2 /* number of minor alarm */
+  #define ALARM_USER 3 /* number of user alarm */
+The following alarm data structure is provided in <lom_io.h>:
+ typedef struct {
+  int alarm_no;
+  int state;
+  } lom_aldata_t;
+An open() will fail if:
+ENXIO The driver is not installed in the system.
+An ioctl() will fail if:
+EFAULT There was a hardware failure during the specified operation.
+EINVAL The alarm number specified is not valid or an invalid value was supplied.
+ENXIO The driver is not installed in the system or the monitor callback routine could not be scheduled.
+ How to set an alarm:
+  #include <sys/unistd.h>
+  #include <fcntl.h>
+  #include <stdio.h>
+  #include <lom_io.h>
+  #define LOM_DEVICE "/dev/lom"
+  int
+  main()
+  {
+  lom_aldata_t lld;
+  int fd = open(LOM_DEVICE, O_RDWR);
+  if (fd == -1) {
+  printf("Error opening device: %s0, LOM_DEVICE);
+  exit (1);
+  }
+  lld.alarm_no = ALARM_CRITICAL; /* Set the critical alarm */
+  lld.state = ALARM_ON; /* Set the alarm */
+  if (ioctl(fd, LOMIOCALCTL, (char *)&lld) != 0)
+  printf("Setting alarm failed");
+  else
+  printf("Alarm set successfully");
+<beginning of page>
+  close(fd);
+  }
+/dev/lom
+LOM device.
+/dev/tsalarm:ctl
+Alarm control device.
+/platform/platform/kernel/drv/sparcv9/tsalarm
+Device driver module.
+/platform/SUNW,Netra-240/kernel/drv/tsalarm.conf
+Driver configuration file.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcarx.u _ ArchitectureSPARC
+attributes(5)
+Writing Device Drivers

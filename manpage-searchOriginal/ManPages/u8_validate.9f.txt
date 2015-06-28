@@ -1,0 +1,120 @@
+<beginning of page>
+u8_validate <-> validate UTF-8 characters and calculate the byte length
+#include <sys/types.h>
+#include <sys/errno.h>
+#include <sys/sunddi.h>
+int u8_validate(char *u8str, size_t n, char **list, int flag,
+ int *errno);
+Solaris DDI specific (Solaris DDI)
+u8str The UTF-8 string to be validated.
+n The maximum number of bytes in u8str that can be examined and validated.
+list A list of null-terminated character strings in UTF-8 that must be additionally checked against as invalid charac<hy>
+ters. The last string in list must be null to indicate there is no further string.
+flag Possible validation options constructed by a bitwise-inclusive-OR of the following values:
+U8_VALIDATE_ENTIRE
+By default, u8_validate() looks at the first character or up to n bytes, whichever is smaller in terms of the number of
+bytes to be consumed, and returns with the result.
+When this option is used, u8_validate() will check up to n bytes from u8str and possibly more than a character be<hy>
+fore returning the result.
+U8_VALIDATE_CHECK_ADDITIONAL
+By default, u8_validate() does not use list supplied.
+When this option is supplied with a list of character strings, u8_validate() additionally validates u8str against the
+character strings supplied with list and returns EBADF in errno if u8str has any one of the character strings in list.
+U8_VALIDATE_UCS2_RANGE
+By default, u8_validate() uses the entire Unicode coding space of U+0000 to U+10FFFF.
+When this option is specified, the valid Unicode coding space is smaller to U+0000 to U+FFFF.
+errno An error occurred during validation. The following values are supported:
+EBADF Validation failed because list-specified characters were found in the string pointed to by u8str.
+EILSEQ Validation failed because an illegal byte was found in the string pointed to by u8str.
+EINVAL Validation failed because an incomplete byte was found in the string pointed to by u8str.
+ERANGE Validation failed because character bytes were encountered that are outside the range of the Unicode cod<hy>
+ing space.
+The u8_validate() function validates u8str in UTF-8 and determines the number of bytes constituting the charac<hy>
+ter(s) pointed to by u8str.
+If u8str is a null pointer, u8_validate() returns 0. Otherwise, u8_validate() returns either the number of bytes that
+<beginning of page>
+constitute the characters if the next n or fewer bytes form valid characters, or -1 if there is an validation failure, in
+which case it may set errno to indicate the error. Example 1 Determine the length of the first UTF-8 character.
+ #include <sys/types.h>
+ #include <sys/errno.h>
+ #include <sys/sunddi.h>
+ char u8[MAXPATHLEN];
+ int errno;
+ .
+ .
+ .
+ len = u8_validate(u8, 4, (char **)NULL, 0, &errno);
+ if (len == -1) {
+  switch (errno) {
+  case EILSEQ:
+  case EINVAL:
+  return (MYFS4_ERR_INVAL);
+  case EBADF:
+  return (MYFS4_ERR_BADNAME);
+  case ERANGE:
+  return (MYFS4_ERR_BADCHAR);
+  default:
+  return (-10);
+  }
+ }
+Example 2 Check if there are any invalid characters in the entire string.
+ #include <sys/types.h>
+ #include <sys/errno.h>
+ #include <sys/sunddi.h>
+ char u8[MAXPATHLEN];
+ int n;
+ int errno;
+ .
+ .
+ .
+ n = strlen(u8);
+ len = u8_validate(u8, n, (char **)NULL, U8_VALIDATE_ENTIRE, &errno);
+ if (len == -1) {
+  switch (errno) {
+  case EILSEQ:
+  case EINVAL:
+  return (MYFS4_ERR_INVAL);
+  case EBADF:
+  return (MYFS4_ERR_BADNAME);
+  case ERANGE:
+  return (MYFS4_ERR_BADCHAR);
+  default:
+  return (-10);
+  }
+ }
+Example 3 Check if there is any invalid character, including prohibited characters, in the entire string.
+ #include <sys/types.h>
+ #include <sys/errno.h>
+ #include <sys/sunddi.h>
+ char u8[MAXPATHLEN];
+ int n;
+ int errno;
+ char *prohibited[4] = {
+  ".", "..", "\\", NULL
+<beginning of page>
+ };
+ .
+ .
+ .
+ n = strlen(u8);
+ len = u8_validate(u8, n, prohibited,
+  (U8_VALIDATE_ENTIRE|U8_VALIDATE_CHECK_ADDITIONAL), &errno);
+ if (len == -1) {
+  switch (errno) {
+  case EILSEQ:
+  case EINVAL:
+  return (MYFS4_ERR_INVAL);
+  case EBADF:
+  return (MYFS4_ERR_BADNAME);
+  case ERANGE:
+  return (MYFS4_ERR_BADCHAR);
+  default:
+  return (-10);
+  }
+ }
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed
+u8_strcmp(3C), u8_textprep_str(3C), u8_validate(3C), attributes(5), u8_strcmp(9F), u8_textprep_str(9F),
+uconv_u16tou32(9F)
+The Unicode Standard (http://www.unicode.org)

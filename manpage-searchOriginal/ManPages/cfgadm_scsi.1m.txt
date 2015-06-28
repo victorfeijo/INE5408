@@ -1,0 +1,187 @@
+<beginning of page>
+cfgadm_scsi <-> SCSI hardware specific commands for cfgadm
+/usr/sbin/cfgadm [-f] [-y | -n] [-v] [-o hardware_option]
+ -c function ap_id...
+/usr/sbin/cfgadm [-f] [-y | -n] [-v] [-o hardware_option]
+ -x hardware_function ap_id...
+/usr/sbin/cfgadm [-v] [-a] [-s listing_option] [-o hardware_option]
+ [-l [ap_id | ap_type ... ]]
+/usr/sbin/cfgadm [-v] [-o hardware_option] -t ap_id...
+/usr/sbin/cfgadm [-v] [-o hardware_option] -h [ap_id]...
+The SCSI hardware specific library /usr/lib/cfgadm/scsi.so.1 provides the functionality for SCSI hot-plugging
+through the cfgadm(1M) command. cfgadm operates on attachment points, which are locations in the system where
+hardware resources can be dynamically reconfigured. Refer to cfgadm(1M) for information regarding attachment
+points.
+For SCSI hot-plugging, each SCSI controller is represented by an attachment point in the device tree. In addition,
+each SCSI device is represented by a dynamic attachment point. Attachment points are named through ap_ids. Two
+types of ap_ids are defined: logical and physical. The physical ap_id is based on the physical pathname, whereas
+the logical ap_id is a shorter more user-friendly name. For SCSI controllers, the logical ap_id is usually the corre<hy>
+sponding disk controller number. For example, a typical logical ap_id would be c0.
+SCSI devices are named relative to the controller ap_id. Thus if a disk device is attached to controller c0, its ap_id
+can be:
+ c0::dsk/c0t0d0
+where dsk/c0t0d0 identifies the specific device. In general, the device identifier is derived from the corresponding
+logical link for the device in /dev. For example, a SCSI tape drive logical ap_id could be c0::rmt/0. Here c0 is the
+logical ap_id for the SCSI controller and rmt/0 is derived from the logical link for the tape drive in /dev/rmt. If an
+identifier can not be derived from the link in /dev, a unique identifier will be assigned to it. For example, if the tape
+device has no link in /dev, it can be assigned an ap_id of the form c0::st3 where st3 is a unique internally generated
+identifier.
+A simple listing of attachment points in the system will include attachment points at SCSI controllers but not SCSI
+devices. Use the -a flag to the list option (-l) to list SCSI devices as well. For example:
+ # cfgadm -l
+  Ap_Id Type Receptacle Occupant Condition
+  c0 scsi-bus connected configured unknown
+  sysctrl0:slot0 cpu/mem connected configured ok
+  sysctrl0:slot1 sbus-upa connected configured ok
+To list SCSI devices in addition to SCSI controllers:
+ # cfgadm -al
+ Ap_Id Type Receptacle Occupant Condition
+ c0 scsi-bus connected configured unknown
+ c0::dsk/c0t14d0 disk connected configured unknown
+ c0::dsk/c0t11d0 disk connected configured unknown
+ c0::dsk/c0t8d0 disk connected configured unknown
+ c0::dsk/c0t0d0 disk connected configured unknown
+ c0::rmt/0 tape connected configured unknown
+ sysctrl0:slot0 cpu/mem connected configured ok
+ sysctrl0:slot1 sbus-upa connected configured ok
+<beginning of page>
+Refer to cfgadm(1M) for more information regarding listing attachment points. The receptacle and occupant state
+for attachment points at the SCSI controller have the following meanings:
+empty not applicable
+disconnected bus quiesced (I/O activity on bus is suspended)
+connected bus active
+configured one or more devices on the bus is configured
+unconfigured no device on the bus is configured
+The corresponding states for individual SCSI devices are:
+empty not applicable
+disconnected bus to which the device is attached is quiesced
+connected bus to which device is attached is active
+configured device is configured
+unconfigured device is not configured
+cfgadm defines several types of operations besides listing (-l).These operations include testing, (-t), invoking config<hy>
+uration state changes, (-c), invoking hardware specific functions (-x), and obtaining configuration administration
+help messages (-h).
+-c function The following generic commands are defined for the SCSI hardware specific library:
+For SCSI controller attachment points, the following configuration state change operations are supported:
+connect Unquiesce the SCSI bus.
+disconnect Quiesce the bus (suspend I/O activity on bus).
+Incorrect use of this command can cause the system to hang. See NOTES.
+configure Configure new devices on SCSI bus.
+unconfigure Unconfigure all devices connected to bus.
+The following generic commands are defined for SCSI devices:
+configure configure a specific device
+unconfigure unconfigure a specific device
+<beginning of page>
+-f When used with the disconnect command, forces a quiesce of the SCSI bus, if supported by hardware.
+Incorrect use of this command can cause the system to hang. See NOTES.
+-h ap_id SCSI specific help can be obtained by using the help option with any SCSI attachment point.
+-o hardware_option No hardware specific options are currently defined.
+-s listing_option Attachment points of class scsi can be listed by using the select sub-option. Refer to the cf<hy>
+gadm(1M) man page for additional information.
+-t ap_id No test commands are available at present.
+-x hardware_function Some of the following commands can only be used with SCSI controllers and some only with
+SCSI devices.
+In the following, controller_ap_id refers to an ap_id for a SCSI controller, for example, c0. device_ap_id refers to
+an ap_id for a SCSI device, for example: c0::dsk/c0dt3d0.
+The following hardware specific functions are defined:
+insert_device controller_ap_id
+Add a new device to the SCSI controller, controller_ap_id.
+This command is intended for interactive use only.
+remove_device device_ap_id
+Remove device device_ap_id.
+This command is intended for interactive use only.
+replace_device device_ap_id
+Remove device device_ap_id and replace it with another device of the same kind.
+This command is intended for interactive use only.
+reset_device device_ap_id
+Reset device_ap_id.
+reset_bus controller_ap_id
+Reset bus controller_ap_id without resetting any devices attached to the bus.
+reset_all controller_ap_id
+Reset bus controller_ap_id and all devices on the bus.
+locator [=on|off] device_ap_id
+Sets or gets the hard disk locator LED, if it is provided by the platform. If the [on|off] suboption is not set, the state
+of the hard disk locator is printed.
+<beginning of page>
+led[=LED,mode=on|off|blink] device_ap_id
+If no sub-arguments are set, this function print a list of the current LED settings. If sub-arguments are set, this func<hy>
+tion sets the mode of a specific LED for a slot.
+Example 1 Configuring a Disk
+The following command configures a disk attached to controller c0:
+ # cfgadm -c configure c0::dsk/c0t3d0
+Example 2 Unconfiguring a Disk
+The following command unconfigures a disk attached to controller c0:
+ # cfgadm -c unconfigure c0::dsk/c0t3d0
+Example 3 Adding a New Device
+The following command adds a new device to controller c0:
+ # cfgadm -x insert_device c0
+The system responds with the following:
+ Adding device to SCSI HBA: /devices/sbus@1f,0/SUNW,fas@e,8800000
+ This operation will suspend activity on SCSI bus c0
+ Continue (yes/no)?
+Enter:
+ y
+The system responds with the following:
+ SCSI bus quiesced successfully.
+ It is now safe to proceed with hotplug operation.
+ Enter y if operation is complete or n to abort (yes/no)?
+Enter:
+ y
+Example 4 Replacing a Device
+The following command replaces a device attached to controller c0:
+<beginning of page>
+ # cfgadm -x replace_device c0::dsk/c0t3d0
+The system responds with the following:
+ Replacing SCSI device: /devices/sbus@1f,0/SUNW,fas@e,8800000/sd@3,0
+ This operation will suspend activity on SCSI bus: c0
+ Continue (yes/no)?
+Enter:
+ y
+The system responds with the following:
+ SCSI bus quiesced successfully.
+ It is now safe to proceed with hotplug operation.
+ Enter y if operation is complete or n to abort (yes/no)?
+Enter:
+ y
+Example 5 Encountering a Mounted File System While Unconfiguring a Disk
+The following command illustrates encountering a mounted file system while unconfiguring a disk:
+ # cfgadm -c unconfigure c1::dsk/c1t0d0
+The system responds with the following:
+ cfgadm: Component system is busy, try again: failed to offline:
+ /devices/pci@1f,4000/scsi@3,1/sd@1,0
+  Resource Information
+ ------------------ --------------------------
+ /dev/dsk/c1t0d0s0 mounted filesystem "/mnt"
+Example 6 Display the Value of the Locator for a Disk
+The following command displays the value of the locator for a disk. This example is specific to the SPARC Enter<hy>
+prise Server family:
+ # cfgadm -x locator c0::dsk/c0t6d0
+The system responds with the following:
+<beginning of page>
+ Disk Led
+ c0t6d0 locator=on
+Example 7 Set the Value of the Locator for a Disk
+The following command sets the value of the locator for a disk. This example is specific to the SPARC Enterprise
+Server family:
+ # cfgadm -x locator=off c0::dsk/c0t6d0
+The system does not print anything in response.
+/usr/lib/cfgadm/scsi.so.1
+hardware-specific library for generic SCSI hot-plugging
+/usr/platform/SPARC-Enterprise/lib/cfgadm/scsi.so.1
+platform-specific library for generic SCSI hot-plugging
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsl
+cfgadm(1M), luxadm(1M), config_admin(3CFGADM), libcfgadm(3LIB), attributes(5)
+The disconnect (quiesce) operation is not supported on controllers which control disks containing critical partitions
+such as root (/), /usr, swap, or /var. The disconnect operation should not be attempted on such controllers. Incor<hy>
+rect usage can result in a system hang and require a reboot.
+When a controller is in the disconnected (quiesced) state, there is a potential for deadlocks occurring in the system.
+The disconnect operation should be used with caution. A controller should be kept in the disconnected state for the
+minimum period of time required to accomplish the DR operation. The disconnect command is provided only to al<hy>
+low the replacement of the SCSI cables while the system is running. It should not be used for any other purpose.
+The only fix for a deadlock (if it occurs) is to reboot the system.
+Hotplugging operations are not supported by all SCSI controllers.
+The connectors on some SCSI devices do not conform to SCSI hotplug specifications. Performing hotplug opera<hy>
+tions on such devices can cause damage to the hardware on the SCSI bus. Refer to your hardware manual for addi<hy>
+tional information.

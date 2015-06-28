@@ -1,0 +1,370 @@
+<beginning of page>
+cfgadm_usb <-> USB hardware-specific commands for cfgadm
+/usr/sbin/cfgadm [-f] [-y | -n] [-v] -c function ap_id...
+/usr/sbin/cfgadm -f [-y | -n] [-v] [-o hardware_options]
+ -x hardware_function ap_id...
+/usr/sbin/cfgadm -v [-a] [-s listing_option]
+ [-l [ap_id | ap_type...]]
+/usr/sbin/cfgadm -v -h [ap_id]...
+The Universal Serial Bus (USB) hardware-specific library /usr/lib/cfgadm/usb.so.1 provides the functionality for
+administering USB devices via the cfgadm(1M) command. cfgadm operates on attachment points. For details re<hy>
+garding attachment points, refer to cfgadm(1M).
+For USB administration, the only attachment points supported are the ports of hubs attached to the USB bus.
+Attachment points are named through attachment point IDs (ap_ids). The USB bus is hierarchical, so the ap_ids are
+as well. USB hubs have ports, numbered from 1 to n. All USB ap_ids consist of a string of the following form:
+ usbN/A[.B[.C[...]]]
+where
+ N is the Nth USB host controller on the system,
+ A is port #A on the root (top) hub.
+ B is port #B of the hub plugged into port #A of the hub above it.
+ C is port #C of the hub plugged into port #B of the hub above it, and so forth.
+For example, the first port on the root hub of USB controller 0 (the only controller), has a logical ap_id:
+ usb0/1
+Similarly, the second port on the first external hub plugged into the first port on the root hub of the first USB con<hy>
+troller has a logical ap_id:
+ usb0/1.2
+For example, if the ap_id is usb0/1.4.3.4, it represents port 4 of the hub plugged into port 3 of the hub plugged into
+port 4 of the hub plugged into port 1 of the root hub of the first USB host controller on the system.
+ example# cfgadm -l
+ Ap_Id Type Receptacle Occupant Condition
+ usb0/1 USB-hub connected configured ok
+ usb0/2 unknown empty unconfigured ok
+ usb0/1.1 USB-storage connected configured ok
+ usb0/1.2 unknown empty unconfigured ok
+ usb0/1.3 unknown empty unconfigured ok
+ usb0/1.4 USB-device connected configured ok
+USB2.0 chips have one EHCI host USB2.0 host controller and a number of companion USB 1.x host controllers (ei<hy>
+ther OHCI or UHCI host controllers).
+When a USB2.0 device has been plugged in, it shows up on the EHCI logical ports which might not have a 1 to 1
+mapping to external physical port numbers on the system. When a USB1.x device is plugged in, the EHCI host
+controller reroutes the device to a companion host controller and the device shows up on the companion's logical
+port number.
+<beginning of page>
+The mapping of logical port numbers to physical port numbers can get quite complicated. For example:
+ % cfgadm
+ Ap_Id Type Receptacle Occupant Condition
+ c0 scsi-bus connected configured unknown
+ usb0/1 usb-mouse connected configured ok
+ usb0/2 usb-kbd connected configured ok
+ usb0/3 unknown empty unconfigured ok
+ usb0/4 usb-hub connected configured ok
+ usb0/4.1 unknown empty unconfigured ok
+ usb0/4.2 unknown empty unconfigured ok
+ usb0/4.3 unknown empty unconfigured ok
+ usb0/4.4 usb-storage connected configured ok
+ usb1/1 unknown empty unconfigured ok
+ usb1/2 unknown empty unconfigured ok
+ usb1/3 unknown empty unconfigured ok
+ usb2/1 unknown empty unconfigured ok
+ usb2/2 usb-device connected configured ok
+ usb3/1 unknown empty unconfigured ok
+ usb3/2 unknown empty unconfigured ok
+ usb3/3 unknown empty unconfigured ok
+ usb3/4 unknown empty unconfigured ok
+ usb3/5 unknown empty unconfigured ok
+In this example usb0 is the onboard USB 1.x host controller. usb1 and usb2 are companion OHCI USB1.x host
+controllers and usb3 is an EHCI USB2.0 host controller.
+The following table shows the somewhat confusing routing for this USB2.0 chip:
+ logical port number  physical port number
+ -------------------  --------------------
+  usb1/1   internal port 1 
+  usb1/2   external port 1
+  usb1/3   external port 3
+  
+  usb2/1   internal port 2
+  usb2/2   external port 2
+  
+  usb3/1   internal port 1
+  usb3/2   internal port 2
+  usb3/3   external port 1
+  usb3/4   external port 2
+  usb3/5   external port 3
+Unfortunately, the exact routing can often only be determined by experimentation.
+The receptacle states for attachment points at the USB port have the following meanings:
+connected
+USB port is powered on and enabled. A USB device is plugged in to the port. The device is logically connected to
+the USB bus.
+disconnected
+USB port is powered on and enabled. A USB device is plugged into the port. The device has been logically discon<hy>
+nected from the USB bus (using the cfgadm -c disconnect command).
+empty
+USB port is powered on, but no device is plugged in to it.
+<beginning of page>
+The occupant states for devices at USB port attachment points at the USB port have the following meanings:
+configured
+The USB device at the USB port is configured and usable by Solaris.
+unconfigured
+The USB device at the USB port was explicitly off-lined using cfgadm -c unconfigure, or was not successfully con<hy>
+figured for use with Solaris, for example, having no driver or a device problem.
+The attachment point conditions are:
+ok
+Normal state - ready for use.
+failing
+Not used.
+failed
+Not used.
+unusable
+The user has physically removed a device while an application had the device open (there might be outstanding I/O).
+Users need to reinsert the same physical device and close the application properly before removing the device again.
+The port cannot configure other inserted devices until this is done.
+If the original device cannot be reinserted into the port, see the for instructions for clearing this attachment point
+condition.
+unknown
+Not used.
+A USB device can be hotplugged or hotunplugged at any time, and the system detects the event and takes the appro<hy>
+priate action.
+It is not necessary to transition a receptacle to the disconnected state before removing its device from the USB.
+However, it is not recommended to hot-remove devices currently in use (such as removable disks currently opened
+by a volume manager or some other application).
+cfgadm defines several types of operations. These operations include invoking configuration state changes (-c), in<hy>
+voking hardware-specific functions (-x), and obtaining configuration administration help messages (-h).
+If any of these operations fail, the device and attachment point might not be in the expected state. Use the cfgadm -l
+command to display the device's current status.
+All other options have the same meaning as defined in cfgadm(1M).
+The following options are supported:
+-c function
+The following generic commands are defined for the USB hardware specific library. The following configuration
+state change operations are supported:
+<beginning of page>
+configure
+If there is a USB device plugged into the port, this command attempts to configure it and set everything up so that it
+is usable by Solaris. This command does an implied connect (reverse of disconnect) if necessary. This command
+accomplishes nothing, and returns an error message, if the device at that port is already configured. After successful
+execution of this command, the device is ready for use under Solaris.
+disconnect
+Performs an unconfigure on the ap_id (if it is not already unconfigured), and then transitions the receptacle to the
+disconnected state, even though a device is still be plugged into the port. Issuing a cfgadm -c configure, or physi<hy>
+cally hotplugging the device, brings the device back to the connected receptacle state, and to the configured occu<hy>
+pant state, assuming a driver can be found and there are no problems enumerating and configuring the device.
+unconfigure
+Makes the device plugged into the port unusable by Solaris (offline it). If successful, cfgadm reports this ap_id's oc<hy>
+cupant state as unconfigured. Issuing a configure to the ap_id (if successful) brings its occupant back to the config<hy>
+ured (online) condition, as it physically hotplugging the device on the port.
+-f
+Not supported.
+-h ap_id
+USB specific help can be obtained by using the help option with any USB attachment point.
+-l[v]
+The -l option works as described in cfgadm(1M). When paired with the -v option, the Information field contains
+the following USB-specific information: <bu> Mfg: manufacturer string (iManufacturer) <bu> Product: product string
+(iProduct) <bu> NConfigs: total number of configurations the device supports (bNumConfigurations). <bu> Config: cur<hy>
+rent configuration setting in decimal (configuration index, not configuration value). <bu> The configuration string de<hy>
+scriptor for the current configuration (iConfiguration) See the Universal Serial Bus specification for a description of
+these fields.
+-o hardware_options
+Hardware options are only supported for the hardware-specific command, -x usb_config. See the description of that
+command below for an explanation of the options available.
+-s listing_options
+Attachment points of class USB can be listed by using the select sub-option. See cfgadm(1M).
+-x hardware_function
+The following hardware-specific functions are defined:
+usb_config -o config=n
+This command requires the mandatory config value to be specified using the -o option.
+Sets the USB configuration of a multi-configuration USB device at ap_id to configuration index n. The device is set
+to this configuration henceforth and this setting persists across reboots, hot-removes, and unconfigure/configure of
+the device.
+Valid values of n range from 0 to (Nconfigs -1). The device is reset by a disconnect followed by a configure. The
+configure causes the device to be configured to the new configuration setting.
+<beginning of page>
+If any of these steps fail, the configuration file and the device are restored to their previous state and an error mes<hy>
+sage is issued.
+usb_reset
+Performs a software reset (re-enumeration) of the device. This is the equivalent of removing the device and inserting
+it back again. The port on the hub is power cycled if the hub supports power cycling of individual ports.
+If the connected device is a hub, this function has the effect of resetting that hub and any devices down the tree of
+which it is the root.
+If any of these steps fail, the device is restored to its previous state and an error message is issued.
+State table: attachment points state versus commands:
+ Valid states:
+  empty/unconfigured <->> no device connected
+  disconnected/unconfigured <->> logically disconnected,
+  unavailable,
+  devinfo node removed,
+  device physically connected
+  connected/unconfigured <->> logically connected,
+  unavailable,
+  devinfo node present
+  connected/configured <->> connected, available
+The table below clarifies the state transitions resulting from actions or commands:
+ current state operation new state
+ ------------- --------- ---------
+ empty/
+ unconfigured:
+  device plugged in: connected/configured or
+  connected/unconfigured
+  (if enumeration failed)
+  device removed: n/a
+  cfgadm -c unconfigure: empty/unconfigured
+  cfgadm -c configure: empty/unconfigured
+  cfgadm -c disconnect: empty/unconfigured
+  (no-op and error)
+ disconnected/
+ unconfigured:
+  device plugged in: n/a
+  device removed: empty/unconfigured
+  cfgadm -c unconfigure: disconnected/unconfigured
+  cfgadm -c configure: connected/configured, or
+  connected/unconfigured
+  (if reenumeration failed)
+  cfgadm -c disconnect: disconnected/unconfigured
+ connected/unconfigured:
+  device plugged in: n/a
+  device removed: empty/unconfigured
+  cfgadm -c unconfigure: connected/unconfigured
+  cfgadm -c configure: connected/configured, or
+  connected/unconfigured
+  (if reenumeration failed)
+  cfgadm -c disconnect: disconnected/unconfigured
+<beginning of page>
+ connected/configured:
+  device plugged in: n/a
+  device removed: empty/unconfigured or
+  connected/configured,
+  but with ap condition
+  'unusable' if device
+  was open when removed
+  cfgadm -c unconfigure: connected/unconfigured
+  cfgadm -c configure: connected/configured
+  cfgadm -c disconnect: disconnected/unconfigured
+Example 1 Listing the Status of All USB Devices
+The following command lists the status of all USB devices on the system:
+ # cfgadm
+ Ap_Id Type Receptacle Occupant Condition
+ usb0/1 USB-hub connected configured ok
+ usb0/2 unknown empty unconfigured ok
+ usb0/1.1 USB-storage connected configured ok
+ usb0/1.2 unknown empty unconfigured ok
+ usb0/1.3 unknown empty unconfigured ok
+ usb0/1.4 USB-device connected configured ok
+Notice that cfgadm treats the USB-device device at ap_id usb0/1.4 as a single unit, since it cannot currently control
+individual interfaces.
+Example 2 Listing the Status of a Port with No Device Plugged In
+The following command lists the status of a port with no device plugged in:
+ example# cfgadm -l usb0/1.3
+ Ap_Id Type Receptacle Occupant Condition
+ usb0/1.3 unknown empty unconfigured ok
+Example 3 Listing the Status of the Same Port with a Device Plugged In
+The following command lists the status of the same port after physically plugging in a device that configures without
+problems:
+ example# cfgadm -l usb0/1.3
+ Ap_Id Type Receptacle Occupant Condition
+ usb0/1.3 USB-hub connected configured ok
+Example 4 Unconfiguring an Existing USB Device
+The following command unconfigures the USB device attached to usb0/1.3, then displays the status of the ap_id:
+ example# cfgadm -c unconfigure usb0/1.3
+ Unconfigure the device: /devices/pci@0,0/pci8086,7112@7,2/hub@2:2.3
+ This operation suspends activity on the USB device
+ Continue (yes/no)?
+ Enter:
+ y
+<beginning of page>
+ example# cfgadm -l usb0/1.3
+ Ap_Id Type Receptacle Occupant Condition
+ usb0/1.3 unknown connected unconfigured ok
+Example 5 Unconfiguring and Logically Disconnecting an Existing USB Device
+The following command unconfigures and logically disconnects a USB device attached to usb0/1.3:
+ example# cfgadm -c disconnect usb0/1.3
+ Disconnect the device: /devices/pci@0,0/pci8086,7112@7,2/hub@2:2.3
+ This operation suspends activity on the USB device
+ Continue (yes/no)?
+ Enter:
+ y
+ example# cfgadm -l usb0/1.3
+ Ap_Id Type Receptacle Occupant Condition
+ usb0/1.3 unknown disconnected unconfigured ok
+A disconnect implies that cfgadm does an unconfigure first. The receptacle status now shows disconnected, even
+though the device is still physically connected. In this case, a physical hotplug or using the cfgadm -c configure on
+the ap_id brings it back on-line.
+Example 6 Configuring a Previously Unconfigured USB Device
+The following command configures a USB device that was previously attached to usb0/1.3:
+ example # cfgadm -yc configure usb0/1.3
+ example# cfgadm -l usb0/1.3
+ Ap_Id Type Receptacle Occupant Condition
+ usb0/1.3 unknown connected configured ok
+Example 7 Resetting a USB Device
+The following command resets a USB device:
+ example# cfgadm -x usb_reset usb0/1.3
+ Reset the device: /devices/pci@0,0/pci8086,7112@7,2/hub@2:2.3
+ This operation suspends activity on the USB device
+ Continue (yes/no)?
+ Enter:
+ y
+Example 8 Displaying Detailed Information About a USB Device
+The following command displays detailed information about a USB device. This device shows the following USB-
+specific information in the 'Information' field:
+<bu> Manufacturer string: Iomega <bu> Product string: USB Zip 250 <bu> Number of configurations supported: 1 <bu> Configura<hy>
+tion currently active: 0 <bu> Configuration string descriptor for configuration 0: Default
+ example# cfgadm -lv usb0/1.5
+ Ap_Id Receptacle Occupant Condition Information
+<beginning of page>
+ When Type Busy Phys_Id
+ usb0/1.5 connected configured ok Mfg:"Io
+ mega" Product:"USB Zip 250" NConfigs:1 Config:0 : Default
+ example# cfgadm -l -s "cols=ap_id:info" usb0/1.5
+ Ap_Id Information
+ usb0/1.5 Mfg:"Iomega" Product:"USB Zip 250"
+ NConfigs:1 Config:0 : Default
+Example 9 Displaying Detailed Information About All USB Devices
+The following command displays detailed information about all USB devices on the system:
+ example# cfgadm -l -s "select=class(usb),cols=ap_id:info"
+ Ap_Id Information
+ usb0/1 Mfg:<undefined> Product:<undefined>
+ NConfigs:1 Config:0 <no cfg str descr>
+ usb0/2
+ usb0/1.1 Mfg:<undefined> Product:<undefined>
+ NConfigs:1 Config:0 <no cfg str descr>
+ usb0/1.2
+ usb0/1.3
+ usb0/1.4 Mfg:"Wizard" Product:"Modem/ISDN"
+ NConfigs:3 Config:1 : V.90 Analog Modem
+ usb0/1.5 Mfg:"Iomega" Product:"USB Zip 250"
+ NConfigs:1 Config:0 : Default
+ usb0/1.6 Mfg:"SOLID YEAR" Product:"SOLID YEAR
+ USB"NConfigs:1 Config:0 <no cfg str descr>
+ usb0/1.7
+Lines containing only an ap_id are empty ports. These can be filtered out. This example only lists USB ap_ids with
+connected devices, and information about those devices.
+ example# cfgadm -l -s "select=class(usb),cols=ap_id:info" | grep Mfg
+ usb0/1 Mfg:<undefined> Product:<undefined>
+ NConfigs:1 Config:0 <no cfg str descr>
+ usb0/1.1 Mfg:<undefined> Product:<undefined>
+ NConfigs:1 Config:0 <no cfg str descr>
+ usb0/1.4 Mfg:"Wizard" Product:"Modem/ISDN"
+ NConfigs:3 Config:1 : V.90 Analog Modem
+ usb0/1.5 Mfg:"Iomega" Product:"USB Zip 250"
+ NConfigs:1 Config:0 : Default
+ usb0/1.6 Mfg:"SOLID YEAR" Product:"SOLID YEAR USB"
+ Config:0 <no cfg str descr>
+Example 10 Listing Information About a Multi-configuration USB Device
+The following example lists information about a multi-configuration USB device.
+Notice the NConfigs field: the configurations available for this device are 0, 1, and 2 (0 to (NConfigs-1)).
+ example# cfgadm -l -s "cols=ap_id:info" usb0/1.4
+ Ap_Id Information
+ usb0/1.4 Mfg:"Wizard" Product:"Modem/ISDN"
+ NConfigs:3 Config:1 V.90 Analog Modem"
+<beginning of page>
+Example 11 Setting the Current Configuration of a Multi-configuration USB Device
+The following example sets the current configuration of a multi-configuration USB device:
+ example# cfgadm -o config=2 -x usb_config usb0/1.4
+ Setting the device: /devices/pci@1f,2000/usb@1/device@3
+ to USB configuration 2
+ This operation suspends activity on the USB device
+ Continue (yes/no)?
+ Enter:
+ y
+ USB configuration changed successfully.
+The device path should be checked to ensure that the right instance of a device is being referred to, in the case where
+multiple devices of the exact same type are on the same bus. This information is available in the 'Information' field.
+/usr/lib/cfgadm/usb.so.1
+Hardware specific library for generic USB device administration
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsl
+cfgadm(1M), config_admin(3CFGADM), attributes(5), scsa2usb(7D), usba(7D)
+Universal Serial Bus 1.1 Specification (www.usb.org)
+
+cfgadm(1M) can not unconfigure, disconnect, reset, or change the configuration of any USB device currently
+opened by any application. These operations also fail on a hub if a device in its hierarchy is opened by an applica<hy>
+tion. See scsa2usb(7D) for unconfiguring a USB mass-storage device that is currently in use.
+Only super-users can execute any functions on an attachment point. However, one need not be a super-user to list the
+attachment points.

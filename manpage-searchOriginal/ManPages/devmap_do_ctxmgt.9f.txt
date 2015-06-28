@@ -1,0 +1,89 @@
+<beginning of page>
+devmap_do_ctxmgt <-> perform device context switching on a mapping
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+int devmap_do_ctxmgt(devmap_cookie_t dhp, void *pvtp, offset_t off,
+ size_t len, uint_t type,
+ uint_t rw, int (*devmap_contextmgt)devmap_cookie_t,
+ void *, offset_t, size_t, uint_t, uint_t);
+Solaris DDI specific (Solaris DDI).
+dhp An opaque mapping handle that the system uses to describe the mapping.
+pvtp Driver private mapping data.
+off User offset within the logical device memory at which the access begins.
+len Length (in bytes) of the memory being accessed.
+devmap_contextmgt The address of driver function that the system will call to perform context switching on a map<hy>
+ping. See devmap_contextmgt(9E) for details.
+type Type of access operation. Provided by devmap_access(9E). Should not be modified.
+rw Direction of access. Provided by devmap_access(9E). Should not be modified.
+Device drivers call devmap_do_ctxmgt() in the devmap_access(9E) entry point to perform device context switch<hy>
+ing on a mapping. devmap_do_ctxmgt() passes a pointer to a driver supplied callback function, devmap_con<hy>
+textmgt(9E), to the system that will perform the actual device context switching. If devmap_contextmgt(9E) is not
+a valid driver callback function, the system will fail the memory access operation which will result in a SIGSEGV
+or SIGBUS signal being delivered to the process.
+devmap_do_ctxmgt() performs context switching on the mapping object identified by dhp and pvtp in the range
+specified by off and len. The arguments dhp, pvtp, type, and rw are provided by the devmap_access(9E) entry point
+and must not be modified. The range from off to off+len must support context switching.
+The system will pass through dhp, pvtp, off, len, type, and rw to devmap_contextmgt(9E) in order to perform the
+actual device context switching. The return value from devmap_contextmgt(9E) will be returned directly to de<hy>
+vmap_do_ctxmgt().
+0 Successful completion.
+Non-zero An error occurred.
+devmap_do_ctxmgt() must be called from the driver's devmap_access(9E) entry point. Example 1 Using de<hy>
+vmap_do_ctxmgt in the devmap_access entry point.
+The following shows an example of using devmap_do_ctxmgt() in the devmap_access(9E) entry point.
+ ...
+ #define OFF_DO_CTXMGT 0x40000000
+ #define OFF_NORMAL 0x40100000
+ #define CTXMGT_SIZE 0x100000
+<beginning of page>
+ #define NORMAL_SIZE 0x100000
+ /*
+  * Driver devmap_contextmgt(9E) callback function.
+  */
+ static int
+ xx_context_mgt(devmap_cookie_t dhp, void *pvtp, offset_t offset,
+  size_t length, uint_t type, uint_t rw)
+ {
+  ......
+  /*
+  * see devmap_contextmgt(9E) for an example
+  */
+ }
+ /*
+  * Driver devmap_access(9E) entry point
+  */
+ static int
+ xxdevmap_access(devmap_cookie_t dhp, void *pvtp, offset_t off,
+  size_t len, uint_t type, uint_t rw)
+ {
+  offset_t diff;
+  int err;
+  /*
+  * check if off is within the range that supports
+  * context management.
+  */
+  if ((diff = off - OFF_DO_CTXMG) >= 0 && diff < CTXMGT_SIZE) {
+  /*
+  * calculates the length for context switching
+  */
+  if ((len + off) > (OFF_DO_CTXMGT + CTXMGT_SIZE))
+  return (-1);
+  /*
+  * perform context switching
+  */
+  err = devmap_do_ctxmgt(dhp, pvtp, off, len, type,
+  rw, xx_context_mgt);
+  /*
+  * check if off is within the range that does normal
+  * memory mapping.
+  */
+  } else if ((diff = off - OFF_NORMAL) >= 0 && diff < NORMAL_SIZE) {
+  if ((len + off) > (OFF_NORMAL + NORMAL_SIZE))
+  return (-1);
+  err = devmap_default_access(dhp, pvtp, off, len, type, rw);
+  } else
+  return (-1);
+  return (err);
+ }
+devmap_access(9E), devmap_contextmgt(9E), devmap_default_access(9F)
+Writing Device Drivers

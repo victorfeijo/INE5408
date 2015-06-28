@@ -1,0 +1,52 @@
+<beginning of page>
+dladdr, dladdr1 <-> translate address to symbolic information
+#include <dlfcn.h>
+int dladdr(void *address, Dl_info_t *dlip);
+int dladdr1(void *address, Dl_info_t *dlip, void **info, int flags);
+The dladdr() and dladdr1() functions determine if the specified address is located within one of the mapped objects
+that make up the current applications address space. An address is deemed to fall within a mapped object when it is
+between the base address, and the _end address of that object. See NOTES. If a mapped object fits this criteria, the
+symbol table made available to the runtime linker is searched to locate the nearest symbol to the specified address.
+The nearest symbol is one that has a value less than or equal to the required address.
+The Dl_info_t structure must be preallocated by the user. The structure members are filled in by dladdr(), based on
+the specified address. The Dl_info_t structure includes the following members:
+  const char *dli_fname;
+  void *dli_fbase;
+  const char *dli_sname;
+  void *dli_saddr;
+The Dl_info_t members provide the following information.
+dli_fname Contains a pointer to the filename of the containing object.
+dli_fbase Contains the base address of the containing object.
+dli_sname Contains a pointer to the symbol name that is nearest to the specified address. This symbol either repre<hy>
+sents the exact address that was specified, or is the nearest symbol with a lower address.
+dli_saddr Contains the actual address of the symbol pointed to by dli_sname.
+The dladdr1() function provides for addition information to be returned as specified by the flags argument:
+RTLD_DL_SYMENT Obtain the ELF symbol table entry for the matched symbol. The info argument points to a
+symbol pointer as defined in <sys/elf.h> (Elf32_Sym **info or Elf64_Sym **info). Most of the information found
+in an ELF symbol can only be properly interpreted by the runtime linker. However, there are two fields that contain
+information useful to the caller of dladdr1(): The st_size field contains the size of the referenced item. The st_info
+field provides symbol type and binding attributes. See the Linker and Libraries Guild for more information.
+RTLD_DL_LINKMAP Obtain the Link_map for the matched file. The info argument points to a Link_map point<hy>
+er as defined in <sys/link.h> (Link_map **info).
+If the specified address cannot be matched to a mapped object, a 0 is returned. Otherwise, a non-zero return is made
+and the associated Dl_info_t elements are filled.
+The dladdr() and dladdr1() functions are one of a family of functions that give the user direct access to the dynamic
+linking facilities. These facilities are available to dynamically-linked processes only. See Linker and Libraries
+Guide.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelMT-Safe
+ld(1), dlclose(3C), dldump(3C), dlerror(3C), dlopen(3C), dlsym(3C), attributes(5)
+<beginning of page>
+Linker and Libraries Guide
+The Dl_info_t pointer elements point to addresses within the mapped objects. These pointers can become invalid if
+objects are removed prior to these elements use. See dlclose(3C).
+If no symbol is found to describe the specified address, both the dli_sname and dli_saddr members are set to 0.
+If the address specified exists within a mapped object in the range between the base address and the address of the
+first global symbol in the object, the reserved local symbol _START_ is returned. This symbol acts as a label repre<hy>
+senting the start of the mapped object. As a label, this symbol has no size. The dli_saddr member is set to the base
+address of the associated object. The dli_sname member is set to the symbol name _START_. If the flag argument
+is set to RTLD_DL_SYMENT, symbol information for _START_ is returned.
+If an object is acting as a filter, care should be taken when interpreting the address of any symbol obtained using a
+handle to this object. For example, using dlsym(3C) to obtain the symbol _end for this object, results in returning
+the address of the symbol _end within the filtee, not the filter. For more information on filters see the Linker and Li<hy>
+braries Guide.

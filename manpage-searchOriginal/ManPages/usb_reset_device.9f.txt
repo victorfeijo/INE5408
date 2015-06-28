@@ -1,0 +1,105 @@
+<beginning of page>
+usb_reset_device <-> reset a USB device according to the reset_level.
+#include <sys/usb/usba.h
+int usb_reset_device (dev_info_t *dip,
+ usb_dev_reset_lvl_t reset_level);
+Solaris DDI specific (Solaris DDI)
+dip
+Pointer to the devices's dev_info structure.
+reset_level
+The level to which the device is reset. See below for a list of valid usb_dev_reset_lvl_t values and explanations.
+The usb_reset_device() function provides a client driver to request a hardware reset for a USB device, which may
+be required in some situations such as: <bu> Resetting the hardware may help drivers to recover devices from an error
+state caused by physical or firmware defects. <bu> Some USB devices need the driver to upload firmware into the de<hy>
+vice's RAM and initiate a hardware reset in order to activate the new firmware.
+The valid values for the reset_level are:
+USB_RESET_LVL_DEFAULT
+The default reset level. The device is reset and any error status is cleared. The device state machines and registers are
+also cleared and need to be reinitialized in the driver. The current driver remains attached. This reset level applies to
+hardware error recovery, or firmware download without changing the descriptors.
+USB_RESET_LVL_REATTACH
+The device is reset. The original driver is detached and a new driver attaching process is started according to the up<hy>
+dated compatible name. This reset level applies to the firmware download with the descriptors changing, or other sit<hy>
+uations in which the device needs to be reattached.
+The usb_reset_device() function creates a new helper thread for reattachment. When called from attach(9E), the
+new thread sets a timer (1 second), and waits until the driver's attach(9E) completes, after which the thread attempts
+to reattach the driver. When not called from attach(9E), the new thread attempts to reattach the driver immediately.
+If the thread fails to reattach to the driver, an error message is printed in system log with the detailed reason. The
+driver returns to a stable state, depending on where the failure occurred.
+The return values for the usb_reset_device() function are:
+USB_SUCCESS If USB_RESET_LVL_DEFAULT is specified, the device was reset successfully. If USB_RE<hy>
+SET_LVL_REATTACH is specified, reattaching was started successfully or a previous reset is still in progress.
+USB_FAILURE The state of the device's parent hub is invalid (disconnected or suspended). This is called when the
+driver being detached. If USB_RESET_LVL_DEFAULT is specified, the device failed to be reset. If USB_RE<hy>
+SET_LVL_REATTACH is specified, reattaching failed to start.
+USB_INVALID_ARGS Invalid arguments.
+USB_INVALID_PERM The driver of the dip does not own the entire device.
+<beginning of page>
+USB_BUSY If USB_RESET_LVL_DEFAULT is specified, one or more pipes other than the default control pipe
+are open on the device.
+USB_INVALID_CONTEXT If USB_RESET_LVL_DEFAULT is specified, called from interrupt context
+Example 1 Resetting a Device
+The following example shows how a device is reset to recover it from an error state:
+ xxx_configure()
+ {
+  xxx_set_parameter1();
+  if (xxx_set_parameter2() == USB_FAILURE) {
+  /* Close all the opened pipes except the default pipe */
+  xxx_close_all_opened_pipes();
+  /* Reset the device */
+  rval = usb_reset_device(dip, USB_RESET_LVL_DEFAULT);
+  if (rval == USB_SUCCESS) {
+  /* Re-configure the device */
+  xxx_set_parameter1();
+  xxx_set_parameter2();
+  /* Open the closed pipes if needed */
+  ...
+  } else {
+  /* Failed to reset the device, check the return value for
+  further process */
+  ...
+  }
+  }
+ }
+Example 2 Resetting a Device After Downloading Firmware
+The following example shows how a device is reset after downloading firmware. the device's descriptors change af<hy>
+ter the reset:
+ static int xxx_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
+ {
+  ...
+  /* Download the firmware to the RAM of the device */
+  if (firmware_download() == USB_SUCCESS) {
+  /* Reset the device and re-enumerate it */
+  rval = usb_reset_device(dip, USB_RESET_LVL_REATTACH);
+  if (rval == USB_SUCCESS) {
+  /* The re-enumeration has been started up, just return */
+  return (DDI_SUCCESS);
+  } else {
+  /* Failed to start the re-enumeration, check the return value
+  for further process*/
+  ...
+  return (DDI_FAILURE);
+  }
+ }
+The usb_reset_device() function may be called from user or kernel context.
+See attributes(5) for descriptions of the following attributes:
+<beginning of page>
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ ArchitecturePCI-
+based systems _ AvailabilitySUNWusb _ Interface StabilityCommitted
+attributes(5), usb_clr_feature(9F), usb_get_cfg(9F), usb_pipe_close(9F), usb_pipe_open(9F), usb_pipe_re<hy>
+set(9F),
+The messages described below may appear on the system console as well as being logged. All messages are format<hy>
+ted in the following manner:
+ WARNING: dev_path hubdinstance_num driver_name Error message ...
+driver_name instance_num is under bus power management, cannot be reset. Please disconnect and reconnect this
+device.
+Bus power management is in process when calling the reset function, the device failed to be reset and stayed in the
+former state. Please disconnect and reconnect it to system.
+Time out when resetting the device driver_name instance_num. Please disconnect and reconnect it to system.
+The parent hub/root hub of this device is busy now. The device failed to be reset and stayed in the former state.
+Please disconnect the device, wait for a while and reconnect it to system.
+driver_name instance_num cannot be reset due to other applications are using it, please first close these applications,
+then disconnect and reconnect the device.
+The device is using by other applications, the related driver failed to be detached. Please make sure to close these ap<hy>
+plications before calling the reset function.
+Always close all applications before resetting a device.

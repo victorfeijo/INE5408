@@ -1,0 +1,49 @@
+<beginning of page>
+closefrom, fdwalk <-> close or iterate over open file descriptors
+#include <stdlib.h>
+void closefrom(int lowfd);
+int fdwalk(int (*func)(void *, int), void *cd);
+The closefrom() function calls close(2) on all open file descriptors greater than or equal to lowfd.
+The effect of closefrom(lowfd) is the same as the code
+ #include <sys/resource.h>
+ struct rlimit rl;
+ int i;
+ getrlimit(RLIMIT_NOFILE, &rl);
+ for (i = lowfd; i < rl.rlim_max; i++)
+  (void) close(i);
+except that close() is called only on file descriptors that are actually open, not on every possible file descriptor
+greater than or equal to lowfd, and close() is also called on any open file descriptors greater than or equal to
+rl.rlim_max (and lowfd), should any exist.
+The fdwalk() function first makes a list of all currently open file descriptors. Then for each file descriptor in the list,
+it calls the user-defined function, func(cd, fd), passing it the pointer to the callback data, cd, and the value of the file
+descriptor from the list, fd. The list is processed in file descriptor value order, lowest numeric value first.
+If func() returns a non-zero value, the iteration over the list is terminated and fdwalk() returns the non-zero value re<hy>
+turned by func(). Otherwise, fdwalk() returns 0 after having called func() for every file descriptor in the list.
+The fdwalk() function can be used for fine-grained control over the closing of file descriptors. For example, the
+closefrom() function can be implemented as:
+ static int
+ close_func(void *lowfdp, int fd)
+ {
+  if (fd >= *(int *)lowfdp)
+  (void) close(fd);
+  return (0);
+ }
+ void
+ closefrom(int lowfd)
+ {
+  (void) fdwalk(close_func, &lowfd);
+ }
+The fdwalk() function can then be used to count the number of open files in the process.
+No return value is defined for closefrom(). If close() fails for any of the open file descriptors, the error is ignored and
+the file descriptors whose close() operation failed might remain open on return from closefrom().
+The fdwalk() function returns the return value of the last call to the callback function func(), or 0 if func() is never
+called (no open files).
+No errors are defined. The closefrom() and fdwalk() functions do not set errno but errno can be set by close() or by
+another function called by the callback function, func().
+/proc/self/fd directory (list of open files)
+The act of closing all open file descriptors should be performed only as the first action of a daemon process. Closing
+file descriptors that are in use elsewhere in the current process normally leads to disastrous results.
+<beginning of page>
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelUnsafe
+close(2), getrlimit(2), proc(4), attributes(5)

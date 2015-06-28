@@ -1,0 +1,476 @@
+<beginning of page>
+mutex_init, mutex_lock, mutex_trylock, mutex_unlock, mutex_consistent, mutex_destroy <-> mutual exclusion locks
+cc -mt [ flag... ] file... [ library... ]
+#include <thread.h>
+#include <synch.h>
+int mutex_init(mutex_t *mp, int type, void * arg);
+int mutex_lock(mutex_t *mp);
+int mutex_trylock(mutex_t *mp);
+int mutex_unlock(mutex_t *mp);
+int mutex_consistent(mutex_t *mp);
+int mutex_destroy(mutex_t *mp);
+Mutual exclusion locks (mutexes) prevent multiple threads from simultaneously executing critical sections of code
+that access shared data (that is, mutexes are used to serialize the execution of threads). All mutexes must be global.
+A successful call for a mutex lock by way of mutex_lock() will cause another thread that is also trying to lock the
+same mutex to block until the owner thread unlocks it by way of mutex_unlock(). Threads within the same process
+or within other processes can share mutexes.
+Mutexes can synchronize threads within the same process or in other processes. Mutexes can be used to synchronize
+threads between processes if the mutexes are allocated in writable memory and shared among the cooperating pro<hy>
+cesses (see mmap(2)), and have been initialized for this task.
+Mutexes are either intra-process or inter-process, depending upon the argument passed implicitly or explicitly to
+the initialization of that mutex. A statically allocated mutex does not need to be explicitly initialized; by default, a
+statically allocated mutex is initialized with all zeros and its scope is set to be within the calling process.
+For inter-process synchronization, a mutex needs to be allocated in memory shared between these processes. Since
+the memory for such a mutex must be allocated dynamically, the mutex needs to be explicitly initialized using mu<hy>
+tex_init().
+The mutex_init() function initializes the mutex referenced by mp with the type specified by type. Upon successful
+initialization the state of the mutex becomes initialized and unlocked. Only the attribute type LOCK_PRIO_PRO<hy>
+TECT uses arg. The type argument must be one of the following:
+USYNC_THREAD
+The mutex can synchronize threads only in this process.
+USYNC_PROCESS
+The mutex can synchronize threads in this process and other processes. The object initialized with this attribute must
+be allocated in memory shared between processes, either in System V shared memory (see shmop(2)) or in memory
+mapped to a file (see mmap(2)). If the object is not allocated in such shared memory, it will not be shared between
+processes.
+The type argument can be augmented by the bitwise-inclusive-OR of zero or more of the following flags:
+LOCK_ROBUST
+The mutex can synchronize threads robustly. At the time of thread or process death, either by calling thr_exit() or
+exit() or due to process abnormal termination, the lock is unlocked if is held by the thread or process. The next own<hy>
+er of the mutex will acquire it with an error return of EOWNERDEAD. The application must always check the re<hy>
+turn value from mutex_lock() for a mutex of this type. The new owner of this mutex should then attempt to make
+the state protected by the mutex consistent, since this state could have been left inconsistent when the last owner
+died. If the new owner is able to make the state consistent, it should call mutex_consistent() to restore the state of
+the mutex and then unlock the mutex. All subsequent calls to mutex_lock()will then behave normally. Only the new
+owner can make the mutex consistent. If for any reason the new owner is not able to make the state consistent, it
+should not call mutex_consistent() but should simply unlock the mutex. All waiting processes will be awakened and
+all subsequent calls to mutex_lock() will fail in acquiring the mutex with an error value of ENOTRECOVER<hy>
+ABLE. If the thread or process that acquired the lock with EOWNERDEAD terminates without unlocking the mu<hy>
+<beginning of page>
+tex, the next owner will acquire the lock with an error value of EOWNERDEAD.
+The memory for the object to be initialized with this attribute must be zeroed before initialization. Any thread or
+process interested in the robust lock can call mutex_init() to potentially initialize it, provided that all such callers of
+mutex_init() specify the same set of attribute flags. In this situation, if mutex_init() is called on a previously ini<hy>
+tialized robust mutex, mutex_init() will not reinitialize the mutex and will return the error value EBUSY.
+LOCK_RECURSIVE
+A thread attempting to relock this mutex without first unlocking it will succeed in locking the mutex. The mutex
+must be unlocked as many times as it is locked.
+LOCK_ERRORCHECK
+Unless LOCK_RECURSIVE is also set, a thread attempting to relock this mutex without first unlocking it will re<hy>
+turn with an error rather than deadlocking itself. A thread attempting to unlock this mutex without first owning it
+will return with an error.
+LOCK_PRIO_INHERIT
+When a thread is blocking higher priority threads because of owning one or more mutexes with the
+LOCK_PRIO_INHERIT attribute, it executes at the higher of its priority or the priority of the highest priority
+thread waiting on any of the mutexes owned by this thread and initialized with this attribute.
+LOCK_PRIO_PROTECT
+When a thread owns one or more mutexes initialized with the LOCK_PRIO_PROTECT attribute, it executes at the
+higher of its priority or the highest of the priority ceilings of all the mutexes owned by this thread and initialized
+with this attribute, regardless of whether other threads are blocked on any of these mutexes. When this attribute is
+specified, arg must point to an int containing the priority ceiling.
+See pthread_mutexattr_getrobust(3C) for more information about robust mutexes. The LOCK_ROBUST at<hy>
+tribute is the same as the POSIX PTHREAD_MUTEX_ROBUST attribute.
+See pthread_mutexattr_settype(3C) for more information on recursive and error checking mutex types. The com<hy>
+bination (LOCK_RECURSIVE | LOCK_ERRORCHECK) is the same as the POSIX PTHREAD_MU<hy>
+TEX_RECURSIVE type. By itself, LOCK_ERRORCHECK is the same as the POSIX PTHREAD_MU<hy>
+TEX_ERRORCHECK type.
+The LOCK_PRIO_INHERIT attribute is the same as the POSIX PTHREAD_PRIO_INHERIT attribute. The
+LOCK_PRIO_PROTECT attribute is the same as the POSIX PTHREAD_PRIO_PROTECT attribute. See
+pthread_mutexattr_getprotocol(3C), pthread_mutexattr_getprioceiling(3C), and pthread_mutex_getprioceil<hy>
+ing(3C) for a full discussion. The LOCK_PRIO_INHERIT and LOCK_PRIO_PROTECT attributes are mutually
+exclusive. Specifying both of these attributes causes mutex_init() to fail with EINVAL.
+Initializing mutexes can also be accomplished by allocating in zeroed memory (default), in which case a type of
+USYNC_THREAD is assumed. In general, the following rules apply to mutex initialization: <bu> The same mutex
+must not be simultaneously initialized by multiple threads. <bu> A mutex lock must not be reinitialized while in use by
+other threads.
+These rules do not apply to LOCK_ROBUST mutexes. See the description for LOCK_ROBUSTabove. If default
+mutex attributes are used, the macro DEFAULTMUTEX can be used to initialize mutexes that are statically allocat<hy>
+ed.
+Default mutex initialization (intra-process):
+ mutex_t mp;
+ mutex_init(&mp, USYNC_THREAD, NULL);
+or
+ mutex_t mp = DEFAULTMUTEX;
+<beginning of page>
+Customized mutex initialization (inter-process):
+ mutex_init(&mp, USYNC_PROCESS, NULL);
+Customized mutex initialization (inter-process robust):
+ mutex_init(&mp, USYNC_PROCESS | LOCK_ROBUST, NULL);
+Statically allocated mutexes can also be initialized with macros specifying LOCK_RECURSIVE and/or
+LOCK_ERRORCHECK:
+mutex_t mp = RECURSIVEMUTEX;
+Same as (USYNC_THREAD | LOCK_RECURSIVE)
+mutex_t mp = ERRORCHECKMUTEX;
+Same as (USYNC_THREAD | LOCK_ERRORCHECK)
+mutex_t mp = RECURSIVE_ERRORCHECKMUTEX;
+Same as (USYNC_THREAD | LOCK_RECURSIVE | LOCK_ERRORCHECK)
+A critical section of code is enclosed by a the call to lock the mutex and the call to unlock the mutex to protect it
+from simultaneous access by multiple threads. Only one thread at a time may possess mutually exclusive access to
+the critical section of code that is enclosed by the mutex-locking call and the mutex-unlocking call, whether the mu<hy>
+tex's scope is intra-process or inter-process. A thread calling to lock the mutex either gets exclusive access to the
+code starting from the successful locking until its call to unlock the mutex, or it waits until the mutex is unlocked by
+the thread that locked it.
+Mutexes have ownership, unlike semaphores. Although any thread, within the scope of a mutex, can get an unlocked
+mutex and lock access to the same critical section of code, only the thread that locked a mutex should unlock it.
+If a thread waiting for a mutex receives a signal, upon return from the signal handler, the thread resumes waiting for
+the mutex as if there was no interrupt. A mutex protects code, not data; therefore, strongly bind a mutex with the da<hy>
+ta by putting both within the same structure, or at least within the same procedure.
+A call to mutex_lock() locks the mutex object referenced by mp. If the mutex is already locked, the calling thread
+blocks until the mutex is freed; this will return with the mutex object referenced by mp in the locked state with the
+calling thread as its owner. If the current owner of a mutex tries to relock the mutex, it will result in deadlock.
+The mutex_trylock() function is the same as mutex_lock(), respectively, except that if the mutex object referenced
+by mp is locked (by any thread, including the current thread), the call returns immediately with an error.
+The mutex_unlock() function are called by the owner of the mutex object referenced by mp to release it. The mutex
+must be locked and the calling thread must be the one that last locked the mutex (the owner). If there are threads
+blocked on the mutex object referenced by mp when mutex_unlock() is called, the mp is freed, and the scheduling
+policy will determine which thread gets the mutex. If the calling thread is not the owner of the lock, no error status is
+returned, and the behavior of the program is undefined.
+The mutex_destroy() function destroys the mutex object referenced by mp. The mutex object becomes uninitialized.
+The space used by the destroyed mutex variable is not freed. It needs to be explicitly reclaimed.
+If successful, these functions return 0. Otherwise, an error number is returned.
+The mutex_init() function will fail if:
+EINVAL The value specified by type is invalid, or the LOCK_PRIO_INHERIT and LOCK_PRIO_PROTECT
+attributes are both specified.
+<beginning of page>
+The mutex_init() function will fail for LOCK_ROBUST type mutex if:
+EBUSY The mutex pointed to by mp was previously initialized and has not yet been destroyed.
+EINVAL The mutex pointed to by mp was previously initialized with a different set of attribute flags.
+The mutex_trylock() function will fail if:
+EBUSY The mutex pointed to by mp is already locked.
+The mutex_lock() and mutex_trylock() functions will fail for a LOCK_RECURSIVE mutex if:
+EAGAIN The mutex could not be acquired because the maximum number of recursive locks for the mutex has been
+reached.
+The mutex_lock() function will fail for a LOCK_ERRORCHECK and non-LOCK_RECURSIVE mutex if:
+EDEADLK The caller already owns the mutex.
+The mutex_lock() function may fail for a non-LOCK_ERRORCHECK and non-LOCK_RECURSIVE mutex if:
+EDEADLK The caller already owns the mutex.
+The mutex_unlock() function will fail for a LOCK_ERRORCHECK mutex if:
+EPERM The caller does not own the mutex.
+The mutex_lock() or mutex_trylock() functions will fail for LOCK_ROBUST type mutex if:
+EOWNERDEAD The last owner of this mutex died while holding the mutex. This mutex is now owned by the call<hy>
+er. The caller must now attempt to make the state protected by the mutex consistent. If it is able to clean up the state,
+then it should restore the state of the mutex by calling mutex_consistent() and unlock the mutex. Subsequent calls
+to mutex_lock() will behave normally, as before. If the caller is not able to clean up the state, mutex_consistent()
+should not be called but the mutex should be unlocked. Subsequent calls to mutex_lock() will fail to acquire the mu<hy>
+tex, returning with the error value ENOTRECOVERABLE. If the owner who acquired the lock with EOWN<hy>
+ERDEAD dies, the next owner will acquire the lock with EOWNERDEAD.
+ENOTRECOVERABLE The mutex trying to be acquired was protecting the state that has been left unrecoverable
+when the mutex's last owner could not make the state protected by the mutex consistent. The mutex has not been ac<hy>
+quired. This condition occurs when the lock was previously acquired with EOWNERDEAD and the owner was not
+able to clean up the state and unlocked the mutex without calling mutex_consistent().
+The mutex_consistent() function will fail if:
+EINVAL The caller does not own the mutex or the mutex is not a LOCK_ROBUST mutex having an inconsistent
+state (EOWNERDEAD).
+The following example uses one global mutex as a gate-keeper to permit each thread exclusive sequential access to
+the code within the user-defined function "change_global_data." This type of synchronization will protect the state
+of shared data, but it also prohibits parallelism.
+ /* cc thisfile.c -lthread */
+ #define _REENTRANT
+ #include <stdio.h>
+ #include <thread.h>
+ #define NUM_THREADS 12
+<beginning of page>
+ void *change_global_data(void *); /* for thr_create() */
+ main(int argc,char * argv[]) {
+  int i=0;
+  for (i=0; i< NUM_THREADS; i++) {
+  thr_create(NULL, 0, change_global_data, NULL, 0, NULL);
+  }
+  while ((thr_join(NULL, NULL, NULL) == 0));
+ }
+ void * change_global_data(void *null){
+  static mutex_t Global_mutex;
+  static int Global_data = 0;
+  mutex_lock(&Global_mutex);
+  Global_data++;
+  sleep(1);
+  printf("%d is global data\n",Global_data);
+  mutex_unlock(&Global_mutex);
+  return NULL;
+ }
+The previous example, the mutex, the code it owns, and the data it protects was enclosed in one function. The next
+example uses C++ features to accommodate many functions that use just one mutex to protect one data:
+ /* CC thisfile.c -lthread use C++ to compile*/
+ #define _REENTRANT
+ #include <stdlib.h>
+ #include <stdio.h>
+ #include <thread.h>
+ #include <errno.h>
+ #include <iostream.h>
+ #define NUM_THREADS 16
+ void *change_global_data(void *); /* for thr_create() */
+ class Mutected {
+  private:
+  static mutex_t Global_mutex;
+  static int Global_data;
+  public:
+  static int add_to_global_data(void);
+  static int subtract_from_global_data(void);
+ };
+ int Mutected::Global_data = 0;
+ mutex_t Mutected::Global_mutex;
+ int Mutected::add_to_global_data() {
+  mutex_lock(&Global_mutex); 
+  Global_data++;
+  mutex_unlock(&Global_mutex); 
+  return Global_data;
+ }
+ int Mutected::subtract_from_global_data() {
+  mutex_lock(&Global_mutex); 
+  Global_data--;
+  mutex_unlock(&Global_mutex);
+  return Global_data;
+ }
+ void
+ main(int argc,char * argv[]) {
+  int i=0;
+  for (i=0;i< NUM_THREADS;i++) {
+  thr_create(NULL,0,change_global_data,NULL,0,NULL);
+<beginning of page>
+  }
+  while ((thr_join(NULL,NULL,NULL) == 0));
+ }
+ void * change_global_data(void *) {
+  static int switcher = 0;
+  if ((switcher++ % 3) == 0) /* one-in-three threads subtracts */
+  cout << Mutected::subtract_from_global_data() << endl; 
+  else
+  cout << Mutected::add_to_global_data() << endl;  
+  return NULL;
+ }
+A mutex can protect data that is shared among processes. The mutex would need to be initialized as
+USYNC_PROCESS. One process initializes the process-shared mutex and writes it to a file to be mapped into
+memory by all cooperating processes (see mmap(2)). Afterwards, other independent processes can run the same
+program (whether concurrently or not) and share mutex-protected data.
+ /* cc thisfile.c -lthread */
+ /* To execute, run the command line "a.out 0 &; a.out 1" */
+ #define _REENTRANT
+ #include <sys/types.h>
+ #include <sys/mman.h>
+ #include <sys/stat.h>
+ #include <fcntl.h>
+ #include <stdio.h>
+ #include <thread.h>
+ #define INTERPROCESS_FILE "ipc-sharedfile"
+ #define NUM_ADDTHREADS 12
+ #define NUM_SUBTRACTTHREADS 10
+ #define INCREMENT '0'
+ #define DECREMENT '1'
+ typedef struct {
+  mutex_t Interprocess_mutex;
+  int Interprocess_data;
+ } buffer_t;
+ buffer_t *buffer;
+ void *add_interprocess_data(), *subtract_interprocess_data();
+ void create_shared_memory(), test_argv();
+ int zeroed[sizeof(buffer_t)];
+ int ipc_fd, i=0;
+ void
+ main(int argc,char * argv[]){
+  test_argv(argv[1]);
+  switch (*argv[1]) {
+  case INCREMENT:
+  /* Initializes the process-shared mutex */
+  /* Should be run prior to running a DECREMENT process */
+  create_shared_memory();
+  ipc_fd = open(INTERPROCESS_FILE, O_RDWR);
+  buffer = (buffer_t *)mmap(NULL, sizeof(buffer_t),
+  PROT_READ | PROT_WRITE, MAP_SHARED, ipc_fd, 0);
+  buffer->Interprocess_data = 0;
+  mutex_init(&buffer->Interprocess_mutex, USYNC_PROCESS,0);
+  for (i=0; i< NUM_ADDTHREADS; i++)
+  thr_create(NULL, 0, add_interprocess_data, argv[1],
+  0, NULL);
+  break;
+  case DECREMENT:
+  /* Should be run after the INCREMENT process has run. */
+<beginning of page>
+  while(ipc_fd = open(INTERPROCESS_FILE, O_RDWR)) == -1)
+  sleep(1);
+  buffer = (buffer_t *)mmap(NULL, sizeof(buffer_t),
+  PROT_READ | PROT_WRITE, MAP_SHARED, ipc_fd, 0);
+  for (i=0; i< NUM_SUBTRACTTHREADS; i++)
+  thr_create(NULL, 0, subtract_interprocess_data, argv[1],
+  0, NULL);
+  break;
+  } /* end switch */
+  while ((thr_join(NULL,NULL,NULL) == 0));
+ } /* end main */
+ void *add_interprocess_data(char argv_1[]){
+  mutex_lock(&buffer->Interprocess_mutex);
+  buffer->Interprocess_data++;
+  sleep(2);
+  printf("%d is add-interprocess data, and %c is argv1\n",
+  buffer->Interprocess_data, argv_1[0]);
+  mutex_unlock(&buffer->Interprocess_mutex);
+  return NULL;
+ }
+ void *subtract_interprocess_data(char argv_1[]) {
+  mutex_lock(&buffer->Interprocess_mutex);
+  buffer->Interprocess_data--;
+  sleep(2);
+  printf("%d is subtract-interprocess data, and %c is argv1\n",
+  buffer->Interprocess_data, argv_1[0]);
+  mutex_unlock(&buffer->Interprocess_mutex);
+  return NULL;
+ }
+ void create_shared_memory(){
+  int i;
+  ipc_fd = creat(INTERPROCESS_FILE, O_CREAT | O_RDWR );
+  for (i=0; i<sizeof(buffer_t); i++){
+  zeroed[i] = 0;
+  write(ipc_fd, &zeroed[i],2);
+  }
+  close(ipc_fd);
+  chmod(INTERPROCESS_FILE, S_IRWXU | S_IRWXG | S_IRWXO);
+ }
+ void test_argv(char argv1[]) {
+  if (argv1 == NULL) {
+  printf("use 0 as arg1 for initial process\n \
+  or use 1 as arg1 for the second process\n");
+  exit(NULL);
+  }
+ }
+A mutex can protect data that is shared among processes robustly. The mutex would need to be initialized as
+USYNC_PROCESS | LOCK_ROBUST. One process initializes the robust process-shared mutex and writes it to a
+file to be mapped into memory by all cooperating processes (see mmap(2)). Afterwards, other independent process<hy>
+es can run the same program (whether concurrently or not) and share mutex-protected data.
+The following example shows how to use a USYNC_PROCESS | LOCK_ROBUST type mutex.
+ /* cc thisfile.c -lthread */
+  /* To execute, run the command line "a.out & a.out 1" */
+  #include <sys/types.h>
+  #include <sys/mman.h>
+  #include <fcntl.h>
+  #include <stdio.h>
+<beginning of page>
+  #include <thread.h>
+  #define INTERPROCESS_FILE "ipc-sharedfile"
+  typedef struct {
+  mutex_t Interprocess_mutex;
+  int Interprocess_data;
+  } buffer_t;
+  buffer_t *buffer;
+  int make_date_consistent();
+  void create_shared_memory();
+  int zeroed[sizeof(buffer_t)];
+  int ipc_fd, i=0;
+  main(int argc,char * argv[]) {
+  int rc;
+  if (argc > 1) {
+  while((ipc_fd = open(INTERPROCESS_FILE, O_RDWR)) == -1)
+  sleep(1);
+  buffer = (buffer_t *)mmap(NULL, sizeof(buffer_t),
+  PROT_READ | PROT_WRITE, MAP_SHARED, ipc_fd, 0);
+  mutex_init(&buffer->Interprocess_mutex,
+  USYNC_PROCESS | LOCK_ROBUST,0);
+  } else {
+  create_shared_memory();
+  ipc_fd = open(INTERPROCESS_FILE, O_RDWR);
+  buffer = (buffer_t *)mmap(NULL, sizeof(buffer_t),
+  PROT_READ | PROT_WRITE, MAP_SHARED, ipc_fd, 0);
+  buffer->Interprocess_data = 0;
+  mutex_init(&buffer->Interprocess_mutex,
+  USYNC_PROCESS | LOCK_ROBUST,0);
+  }
+  for(;;) {
+  rc = mutex_lock(&buffer->Interprocess_mutex);
+  switch (rc) {
+  case EOWNERDEAD:
+  /*
+  * The lock is acquired.
+  * The last owner died holding the lock.
+  * Try to make the state associated with
+  * the mutex consistent.
+  * If successful, make the robust lock consistent.
+  */
+  if (make_data_consistent())
+  mutex_consistent(&buffer->Interprocess_mutex);
+  mutex_unlock(&buffer->Interprocess_mutex);
+  break;
+  case ENOTRECOVERABLE:
+  /*
+  * The lock is not acquired.
+  * The last owner got the mutex with EOWNERDEAD
+  * and failed to make the data consistent.
+  * There is no way to recover, so just exit.
+  */
+  exit(1);
+  case 0:
+  /*
+  * There is no error - data is consistent.
+  * Do something with data.
+  */
+  mutex_unlock(&buffer->Interprocess_mutex);
+  break;
+  }
+  }
+ } /* end main */
+ void create_shared_memory() {
+  int i;
+  ipc_fd = creat(INTERPROCESS_FILE, O_CREAT | O_RDWR );
+  for (i=0; i<sizeof(buffer_t); i++) {
+<beginning of page>
+  zeroed[i] = 0;
+  write(ipc_fd, &zeroed[i],2);
+  }
+  close(ipc_fd);
+  chmod(INTERPROCESS_FILE, S_IRWXU | S_IRWXG | S_IRWXO);
+  }
+  /* return 1 if able to make data consistent, otherwise 0. */
+  int make_data_consistent () {
+  buffer->Interprocess_data = 0;
+  return (1);
+  }
+The following example allocates and frees memory in which a mutex is embedded.
+ struct record {
+  int field1;
+  int field2;
+  mutex_t m;
+ } *r;
+ r = malloc(sizeof(struct record));
+ mutex_init(&r->m, USYNC_THREAD, NULL);
+ /*
+  * The fields in this record are accessed concurrently
+  * by acquiring the embedded lock.
+  */
+The thread execution in this example is as follows:
+ Thread 1 executes: Thread 2 executes:
+ ... ...
+ mutex_lock(&r->m); mutex_lock(&r->m);
+ r->field1++; localvar = r->field1;
+ mutex_unlock(&r->m); mutex_unlock(&r->m);
+ ... ...
+Later, when a thread decides to free the memory pointed to by r, the thread should call mutex_destroy() on the
+mutexes in this memory.
+In the following example, the main thread can do a thr_join() on both of the above threads. If there are no other
+threads using the memory in r, the main thread can now safely free r:
+ for (i = 0; i < 2; i++)
+  thr_join(0, 0, 0);
+ mutex_destroy(&r->m); /* first destroy mutex */
+ free(r); /* then free memory */
+If the mutex is not destroyed, the program could have memory leaks.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stabili<hy>
+tyStable _ MT-LevelMT-Safe
+mmap(2), shmop(2), pthread_mutexattr_getprioceiling(3C), pthread_mutexattr_getprotocol(3C),
+pthread_mutexattr_getrobust(3C), pthread_mutexattr_gettype(3C), pthread_mutex_getprioceiling(3C),
+pthread_mutex_init(3C), attributes(5), mutex(5), standards(5)
+<beginning of page>
+Previous releases of Solaris provided the USYNC_PROCESS_ROBUST mutex type. This type is now deprecated
+but is still supported for source and binary compatibility. When passed to mutex_init(), it is transformed into
+(USYNC_PROCESS | LOCK_ROBUST). The former method for restoring a USYNC_PROCESS_ROBUST
+mutex to a consistent state was to reinitialize it by calling mutex_init(). This method is still supported for source
+and binary compatibility, but the proper method is to call mutex_consistent().
+The USYNC_PROCESS_ROBUST type permitted an alternate error value, ELOCKUNMAPPED, to be returned
+by mutex_lock() if the process containing a locked robust mutex unmapped the memory containing the mutex or
+performed one of the exec(2) functions. The ELOCKUNMAPPED error value implies all of the consequences of
+the EOWNERDEAD error value and as such is just a synonym for EOWNERDEAD. For full source and binary
+compatibility, the ELOCKUNMAPPED error value is still returned from mutex_lock() in these circumstances, but
+only if the mutex was initialized with the USYNC_PROCESS_ROBUST type. Otherwise, EOWNERDEAD is re<hy>
+turned in these circumstances.
+The mutex_lock(), mutex_unlock(), and mutex_trylock() functions do not validate the mutex type. An uninitial<hy>
+ized mutex or a mutex with an invalid type does not return EINVAL. Interfaces for mutexes with an invalid type
+have unspecified behavior.
+Uninitialized mutexes that are allocated locally could contain junk data. Such mutexes need to be initialized using
+mutex_init().
+By default, if multiple threads are waiting for a mutex, the order of acquisition is undefined.

@@ -1,0 +1,55 @@
+<beginning of page>
+attach <-> Attach a device to the system, or resume it
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+int prefixattach(dev_info_t *dip, ddi_attach_cmd_t cmd);
+Solaris DDI specific (Solaris DDI)
+dip A pointer to the device's dev_info structure.
+cmd Attach type. Possible values are DDI_ATTACH and DDI_RESUME. Other values are reserved. The driver
+must return DDI_FAILURE if reserved values are passed to it.
+The attach(9E) function is the device-specific initialization entry point. This entry point is required and must be
+written.
+The DDI_ATTACH command must be provided in the attach(9E) entry point. DDI_ATTACH is used to initialize a
+given device instance. When attach(9E) is called with cmd set to DDI_ATTACH, all normal kernel services (such
+as kmem_alloc(9F)) are available for use by the driver. Device interrupts are not blocked when attaching a device to
+the system.
+The attach(9E) function is called once for each instance of the device on the system with cmd set to DDI_AT<hy>
+TACH. Until attach(9E) succeeds, the only driver entry point which may be called is getinfo(9E). See the Writing
+Device Drivers for more information. The instance number may be obtained using ddi_get_instance(9F).
+At attach time, all components of a power-manageable device are assumed to be at unknown levels. Before using the
+device, the driver needs to bring the required component(s) to a known power level. The pm_raise_power(9F) func<hy>
+tion can be used to set the power level of a component. This function must not be called before data structures refer<hy>
+enced in power(9E) have been initialized.
+The attach() function may be called with cmd set to DDI_RESUME after detach(9E) has been successfully called
+with cmd set to DDI_SUSPEND.
+When called with cmd set to DDI_RESUME, attach() must restore the hardware state of a device (power may have
+been removed from the device), allow pending requests to continue, and service new requests. In this case, the driver
+must not make any assumptions about the state of the hardware, but must restore the state of the device except for
+the power level of components.
+If the device driver uses the automatic device Power Management interfaces (driver exports the pm-compo<hy>
+nents(9P) property), the Power Management framework sets its notion of the power level of each component of a
+device to unknown while processing a DDI_RESUME command.
+The driver can deal with components during DDI_RESUME in one of the following ways: 1. If the driver can de<hy>
+termine the power level of the component without having to power it up (for example, by calling ddi_peek(9F) or
+some other device-specific method) then it should notify the power level to the framework by calling pm_pow<hy>
+er_has_changed(9F). 2. The driver must also set its own notion of the power level of the component to unknown.
+The system will consider the component idle or busy based on the most recent call to pm_idle_component(9F) or
+pm_busy_component(9F) for that component. If the component is idle for sufficient time, the framework will call
+into the driver's power(9E) entry point to turn the component off. If the driver needs to access the device, then it
+must call pm_raise_power(9F) to bring the component up to the level needed for the device access to succeed. The
+driver must honor any request to set the power level of the component, since it cannot make any assumption about
+what power level the component has (or it should have called pm_power_has_changed(9F) as outlined above). As
+a special case of this, the driver may bring the component to a known state because it wants to perform an operation
+on the device as part of its DDI_RESUME processing (such as loading firmware so that it can detect hot-plug
+events).
+The attach() function returns:
+DDI_SUCCESS Successful completion
+<beginning of page>
+DDI_FAILURE Operation failed
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed
+cpr(7), pm(7D), pm(9P), pm-components(9P), detach(9E), getinfo(9E), identify(9E), open(9E), power(9E),
+probe(9E), ddi_add_intr(9F), ddi_create_minor_node(9F), ddi_get_instance(9F), ddi_map_regs(9F),
+kmem_alloc(9F), pm_raise_power(9F)
+Writing Device Drivers

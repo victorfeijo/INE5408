@@ -1,0 +1,255 @@
+<beginning of page>
+dsp <-> generic audio device interface
+#include <sys/soundcard.h>
+To record audio input, applications open() the appropriate device and read data from it using the read() system call.
+Similarly, sound data is queued to the audio output port by using the write(2) system call. Device configuration is
+performed using the ioctl(2) interface.
+Because some systems can contain more than one audio device, application writers are encouraged to open the
+/dev/mixer device and determine the physical devices present on the system using the SNDCTL_SYSINFO and
+SNDCTL_AUDIOINFO ioctls. See mixer(7I). The user should be provided a the ability to select a different audio
+device, or alternatively, an environment variable such as AUDIODSP can be used. In the absence of any specific
+configuration from the user, the generic device file, /dev/dsp, can be used. This normally points to a reasonably ap<hy>
+propriate default audio device for the system.
+The audio device is not treated as an exclusive resource.
+Each open() completes as long as there are channels available to be allocated. If no channels are available to be allo<hy>
+cated, the call returns -1 with the errno set to EBUSY.
+Audio applications should explicitly set the encoding characteristics to match the audio data requirements after
+opening the device, and not depend on any default configuration.
+The read() system call copies data from the system's buffers to the application. Ordinarily, read() blocks until the
+user buffer is filled. The poll(2) system call can be used to determine the presence of data that can be read without
+blocking. The device can alternatively be set to a non-blocking mode, in which case read() completes immediately,
+but can return fewer bytes than requested. Refer to the read(2) manual page for a complete description of this behav<hy>
+ior.
+When the audio device is opened with read access, the device driver allocates resources for recording. Since this
+consumes system resources, processes that do not record audio data should open the device write-only (O_WRON<hy>
+LY).
+The recording process can be stopped by using the SNDCTL_DSP_HALT_INPUT ioctl, which also discards all
+pending record data in underlying device FIFOs.
+Before changing record parameters, the input should be stopped using the SNDCTL_DSP_HALT_INPUT ioctl,
+which also flushes the any underlying device input FIFOs. (This is not necessary if the process never started record<hy>
+ing by calling read(2). Otherwise, subsequent reads can return samples in the old format followed by samples in the
+new format. This is particularly important when new parameters result in a changed sample size.
+Input data can accumulate in device buffers very quickly. At a minimum, it accumulates at 8000 bytes per second for
+8-bit, 8 KHz, mono, u-Law data. If the device is configured for more channels, higher sample resolution, or higher
+sample rates, it accumulates even faster. If the application that consumes the data cannot keep up with this data rate,
+the underlying FIFOs can become full. When this occurs, any new incoming data is lost until the application makes
+room available by consuming data. Additionally, a record overrun is noted, which can be retrieved using the SND<hy>
+CTL_DSP_GETERROR ioctl.
+Record volume for a stream can be adjusted by issuing the SNDCTL_DSP_SETRECVOL ioctl. The volume can
+also be retrieved using the SNDCTL_DSP_GETRECVOL.
+The write() system call copies data from an application's buffer to the device output FIFO. Ordinarily, write()
+blocks until the entire user buffer is transferred. The device can alternatively be set to a non-blocking mode, in which
+case write()completes immediately, but might have transferred fewer bytes than requested. See write(2).
+Although write() returns when the data is successfully queued, the actual completion of audio output might take
+considerably longer. The SNDCTL_DSP_SYNC ioctl can be issued to allow an application to block until all of the
+queued output data has been played.
+The final close(2) of the file descriptor waits until all of the audio output has drained. If a signal interrupts the
+close(), or if the process exits without closing the device, any remaining data queued for audio output is flushed and
+the device is closed immediately.
+The output of playback data can be halted entirely, by calling the SNDCTL_DSP_HALT_OUTPUT ioctl. This also
+discards any data that is queued for playback in device FIFOs.
+<beginning of page>
+Before changing playback parameters, the output should be drained using the SNDCTL_DSP_SYNC ioctl, and then
+stopped using the SNDCTL_DSP_HALT_OUTPUT ioctl, which also flushes the any underlying device output FI<hy>
+FOs. This is not necessary if the process never started playback, such as by calling write(2). This is particularly im<hy>
+portant when new parameters result in a changed sample size.
+Output data is played from the playback buffers at a default rate of at least 8000 bytes per second for u-Law, A-Law
+or 8-bit PCM data (faster for 16-bit linear data or higher sampling rates). If the output FIFO becomes empty, the
+framework plays silence, resulting in audible stall or click in the output, until more data is supplied by the applica<hy>
+tion. The condition is also noted as a play underrun, which can be determined using the SNDCTL_DSP_GETER<hy>
+ROR ioctl.
+Playback volume for a stream can be adjusted by issuing the SNDCTL_DSP_SETPLAYVOL ioctl. The volume
+can also be retrieved using the SNDCTL_DSP_GETPLAYVOL.
+The O_NONBLOCK flag can be set using the F_SETFL fcntl(2) to enable non-blocking read() and write() re<hy>
+quests. This is normally sufficient for applications to maintain an audio stream in the background.
+It is also possible to determine the amount of data that can be transferred for playback or recording without blocking
+using the SNDCTL_DSP_GETOSPACE or SNDCTL_DSP_GETISPACE ioctls, respectively.
+The /dev/mixer provides access to global hardware settings such as master volume settings, etc. It is also the inter<hy>
+face used for determining the hardware configuration on the system.
+Applications should open(2) /dev/mixer, and use the SNDCTL_SYSINFO and SNDCTL_AUDIOINFO ioctls to
+determine the device node names of audio devices on the system. See mixer(7I) for additional details.
+The following ioctls are supported on the audio device, as well as the mixer device. See mixer(7I) for details.
+ OSS_GETVERSION
+ SNDCTL_SYSINFO
+ SNDCTL_AUDIOINFO
+ SNDCTL_MIXERINFO
+ SNDCTL_CARDINFO
+The dsp device supports the following ioctl commands:
+SNDCTL_DSP_SYNC The argument is ignored. This command suspends the calling process until the output FI<hy>
+FOs are empty and all queued samples have been played, or until a signal is delivered to the calling process. An im<hy>
+plicit SNDCTL_DSP_SYNC is performed on the final close() of the dsp device.
+This ioctl should not be used unnecessarily, as if it is used in the middle of playback it causes a small click or pause,
+as the FIFOs are drained. The correct use of this ioctl is just before changing sample formats.
+SNDCTL_DSP_HALT
+SNDCTL_DSP_HALT_INPUT
+SNDCTL_DSP_HALT_OUTPUT The argument is ignored. All input or output (or both) associated with the file is
+halted, and any pending data is discarded.
+SNDCTL_DSP_SPEED The argument is a pointer to an integer, indicating the sample rate (in Hz) to be used. The
+rate applies to both input and output for the file descriptor. On return the actual rate, which can differ from that re<hy>
+quested, is stored in the integer pointed to by the argument. To query the configured speed without changing it the
+value 0 can be used by the application
+SNDCTL_DSP_GETFMTS The argument is a pointer to an integer, which receives a bit mask of encodings sup<hy>
+ported by the device. Possible values are
+ AFMT_MU_LAW 8-bit unsigned u-Law
+ AFMT_A_LAW 8-bit unsigned a-Law
+ AFMT_U8 8-bit unsigned linear PCM
+ AFMT_S16_LE 16-bit signed
+  little-endian linear PCM
+ AFMT_S16_BE 16-bit signed
+  big-endian linear PCM
+ AFMT_S16_NE 16-bit signed native-endian
+<beginning of page>
+  linear PCM
+ AFMT_U16_LE 16-bit unsigned
+  little-endian linear PCM
+ AFMT_U16_BE 16-bit unsigned big-endian
+  linear PCM
+ AFMT_U16_NE 16-bit unsigned big-endian
+  linear PCM
+ AFMT_S24_LE 24-bit signed little-endian
+  linear PCM, 32-bit aligned
+ AFMT_S24_BE 24-bit signed big-endian
+  linear PCM, 32-bit aligned
+ AFMT_S24_NE 24-bit signed native-endian
+  linear PCM, 32-bit aligned
+ AFMT_S32_LE 32-bit signed little-endian
+  linear PCM
+ AFMT_S32_BE 32-bit signed big-endian
+  linear PCM
+ AFMT_S32_NE 32-bit signed native-endian
+  linear PCM
+ AFMT_S24_PACKED 24-bit signed little-endian
+  packed linear PCM
+Not all devices support all of these encodings. This implementation uses AFMT_S24_LE or AFMT_S24_BE,
+whichever is native, internally.
+SNDCTL_DSP_SETFMT The argument is a pointer to an integer, which indicates the encoding to be used. The
+same values as for SNDCTL_DSP_GETFMT can be used, but the caller can only specify a single option. The en<hy>
+coding is used for both input and output performed on the file descriptor.
+SNDCTL_DSP_CHANNELS The argument is a pointer to an integer, indicating the number of channels to be used
+(1 for mono, 2 for stereo, etc.) The value applies to both input and output for the file descriptor. On return the actual
+channel configuration (which can differ from that requested) is stored in the integer pointed to by the argument. To
+query the configured channels without changing it the value 0 can be used by the application.
+SNDDCTL_DSP_GETCAPS The argument is a pointer to an integer bit mask, which indicates the capabilities of
+the device. The bits returned can include
+ PCM_CAP_OUTPUT Device supports playback
+ PCM_CAP_INPUT Device supports recording
+ PCM_CAP_DUPLEX Device supports simultaneous
+  playback and recording
+SNDCTL_DSP_GETPLAYVOL
+SNDCTL_DSP_GETRECVOL The argument is a pointer to an integer to receive the volume level for either play<hy>
+back or record. The value is encoded as a stereo value with the values for two channels in the least significant two
+bytes. The value for each channel thus has a range of 0-100. In this implementation, only the low order byte is used,
+as the value is treated as a monophonic value, but a stereo value (with both channel levels being identical) is returned
+for compatibility.
+SNDCTL_DSP_SETPLAYVOL
+SNDCTL_DSP_SETRECVOL The argument is a pointer to an integer indicating volume level for either playback
+or record. The value is encoded as a stereo value with the values for two channels in the least significant two bytes.
+The value for each channel has a range of 0-100. Note that in this implementation, only the low order byte is used,
+as the value is treated as a monophonic value. Portable applications should assign the same value to both bytes
+SNDCTL_DSP_GETISPACE
+SNDCTL_DSP_GETOSPACE The argument is a pointer to a struct audio_buf_info, which has the following
+structure:
+ typedef struct audio_buf_info {
+<beginning of page>
+  int fragments;* /# of available fragments */
+  int fragstotal;
+  /* Total # of fragments allocated */
+  int fragsize;
+  /* Size of a fragment in bytes */
+  int bytes;
+  /* Available space in bytes */
+  /* Note! 'bytes' could be more than
+  fragments*fragsize */
+ } audio_buf_info;
+The fields fragments, fragstotal, and fragsize are intended for use with compatible applications (and in the future
+with mmap(2)) only, and need not be used by typical applications. On successful return the bytes member contains
+the number of bytes that can be transferred without blocking.
+SNDCTL_DSP_CURRENT_IPTR
+SNDCTL_DSP_CURRENT_OPTR The argument is a pointer to an oss_count_t, which has the following defini<hy>
+tion:
+ typedef struct {
+  long long samples;
+  /* Total # of samples */
+  int fifo_samples;
+  /* Samples in device FIFO */
+  int filler[32];/* For future use */
+ } oss_count_t;
+The samples field contains the total number of samples transferred by the device so far. The fifo_samples is the
+depth of any hardware FIFO. This structure can be useful for accurate stream positioning and latency calculations.
+SNDCTL_DSP_GETIPTR
+SNDCTL_DSP_GETOPTR The argument is a pointer to a struct count_info, which has the following definition:
+ typedef struct count_info {
+  unsigned int bytes;
+  /* Total # of bytes processed */
+  int blocks;
+  /* # of fragment transitions since
+  last time */
+  int ptr;/* Current DMA pointer value */
+ } count_info;
+These ioctls are primarily supplied for compatibility, and should not be used by most applications.
+SNDCTL_DSP_GETODELAY The argument is a pointer to an integer. On return, the integer contains the number
+of bytes still to be played before the next byte written are played. This can be used for accurate determination of de<hy>
+vice latency. The result can differ from actual value by up the depth of the internal device FIFO, which is typically
+64 bytes.
+SNDCTL_DSP_GETERROR The argument is a pointer to a struct audio_errinfo, defined as follows:
+ typedef struct audio_errinfo {
+  int play_underruns;
+  int rec_overruns;
+  unsigned int play_ptradjust;
+  unsigned int rec_ptradjust;
+  int play_errorcount;
+  int rec_errorcount;
+  int play_lasterror;
+  int rec_lasterror;
+  int play_errorparm;
+<beginning of page>
+  int rec_errorparm;
+  int filler[16];
+ } audio_errinfo;
+For this implementation, only the play_underruns and rec_overruns values are significant. No other fields are used
+in this implementation.
+These fields are reset to zero each time their value is retrieved using this ioctl.
+These ioctls are supplied exclusively for compatibility with existing applications. Their use is not recommended, and
+they are not documented here. Many of these are implemented as simple no-ops.
+ SNDCTL_DSP_POST
+ SNDCTL_DSP_STEREO
+ SNDCTL_DSP_SETDUPLEX
+ SNDCTL_DSP_LOW_WATER
+ SNDCTL_DSP_PROFILE
+ SNDCTL_DSP_GETBLKSIZE
+ SNDCTL_DSP_SUBDIVIDE
+ SNDCTL_DSP_SETFRAGMENT
+ SNDCTL_DSP_COOKEDMODE
+ SNDCTL_DSP_READCTL
+ SNDCTL_DSP_WRITECTL
+ SNDCTL_DSP_SILENCE
+ SNDCTL_DSP_SKIP
+ SNDCTL_DSP_POST
+ SNDCTL_DSP_GET_RECSRC
+ SNDCTL_DSP_SET_RECSRC
+ SNDCTL_DSP_SET_RECSRC_NAMES
+ SNDCTL_DSP_GET_PLAYTGT
+ SNDCTL_DSP_SET_PLAYTGT
+ SNDCTL_DSP_SET_PLAYTGT_NAMES
+ SNDCTL_DSP_GETTRIGGER
+ SNDCTL_DSP_SETTRIGGER
+ SNDCTL_AUDIOINFO_EX
+ SNDCTL_ENGINEINFO
+An open() fails if:
+EBUSY The requested play or record access isbusy and either the O_NDELAY or O_NONBLOCK flag was set in
+the open() request.
+EINTR The requested play or record access is busy and a signal interrupted the open() request.
+EINVAL The device cannot support the requested play or record access.
+An ioctl() fails if:
+EINVAL The parameter changes requested in the ioctl are invalid or are not supported by the device.
+The physical audio device names are system dependent and are rarely used by programmers. Programmers should
+use the generic device names listed below.
+/dev/dsp Symbolic link to the system's primary audio device
+/dev/mixer Symbolic link to the pseudo mixer device for the system
+<beginning of page>
+/dev/sndstat Symbolic link to the pseudo mixer device for the system
+/usr/share/audio/samples Audio files
+See attributes(5) for a description of the following attributes:
+tab() box; cw(1.82i) |cw(3.68i) lw(1.82i) |lw(3.68i) ATTRIBUTE TYPEATTRIBUTE VALUE _ ArchitectureS<hy>
+PARC, x86 _ AvailabilitySUNWcsu, SUNWaudd, SUNWaudh _ Stability LevelUncommitted
+close(2), fcntl(2), ioctl(2), mmap(2), open(2), poll(2), read(2), write(2), attributes(5), audio(7D), mixer(7I)

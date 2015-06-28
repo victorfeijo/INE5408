@@ -1,0 +1,451 @@
+<beginning of page>
+pf_key <-> Security association database interface
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <net/pfkeyv2.h>
+int socket(PF_KEY,SOCK_RAW,PF_KEY_V2);
+Keying information for IPsec security services is maintained in security association databases (SADBs). The securi<hy>
+ty associations (SAs) are used to protect both inbound and outbound packets.
+A user process (or possibly multiple co-operating processes) maintains SADBs by sending messages over a special
+kind of socket. This is analogous to the method described in route(7P). Only a superuser may access an SADB.
+SunOS applications that use PF_KEY include ipseckey(1M) and in.iked(1M).
+The operating system may spontaneously send pf_key messages to listening processes, such as a request for a new
+SA for an outbound datagram or to report the expiration of an existing SA.
+One opens the channel for passing SADB control messages by using the socket call shown in the section above.
+More than one key socket can be open per system.
+Messages are formed by a small base header, followed by zero or more extension messages, some of which require
+additional data following them. The base message and all extensions must be eight-byte aligned. An example mes<hy>
+sage is the GET message, which requires the base header, the SA extension, and the ADDRESS_DST extension.
+Messages include:
+ #define SADB_GETSPI /* Get a new SPI value from the system. */
+ #define SADB_UPDATE /* Update an SA. */
+ #define SADB_ADD /* Add a fully-formed SA. */
+ #define SADB_DELETE /* Delete an SA. */
+ #define SADB_GET /* Get an SA */
+ #define SADB_ACQUIRE /* Kernel needs a new SA. */
+ #define SADB_REGISTER /* Regis. to receive ACQUIRE msgs. */
+ #define SADB_EXPIRE /* SA has expired. */
+ #define SADB_FLUSH /* Flush all SAs. */
+ #define SADB_DUMP /* Get all SAs. (Unreliable) */
+ #define SADB_X_PROMISC /* Listen promiscuously */
+ #define SADB_X_INVERSE_ACQUIRE /* Query kernel policy,
+          get an ACQUIRE in return. */
+ #define SADB_X_UPDATEPAIR /* Update an SA and its pair SA */
+ #define SADB_X_DELPAIR /* Delete an SA pair. */
+The base message header consists of:
+ struct sadb_msg {
+  uint8_t sadb_msg_version; /* Set to PF_KEY_V2, for compat. */
+  uint8_t sadb_msg_type; /* Msg. type */
+  uint8_t sadb_msg_errno; /* Why message failed */
+  uint8_t sadb_msg_satype; /* Which security service */
+  uint16_t sadb_msg_len; /* Length in 8-byte units */
+  uint16_t sadb_msg_reserved; /* Zero out */
+  #define sadb_x_msg_diagnostic sadb_msg_reserved
+      /* Extended diagnostics for errors */
+  uint32_t sadb_msg_seq; /* For msg. originator */
+  uint32_t sadb_msg_pid; /* ID originator */
+ };
+Extension types include:
+ #define SADB_EXT_SA /* SA info */
+<beginning of page>
+ #define SADB_EXT_LIFETIME_HARD /* Hard lifetime */
+ #define SADB_EXT_LIFETIME_SOFT /* Soft lifetime */
+ #define SADB_EXT_ADDRESS_SRC /* Source address */
+ #define SADB_EXT_ADDRESS_DST /* Destination address */
+ #define SADB_EXT_ADDRESS_PROXY /* Proxy address - DEPRECATED */
+ #define SADB_EXT_KEY_AUTH /* Authen. key */
+ #define SADB_EXT_KEY_ENCRYPT /* Encryption key */
+ #define SADB_EXT_IDENTITY_SRC /* Source certif. ID */
+ #define SADB_EXT_IDENTITY_DST /* Destination certif. ID */
+ #define SADB_EXT_SENSITIVITY /* Sensitivity info */
+ #define SADB_EXT_PROPOSAL /* Security proposal */
+ #define SADB_EXT_SUPPORTED_AUTH /* Supported authen. algo's */
+ #define SADB_EXT_SUPPORTED_ENCRYPT /* Supported encryption algo's */
+ #define SADB_EXT_SPIRANGE /* Range of possible SPIs *
+ #define SADB_X_EXT_EREG /* Reg. for extended ACQUIRE */
+ #define SADB_X_EXT_EPROP /* Extended ACQUIRE proposals */
+ #define SADB_X_EXT_KM_COOKIE /* Indicates which KM derived SA. */
+ #define SADB_X_EXT_ADDRESS_NATT_LOC /* NAT-Traversal local (my public) */
+ #define SADB_X_EXT_ADDRESS_NATT_REM /* NAT-T remote (peer's private) */
+ #define SADB_X_EXT_ADDRESS_INNER_SRC /* Tunnel-mode inner source */
+ #define SADB_X_EXT_ADDRESS_INNER_DST /* Tunnel-mode inner dest */
+ #define SADB_X_EXT_PAIR /* SA pair extension.
+Security Association Information Extension flags:
+ #define SADB_SAFLAGS_PFS 0x1 /* Perfect forward secrecy? */
+ #define SADB_SAFLAGS_NOREPLAY 0x2 /* Replay field NOT PRESENT. */
+ #define SADB_X_SAFLAGS_USED 0x80000000 /* SA used/not used */
+ #define SADB_X_SAFLAGS_UNIQUE 0x40000000 /* SA unique/reusable */
+ #define SADB_X_SAFLAGS_AALG1 0x20000000 /* Auth-alg specif. flag 1 */
+ #define SADB_X_SAFLAGS_AALG2 0x10000000 /* Auth-alg specif. flag 2 */
+ #define SADB_X_SAFLAGS_EALG1 0x8000000 /* Encr-alg specif. flag 1 */
+ #define SADB_X_SAFLAGS_EALG2 0x4000000 /* Encr-alg specif. flag 2 */
+ #define SADB_X_SAFLAGS_KM1 0x2000000 /* Key mgmt. specif. flag 1 */
+ #define SADB_X_SAFLAGS_KM2 0x1000000 /* Key mgmt. specif. flag 2 */
+ #define SADB_X_SAFLAGS_KM3 0x800000 /* Key mgmt. specif. flag 3 */
+ #define SADB_X_SAFLAGS_KM4 0x400000 /* Key mgmt. specif. flag 4 */
+ #define SADB_X_SAFLAGS_KRES1 0x200000 /* Reserved by the kernel */
+ #define SADB_X_SAFLAGS_NATT_LOC 0x100000 /* this has a natted srcSA */
+ #define SADB_X_SAFLAGS_NATT_REM 0x80000 /* this has a natted dstSA */
+ #define SADB_X_SAFLAGS_KRES2 0x40000 /* Reserved by the kernel */
+ #define SADB_X_SAFLAGS_TUNNEL 0x20000 /* tunnel mode */
+ #define SADB_X_SAFLAGS_PAIRED 0x10000 /* inbound/outbound pair*/
+ #define SADB_X_SAFLAGS_OUTBOUND 0x8000 /* SA direction bit */
+ #define SADB_X_SAFLAGS_INBOUND 0x4000 /* SA direction bit */
+Extension headers include:
+ struct sadb_ext {
+  uint16_t sadb_ext_len; /* In 64-bit words, inclusive */
+  uint16_t sadb_ext_type; /* 0 is reserved */
+ };
+ struct sadb_sa {
+  uint16_t sadb_sa_len;
+  uint16_t sadb_sa_exttype; /* ASSOCIATION */
+  uint32_t sadb_sa_spi;
+  uint8_t sadb_sa_replay;
+  uint8_t sadb_sa_state;
+  uint8_t sadb_sa_auth;
+  uint8_t sadb_sa_encrypt;
+  uint32_t sadb_sa_flags;
+ };
+<beginning of page>
+ struct sadb_lifetime {
+  uint16_t sadb_lifetime_len;
+  uint16_t sadb_lifetime_exttype; /* SOFT, HARD, CURRENT */
+  uint32_t sadb_lifetime_allocations;
+  uint64_t sadb_lifetime_bytes;
+  uint64_t sadb_lifetime_addtime;
+  uint64_t sadb_lifetime_usetime;
+ };
+ struct sadb_address {
+  uint16_t sadb_address_len;
+  uint16_t sadb_address_exttype; /* SRC, DST, NATT_*, INNER_* */
+  uint8_t sadb_address_proto; /* Proto for ports... */
+  uint8_t sadb_address_prefixlen; /* Prefix length for INNER_*. */
+  uint16_t sadb_address_reserved; /* Padding */
+  /* Followed by a sockaddr
+  structure.*/
+ };
+ struct sadb_key {
+  uint16_t sadb_key_len;
+  uint16_t sadb_key_exttype; /* AUTH, ENCRYPT */
+  uint16_t sadb_key_bits;
+  uint16_t sadb_key_reserved;
+  /* Followed by actual key(s) in
+  canonical (outbound proc.) order. */
+ };
+ struct sadb_ident {
+  uint16_t sadb_ident_len;
+  uint16_t sadb_ident_exttype; /* SRC, DST, PROXY */
+  uint16_t sadb_ident_type; /* FQDN, USER_FQDN, etc. */
+  uint16_t sadb_ident_reserved; /* Padding */
+  uint64_t sadb_ident_id; /* For userid, etc. */
+  /* Followed by an identity null-terminate C string if present. */
+ };
+ struct sadb_sens {
+  uint16_t sadb_sens_len;
+  uint16_t sadb_sens_exttype; /* SENSITIVITY */
+  uint32_t sadb_sens_dpd;
+  uint8_t sadb_sens_sens_level;
+  uint8_t sadb_sens_sens_len; /* 64-bit words */
+  uint8_t sadb_sens_integ_level;
+  uint8_t sadb_sens_integ_len; /* 64-bit words */
+  uint32_t sadb_sens_reserved;
+  /*
+  * followed by two uint64_t arrays
+  * uint64_t sadb_sens_bitmap[sens_bitmap_len];
+  * uint64_t integ_bitmap[integ_bitmap_len];
+  */
+ };
+ struct sadb_prop {
+  uint16_t sadb_prop_len;
+  uint16_t sadb_prop_exttype; /* PROPOSAL, X_EPROP */
+  uint8_t sadb_prop_replay;
+  uint8_t sadb_X_prop_ereserved;
+  uint16_t sadb_x_prop_numecombs;
+<beginning of page>
+ /* Followed by sadb_comb[] array or sadb_ecomb[] array. */
+ };
+ struct sadb_comb {
+  uint8_t sadb_comb_auth;
+  uint8_t sadb_comb_encrypt;
+  uint16_t sadb_comb_flags;
+  uint16_t sadb_comb_auth_minbits;
+  uint16_t sadb_comb_auth_maxbits;
+  uint16_t sadb_comb_encrypt_minbits;
+  uint16_t sadb_comb_encrypt_maxbits;
+  uint32_t sadb_comb_reserved;
+  uint32_t sadb_comb_soft_allocations;
+  uint32_t sadb_comb_hard_allocations;
+  uint64_t sadb_comb_soft_bytes;
+  uint64_t sadb_comb_hard_bytes;
+  uint64_t sadb_comb_soft_addtime;
+  uint64_t sadb_comb_hard_addtime;
+  uint64_t sadb_comb_soft_usetime;
+  uint64_t sadb_comb_hard_usetime;
+ };
+ struct sadb_x_ecomb {
+  uint8_t sadb_x_ecomb_numalgs;
+  uint8_t sadb_x_ecomb_reserved;
+  uint16_t sadb_x_ecomb_flags; /* E.g. PFS? */
+  uint32_t sadb_x_ecomb_reserved2;
+  uint32_t sadb_x_ecomb_soft_allocations;
+  uint32_t sadb_x_ecomb_hard_allocations;
+  uint64_t sadb_x_ecomb_soft_bytes;
+  uint64_t sadb_x_ecomb_hard_bytes;
+  uint64_t sadb_x_ecomb_soft_addtime;
+  uint64_t sadb_x_ecomb_hard_addtime;
+  uint64_t sadb_x_ecomb_soft_usetime;
+  uint64_t sadb_x_ecomb_hard_usetime;
+ };
+ struct sadb_x_algdesc {
+  uint8_t sadb_x_algdesc_satype; /* ESP, AH, etc. */
+  uint8_t sadb_x_algdesc_algtype; /* AUTH, CRYPT, COMPRESS */
+  uint8_t sadb_x_algdesc_alg; /* DES, 3DES, MD5, etc. */
+  uint8_t sadb_x_algdesc_reserved;
+  uint16_t sadb_x_algdesc_minbits; /* Bit strengths. */
+  uint16_t sadb_x_algdesc_maxbits;
+  };
+ struct sadb_x_ereg {
+  uint16_t sadb_x_ereg_len;
+  uint16_t sadb_x_ereg_exttype; /* X_EREG */
+  uint8_t sadb_x_ereg_satypes[4]; /* Array of SA types, 0-terminated.
+ |};
+ struct sadb_x_kmc {
+  uint16_t sadb_x_kmc_len;
+  uint16_t sadb_x_kmc_exttype; /* X_KM_COOKIE */
+  uint32_t sadb_x_kmc_proto; /* KM protocol */
+  uint32_t sadb_x_kmc_cookie; /* KMP-specific */
+  uint32_t sadb_x_kmc_reserved; /* Reserved; must be zero */
+  };
+<beginning of page>
+ struct sadb_supported {
+  uint16_t sadb_supported_len;
+  uint16_t sadb_supported_exttype;
+  uint32_t sadb_supported_reserved;
+ };
+ struct sadb_alg {
+  uint8_t sadb_alg_id; /* Algorithm type. */
+  uint8_t sadb_alg_ivlen; /* IV len, in bits */
+  uint16_t sadb_alg_minbits; /* Min. key len (in bits) */
+  uint16_t sadb_alg_maxbits; /* Max. key length */
+  uint16_t sadb_alg_reserved;
+ };
+ struct sadb_spirange {
+  uint16_t sadb_spirange_len;
+  uint16_t sadb_spirange_exttype; /* SPI_RANGE */
+  uint32_t sadb_spirange_min
+  uint32_t sadb_spirange_max;
+  uint32_t sadb_spirange_reserved;
+ };
+ struct sadb_x_pair {
+  uint16_t sadb_x_pair_len;
+  uint16_t sadb_x_pair_exttype; /* SADB_X_EXT_PAIR */
+  uint32_t sadb_x_pair_spi; /* SPI of paired SA */
+ };
+Each message has a behavior. A behavior is defined as where the initial message travels, for example, user to kernel,
+and what subsequent actions are expected to take place. Contents of messages are illustrated as:
+ <base, REQUIRED EXTENSION, REQ., (OPTIONAL EXTENSION,) (OPT)>
+The SA extension is sometimes used only for its SPI field. If all other fields must be ignored, this is represented by
+SA(*).
+The lifetime extensions are represented with one to three letters after the word lifetime, representing (H)ARD,
+(S)OFT, and (C)URRENT.
+The address extensions are represented with one to three letters after the word "address," representing (S)RC, (D)ST,
+(Nl)NAT-T local, (Nr)NAT-T remote, (Is)Inner source, and (Id)Inner destination.
+Source and destination address extensions reflect outer-header selectors for an IPsec SA. An SA is inbound or out<hy>
+bound depending on which of the source or destination address is local to the node. Inner-source and inner-destina<hy>
+tion selectors represent inner-header selectors for Tunnel Mode SAs. A Tunnel Mode SA must have either IPPRO<hy>
+TO_ENCAP or IPPROTO_IPV6 in its outer-headers as protocol selector, in addition to filled-in Inner-address exten<hy>
+sions.
+NAT-T local and NAT-T remote addresses store local and remote ports used for ESP-in-UDP encapsulation. A non-
+zero local NAT-T address extension represents the local node's external IP address if it is not equivalent to the SA's
+local address. A non-zero remote NAT-T address represents a peer's behind-a-NAT address if it is not equivalent to
+the SA's remote address. An SA with NAT-T extensions will protect-and-transmit outbound traffic. Processing of in<hy>
+bound NAT-T traffic requires a UDP socket bound to the appropriate local port and it must have the
+UDP_NAT_T_ENDPOINT (see udp(7P)) socket option enabled.
+Note that when an error occurs, only the base header is sent. In the event of an error, an extended diagnostic may be
+set (see DIAGNOSTICS). Typical errors include:
+EINVAL Various message improprieties, including SPI ranges that are malformed, weak keys, and others. If EIN<hy>
+VAL is returned, an application should look at the sadb_x_msg_diagnostic field of the sadb_msg structure. It con<hy>
+tains one of many possible causes for EINVAL. See net/pfkeyv2.h for values, all of the form SADB_X_DIAGNOS<hy>
+<beginning of page>
+TIC_.
+ENOMEM Needed memory was not available.
+ENSGSIZ Message exceeds the maximum length allowed.
+EEXIST SA (that is being added or created with GETSPI) already exists.
+ESRCH SA could not be found.
+The following are examples of message use and behavior:
+Send a SADB_GETSPI message from a user process to the kernel.
+ <base, address, SPI range>
+The kernel returns the SADB_GETSPI message to all listening processes.
+ <base, SA(*), address (SD)>
+Send a SADB_UPDATE message from a user process to the kernel.
+ <base, SA, (lifetime(HS),) address(SD), (address(Is,Id),
+  address(Nl,Nr), key (AE), (identity(SD),) (sensitivity)>
+The kernel returns the SADB_UPDATE message to all listening processes.
+ <base, SA(*), address (SD), (pair)>
+Adding a sadb_x_pair extension to an SADB_UPDATE or SADB_ADD message will update the security associa<hy>
+tion pair linkage with the SPI of the security association contained in that extension. The resulting security associa<hy>
+tion "pair" can be updated or as a single entity using the SADB_X_UPDATEPAIR or SADB_X_DELPAIR mes<hy>
+sage types.
+Send a SADB_ADD message from a user process to the kernel.
+ <base, SA, (lifetime(HS),) address(SD), (address(Is,Id),)
+  (address(Nl,Nr),) key (AE), (identity(SD),) (sensitivity) (pair)>
+The kernel returns the SADB_ADD message to all listening processes.
+ <base, SA, (lifetime(HS),) address (SD), (address(Is,Id),)
+  (address(Nl,Nr),) (identity (SD),) (sensitivity)>
+Send a SADB_X_UPDATEPAIR message from a user process to the kernel. This message type is used to update
+the lifetime values of a security association and the lifetime values of the security association it is paired with.
+ <base, SA, lifetime(HS), address(SD)>
+Send a SADB_DELETE message from a user process to the kernel. The SADB_X_DELPAIR message type will
+request deletion of the security association and the security association it is paired with.
+ <base, SA (*), address (SD)>
+<beginning of page>
+The kernel returns the SADB_DELETE message to all listening processes.
+ <base, SA (*), address (SD)>
+Send a SADB_GET message from a user process to the kernel.
+ <base, SA (*), address (SD)>
+The kernel returns the SADB_GET message to the socket that sent the SADB_GET message.
+ <base, SA , (lifetime (HSC),) address SD), (address (P),) key (AE),
+  (identity (SD),) (sensitivity)>
+The kernel sends a SADB_ACQUIRE message to registered sockets. Note that any GETSPI, ADD, or UPDATE
+calls in reaction to an ACQUIRE must fill in the sadb_msg_seq of those messages with the one in the ACQUIRE
+message. The address (SD) extensions must have the port fields filled in with the port numbers of the session requir<hy>
+ing keys if appropriate.
+ <base, address (SD), (address(Is,Id)), (identity(SD),)
+  (sensitivity,) proposal>
+Extended ACQUIRE will have a slightly different format. The sadb_msg_satype field is 0, and the extension con<hy>
+tains the desired combination(s) of security protocols.
+ <base, address (SD), (address(Is,Id)), (identity(SD),)
+  (sensitivity,) eprop>
+If key management fails, send an SADB_ACQUIRE to indicate failure.
+ <base>
+For inbound Key Management processing, a Key Management application may wish to consult the kernel for its pol<hy>
+icy. The application should send to the kernel:
+ <base, address (SD), (address(Is,Id))>
+The kernel returns a message similar to a kernel-generated extended ACQUIRE:
+ <base, address (SD), (address(Is,Id)), (identity(SD),)
+  (sensitivity,) eprop>
+Send a SADB_REGISTER message from a user process to the kernel.
+ <base>
+The kernel returns the SADB_REGISTER message to registered sockets, with algorithm types supported by the
+kernel being indicated in the supported algorithms field. Note that this message may arrive asynchronously due to an
+algorithm being loaded or unloaded into a dynamically linked kernel.
+ <base, supported>
+There is also the extended REGISTER, which will allow this process to receive extended ACQUIREs.
+ <base, ereg>
+<beginning of page>
+Which returns a series of SADB_REGISTER replies (one for each security protocol registered) from the kernel.
+The kernel sends a SADB_EXPIRE message to all listeners when the soft limit of a security association has been
+expired.
+ <base, SA, lifetime (C and one of HS), address (SD)>
+Send a SADB_FLUSH message from a user process to the kernel.
+ <base>
+The kernel returns the SADB_FLUSH message to all listening sockets.
+ <base>
+Send a SADB_DUMP message from a user process to the kernel.
+ <base>
+Several SADB_DUMP messages will return from the kernel to the sending socket.
+ <base, SA, (lifetime (HSC),) address (SD), (address (Is,Id),)
+  (address (Nl,Nr),) key (AE), (identity (SD),) sensitivity)>
+To mark the end of a dump a single base header arrives with its sadb_mdg_seq set to 0.
+ <base>
+Send a SADB_X_PROMISC message from a user process to the kernel.
+ <base>
+The kernel returns the SADB_X_PROMISC message to all listening processes.
+ <base>
+The message returning from the kernel will contain a diagnostic value in the base message header, the diagnostic
+value will indicate if action requested by the original message was a success.
+Diagnostic Values:
+ #define SADB_X_DIAGNOSTIC_NONE 0
+ #define SADB_X_DIAGNOSTIC_UNKNOWN_MSG 1
+ #define SADB_X_DIAGNOSTIC_UNKNOWN_EXT 2
+ #define SADB_X_DIAGNOSTIC_BAD_EXTLEN 3
+ #define SADB_X_DIAGNOSTIC_UNKNOWN_SATYPE 4
+ #define SADB_X_DIAGNOSTIC_SATYPE_NEEDED 5
+ #define SADB_X_DIAGNOSTIC_NO_SADBS 6
+ #define SADB_X_DIAGNOSTIC_NO_EXT 7
+  /* Bad address family value */
+ #define SADB_X_DIAGNOSTIC_BAD_SRC_AF 8
+  /* in sockaddr->sa_family. */
+ #define SADB_X_DIAGNOSTIC_BAD_DST_AF 9
+  /* These two are synonyms. */
+ #define SADB_X_DIAGNOSTIC_BAD_PROXY_AF 10
+ #define SADB_X_DIAGNOSTIC_BAD_INNER_SRC_AF 10
+<beginning of page>
+ #define SADB_X_DIAGNOSTIC_AF_MISMATCH 11
+ #define SADB_X_DIAGNOSTIC_BAD_SRC 12
+ #define SADB_X_DIAGNOSTIC_BAD_DST 13
+ #define SADB_X_DIAGNOSTIC_ALLOC_HSERR 14
+ #define SADB_X_DIAGNOSTIC_BYTES_HSERR 15
+ #define SADB_X_DIAGNOSTIC_ADDTIME_HSERR 16
+ #define SADB_X_DIAGNOSTIC_USETIME_HSERR 17
+ #define SADB_X_DIAGNOSTIC_MISSING_SRC 18
+ #define SADB_X_DIAGNOSTIC_MISSING_DST 19
+ #define SADB_X_DIAGNOSTIC_MISSING_SA 20
+ #define SADB_X_DIAGNOSTIC_MISSING_EKEY 21
+ #define SADB_X_DIAGNOSTIC_MISSING_AKEY 22
+ #define SADB_X_DIAGNOSTIC_MISSING_RANGE 23
+ #define SADB_X_DIAGNOSTIC_DUPLICATE_SRC 24
+ #define SADB_X_DIAGNOSTIC_DUPLICATE_DST 25
+ #define SADB_X_DIAGNOSTIC_DUPLICATE_SA 26
+ #define SADB_X_DIAGNOSTIC_DUPLICATE_EKEY 27
+ #define SADB_X_DIAGNOSTIC_DUPLICATE_AKEY 28
+ #define SADB_X_DIAGNOSTIC_DUPLICATE_RANGE 29
+ #define SADB_X_DIAGNOSTIC_MALFORMED_SRC 30
+ #define SADB_X_DIAGNOSTIC_MALFORMED_DST 31
+ #define SADB_X_DIAGNOSTIC_MALFORMED_SA 32
+ #define SADB_X_DIAGNOSTIC_MALFORMED_EKEY 33
+ #define SADB_X_DIAGNOSTIC_MALFORMED_AKEY 34
+ #define SADB_X_DIAGNOSTIC_MALFORMED_RANGE 35
+ #define SADB_X_DIAGNOSTIC_AKEY_PRESENT 36
+ #define SADB_X_DIAGNOSTIC_EKEY_PRESENT 37
+ #define SADB_X_DIAGNOSTIC_PROP_PRESENT 38
+ #define SADB_X_DIAGNOSTIC_SUPP_PRESENT 39
+ #define SADB_X_DIAGNOSTIC_BAD_AALG 40
+ #define SADB_X_DIAGNOSTIC_BAD_EALG 41
+ #define SADB_X_DIAGNOSTIC_BAD_SAFLAGS 42
+ #define SADB_X_DIAGNOSTIC_BAD_SASTATE 43
+ #define SADB_X_DIAGNOSTIC_BAD_AKEYBITS 44
+ #define SADB_X_DIAGNOSTIC_BAD_EKEYBITS 45
+ #define SADB_X_DIAGNOSTIC_ENCR_NOTSUPP 46
+ #define SADB_X_DIAGNOSTIC_WEAK_EKEY 47
+ #define SADB_X_DIAGNOSTIC_WEAK_AKEY 48
+ #define SADB_X_DIAGNOSTIC_DUPLICATE_KMP 49
+ #define SADB_X_DIAGNOSTIC_DUPLICATE_KMC 50
+ #define SADB_X_DIAGNOSTIC_MISSING_NATT_LOC 51
+ #define SADB_X_DIAGNOSTIC_MISSING_NATT_REM 52
+ #define SADB_X_DIAGNOSTIC_DUPLICATE_NATT_LOC 53
+ #define SADB_X_DIAGNOSTIC_DUPLICATE_NATT_REM 54
+ #define SADB_X_DIAGNOSTIC_MALFORMED_NATT_LOC 55
+ #define SADB_X_DIAGNOSTIC_MALFORMED_NATT_REM 56
+ #define SADB_X_DIAGNOSTIC_DUPLICATE_NATT_PORTS 57
+ #define SADB_X_DIAGNOSTIC_MISSING_INNER_SRC 58
+ #define SADB_X_DIAGNOSTIC_MISSING_INNER_DST 59
+ #define SADB_X_DIAGNOSTIC_DUPLICATE_INNER_SRC 60
+ #define SADB_X_DIAGNOSTIC_DUPLICATE_INNER_DST 61
+ #define SADB_X_DIAGNOSTIC_MALFORMED_INNER_SRC 62
+ #define SADB_X_DIAGNOSTIC_MALFORMED_INNER_DST 63
+<beginning of page>
+ #define SADB_X_DIAGNOSTIC_PREFIX_INNER_SRC 64
+ #define SADB_X_DIAGNOSTIC_PREFIX_INNER_DST 65
+ #define SADB_X_DIAGNOSTIC_BAD_INNER_DST_AF 66
+ #define SADB_X_DIAGNOSTIC_INNER_AF_MISMATCH 67
+ #define SADB_X_DIAGNOSTIC_BAD_NATT_REM_AF 68
+ #define SADB_X_DIAGNOSTIC_BAD_NATT_LOC_AF 69
+ #define SADB_X_DIAGNOSTIC_PROTO_MISMATCH 70
+ #define SADB_X_DIAGNOSTIC_INNER_PROTO_MISMATCH 71
+ #define SADB_X_DIAGNOSTIC_DUAL_PORT_SETS 72
+ #define SADB_X_DIAGNOSTIC_PAIR_INAPPROPRIATE 73
+ #define SADB_X_DIAGNOSTIC_PAIR_ADD_MISMATCH 74
+ #define SADB_X_DIAGNOSTIC_PAIR_ALREADY 75
+ #define SADB_X_DIAGNOSTIC_PAIR_SA_NOTFOUND 76
+ #define SADB_X_DIAGNOSTIC_BAD_SA_DIRECTION 77
+ #define SADB_X_DIAGNOSTIC_SA_NOTFOUND 78
+ #define SADB_X_DIAGNOSTIC_SA_EXPIRED 79
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsr Interface StabilityEvolving
+in.iked(1M), ipseckey(1M), ipsec(7P), ipsecah(7P), ipsecesp(7P), route(7P), udp(7P)
+McDonald, D.L., Metz, C.W., and Phan, B.G., RFC 2367, PF_KEY Key Management API, Version 2, The Internet
+Society, July 1998.
+Time-based lifetimes may not expire with exact precision in seconds because kernel load may affect the aging of
+SA's.

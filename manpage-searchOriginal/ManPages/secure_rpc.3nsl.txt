@@ -1,0 +1,106 @@
+<beginning of page>
+secure_rpc, authdes_getucred, authdes_seccreate, getnetname, host2netname, key_decryptsession, key_encryptses<hy>
+sion, key_gendes, key_setsecret, key_secretkey_is_set, netname2host, netname2user, user2netname <-> library rou<hy>
+tines for secure remote procedure calls
+cc [ flag... ] file... -lnsl [ library...]
+#include <rpc/rpc.h>
+#include <sys/types.h>
+int authdes_getucred(const struct authdes_cred *adc, uid_t *uidp,
+ gid_t *gidp, short *gidlenp, gid_t *gidlist);
+AUTH *authdes_seccreate(const char *name, const uint_t window,
+ const char *timehost, ckey);
+int getnetname(char name [MAXNETNAMELEN+1]);
+int host2netname(char name [MAXNETNAMELEN+1], const char *host,
+ const char *domain);
+int key_decryptsession(const char *remotename, des_block *deskey);
+int key_encryptsession(const char *remotename, des_block *deskey);
+int key_gendes(des_block *deskey);
+int key_setsecret(const char *key);
+int key_secretkey_is_set(void)
+int netname2host(const char *name, char *host, const int hostlen);
+int netname2user(const char *name, uid_t *uidp, gid_t *gidp, int *gidlenp,
+ gid_t *gidlist [NGRPS]);
+int user2netname(char name [MAXNETNAMELEN+1], const uid_t uid,
+ const char *domain);
+The RPC library functions allow C programs to make procedure calls on other machines across the network.
+RPC supports various authentication flavors. Among them are:
+AUTH_NONE No authentication (none).
+AUTH_SYS Traditional UNIX-style authentication.
+AUTH_DES DES encryption-based authentication.
+The authdes_getucred() and authdes_seccreate() functions implement the AUTH_DES authentication style. The
+keyserver daemon keyserv(1M) must be running for the AUTH_DES authentication system to work and keylo<hy>
+gin(1) must have been run. The AUTH_DES style of authentication is discussed here. For information about the
+AUTH_NONE and AUTH_SYS flavors of authentication, refer to rpc_clnt_auth(3NSL). See rpc(3NSL) for the
+definition of the AUTH data structure.
+The following functions documented on this page are MT-Safe. For the MT-levels of other authentication styles, see
+relevant man pages.
+authdes_getucred() This is the first of two functions that interface to the RPC secure authentication system
+AUTH_DES. The second is the authdes_seccreate() function. The authdes_getucred() function is used on the
+server side to convert an AUTH_DES credential, which is operating system independent, to an AUTH_SYS creden<hy>
+tial. The authdes_getucred() function returns 1 if it succeeds, 0 if it fails.
+The *uidp parameter is set to the user's numerical ID associated with adc. The *gidp parameter is set to the numeri<hy>
+cal ID of the user's group. The *gidlist parameter contains the numerical IDs of the other groups to which the user
+belongs. The *gidlenp parameter is set to the number of valid group ID entries specified by the *gidlist parameter.
+<beginning of page>
+The authdes_getucred() function fails if the authdes_cred structure was created with the netname of a host. In such
+a case, netname2host() should be used to get the host name from the host netname in the authdes_cred structure.
+authdes_seccreate() The second of two AUTH_DES authentication functions, the authdes_seccreate() function is
+used on the client side to return an authentication handle that enables the use of the secure authentication system.
+The first field, name, specifies the network name netname of the owner of the server process. The field usually repre<hy>
+sents a hostname derived from the host2netname() utility, but the field might also represent a user name converted
+with the user2netname() utility.
+The second field, window, specifies the validity of the client credential in seconds. If the difference in time between
+the client's clock and the server's clock exceeds window, the server rejects the client's credentials and the clock will
+have to be resynchronized. A small window is more secure than a large one, but choosing too small a window in<hy>
+creases the frequency of resynchronization due to clock drift.
+The third parameter, timehost, is the host's name and is optional. If timehost is NULL, the authentication system as<hy>
+sumes that the local clock is always in sync with the timehost clock and does not attempt resynchronization. If a
+timehost is supplied, the system consults the remote time service whenever resynchronization is required. The time<hy>
+host parameter is usually the name of the host on which the server is running.
+The final parameter, ckey, is also optional. If ckey is NULL, the authentication system generates a random DES key
+to be used for the encryption of credentials. If ckey is supplied, it is used for encryption.
+If authdes_seccreate() fails, it returns NULL.
+getnetname() This function returns the unique, operating system independent netname of the caller in the fixed-
+length array name. The function returns 1 if it succeeds and 0 if it fails.
+host2netname() This function converts a domain-specific hostname host to an operating system independent net<hy>
+name. The function returns 1 if it succeeds and 0 if it fails. The host2netname() function is the inverse of the net<hy>
+name2host() function. If the domain is NULL, host2netname() uses the default domain name of the machine. If
+host is NULL, it defaults to that machine itself. If domain is NULL and host is an NIS name such as myhost.sun.ex<hy>
+ample.com, the host2netname() function uses the domain sun.example.com rather than the default domain name
+of the machine.
+key_decryptsession() This function is an interface to the keyserver daemon, which is associated with RPC's secure
+authentication system (AUTH_DES authentication). User programs rarely need to call key_decryptsession() or the
+associated functions key_encryptsession(), key_gendes(), and key_setsecret().
+The key_decryptsession() function takes a server netname remotename and a DES key deskey, and decrypts the key
+by using the the public key of the server and the secret key associated with the effective UID of the calling process.
+The key_decryptsession() function is the inverse of key_encryptsession() function.
+key_encryptsession() This function is a keyserver interface that takes a server netname remotename and a DES key
+deskey, and encrypts the key using the public key of the the server and the secret key associated with the effective
+UID of the calling process. If the keyserver does not have a key registered for the UID, it falls back to using the se<hy>
+cret key for the netname nobody unless this feature has been disabled. See keyserv(1M). The key_encryptsession()
+function is the inverse of key_decryptsession() function. The key_encryptsession() function returns 0 if it suc<hy>
+ceeds, <mi>1 if it fails.
+key_gendes() This is a keyserver interface function used to ask the keyserver for a secure conversation key. Select<hy>
+ing a conversion key at random is generally not secure because the common ways of choosing random numbers are
+too easy to guess. The key_gendes() function returns 0 if it succeeds, <mi>1 if it fails.
+key_setsecret() This is a keyserver interface function used to set the key for the effective UID of the calling process.
+This function returns 0 if it succeeds, <mi>1 if it fails.
+<beginning of page>
+key_secretkey_is_set() This is a keyserver interface function used to determine if a key has been set for the effective
+UID of the calling process. If the keyserver has a key stored for the effective UID of the calling process, the key_se<hy>
+cretkey_is_set() function returns 1. Otherwise it returns 0.
+netname2host() This function converts an operating system independent netname name to a domain-specific host<hy>
+name host. The hostlen parameter is the maximum size of host. The netname2host() function returns 1 if it succeeds
+and 0 if it fails. The function is the inverse of the host2netname() function.
+netname2user() This function converts an operating system independent netname to a domain-specific user ID. The
+netname2user() function returns 1 if it succeeds and 0 if it fails.The function is the inverse of the user2netname()
+function.
+The *uidp parameter is set to the user's numerical ID associated with name. The *gidp parameter is set to the nu<hy>
+merical ID of the user's group. The gidlist parameter contains the numerical IDs of the other groups to which the us<hy>
+er belongs. The *gidlenp parameter is set to the number of valid group ID entries specified by the gidlist parameter.
+user2netname() This function converts a domain-specific username to an operating system independent netname.
+The user2netname() function returns 1 if it succeeds and 0 if it fails. The function is the inverse of netname2user()
+function.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelMT-Safe
+chkey(1), keylogin(1), keyserv(1M), newkey(1M), rpc(3NSL), rpc_clnt_auth(3NSL), attributes(5)

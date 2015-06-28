@@ -1,0 +1,143 @@
+<beginning of page>
+cputrack <-> monitor process and LWP behavior using CPU performance counters
+cputrack -c eventspec [-c eventspec]... [-efntvD]
+ [-N count] [-o pathname] [-T interval] command [args]
+cputrack -c eventspec [-c eventspec]... -p pid [-efntvD]
+ [-N count] [-o pathname] [-T interval]
+cputrack -h
+The cputrack utility allows CPU performance counters to be used to monitor the behavior of a process or family of
+processes running on the system. If interval is specified with the -T option, cputrack samples activity every interval
+seconds, repeating forever. If a count is specified with the -N option, the statistics are repeated count times for each
+process tracked. If neither are specified, an interval of one second is used. If command and optional args are speci<hy>
+fied, cputrack runs the command with the arguments given while monitoring the specified CPU performance
+events. Alternatively, the process ID of an existing process can be specified using the -p option.
+Because cputrack is an unprivileged program, it is subject to the same restrictions that apply to truss(1). For exam<hy>
+ple, setuid(2) executables cannot be tracked.
+The following options are supported:
+-c eventspec Specifies a set of events for the CPU performance counters to monitor. The syntax of these event speci<hy>
+fications is:
+ [picn=]eventn[,attr[n][=val]][,[picn=]eventn
+  [,attr[n][=val]],...,]
+You can use the -h option to obtain a list of available events and attributes. This causes generation of the usage mes<hy>
+sage. You can omit an explicit counter assignment, in which case cpustat attempts to choose a capable counter auto<hy>
+matically.
+Attribute values can be expressed in hexadecimal, octal, or decimal notation, in a format suitable for strtoll(3C). An
+attribute present in the event specification without an explicit value receives a default value of 1. An attribute without
+a corresponding counter number is applied to all counters in the specification.
+The semantics of these event specifications can be determined by reading the CPU manufacturer's documentation
+for the events.
+Multiple -c options can be specified, in which case cputrack cycles between the different event settings on each
+sample.
+-D Enables debug mode.
+-e Follows all exec(2), or execve(2) system calls.
+-f Follows all children created by fork(2), fork1(2), or vfork(2) system calls.
+-h Prints an extended help message on how to use the utility, how to program the processor-dependent counters, and
+where to look for more detailed information.
+-n Omits all header output (useful if cputrack is the beginning of a pipeline).
+-N count Specifies the maximum number of CPU performance counter samples to take before exiting.
+-o outfile Specifies file to be used for the cputrack output.
+<beginning of page>
+-p pid Interprets the argument as the process ID of an existing process to which process counter context should be
+attached and monitored.
+-t Prints an additional column of processor cycle counts, if available on the current architecture.
+-T interval Specifies the interval between CPU performance counter samples in seconds. Very small intervals may
+cause some samples to be skipped. See WARNINGS.
+-v Enables more verbose output.
+The operating system enforces certain restrictions on the tracing of processes. In particular, a command whose ob<hy>
+ject file cannot be read by a user cannot be tracked by that user; set-uid and set-gid commands can only be tracked
+by a privileged user. Unless it is run by a privileged user, cputrack loses control of any process that performs an ex<hy>
+ec() of a set-id or unreadable object file. Such processes continue normally, though independently of cputrack, from
+the point of the exec().
+The system may run out of per-user process slots when the -f option is used, since cputrack runs one controlling
+process for each process being tracked.
+The times printed by cputrack correspond to the wallclock time when the hardware counters were actually sample.
+The time is derived from the same timebase as gethrtime(3C).
+The cputrack utility attaches performance counter context to each process that it examines. The presence of this
+context allows the performance counters to be multiplexed between different processes on the system, but it cannot
+be used at the same time as the cpustat(1M) utility.
+Once an instance of the cpustat utility is running, further attempts to run cputrack will fail until all instances of
+cpustat terminate.
+Sometimes cputrack provides sufficient flexibility and prints sufficient statistics to make adding the observation
+code to an application unnecessary. However, more control is occasionally desired. Because the same performance
+counter context is used by both the application itself and by the agent LWP injected into the application by cpu<hy>
+track, it is possible for an application to interact with the counter context to achieve some interesting capabilities.
+See cpc_enable(3CPC).
+The processor cycle counts enabled by the -t option always apply to both user and system modes, regardless of the
+settings applied to the performance counter registers.
+The output of cputrack is designed to be readily parseable by nawk(1) and perl(1), thereby allowing performance
+tools to be composed by embedding cputrack in scripts. Alternatively, tools may be constructed directly using the
+same APIs that cputrack is built upon, using the facilities of libcpc(3LIB) and libpctx(3LIB). See cpc(3CPC).
+Although cputrack uses performance counter context to maintain separate performance counter values for each
+LWP, some of the events that can be counted will inevitably be impacted by other activities occurring on the system,
+particularly for limited resources that are shared between processes (for example, cache miss rates). For such events,
+it may also be interesting to observe overall system behavior with cpustat(1M).
+For the -T interval option, if interval is specified as zero, no periodic sampling is performed. The performance coun<hy>
+ters are only sampled when the process creates or destroys an LWP, or it invokes fork(2), exec(2), or exit(2). Ex<hy>
+ample 1 Using Performance Counters to Count Clock Cycles
+In this example, the utility is being used on a machine containing an UltraSPARC-III+ processor. The counters are
+set to count processor clock cycles and instructions dispatched in user mode while running the sleep(1) command.
+ example% cputrack -c pic0=Cycle_cnt,pic1=Instr_cnt sleep 10
+  time lwp event pic0 pic1
+  1.007 1 tick 765308 219233
+  2.007 1 tick 0 0
+  4.017 1 tick 0 0
+<beginning of page>
+  6.007 1 tick 0 0
+  8.007 1 tick 0 0
+ 10.007 1 tick 0 0
+ 10.017 1 exit 844703 228058
+Example 2 Counting External Cache References and Misses
+This example shows more verbose output while following the fork() and exec() of a simple shell script on an Ultra<hy>
+SPARC machine. The counters are measuring the number of external cache references and external cache misses.
+Notice that the explicit pic0 and pic1 names can be omitted where there are no ambiguities.
+ example% cputrack -fev -c EC_ref,EC_hit /bin/ulimit -c
+ time pid lwp event pic0 pic1
+ 0.007 101142 1 init_lwp 805286 20023
+ 0.023 101142 1 fork # 101143
+ 0.026 101143 1 init_lwp 1015382 24461
+ 0.029 101143 1 fini_lwp 1025546 25074
+ 0.029 101143 1 exec 1025546 25074
+ 0.000 101143 1 exec \
+  # '/usr/bin/sh /usr/bin/basename\
+  /bin/ulimit'
+ 0.039 101143 1 init_lwp 1025546 25074
+ 0.050 101143 1 fini_lwp 1140482 27806
+ 0.050 101143 1 exec 1140482 27806
+ 0.000 101143 1 exec # '/usr/bin/expr \
+  //bin/ulimit : [^/]/*$ : .*/* : $ | //bin/ulimi'
+ 0.059 101143 1 init_lwp 1140482 27806
+ 0.075 101143 1 fini_lwp 1237647 30207
+ 0.075 101143 1 exit 1237647 30207
+ unlimited
+ 0.081 101142 1 fini_lwp 953383 23814
+ 0.081 101142 1 exit 953383 23814
+Example 3 Counting Instructions
+This example shows how many instructions were executed in the application and in the kernel to print the date on a
+Pentium III machine:
+ example% cputrack -c inst_retired,inst_retired,nouser1,sys1 date
+  time lwp event pic0 pic1
+ Fri Aug 20 20:03:08 PDT 1999
+  0.072 1 exit 246725 339666
+Example 4 Counting TLB Hits
+This example shows how to use processor-specific attributes to count TLB hits on a Pentium 4 machine:
+ example% cputrack -c ITLB_reference,emask=1 date
+  time lwp event pic0
+  Fri Aug 20 20:03:08 PDT 1999
+  0.072 1 exit 246725
+<beginning of page>
+By running any instance of the cpustat(1M) utility, all existing performance counter context is forcibly invalidated
+across the machine. This may in turn cause all invocations of the cputrack command to exit prematurely with un<hy>
+specified errors.
+If cpustat is invoked on a system that has CPU performance counters which are not supported by Solaris, the fol<hy>
+lowing message appears:
+ cputrack: cannot access performance counters - Operation not applicable
+This error message implies that cpc_open() has failed and is documented in cpc_open(3CPC). Review this docu<hy>
+mentation for more information about the problem and possible solutions.
+If a short interval is requested, cputrack may not be able to keep up with the desired sample rate. In this case, some
+samples may be dropped.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcpcu Interface StabilityEvolving
+nawk(1), perl(1), proc(1), truss(1), prstat(1M), cpustat(1M), exec(2), exit(2), fork(2), setuid(2), vfork(2), geth<hy>
+rtime(3C), strtoll(3C), cpc(3CPC), cpc_bind_pctx(3CPC), cpc_enable(3CPC), cpc_open(3CPC), libcpc(3LIB),
+libpctx(3LIB), proc(4), attributes(5)

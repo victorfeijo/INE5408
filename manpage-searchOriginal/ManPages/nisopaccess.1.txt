@@ -1,0 +1,76 @@
+<beginning of page>
+nisopaccess <-> NIS+ operation access control administration command
+nisopaccess [-v] directory operation rights
+nisopaccess [-v] [-r] directory operation
+nisopaccess [-v] [-l] directory [operation]
+Most NIS+ operations have implied access control through the permissions on the objects that they manipulate. For
+example, in order to read an entry in a table, you must have read permission on that entry. However, some NIS+ op<hy>
+erations by default perform no access checking at all and are allowed to all:
+Operation Example of commands that use the operation
+NIS_CHECKPOINT nisping -C
+NIS_CPTIME nisping, rpc.nisd
+NIS_MKDIR nismkdir
+NIS_PING nisping, rpc.nisd
+NIS_RMDIR nisrmdir
+NIS_SERVSTATE nisbackup, nisrestore
+NIS_STATUS nisstat, rpc.nispasswdd
+The nisopaccess command can be used to enforce access control on these operations on a per NIS+ directory basis.
+The directory argument should be the fully qualified name, including the trailing dot, of the NIS+ directory to which
+nisopaccess will be applied. As a short-hand method, if the directory name does not end in a trailing dot, for exam<hy>
+ple "org_dir", then the domain name is appended. The domain name is also appended to partial paths such as
+"org_dir.xyz".
+You can use upper or lower case for the operation argument. However, you cannot mix cases. The "NIS_" prefix
+may be omitted. For example, NIS_PING can be specified as NIS_PING, nis_ping, PING, or ping.
+The rights argument is specified in the format defined by the nischmod(1) command. Since only the read ("r") rights
+are used to determine who has the right to perform the operation, the modify and delete rights may be used to con<hy>
+trol who can change access to the operation.
+The access checking performed for each operation is as follows. When an operation requires access be checked on
+all directories served by its rpc.nisd(1M), access is denied if even one of the directories prohibits the operation.
+NIS_CHECKPOINT Check specified directory, or all directories if there is no directory argument, as is the case
+when NIS_CHECKPOINT is issued by the "nisping -Ca" command. Return NIS_PERMISSION when access is
+denied.
+NIS_CPTIME Check specified directory. It returns 0 when access is denied.
+NIS_MKDIR Check parent of specified directory. Returns NIS_PERMISSION when access is denied.
+If the parent directory is not available locally, that is, it is not served by this rpc.nisd(1M), NIS_MKDIR access is
+allowed, though the operation will be executed only if this rpc.nisd is a known replica of the directory.
+<beginning of page>
+You should note that the NIS_MKDIR operation does not create a NIS+ directory; it adds a directory to the serving
+list for this rpc.nisd, if appropriate.
+NIS_PING Check specified directory. No return value.
+NIS_RMDIR Check specified directory. NIS_PERMISSION is returned when access denied.
+The NIS_RMDIR operation does not remove a NIS+ directory; it deletes the directory from the serving list for this
+rpc.nisd, if appropriate.
+NIS_SERVSTATE Check access on all directories served by this rpc.nisd. If access is denied for a tag, "<permis<hy>
+sion denied>" is returned instead of the tag value.
+NIS_STATUS Same as for NIS_SERVSTATE.
+Notice that older clients may not supply authentication information for some of the operations listed above. These
+clients are treated as "nobody" when access checking is performed.
+The access control is implemented by creating a NIS+ table called "proto_op_access" in each NIS+ directory to
+which access control should be applied. The table can be manipulated using normal NIS+ commands. However,
+nisopaccess is the only supported interface for NIS+ operation access control.
+The following options are supported:
+-l List the access control for a single operation, or for all operations that have access control enabled.
+-r Remove access control for a certain operation on the specified directory.
+-v Verbose mode.
+Example 1 Enabling Access Control for the NIS_PING Operation
+To enable access control for the NIS_PING operation on "org_dir.`domainname`." such that only the owner of the
+directory can perform a NIS_PING, or change the NIS_PING rights:
+ example% nisopaccess org_dir NIS_PING o=rmcd,g=,w=,n=
+Example 2 Listing the Access to NIS_PING
+To list the access to the NIS_PING operation for org_dir:
+ example% nisopaccess -l org_dir NIS_PING
+ NIS_PING ----rmcd-------- owner.dom.ain. group.dom.ain.
+Example 3 Removing Access Control for NIS_PING
+To remove access control for NIS_PING on org_dir:
+ example% nisopaccess -r org_dir NIS_PING
+The following exit values are returned:
+<beginning of page>
+0 Successful operation.
+other Operation failed. The status is usually the return status from a NIS+ command such as nistbladm.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wnisu
+NIS+(1), nischmod(1), nistbladm(1), rpc.nisd(1M), attributes(5)
+NIS+ might not be supported in future releases of the Solaris operating system. Tools to aid the migration from
+NIS+ to LDAP are available in the current Solaris release. For more information, visit http://www.sun.com/directo<hy>
+ry/nisplus/transition.html.

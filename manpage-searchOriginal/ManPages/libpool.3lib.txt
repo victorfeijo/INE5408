@@ -1,0 +1,167 @@
+<beginning of page>
+libpool <-> pool configuration manipulation library
+cc [ flag... ] file... [ library... ]
+#include <pool.h>
+The functions in this library define the interface for reading and writing resource pools configuration files, as well as
+that for commiting an existing configuration to becoming the running OS configuration (with respect to partitioning
+subsystems). The <pool.h> header provides type and function declarations for all library services.
+The resource pools facility brings together process-bindable resources into a common abstraction called a pool. Pro<hy>
+cessor sets and other entities can be configured, grouped, and labelled in a persistent fashion such that workload
+components can be associated with a subset of a system's total resources. The libpool library provides a C language
+API for accessing this functionality, while pooladm(1M), poolbind(1M), and poolcfg(1M) make this facility avail<hy>
+able through command invocations from a shell. Each of those manual pages describes aspects of the pools facility;
+this page describes the properties available to the various entities managed within the pools facility. These entities
+include the system, pools, and the pset resources for processor sets.
+When the pools facility is enabled on a system, the behavior of the following functions is modified.
+tab(); cw(3.38i) cw(2.12i) lw(3.38i) lw(2.12i) System CallError Value _ pset_assign(pset !=PS_QUERY)ENOT<hy>
+SUP pset_bind(pset !=PS_QUERY)ENOTSUP pset_create()ENOTSUP pset_destroy()ENOTSUP pset_setat<hy>
+tr()ENOTSUP
+Each active entity within the resource pools framework can have an arbitrary collection of named, typed properties
+associated with it. Properties supported by the pools framework are listed, with descriptions, under each entity be<hy>
+low. In general, resource properties can be one of five types: boolean (bool), signed (int64) and unsigned (uint64)
+integers, floating point (double), and string values.
+All entities and resources support a string property for commenting purposes; this property is available for use by
+management applications to record descriptions and other administrator oriented data. The comment field is not used
+by the default pools commands, except when a configuration is initiated by the poolcfg utility, in which case an in<hy>
+formative message is placed in the system.comment property for that configuration.
+tab(); cw(2.41i) cw(.73i) cw(2.36i) lw(2.41i) lw(.73i) lw(2.36i) Property nameTypeDescription system.allocate-
+methodstringT{ Allocation method to use when this configuration is instantiated T} system.bind-defaultboolT{ If
+specified pool not found, bind to pool with 'pool.default' property set to true T} system.commentstringUser de<hy>
+scription of system system.namestringUser name for the configuration system.versionint64T{ libpool version re<hy>
+quired to manipulate this configuration T} system.poold.log-levelstringpoold logging level system.poold.log-loca<hy>
+tionstringpoold logging location system.poold.history-filestringpoold decision history location sys<hy>
+tem.poold.monitor-intervaluint64poold monitoring sample interval system.poold.objectivesstringpoold objec<hy>
+tives for a system.
+The system.allocate-method, system.bind-default, system.comment, system.name, system.poold.log-level, sys<hy>
+tem.poold.log-location, system.poold.history-file, system.poold.monitor-interval, and system.poold.objectives
+properties are writable; the system.version property is not.
+The system.allocate-method property accepts only two values, "importance based" and "surplus to default". The de<hy>
+fault value for this property is "importance based". The property is optional and if it is not present the library will al<hy>
+locate resources as though it were present and had the default value. These strings are defined in <pool.h> as
+POA_IMPORTANCE and POA_SURPLUS_TO_DEFAULT.
+If "importance based" allocation is defined, then during a commit the library will allocate resources to pools using an
+algorithm that observes minimum and maximum constraints for resources but favors those resources with greater
+importance.
+If "surplus to default" is defined, then during a commit the library will allocate minimum resources to all resource
+sets apart from default which will receive any surplus.
+The system.bind-default property defaults to true. This property interacts with the project.pool resource control to
+specify the binding behavior for processes associated with a project. If project.pool is not specified, then this prop<hy>
+<beginning of page>
+erty has no effect. If project.pool is specified and the specified pool exists, this property has no effect. If the speci<hy>
+fied pool does not exist, perhaps because of a reconfiguration, then this property controls the binding behavior for
+the project member. If system.bind-default is true, then the project member is bound to the default pool (identified
+as the pool for which pool.default is true); otherise the project member is refused access to the system. Care should
+be taken with the pools configuration if this property is set to false, so as to avoid denying users access to the system.
+The various poold properties are used to configure the operation of poold(1M).
+The system.poold.log-level property is used to specify the level of detail provided in log messages. Valid values are:
+ALERT, CRIT, ERR, WARNING, NOTICE, INFO, and DEBUG.
+ALERT provides the least level of detail, DEBUG the greatest. See syslog(3C) for more information about the
+meaning of these debug levels. If this property is not specified, the default value NOTICE is used.
+The system.poold.log-location property is used to specify the location of the logfiles generated by poold. The spe<hy>
+cial value of "syslog" indicates that logged messages should be written to syslog(). If this property is not specified,
+the default location /var/log/pool is used.
+The system.poold.history-file specifies the location of the decision history file which is used by poold to improve
+the quality of its decision making over time. If this property is not specified, the default location /var/adm/pool is
+used.
+The system.poold.monitor-interval property specifies the monitoring interval (in milliseconds) to be used by poold
+when sampling utilization statistics. If this property is not specified, the default value of 15 seconds is used.
+The system.poold.objectives property specifies any system wide objectives. An objectives property has the follow<hy>
+ing syntax:
+ objectives = objective [; objective]*
+ objective = [n:] keyword [op] [value]
+All objectives are prefixed with an optional importance. The importance acts as a multiplier for the objective and
+thus increases the significance of its contribution to the objective function evaluation. If no importance is specified,
+the default value is 1.
+The "wt-load" objective is the only objective to which a system element can be set. This objective favors configura<hy>
+tions that match resource allocations to resource utilization. A resource set that uses more resources will be given
+more resources when this objective is active. An administrator should use this objective when he is relatively satis<hy>
+fied with the constraints established using the minimum and maximum properties and would like the DRP to manip<hy>
+ulate resources freely within those constraints.
+tab(); cw(1.85i) cw(.84i) cw(2.81i) lw(1.85i) lw(.84i) lw(2.81i) Property nameTypeDescription pool.activebool<hy>
+Mark this pool as active, if true. pool.commentstringUser description of pool. pool.defaultboolT{ Mark this pool
+as the default pool, if true; see system.bind-default property. T} pool.importanceint64T{ Relative importance of
+this pool; for possible resource dispute resolution. T} pool.namestringT{ User name for pool; used by setpro<hy>
+ject(3PROJECT) as value for 'project.pool' project attribute in project(4) database. T} pool.schedulerstringT{
+Scheduler class to which consumers of this pool will be bound. This property is optional and if not specified, the
+scheduler bindings for consumers of this pool are not affected. T} pool.sys_idint64System-assigned pool ID.
+pool.temporaryboolT{ Mark this pool as a temporary resource; if true, this pool can exist only in the dynamic con<hy>
+figuration and cannot be committed to a configuration file. T}
+The pool.default, pool.sys_id, and pool.temporary properties are not writable; all other listed properties are
+writable.
+If pool.scheduler is specified, it must be set to the name of a valid scheduling class for the system. See the -c option
+for priocntl(1) for a list of valid class names.
+tab(); cw(1.85i) cw(.84i) cw(2.81i) lw(1.85i) lw(.84i) lw(2.81i) Property nameTypeDescription pset.com<hy>
+mentstringUser description of resource. pset.defaultboolMarks default processor set. pset.loaduint64The load for
+this processor set. pset.maxuint64T{ Maximum number of CPUs permitted in this processor set. T} pset.min<hy>
+<beginning of page>
+uint64T{ Minimum number of CPUs permitted in this processor set. T} pset.namestringUser name for resource.
+pset.sizeuint64T{ Current number of CPUs in this processor set. T} pset.sys_idint64System-assigned processor set
+ID. pset.temporaryboolT{ Mark this processor set as a temporary resource; if true, this processor set can exist only
+in the dynamic configuration and cannot be committed to a configuration file. T} pset.typestringT{ Names re<hy>
+source type; value for all processor sets is pset. T} pset.unitsstringT{ Identifies meaning of size-related properties;
+value for all processor sets is population. T} pset.poold.objectivesstringT{ Specifies the poold objectives for a
+pset. T}
+The pset.comment, pset.max, pset.min, pset.name, and pset.poold.objectives properties are writable; the pset.de<hy>
+fault, pset.load, pset.size, pset.sys_id, pset.temporary, pset.type, and pset.units properties are not.
+The pset.load property represents the load on a processor set. The lowest value for this property is 0. The value of
+pset.load increases in a linear fashion with the load on the set, as measured by the number of jobs in the system run
+queue.
+The pset.poold.objectives property specifies an objective which is specific to a particular pset. See the sys<hy>
+tem.poold.objectives entry for the specification of this property's syntax.
+There are two types of objectives that can be set on a pset:
+locality This objective influences the impact that locality, as measured by lgroup data, has upon the chosen configu<hy>
+ration. This objective can take one of three values:
+tight If set, configurations that maximize resource locality are favored.
+loose If set, configurations that minimize resource locality are favored.
+none This is the default value for this objective. If set, configuration favorability is uninfluenced by resource locality.
+utilization This objective favors configurations that allocate resources to partitions that are failing to preserve the
+specified utilization objective.
+These objectives are specified in terms of an operator and a value. The operators are
+< The ``less than'' operator is used to indicate that the specified value should be treated as a maximum target value.
+> The ``greater than'' operator is used to indicate that the specified value should be treated as a minimum target val<hy>
+ue.
+~ The ``about'' operator is used to indicate that the specified value should be treated as a target value about which
+some fluctuation is acceptable.
+Only one objective of each type of operator can be set. For example, if the ~ operator is set, the < and > operators
+cannot be set. It is possible to set a < and a > operator together; the values will be validated to ensure that they do not
+overlap.
+tab(); cw(1.85i) cw(1.07i) cw(2.58i) lw(1.85i) lw(1.07i) lw(2.58i) Property nameTypeDescription _ cpu.com<hy>
+mentstringUser description of CPU. cpu.pinnedboolCPU pinned to this processor set. cpu.statusint64T{ Proces<hy>
+sor status, on-line, offline or interrupts disabled. T} cpu.sys_idint64System-assigned processor ID.
+The cpu.comment, cpu.pinned, and cpu.status properties are writeable.
+The cpu.status property can be set only to the following values:
+<beginning of page>
+off-line Set the CPU offline.
+on-line Set the CPU online.
+no-intr Disable interrupt processing on the CPU.
+These values are defined in <sys/processor.h> as the PS_OFFLINE, PS_ONLINE, and PS_NOINTR macros.
+The shared object libpool.so.1 provides the public interfaces defined below. See Intro(3) for additional information
+on shared object interfaces.
+tab(); lw(2.72i) lw(2.78i) lw(2.72i) lw(2.78i) pool_associatepool_component_info pool_component_to_elem<hy>
+pool_conf_alloc pool_conf_closepool_conf_commit pool_conf_exportpool_conf_free pool_conf_in<hy>
+fopool_conf_location pool_conf_openpool_conf_remove pool_conf_rollbackpool_conf_status pool_conf_to_el<hy>
+empool_conf_update pool_conf_validatepool_create pool_destroypool_dissociate pool_dynamic_location<hy>
+pool_error pool_get_bindingpool_get_owning_resource pool_get_poolpool_get_property pool_get_resource<hy>
+pool_get_resource_binding pool_get_statuspool_info pool_put_propertypool_query_components
+pool_query_pool_resourcespool_query_pools pool_query_resource_componentspool_query_resources
+pool_resource_createpool_resource_destroy pool_resource_infopool_resource_to_elem pool_resource_trans<hy>
+ferpool_resource_type_list pool_resource_xtransferpool_rm_property pool_set_bindingpool_set_status
+pool_static_locationpool_strerror pool_to_elempool_value_alloc pool_value_freepool_value_get_bool
+pool_value_get_doublepool_value_get_int64 pool_value_get_namepool_value_get_string pool_val<hy>
+ue_get_typepool_value_get_uint64 pool_value_set_boolpool_value_set_double pool_value_set_int64pool_val<hy>
+ue_set_name pool_value_set_stringpool_value_set_uint64 pool_versionpool_walk_components
+pool_walk_poolspool_walk_properties pool_walk_resources
+/usr/lib/libpool.so.1 shared object
+/usr/lib/64/libpool.so.1 64-bit shared object
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUNW<hy>
+pool (32-bit) _ SUNWpoolx (64-bit) _ CSIEnabled _ Interface StabilityUnstable _ MT-LevelSafe
+Intro(3), pool_component_info(3POOL), pool_conf_open(3POOL), pool_conf_to_elem(3POOL), pool_cre<hy>
+ate(3POOL), pool_error(3POOL), pool_get_binding(3POOL), pool_get_property(3POOL), pool_get_re<hy>
+source(3POOL), pool_resource_create(3POOL), pool_value_alloc(3POOL), pool_walk_pools(3POOL), at<hy>
+tributes(5), smf(5)
+Functions in libpool can be used to manipulate static configurations even when the pools facility is not enabled. See
+pooladm(1M) and pool_set_status(3POOL) for more information about enabling the pools facility. The pools facil<hy>
+ity must be enabled, however, to modify the dynamic configuration.
+Since the Resource Pools facility is an smf(5) service, it can also be enabled and disabled using the standard Service
+Management Facility (SMF) interfaces.

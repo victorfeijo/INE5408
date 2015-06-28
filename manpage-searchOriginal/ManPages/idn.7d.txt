@@ -1,0 +1,79 @@
+<beginning of page>
+idn <-> inter-domain network device driver
+/dev/idn
+The idn driver is a multi-thread, loadable, clonable, STREAMS-based pseudo driver that supports the connectionless
+Data Link Provider Interface dlpi(7P) over the Sun Enterprise 10000 Gigplane-XB Interconnect. This connection is
+permitted only between domains within the same Sun Enterprise 10000 server.
+The idn driver supports 1 to 32 logical network interfaces that can be connected to domains linked to the local do<hy>
+main through the domain_link(1M) command. (See domain_link(1M) in the Sun Enterprise 10000 SSP 3.5 Refer<hy>
+ence Manual for more information.) The idn driver works in conjunction with the System Service Processor (SSP)
+to perform domain linking/unlinking and automated linking upon host bootup.
+The /dev/idn device is used to access all IDN services provided by the system.
+The idn driver is a style-2 Data Link Service provider. All M_PROTO and M_PCPROTO-type messages are inter<hy>
+preted as DLPI primitives. For the idn driver to associate the opened stream with a particular device (ppa), you
+must send an explicit DL_ATTACH_REQ message. The ppa ID is interpreted as an unsigned long and indicates the
+corresponding device instance (unit) number. The DL_ERROR_ACK error is returned by the driver if the ppa field
+value does not correspond to a valid device-instance number for the system. The device is initialized on first attach
+and de-initialized (stopped) on the last detach. <bu> The maximum SDU is configurable by using the idn.conf file and
+has a range of 512 bytes to 512 Kbytes. The default value is 16384 bytes. <bu> The minimum SDU is 0. <bu> The Service
+Access Pointer (SAP) address length is 8. <bu> The MAC type is DL_ETHER. <bu> The SAP length value is -2, meaning
+the physical address component is followed immediately by a 2-byte SAP component within the DLSAP address. <bu>
+The service mode is DL_CLDLS. <bu> Optional quality of service (QOS) is not presently supported; accordingly, the
+QOS fields are 0. <bu> The provider style is DL_STYLE2. <bu> The version is DL_VERSION_2. <bu> The broadcast ad<hy>
+dress value is Ethernet/IEEE broadcast address (0xFFFFFF). The idn driver supports broadcast by issuing messages
+to each target individually. The idn driver is inherently a point-to-point network between domains. When the idn
+driver is in the DL_ATTACHED state, the user must send a DL_BIND_REQ request to associate a particular SAP
+with the stream. The idn driver interprets the SAP field within the DL_BIND_REQ message as an Ethernet type
+and valid values for the SAP field are in the range of 0 to 0xFFFF. Only one Ethernet type can be bound to the
+stream at any time.
+If a SAP with a value of 0 is selected, the receiver will be in 802.3 mode. All frames received from the media having
+a type field in the range of 0 to 1500 are assumed to be 802.3 frames and are routed up all open streams which are
+bound to SAP value 0. If more than one stream is in 802.3 mode, then the frame will be duplicated and routed up as
+multiple stream DL_UNITDATA_IND messages.
+In transmission, the driver checks the SAP field of the DL_BIND_REQ to determine if the SAP value is 0, and if
+the destination type field is in the range of 0 to 1500. If either is true, the driver computes the length of the message,
+(excluding the initial message block M_PROTO mblk) of all subsequent DL_UNITDATA_REQ messages and
+transmits 802.3 frames that have this value in the MAC frame header length field.
+The driver also supports raw M_DATA mode. When the user sends a DLIOCRAW ioctl, the particular stream is put
+in raw mode. A complete frame and a proper ether header is expected as part of the data.
+The DLSAP address format consists of the 6-byte, physical address component (Ethernet) followed immediately by
+the 2-byte SAP component (type), producing an 8-byte DLSAP address. Applications should not hardcode to this
+particular implementation-specific DLSAP address format, but instead should use information returned in the
+DL_INFO_ACK primitive to compose and decompose DLSAP addresses. The SAP length, full DLSAP length,
+and SAP physical ordering are included within the DL_INFO_ACK primitive. The physical address length can be
+computed by subtracting the SAP length from the full DLSAP address length or by issuing the DL_PHYS_AD<hy>
+DR_REQ message to obtain the current physical address associated with the stream.
+When the idn driver is in the DL_BOUND state, you can transmit frames on the IDN by sending DL_UNITDA<hy>
+TA_REQ messages to the driver. The driver then routes received IDN frames up the open and bound streams having
+a SAP which matches the Ethernet type as DL_UNITDATA_IND messages. If necessary, received IDN frames are
+duplicated and routed up multiple open streams. The DLSAP address contained within the DL_UNITDATA_REQ
+and DL_UNITDATA_IND messages consists of both the SAP (type) and physical (Ethernet) components.
+In addition to the mandatory connectionless DLPI message set, the idn driver supports the following primitives:
+The DL_ENABMULTI_REQ and DL_DISABMULTI_REQ primitives which enable or disable, respectively, the
+reception of individual multicast group addresses. A set of multicast addresses may be iteratively created and modi<hy>
+fied on a per-stream basis using these primitives. These primitives are accepted by the driver in any state following
+the DL_ATTACHED state.
+<beginning of page>
+The DL_PROMISCON_REQ and DL_PROMISCOFF_REQ primitives, which with the DL_PROMISC_PHYS
+flag set in the dl_level field, enable or disable, respectively, the reception of all promiscuous frames on the media, in<hy>
+cluding frames generated by the local domain. When used with the DL_PROMISC_SAP flag set in the dl_level
+field, these primitives enable or disable, respectively, the reception of all SAP (Ethernet type) values. When used
+with the DL_PROMISC_MULTI flag set in the dl_level field, these primitives enable or disable, respectively, the
+reception of all multicast group addresses. The effect of each is always on a per-stream basis and independent of the
+other SAP and physical level configurations on this stream or other streams.
+The DL_PHYS_ADDR_REQ primitive which returns the 6-octet, Ethernet address associated with (or attached to)
+the stream in the DL_PHYS_ADDR_ACK primitive. This primitive is valid only in states following a successful
+DL_ATTACH_REQ request.
+Because the driver maintains domain address information in the address to direct packets to the correct destination,
+the DL_SET_PHYS_ADDR_REQ primitive is not allowed.
+The following files are supported:
+/dev/idn
+IDN special character device
+/platform/SUNW,Ultra-Enterprise-10000/kernel/drv/idn.conf
+System-wide and per-interface default device driver properties
+netstat(1M), ndd(1M), dlpi(7P)
+domain_link(1M) in the Sun Enterprise 10000 SSP 3.5 Reference Manual.
+Sun Enterprise 10000 InterDomain Networks User Guide
+The idn driver supports a set of properties that can be set by using the driver.conf file for the IDN. See the Sun En<hy>
+terprise 10000 InterDomain Networks User Guide for more information about the properties in the driver.conf(4),
+(idn.conf, for IDNs).

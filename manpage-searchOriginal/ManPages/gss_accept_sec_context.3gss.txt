@@ -1,0 +1,171 @@
+<beginning of page>
+gss_accept_sec_context <-> accept a security context initiated by a peer application
+cc [ flag... ] file... -lgss [ library... ]
+#include <gssapi/gssapi.h>
+OM_uint32 gss_accept_sec_context(OM_uint32 *minor_status,
+ gss_ctx_id_t *context_handle,
+ const gss_cred_id_t acceptor_cred_handle,
+ const gss_buffer_t input_token,
+ const gss_channel_bindings_t input_chan_bindings,
+ const gss_name_t * src_name, gss_OID * mech_type,
+ gss_buffer_t output_token, OM_uint32 *ret_flags,
+ OM_uint32 * time_rec, gss_cred_id_t *delegated_cred_handle);
+The parameter descriptions for gss_accept_sec_context() follow:
+minor_status
+The status code returned by the underlying mechanism.
+context_handle
+The context handle to return to the initiator. This should be set to GSS_C_NO_CONTEXT before the loop begins.
+acceptor_cred_handle
+The handle for the credentials acquired by the acceptor, typically through gss_acquire_cred(). It may be initialized
+to GSS_C_NO_CREDENTIAL to indicate a default credential to use. If no default credential is defined, the func<hy>
+tion returns GSS_C_NO_CRED.
+input_token_buffer
+Token received from the context initiative.
+input_chan_bindings
+Optional application-specified bindings. Allows application to securely bind channel identification information to
+the security context. Set to GSS_C_NO_CHANNEL_BINDINGS if you do not want to use channel bindings.
+src_name
+The authenticated name of the context initiator. After use, this name should be deallocated by passing it to gss_re<hy>
+lease_name(). See gss_release_name(3GSS). If not required, specify NULL.
+mech_type
+The security mechanism used. Set to NULL if it does not matter which mechanism is used.
+output_token
+The token to send to the acceptor. Initialize it to GSS_C_NO_BUFFER before the function is called (or its length
+field set to zero). If the length is zero, no token need be sent.
+ret_flags
+Contains various independent flags, each of which indicates that the context supports a specific service option. If not
+needed, specify NULL. Test the returned bit-mask ret_flags value against its symbolic name to determine if the giv<hy>
+en option is supported by the context. ret_flags may contain one of the following values:
+GSS_C_DELEG_FLAG
+If true, delegated credentials are available by means of the delegated_cred_handle parameter. If false, no credentials
+<beginning of page>
+were delegated.
+GSS_C_MUTUAL_FLAG
+If true, a remote peer asked for mutual authentication. If false, no remote peer asked for mutual authentication.
+GSS_C_REPLAY_FLAG
+If true, replay of protected messages will be detected. If false, replayed messages will not be detected.
+GSS_C_SEQUENCE_FLAG
+If true, out of sequence protected messages will be detected. If false, they will not be detected.
+GSS_C_CONF_FLAG
+If true, confidentiality service may be invoked by calling the gss_wrap() routine. If false, no confidentiality service
+is available by means of gss_wrap(). gss_wrap() will provide message encapsulation, data-origin authentication and
+integrity services only.
+GSS_C_INTEG_FLAG
+If true, integrity service may be invoked by calling either the gss_get_mic(3GSS) or the gss_wrap(3GSS) routine. If
+false, per-message integrity service is not available.
+GSS_C_ANON_FLAG
+If true, the initiator does not wish to be authenticated. The src_name parameter, if requested, contains an anonymous
+internal name. If false, the initiator has been authenticated normally.
+GSS_C_PROT_READY_FLAG
+If true, the protection services specified by the states of GSS_C_CONF_FLAG and GSS_C_INTEG_FLAG are
+available if the accompanying major status return value is either GSS_S_COMPLETE or GSS_S_CONTIN<hy>
+UE_NEEDED. If false, the protection services are available only if the accompanying major status return value is
+GSS_S_COMPLETE.
+GSS_C_TRANS_FLAG
+If true, the resultant security context may be transferred to other processes by means of a call to gss_ex<hy>
+port_sec_context(3GSS). If false, the security context cannot be transferred.
+time_rec
+The number of sections for which the context will remain value Specify NULL if not required.
+delegated_cred_handle
+The credential value for credentials received from the context's initiator. It is valid only if the initiator has requested
+that the acceptor act as a proxy: that is, if the ret_flag argument resolves to GSS_C_DELEG_FLAG.
+The gss_accept_sec_context() function allows a remotely initiated security context between the application and a
+remote peer to be established. The routine may return an output_token, which should be transferred to the peer appli<hy>
+cation, where the peer application will present it to gss_init_sec_context(). See gss_init_sec_context(3GSS). If no
+token need be sent, gss_accept_sec_context() will indicate this by setting the length field of the output_token argu<hy>
+ment to zero. To complete the context establishment, one or more reply tokens may be required from the peer appli<hy>
+cation; if so, gss_accept_sec_context() will return a status flag of GSS_S_CONTINUE_NEEDED, in which case it
+should be called again when the reply token is received from the peer application, passing the token to gss_ac<hy>
+<beginning of page>
+cept_sec_context() by means of the input_token parameters.
+Portable applications should be constructed to use the token length and return status to determine whether to send or
+to wait for a token.
+Whenever gss_accept_sec_context() returns a major status that includes the value GSS_S_CONTINUE_NEED<hy>
+ED, the context is not fully established, and the following restrictions apply to the output parameters: <bu> The value re<hy>
+turned by means of the time_rec parameter is undefined. <bu> Unless the accompanying ret_flags parameter contains
+the bit GSS_C_PROT_READY_FLAG, which indicates that per-message services may be applied in advance of a
+successful completion status, the value returned by the mech_type parameter may be undefined until gss_ac<hy>
+cept_sec_context() returns a major status value of GSS_S_COMPLETE.
+The values of the GSS_C_DELEG_FLAG, GSS_C_MUTUAL_FLAG, GSS_C_REPLAY_FLAG, GSS_C_SE<hy>
+QUENCE_FLAG, GSS_C_CONF_FLAG, GSS_C_INTEG_FLAG and GSS_C_ANON_FLAG bits returned by
+means of the ret_flags parameter are values that would be valid if context establishment were to succeed.
+The values of the GSS_C_PROT_READY_FLAG and GSS_C_TRANS_FLAG bits within ret_flags indicate the
+actual state at the time gss_accept_sec_context() returns, whether or not the context is fully established. However,
+applications should not rely on this behavior, as GSS_C_PROT_READY_FLAG was not defined in Version 1 of
+the GSS-API. Instead, applications should be prepared to use per-message services after a successful context estab<hy>
+lishment, based upon the GSS_C_INTEG_FLAG and GSS_C_CONF_FLAG values.
+All other bits within the ret_flags argument are set to zero.
+While gss_accept_sec_context() returns GSS_S_CONTINUE_NEEDED, the values returned by means of the the
+ret_flags argument indicate the services available from the established context. If the initial call of gss_ac<hy>
+cept_sec_context() fails, no context object is created, and the value of the context_handle parameter is set to
+GSS_C_NO_CONTEXT. In the event of a failure on a subsequent call, the security context and the context_handle
+parameter are left untouched for the application to delete using gss_delete_sec_context(3GSS). During context es<hy>
+tablishment, the informational status bits GSS_S_OLD_TOKEN and GSS_S_DUPLICATE_TOKEN indicate fa<hy>
+tal errors; GSS-API mechanisms always return them in association with a routine error of GSS_S_FAILURE. This
+pairing requirement did not exist in version 1 of the GSS-API specification, so applications that wish to run over
+version 1 implementations must special-case these codes.
+gss_accept_sec_context() may return the following status codes:
+GSS_S_COMPLETE Successful completion.
+GSS_S_CONTINUE_NEEDED A token from the peer application is required to complete the context, and that
+gss_accept_sec_context() must be called again with that token.
+GSS_S_DEFECTIVE_TOKEN Consistency checks performed on the input_token failed.
+GSS_S_DEFECTIVE_CREDENTIAL Consistency checks performed on the credential failed.
+GSS_S_NO_CRED The supplied credentials were not valid for context acceptance, or the credential handle did not
+reference any credentials.
+GSS_S_CREDENTIALS_EXPIRED The referenced credentials have expired.
+GSS_S_BAD_BINDINGS The input_token contains different channel bindings than those specified by means of the
+input_chan_bindings parameter.
+GSS_S_NO_CONTEXT The supplied context handle did not refer to a valid context.
+GSS_S_BAD_SIG The input_token contains an invalid MIC.
+<beginning of page>
+GSS_S_OLD_TOKEN The input_token was too old. This is a fatal error while establishing context.
+GSS_S_DUPLICATE_TOKEN The input_token is valid, but it is duplicate of a token already processed. This is a
+fatal error while establishing context.
+GSS_S_BAD_MECH The token received specified a mechanism that is not supported by the implementation or the
+provided credential.
+GSS_S_FAILURE The underlying mechanism detected an error for which no specific GSS status code is defined.
+The mechanism-specific status code reported by means of the minor_status parameter details the error condition.
+Example 1 Invoking gss_accept_sec_context() Within a Loop
+A typical portable caller should always invoke gss_accept_sec_context() within a loop:
+ gss_ctx_id_t context_hdl = GSS_C_NO_CONTEXT;
+ do {
+  receive_token_from_peer(input_token);
+  maj_stat = gss_accept_sec_context(&min_stat,
+  &context_hdl,
+  cred_hdl,
+  input_token,
+  input_bindings,
+  &client_name,
+  &mech_type,
+  output_token,
+  &ret_flags,
+  &time_rec,
+  &deleg_cred);
+  if (GSS_ERROR(maj_stat)) {
+  report_error(maj_stat, min_stat);
+  };
+  if (output_token->length != 0) {
+  send_token_to_peer(output_token);
+  gss_release_buffer(&min_stat, output_token);
+  };
+  if (GSS_ERROR(maj_stat)) {
+  if (context_hdl != GSS_C_NO_CONTEXT)
+  gss_delete_sec_context(&min_stat,
+  &context_hdl,
+  GSS_C_NO_BUFFER);
+  break;
+  };
+ } while (maj_stat & GSS_S_CONTINUE_NEEDED);
+ /* Check client_name authorization */
+ ...
+ (void) gss_release_name(&min_stat, &client_name);
+ /* Use and/or store delegated credential */
+ ...
+ (void) gss_release_cred(&min_stat, &deleg_cred);
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelSafe
+<beginning of page>
+gss_delete_sec_context(3GSS), gss_export_sec_context(3GSS), gss_get_mic(3GSS), gss_init_sec_con<hy>
+text(3GSS), gss_release_cred(3GSS), gss_release_name(3GSS), gss_store_cred(3GSS), gss_wrap(3GSS), at<hy>
+tributes(5)
+Solaris Security for Developers Guide

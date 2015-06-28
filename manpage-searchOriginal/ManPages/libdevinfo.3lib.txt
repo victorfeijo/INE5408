@@ -1,0 +1,111 @@
+<beginning of page>
+libdevinfo <-> device information library
+cc [ flag... ] file... -ldevinfo [ library... ]
+#include <libdevinfo.h>
+Functions in this library access device configuration information.
+Device configuration data is organized as a tree of device nodes, defined as di_node_t in the libdevinfo interfaces.
+Each di_node_t represents a physical or logical (pseudo) device. The types of data associated with device nodes are:
+<bu> data defined for all device nodes (attributes) <bu> data defined for all multipath path nodes <bu> data defined for all minor
+node data <bu> properties specific to nodes
+All device nodes have a set of common attributes, such as a node name, an instance number, and a driver binding
+name. Common device node attributes are accessed by calling interfaces listed on the di_binding_name(3DEVIN<hy>
+FO) manual page. Each device node also has a physical path, which is accessed by calling di_devfs_path(3DEVIN<hy>
+FO).
+Properties provide device specific information for device configuration and usage. Properties can be defined by soft<hy>
+ware (di_prop_t) or by firmware (di_prom_prop_t). One way to access each di_prop_t is to make successive calls
+to di_prop_next(3DEVINFO) until DI_PROP_NIL is returned. For each di_prop_t, use interfaces on the
+di_prop_bytes(3DEVINFO) manual page to obtain property names and values. Another way to access these proper<hy>
+ties is to call di_prop_lookup_bytes(3DEVINFO) to find the value of a property with a given name. Accessing a
+di_prom_prop_t is similar to accessing a di_prop_t, except that the interface names start with di_prom_prop and
+additional calls to di_prom_init(3DEVINFO) and di_prom_fini(3DEVINFO) are required.
+Minor nodes contain information exported by the device for creating special files for the device. Each device node
+has 0 or more minor nodes associated with it. A list of minor nodes (di_minor_t) can be obtained by making succes<hy>
+sive calls to di_minor_next(3DEVINFO) until DI_MINOR_NIL is returned. For each minor node, di_minor_de<hy>
+vt(3DEVINFO) and related interfaces are called to get minor node data.
+In some configurations, multipath device access via a virtual host controller interface (vHCI) abstraction is possible.
+An example of a driver using this abstraction is scsi_vhci(7D). In such cases, devices are not directly represented as
+children of their physical host controller interface (pHCI) bus adapter. Instead, devices have an identity-oriented rep<hy>
+resentation as a child of a vHCI. All paths leading to the same identity are represented by a common child endpoint
+of the vHCI called the "client" device node. The vHCI virtualizes access among the underlying pHCI physical paths.
+The underlying connection between vHCI-managed client endpoints and the pHCI paths to that endpoint is repre<hy>
+sented by a class of nodes called "path" nodes (di_path_t).
+Each path node is associated with two device nodes: its pHCI device node, and its client device node. A list of paths
+associated with a specific pHCI device node can be obtained using di_path_phci_next_path(3DEVINFO), and a
+list of paths associated with a specific client device node can be obtained using di_path_client_next_path(3DEV<hy>
+INFO). These functions return DI_PATH_NIL when the end of the list of path nodes is reached.
+For each path node, di_path_state(3DEVINFO) and related interfaces are called to get path node data.
+Using libdevinfo involves three steps: <bu> Creating a snapshot of the device tree <bu> Traversing the device tree to get in<hy>
+formation of interest <bu> Destroying the snapshot of the device tree
+A snapshot of the device tree is created by calling di_init(3DEVINFO) and destroyed by calling di_fini(3DEVIN<hy>
+FO). An application can specify the data to be included in the snapshot (full or partial tree, include or exclude prop<hy>
+erties and minor nodes) and get a handle to the root of the device tree. See di_init(3DEVINFO) for details. The ap<hy>
+plication then traverses the device tree in the snapshot to obtain device configuration data.
+The device tree is normally traversed through parent-child-sibling linkage. Each device node contains references to
+its parent, its next sibling, and the first of its children. Given the di_node_t returned from di_init(), one can find all
+children by first calling di_child_node(3DEVINFO), followed by successive calls to di_sibling_node(3DEVINFO)
+until DI_NODE_NIL is returned. By following this procedure recursively, an application can visit all device nodes
+contained in the snapshot. Two interfaces,The di_walk_node(3DEVINFO) and di_walk_minor(3DEVINFO) func<hy>
+tions are provided to facilitate device tree traversal. The di_walk_node() function visits all device nodes and ex<hy>
+ecutes a user-supplied callback function for each node visited. The di_walk_minor() function does the same for
+each minor node in the device tree.
+An alternative way to traverse the device tree is through the per-driver device node linkage. Device nodes contain a
+reference to the next device node bound to the same driver. Given the di_node_t returned from di_init(), an applica<hy>
+tion can find all device nodes bound to a driver by first calling di_drv_first_node(3DEVINFO), followed by succes<hy>
+sive calls to di_drv_next_node(3DEVINFO) until DI_NODE_NIL is returned. Traversing the per-driver device
+<beginning of page>
+node list works only when the snapshot includes all device nodes.
+See di_init(3DEVINFO) for examples of libdevinfo usage. See Writing Device Drivers for information about So<hy>
+laris device configuration.
+The shared object libdevinfo.so.1 provides the public interfaces defined below. See Intro(3) for additional informa<hy>
+tion on shared object interfaces.
+tab(); lw(2.75i) lw(2.75i) lw(2.75i) lw(2.75i) di_binding_namedi_bus_addr di_child_nodedi_compatible_names
+di_devfs_minor_pathdi_devfs_path di_devfs_path_freedi_devid di_driver_majordi_driver_name di_driv<hy>
+er_opsdi_drv_first_node di_drv_next_nodedi_fini di_initdi_instance di_link_next_by_lnode<hy>
+di_link_next_by_node di_link_private_getdi_link_private_set di_link_spectypedi_link_to_lnode di_ln<hy>
+ode_devinfodi_lnode_devt di_lnode_namedi_lnode_next di_lnode_private_getdi_lnode_private_set di_mi<hy>
+nor_devtdi_minor_name di_minor_nextdi_minor_nodetype di_minor_private_getdi_minor_private_set
+di_minor_spectypedi_minor_type di_node_namedi_node_private_get di_node_private_setdi_nodeid di_par<hy>
+ent_nodedi_path_bus_addr di_path_client_devfs_pathdi_path_client_next_path di_path_client_node<hy>
+di_path_devfs_path di_path_instancedi_path_node_name di_path_phci_next_pathdi_path_phci_node
+di_path_prop_bytesdi_path_prop_int64s di_path_prop_intsdi_path_prop_len di_path_prop_lookup_bytes<hy>
+di_path_prop_lookup_int64s di_path_prop_lookup_intsdi_path_prop_lookup_strings di_path_prop_name<hy>
+di_path_prop_strings di_path_prop_nextdi_path_prop_type di_path_statedi_prom_fini di_prom_init<hy>
+di_prom_prop_data di_prom_prop_lookup_bytesdi_prom_prop_lookup_ints di_prom_prop_lookup_strings<hy>
+di_prom_prop_name di_prom_prop_nextdi_prop_bytes di_prop_devtdi_prop_int64 di_prop_ints<hy>
+di_prop_lookup_bytes di_prop_lookup_int64di_prop_lookup_ints di_prop_lookup_stringsdi_prop_name
+di_prop_nextdi_prop_strings di_prop_typedi_sibling_node di_statedi_walk_link di_walk_lnodedi_walk_mi<hy>
+nor di_walk_node
+Example 1 Information accessible through libdevinfo interfaces
+The following example illustrates the kind of information accessible through libdevinfo interfaces for a device node
+representing a hard disk (sd2):
+ Attributes
+  node name: sd
+  instance: 2
+  physical path: /sbus@1f,0/espdma@e,8400000/esp@e,8800000/sd@2,0
+ Properties
+  target=2
+  lun=0
+ Minor nodes
+  (disk partition /dev/dsk/c0t2d0s0)
+  name: a
+  dev_t: 0x0080010 (32/16)
+  spectype: IF_BLK (block special)
+  (disk partition /dev/rdsk/c0t2d0s2)
+  name: c,raw
+  dev_t: 0x0080012 (32/18)
+  spectype: IF_CHR (character special)
+/lib/libdevinfo.so.1
+shared object
+/usr/lib/64/libdevinfo.so.1
+64-bit shared object
+See attributes(5) for descriptions of the following attributes:
+<beginning of page>
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsl, SUNWstatl (32-bit) SUNWcslx (64-bit) _ Interface StabilityCommitted _ MT-LevelSafe
+pvs(1), devlinks(1M), prtconf(1M), Intro(3), di_binding_name(3DEVINFO), di_child_node(3DEVINFO),
+di_devfs_path(3DEVINFO), di_init(3DEVINFO), di_minor_devt(3DEVINFO), di_minor_next(3DEVINFO),
+di_path_bus_addr(3DEVINFO), di_path_client_next_path(3DEVINFO), di_path_prop_bytes(3DEVINFO),
+di_path_prop_lookup_bytes(3DEVINFO), di_path_prop_next(3DEVINFO), di_prom_init(3DEVINFO),
+di_prop_bytes(3DEVINFO), di_prop_lookup_bytes(3DEVINFO), di_prop_next(3DEVINFO), di_walk_mi<hy>
+nor(3DEVINFO), di_walk_node(3DEVINFO), attributes(5)
+Writing Device Drivers

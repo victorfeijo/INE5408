@@ -1,0 +1,158 @@
+<beginning of page>
+in.dhcpd <-> Dynamic Host Configuration Protocol server
+/usr/lib/inet/in.dhcpd [-denv] [-h relay_hops] [-i interface, ...]
+ [-l syslog_local_facility] [-b automatic | manual]
+ [-o DHCP_offer_time] [-t dhcptab_rescan_interval]
+/usr/lib/inet/in.dhcpd [-dv] [-h relay_hops] [-i interface,]...
+ [-l syslog_local_facility] -r IP_address | hostname, ...
+in.dhcpd is a daemon that responds to Dynamic Host Configuration Protocol (DHCP) requests and optionally to
+BOOTP protocol requests. The daemon forks a copy of itself that runs as a background process. It must be run as
+root. The daemon has two run modes, DHCP server (with optional BOOTP compatibility mode) and BOOTP relay
+agent mode.
+The first line in the SYNOPSIS section illustrates the options available in the DHCP/BOOTP server mode. The sec<hy>
+ond line in the SYNOPSIS section illustrates the options available when the daemon is run in BOOTP relay agent
+mode.
+The DHCP and BOOTP protocols are used to provide configuration parameters to Internet hosts. Client machines
+are allocated their IP addresses as well as other host configuration parameters through this mechanism.
+The DHCP/BOOTP daemon manages two types of DHCP data tables: the dhcptab configuration table and the
+DHCP network tables.
+See dhcptab(4) regarding the dhcptab configuration table and dhcp_network(4) regarding the DHCP network ta<hy>
+bles.
+The dhcptab contains macro definitions defined using a termcap-like syntax which permits network administrators
+to define groups of DHCP configuration parameters to be returned to clients. However, a DHCP/BOOTP server al<hy>
+ways returns hostname, network broadcast address, network subnet mask, and IP maximum transfer unit (MTU) if
+requested by a client attached to the same network as the server machine. If those options have not been explicitly
+configured in the dhcptab, in.dhcpd returns reasonable default values.
+The dhcptab is read at startup, upon receipt of a SIGHUP signal, or periodically as specified by the -t option. A
+SIGHUP (sent using the command svcadm refresh network/dhcp-server) causes the DHCP/BOOTP daemon to
+reread the dhcptab within an interval from 0-60 seconds (depending on where the DHCP daemon is in its polling
+cycle). For busy servers, users should run svcadm restart network/dhcp-server to force the dhcptab to be reread.
+The DHCP network tables contain mappings of client identifiers to IP addresses. These tables are named after the
+network they support and the datastore used to maintain them.
+The DHCP network tables are consulted during runtime. A client request received from a network for which no
+DHCP network table exists is ignored.
+This command may change in future releases of Solaris software. Scripts, programs, or procedures that use this com<hy>
+mand might need modification when upgrading to future Solaris software releases.The command line options pro<hy>
+vided with the in.dhcpd daemon are used only for the current session, and include only some of the server options
+you can set. The dhcpsvc.conf(4) contains all the server default settings, and can be modified by using the dhcpmgr
+utility. See dhcpsvc.conf(4) for more details.
+The following options are supported:
+-b automatic | manual
+This option enables BOOTP compatibility mode, allowing the DHCP server to respond to BOOTP clients. The op<hy>
+tion argument specifies whether the DHCP server should automatically allocate permanent lease IP addresses to re<hy>
+questing BOOTP clients if the clients are not registered in the DHCP network tables (automatic) or respond only to
+BOOTP clients who have been manually registered in the DHCP network tables ( manual). This option only affects
+DHCP server mode.
+-d
+Debugging mode. The daemon remains as a foreground process, and displays verbose messages as it processes
+DHCP and/or BOOTP datagrams. Messages are displayed on the current TTY. This option can be used in both
+DHCP/BOOTP server mode and BOOTP relay agent mode.
+<beginning of page>
+-h relay_hops
+Specifies the maximum number of relay agent hops that can occur before the daemon drops the DHCP/BOOTP data<hy>
+gram. The default number of relay agent hops is 4. This option affects both DHCP/BOOTP server mode and
+BOOTP relay agent mode.
+-i interface, ...
+Selects the network interfaces that the daemon should monitor for DHCP/BOOTP datagrams. The daemon ignores
+DHCP/BOOTP datagrams on network interfaces not specified in this list. This option is only useful on machines that
+have multiple network interfaces. If this option is not specified, then the daemon listens for DHCP/BOOTP data<hy>
+grams on all network interfaces. The option argument consists of a comma-separated list of interface names. It af<hy>
+fects both DHCP/BOOTP server and BOOTP relay agent run modes.
+-l syslog_local_facility
+The presence of this option turns on transaction logging for the DHCP server or BOOTP relay agent. The value
+specifies the syslog local facility (an integer from 0 to 7 inclusive) the DHCP daemon should use for tagging the
+transactions. Using a facility separate from the LOG_DAEMON facility allows the network administrator to cap<hy>
+ture these transactions separately from other DHCP daemon events for such purposes as generating transaction re<hy>
+ports. See syslog(3C), for details about local facilities. Transactions are logged using a record with 9 space-separated
+fields as follows: 1. Protocol:
+  Relay mode: "BOOTP"
+  Server mode: "BOOTP" or "DHCP" based upon client
+  type.
+2. Type:
+ Relay mode: "RELAY-CLNT", "RELAY-SRVR"
+ Server mode: "ASSIGN", "EXTEND", "RELEASE",
+  "DECLINE", "INFORM", "NAK" "ICMP-ECHO."
+3. Transaction time: absolute time in seconds (unix time) 4. Lease time:
+ Relay mode: Always 0.
+ Server mode: 0 for ICMP-ECHO events, absolute time in
+  seconds (unix time) otherwise
+5. Source IP address: Dotted Internet form
+Relay mode: Relay interface IP on RELAY-CLNT, INADDR_ANY on RELAY-SRVR. Server mode: Client IP.
+6. Destination IP address: Dotted Internet form
+Relay mode: Client IP on RELAY-CLNT, Server IP on RELAY-SRVR. Server mode: Server IP.
+7. Client Identifier: Hex representation (0-9, A-F)
+Relay mode: MAC address Server mode: BOOTP - MAC address; DHCP - client id
+8. Vendor Class identifier (white space converted to periods (.)).
+Relay mode: Always "N/A" Server mode: Vendor class ID tokenized by converting white space characters to periods (.)
+9. MAC address: Hex representation (0-9, A-F)
+Relay mode: MAC address Server mode: MAC address
+The format of this record is subject to change between releases.
+Transactions are logged to the console if daemon is in debug mode (-d).
+Logging transactions impact daemon performance.
+It is suggested that you periodically rotate the DHCP transaction log file to keep it from growing until it fills the
+filesystem. This can be done in a fashion similar to that used for the general system message log /var/adm/messages
+<beginning of page>
+and is best accomplished using the facilities provided by logadm(1M).
+-n
+Disable automatic duplicate IP address detection. When this option is specified, the DHCP server does not attempt
+to verify that an IP address it is about to offer a client is not in use. By default, the DHCP server pings an IP ad<hy>
+dress before offering it to a DHCP/BOOTP client, to verify that the address is not in use by another machine.
+-o DHCP_offer_time
+Specifies the number of seconds the DHCP server should cache the offers it has extended to discovering DHCP
+clients. The default setting is 10 seconds. On slow network media, this value can be increased to compensate for
+slow network performance. This option affects only DHCP server mode.
+-r IP_address | hostname, ...
+This option enables BOOTP relay agent mode. The option argument specifies a comma-separated list of IP address<hy>
+es or hostnames of DHCP or BOOTP servers to which the relay agent is to forward BOOTP requests. When the
+daemon is started in this mode, any DHCP tables are ignored, and the daemon simply acts as a BOOTP relay agent.
+A BOOTP relay agent listens to UDP port 68, and forwards BOOTP request packets received on this port to the
+destinations specified on the command line. It supports the BROADCAST flag described in RFC 1542. A BOOTP
+relay agent can run on any machine that has knowledge of local routers, and thus does not have to be an Internet
+gateway machine.
+Note that the proper entries must be made to the netmasks database so that the DHCP server being served by the
+BOOTP relay agents can identify the subnet mask of the foreign BOOTP/DHCP client's network. See netmasks(4)
+for the format and use of this database.
+-t dhcptab_rescan_interval
+Specifies the interval in minutes that the DHCP server should use to schedule the automatic rereading of the dhcpt<hy>
+ab information. Typically, you would use this option if the changes to the dhcptab are relatively frequent. Once the
+contents of the dhcptab have stabilized, you can turn off this option to avoid needless reinitialization of the server.
+-v
+Verbose mode. The daemon displays more messages than in the default mode. Note that verbose mode can reduce
+daemon efficiency due to the time taken to display messages. Messages are displayed to the current TTY if the de<hy>
+bugging option is used; otherwise, messages are logged to the syslogd facility. This option can be used in both
+DHCP/BOOTP server mode and BOOTP relay agent mode.
+Example 1 Starting a DHCP Server in BOOTP Compatibility Mode
+The following command starts a DHCP server in BOOTP compatibility mode, permitting the server to automatical<hy>
+ly allocate permanent IP addresses to BOOTP clients which are not registered in the server's table; limits the serv<hy>
+er's attention to incoming datagrams on network devices le2 and tr0; drops BOOTP packets whose hop count ex<hy>
+ceeds 2; configures the DHCP server to cache extended DHCP offers for 15 seconds; and schedules dhcptab res<hy>
+cans to occur every 10 minutes:
+ # in.dhcpd -i le2,tr0 -h 2 -o 15 -t 10 -b automatic
+Example 2 Starting the Daemon in BOOTP Relay Agent Mode
+The following command starts the daemon in BOOTP relay agent mode, registering the hosts bladerunner and
+10.0.0.5 as relay destinations, with debugging and verbose modes enabled, and drops BOOTP packets whose hop
+count exceeds 5:
+ # in.dhcpd -d -v -h 5 -r bladerunner,10.0.0.5
+<beginning of page>
+/etc/inet/dhcpsvc.conf
+/etc/init/hosts
+/usr/lib/inet/dhcp/nsu/rfc2136.so.1
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wdhcsu _ Interface StabilityEvolving
+svcs(1), cron(1M), dhcpmgr(1M), dhtadm(1M), inetadm(1M), inetd(1M), logadm(1M), pntadm(1M), sv<hy>
+cadm(1M), syslogd(1M), syslog(3C), dhcpsvc.conf(4), dhcp_network(4), dhcptab(4), ethers(4), hosts(4), net<hy>
+masks(4), nsswitch.conf(4), attributes(5), dhcp(5), smf(5)
+
+Alexander, S., and R. Droms, DHCP Options and BOOTP Vendor Extensions, RFC 2132, Silicon Graphics, Inc.,
+Bucknell University, March 1997.
+Droms, R., Interoperation Between DHCP and BOOTP, RFC 1534, Bucknell University, October 1993.
+Droms, R., Dynamic Host Configuration Protocol, RFC 2131, Bucknell University, March 1997.
+Wimer, W., Clarifications and Extensions for the Bootstrap Protocol, RFC 1542, Carnegie Mellon University, Octo<hy>
+ber 1993.
+The in.dhcpd service is managed by the service management facility, smf(5), under the service identifier:
+ svc:/network/dhcp-server
+Administrative actions on this service, such as enabling, disabling, or requesting restart, can be performed using sv<hy>
+cadm(1M). Responsibility for initiating and restarting this service is delegated to inetd(1M). Use inetadm(1M) to
+make configuration changes and to view configuration information for this service. The service's status can be
+queried using the svcs(1) command.

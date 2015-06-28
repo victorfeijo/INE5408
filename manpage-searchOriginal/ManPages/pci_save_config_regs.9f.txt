@@ -1,0 +1,64 @@
+<beginning of page>
+pci_save_config_regs, pci_restore_config_regs <-> save and restore the PCI configuration registers
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+int pci_save_config_regs(dev_info_t *dip);
+int pci_restore_config_regs(dev_info_t *dip);
+Solaris DDI-specific (Solaris DDI).
+dip Pointer to the device's dev_info structure.
+pci_save_config_regs() saves the current configuration registers on persistent system memory. pci_restore_con<hy>
+fig_regs() restores configuration registers previously saved by pci_save_config_regs().
+pci_save_config_regs() should be called by the driver's power() entry point before powering a device off (to PCI
+state D3). Likewise, pci_restore_config_regs() should be called after powering a device on (from PCI state D3), but
+before accessing the device. See power(9E).
+pci_save_config_regs() and pci_restore_config_regs() return:
+DDI_SUCCESS Operation completed successfully.
+DDI_FAILURE Operation failed to complete successfully.
+Both these functions can be called from user or kernel context. Example 1 Invoking the save and restore functions
+ static int
+ xx_power(dev_info_t *dip, int component, int level) {
+  struct xx *xx;
+  int rval = DDI_SUCCESS;
+  xx = ddi_get_soft_state(xx_softstate, ddi_get_instance(dip));
+  if (xx == NULL) {
+  return (DDI_FAILURE);
+  }
+  mutex_enter(&xx<mi>>x_mutex);
+  switch (level) {
+  case PM_LEVEL_D0:
+  XX_POWER_ON(xx);
+  if (pci_restore_config_regs(dip) == DDI_FAILURE) {
+  /*
+  * appropriate error path handling here
+  */
+  ...
+  rval = DDI_FAILURE;
+  }
+  break;
+  case PM_LEVEL_D3:
+  if (pci_save_config_regs(dip) == DDI_FAILURE) {
+  /*
+  * appropriate error path handling here
+  */
+  ...
+  rval = DDI_FAILURE;
+  }
+  else {
+<beginning of page>
+  XX_POWER_OFF(xx);
+  }
+  break;
+  default:
+  rval = DDI_FAILURE;
+  break;
+  }
+  mutex_exit(&xx<mi>>x_mutex);
+  return (rval);
+ }
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed
+attributes(5), power(9E)
+Writing Device Drivers
+PCI Bus Power Management Interface Specification Version 1.1
+PCI Bus Specification Revision 2.1

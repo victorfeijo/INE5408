@@ -1,0 +1,59 @@
+<beginning of page>
+rcmd, rcmd_af, rresvport, rresvport_af, ruserok <-> routines for returning a stream to a remote command
+cc [ flag ... ] file... -lsocket -lnsl [ library... ]
+#include <netdb.h>
+#include <unistd.h>
+int rcmd(char **ahost, unsigned short inport, const char *luser,
+ const char *ruser, const char *cmd, int *fd2p);
+int rcmd_af(char **ahost, unsigned short inport, const char *luser,
+ const char *ruser, const char *cmd, int *fd2p, int af);
+int rresvport(int *port);
+int rresvport_af(int *port, int af);
+int ruserok(const char *rhost, int suser, const char *ruser,
+ const char *luser);
+The rcmd() function is used by the superuser to execute a command on a remote machine with an authentication
+scheme based on reserved port numbers. An AF_INET socket is returned with rcmd(). The rcmd_af() function
+supports AF_INET, AF_INET6 or AF_UNSPEC for the address family. An application can choose which type of
+socket is returned by passing AF_INET or AF_INET6 as the address family. The use of AF_UNSPEC means that
+the caller will accept any address family. Choosing AF_UNSPEC provides a socket that best suits the connectivity
+to the remote host.
+The rresvport() function returns a descriptor to a socket with an address in the privileged port space. The rresv<hy>
+port_af() function is the equivalent to rresvport(), except that you can choose AF_INET or AF_INET6 as the
+socket address family to be returned by rresvport_af(). AF_UNSPEC does not apply to the rresvport() function.
+The ruserok() function is a routine used by servers to authenticate clients that request as service with rcmd.
+All of these functions are present in the same file and are used by the in.rshd(1M) server among others.
+The rcmd() and rcmd_af() functions look up the host *ahost using getaddrinfo(3SOCKET) and return <mi>1 if the
+host does not exist. Otherwise, *ahost is set to the standard name of the host and a connection is established to a
+server residing at the Internet port inport.
+If the connection succeeds, a socket in the Internet domain of type SOCK_STREAM is returned to the caller. The
+socket is given to the remote command as standard input (file descriptor 0) and standard output (file descriptor 1). If
+fd2p is non-zero, an auxiliary channel to a control process is set up and a descriptor for it is placed in *fd2p. The
+control process returns diagnostic output file (descriptor 2) from the command on the auxiliary channel. The control
+process also accepts bytes on this channel as signal numbers to be forwarded to the process group of the command.
+If fd2p is 0, the standard error (file descriptor 2) of the remote command is made the same as its standard output. No
+provision is made for sending arbitrary signals to the remote process, other than possibly sending out-of-band data.
+The protocol is described in detail in in.rshd(1M).
+The rresvport() and rresvport_af() functions are used to obtain a socket bound to a privileged port number. The
+socket is suitable for use by rcmd() and rresvport_af() and several other routines. Privileged Internet ports are those
+in the range 1 to 1023. Only the superuser is allowed to bind a socket to a privileged port number. The application
+must pass in port, which must be in the range 512 to 1023. The system first tries to bind to that port number. If it
+fails, the system then tries to bind to another unused privileged port, if one is available.
+The ruserok() function takes a remote host name returned by the gethostbyaddr() function with two user names
+and a flag to indicate whether the local user's name is that of the superuser. See gethostbyname(3NSL). The
+ruserok() function then checks the files /etc/hosts.equiv and possibly .rhosts in the local user's home directory to
+see if the request for service is allowed. A 0 value is returned if the machine name is listed in the /etc/hosts.equiv
+file, or if the host and remote user name are found in the .rhosts file. Otherwise, the ruserok() function returns <mi>1. If
+the superuser flag is 1, the /etc/hosts.equiv is not checked.
+The error code EAGAIN is overloaded to mean "All network ports in use."
+The rcmd() and rcmd_af() functions return a valid socket descriptor upon success. The functions returns <mi>1 upon
+error and print a diagnostic message to standard error.
+<beginning of page>
+The rresvport() and rresvport_af() functions return a valid, bound socket descriptor upon success. The functions
+return <mi>1 upon error with the global value errno set according to the reason for failure.
+/etc/hosts.equiv system trusted hosts and users
+~/.rhosts user's trusted hosts and users
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelUnsafe
+This interface is Unsafe in multithreaded applications. Unsafe interfaces should be called only from the main thread.
+rlogin(1), rsh(1), in.rexecd(1M), in.rshd(1M), Intro(2), getaddrinfo(3SOCKET), gethostbyname(3NSL), rex<hy>
+ec(3SOCKET), attributes(5)

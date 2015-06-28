@@ -1,0 +1,229 @@
+<beginning of page>
+ip, IP <-> Internet Protocol
+#include <sys/socket.h>
+#include <netinet/in.h>
+s = socket(AF_INET, SOCK_RAW, proto);
+t = t_open ("/dev/rawip", O_RDWR);
+IP is the internetwork datagram delivery protocol that is central to the Internet protocol family. Programs may use IP
+through higher-level protocols such as the Transmission Control Protocol (TCP) or the User Datagram Protocol
+(UDP), or may interface directly to IP. See tcp(7P) and udp(7P). Direct access may be by means of the socket inter<hy>
+face, using a "raw socket," or by means of the Transport Level Interface (TLI). The protocol options defined in the
+IP specification may be set in outgoing datagrams.
+Packets sent to or from this system may be subject to IPsec policy. See ipsec(7P) for more information.
+The STREAMS driver /dev/rawip is the TLI transport provider that provides raw access to IP.
+Raw IP sockets are connectionless and are normally used with the sendto() and recvfrom() calls (see send(3SOCK<hy>
+ET) and recv(3SOCKET)), although the connect(3SOCKET) call may also be used to fix the destination for future
+datagram. In this case, the read(2) or recv(3SOCKET) and write(2) or send(3SOCKET) calls may be used. If proto
+is IPPROTO_RAW or IPPROTO_IGMP, the application is expected to include a complete IP header when send<hy>
+ing. Otherwise, that protocol number will be set in outgoing datagrams and used to filter incoming datagrams and an
+IP header will be generated and prepended to each outgoing datagram. In either case, received datagrams are re<hy>
+turned with the IP header and options intact.
+If an application uses IP_HDRINCL and provides the IP header contents, the IP stack does not modify the follow<hy>
+ing supplied fields under any conditions: Type of Service, DF Flag, Protocol, and Destination Address. The IP Op<hy>
+tions and IHL fields are set by use of IP_OPTIONS, and Total Length is updated to include any options. Version is
+set to the default. Identification is chosen by the normal IP ID selection logic. The source address is updated if none
+was specified and the TTL is changed if the packet has a broadcast destination address. Since an applicaton cannot
+send down fragments (as IP assigns the IP ID), Fragment Offset is always 0. The IP Checksum field is computed by
+IP. None of the data beyond the IP header are changed, including the application-provided transport header.
+The socket options supported at the IP level are:
+IP_OPTIONS IP options for outgoing datagrams. This socket option may be used to set IP options to be included in
+each outgoing datagram. IP options to be sent are set with setsockopt() (see getsockopt(3SOCKET)). The getsock<hy>
+opt(3SOCKET) call returns the IP options set in the last setsockopt() call. IP options on received datagrams are visi<hy>
+ble to user programs only using raw IP sockets. The format of IP options given in setsockopt() matches those de<hy>
+fined in the IP specification with one exception: the list of addresses for the source routing options must include the
+first-hop gateway at the beginning of the list of gateways. The first-hop gateway address will be extracted from the
+option list and the size adjusted accordingly before use. IP options may be used with any socket type in the Internet
+family.
+IP_SEC_OPT Enable or obtain IPsec security settings for this socket. For more details on the protection services of
+IPsec, see ipsec(7P).
+IP_ADD_MEMBERSHIP Join a multicast group.
+IP_DROP_MEMBERSHIP Leave a multicast group.
+IP_BOUND_IF Limit reception and transmission of packets to this interface. Takes an integer as an argument. The
+integer is the selected interface index.
+The following options take in_pktinfo_t as the parameter:
+IP_PKTINFO
+Set the source address and/or transmit interface of the packet(s). Note that the IP_BOUND_IF socket option takes
+<beginning of page>
+precedence over the interface index passed in IP_PKTINFO.
+ struct in_pktinfo {
+  unsigned int ipi_ifindex;/* send/recv interface index */
+  struct in_addr ipi_spec_dst;/* matched source addr. */
+  struct in_addr ipi_addr;/* src/dst addr. in IP hdr */
+ } in_pktinfo_t;
+When passed in (on transmit) via ancillary data with IP_PKTINFO, ipi_spec_dst is used as the source address and
+ipi_ifindex is used as the interface index to send the packet out.
+IP_RECVPKTINFO
+Enable/disable receipt of the index of the interface the packet arrived on, the local address that was matched for re<hy>
+ception, and the inbound packet's actual destination address. Takes boolean as the parameter. Returns struct in_pkt<hy>
+info_t as ancillary data.
+The following options take a struct ip_mreq as the parameter. The structure contains a multicast address which
+must be set to the CLASS-D IP multicast address and an interface address. Normally the interface address is set to
+INADDR_ANY which causes the kernel to choose the interface on which to join.
+IP_BLOCK_SOURCE Block multicast packets whose source address matches the given source address. The speci<hy>
+fied group must be joined previously using IP_ADD_MEMBERSHIP or MCAST_JOIN_GROUP.
+IP_UNBLOCK_SOURCE Unblock (begin receiving) multicast packets which were previously blocked using
+IP_BLOCK_SOURCE.
+IP_ADD_SOURCE_MEMBERSHIP Begin receiving packets for the given multicast group whose source address
+matches the specified address.
+IP_DROP_SOURCE_MEMBERSHIP Stop receiving packets for the given multicast group whose source address
+matches the specified address.
+The following options take a struct ip_mreq_source as the parameter. The structure contains a multicast address
+(which must be set to the CLASS-D IP multicast address), an interface address, and a source address.
+MCAST_JOIN_GROUP Join a multicast group. Functionally equivalent to IP_ADD_MEMBERSHIP.
+MCAST_BLOCK_SOURCE Block multicast packets whose source address matches the given source address. The
+specified group must be joined previously using IP_ADD_MEMBERSHIP or MCAST_JOIN_GROUP.
+MCAST_UNBLOCK_SOURCE Unblock (begin receiving) multicast packets which were previously blocked us<hy>
+ing MCAST_BLOCK_SOURCE.
+MCAST_LEAVE_GROUP Leave a multicast group. Functionally equivalent to IP_DROP_MEMBERSHIP.
+MCAST_JOIN_SOURCE_GROUP Begin receiving packets for the given multicast group whose source address
+matches the specified address.
+MCAST_LEAVE_SOURCE_GROUP Stop receiving packets for the given multicast group whose source address
+matches the specified address.
+The following options take a struct group_req or struct group_source_req as the parameter. The `group_req struc<hy>
+ture contains an interface index and a multicast address which must be set to the CLASS-D multicast address. The
+group_source_req structure is used for those options which include a source address. It contains an interface index,
+<beginning of page>
+multicast address, and source address.
+IP_MULTICAST_IF The outgoing interface for multicast packets. This option takes a struct in_addr as an argu<hy>
+ment, and it selects that interface for outgoing IP multicast packets. If the address specified is INADDR_ANY, it us<hy>
+es the unicast routing table to select the outgoing interface (which is the default behavior).
+IP_MULTICAST_TTL Time to live for multicast datagrams. This option takes an unsigned character as an argu<hy>
+ment. Its value is the TTL that IP uses on outgoing multicast datagrams. The default is 1.
+IP_MULTICAST_LOOP Loopback for multicast datagrams. Normally multicast datagrams are delivered to
+members on the sending host (or sending zone). Setting the unsigned character argument to 0 causes the opposite be<hy>
+havior, meaning that when multiple zones are present, the datagrams are delivered to all zones except the sending
+zone.
+IP_RECVIF Receive the inbound interface index.
+IP_TOS This option takes an integer argument as its input value. The least significant 8 bits of the value are used to
+set the Type Of Service field in the IP header of the outgoing packets.
+IP_NEXTHOP This option specifies the address of the onlink nexthop for traffic originating from that socket. It
+causes the routing table to be bypassed and outgoing traffic is sent directly to the specified nexthop. This option
+takes an ipaddr_t argument representing the IPv4 address of the nexthop as the input value. The IP_NEXTHOP op<hy>
+tion takes precedence over IPOPT_LSRR. IP_BOUND_IF and SO_DONTROUTE take precedence over IP_NEX<hy>
+THOP. This option has no meaning for broadcast and multicast packets. The application must ensure that the speci<hy>
+fied nexthop is alive. An application may want to specify the IP_NEXTHOP option on a TCP listener socket only
+for incoming requests to a particular IP address. In this case, it must avoid binding the socket to INADDR_ANY and
+instead must bind the listener socket to the specific IP address. In addition, typically the application may want the in<hy>
+coming and outgoing interface to be the same. In this case, the application must select a suitable nexthop that is on<hy>
+link and reachable via the desired interface and do a setsockopt (IP_NEXTHOP) on it. Then it must bind to the IP
+address of the desired interface. Setting the IP_NEXTHOP option requires the PRIV_SYS_NET_CONFIG privi<hy>
+lege.
+The multicast socket options (IP_MULTICAST_IF, IP_MULTICAST_TTL, IP_MULTICAST_LOOP and
+IP_RECVIF) can be used with any datagram socket type in the Internet family.
+At the socket level, the socket option SO_DONTROUTE may be applied. This option forces datagrams being sent
+to bypass routing and forwarding by forcing the IP Time To Live field to 1, meaning that the packet will not be for<hy>
+warded by routers.
+Raw IP datagrams can also be sent and received using the TLI connectionless primitives.
+Datagrams flow through the IP layer in two directions: from the network up to user processes and from user process<hy>
+es down to the network. Using this orientation, IP is layered above the network interface drivers and below the trans<hy>
+port protocols such as UDP and TCP. The Internet Control Message Protocol (ICMP) is logically a part of IP. See
+icmp(7P).
+IP provides for a checksum of the header part, but not the data part, of the datagram. The checksum value is comput<hy>
+ed and set in the process of sending datagrams and checked when receiving datagrams.
+IP options in received datagrams are processed in the IP layer according to the protocol specification. Currently rec<hy>
+ognized IP options include: security, loose source and record route (LSRR), strict source and record route (SSRR),
+record route, and internet timestamp.
+By default, the IP layer will not forward IPv4 packets that are not addressed to it. This behavior can be overridden
+by using routeadm(1M) to enable the ipv4-forwarding option. IPv4 forwarding is configured at boot time based on
+the setting of routeadm(1M)'s ipv4-forwarding option.
+For backwards compatibility, IPv4 forwarding can be enabled or disabled using ndd(1M)'s ip_forwarding variable.
+It is set to 1 if IPv4 forwarding is enabled, or 0 if it is disabled.
+<beginning of page>
+Additionally, finer-grained forwarding can be configured in IP. Each interface can be configured to forward IP pack<hy>
+ets by setting the IFF_ROUTER interface flag. This flag can be set and cleared using ifconfig(1M)'s router and
+router options. If an interface's IFF_ROUTER flag is set, packets can be forwarded to or from the interface. If it is
+clear, packets will neither be forwarded from this interface to others, nor forwarded to this interface. Setting the
+ip_forwarding variable sets all of the IPv4 interfaces' IFF_ROUTER flags.
+For backwards compatibility, each interface creates an <ifname>:ip_forwarding /dev/ip variable that can be modi<hy>
+fied using ndd(1M). An interface's :ip_forwarding ndd variable is a boolean variable that mirrors the status of its
+IFF_ROUTER interface flag. It is set to 1 if the flag is set, or 0 if it is clear. This interface specific <ifname>
+:ip_forwarding ndd variable is obsolete and may be removed in a future release of Solaris. The ifconfig(1M) router
+and -router interfaces are preferred.
+The IP layer sends an ICMP message back to the source host in many cases when it receives a datagram that can not
+be handled. A "time exceeded" ICMP message is sent if the "time to live" field in the IP header drops to zero in the
+process of forwarding a datagram. A "destination unreachable" message is sent if a datagram can not be forwarded
+because there is no route to the final destination, or if it can not be fragmented. If the datagram is addressed to the lo<hy>
+cal host but is destined for a protocol that is not supported or a port that is not in use, a destination unreachable mes<hy>
+sage is also sent. The IP layer may send an ICMP "source quench" message if it is receiving datagrams too quickly.
+ICMP messages are only sent for the first fragment of a fragmented datagram and are never returned in response to
+errors in other ICMP messages.
+The IP layer supports fragmentation and reassembly. Datagrams are fragmented on output if the datagram is larger
+than the maximum transmission unit (MTU) of the network interface. Fragments of received datagrams are dropped
+from the reassembly queues if the complete datagram is not reconstructed within a short time period.
+Errors in sending discovered at the network interface driver layer are passed by IP back up to the user process.
+Multi-Data Transmit allows more than one packet to be sent from the IP module to another in a given call, thereby
+reducing the per-packet processing costs. The behavior of Multi-Data Transmit can be overrideen by using ndd(1M)
+to set the /dev/ip variable, ip_multidata_outbound to 0. Note, the IP module will only initiate Multi-Data Transmit if
+the network interface driver supports it.
+Through the netinfo framework, this driver provides the following packet events:
+Physical in Packets received on a network interface from an external source.
+Physical out Packets to be sent out a network interface.
+Forwarding Packets being forwarded through this host to another network.
+loopback in Packets that have been sent by a local application to another.
+loopback out Packets about to be received by a local application from another.
+Currently, only a single function may be registered for each event. As a result, if the slot for an event is already oc<hy>
+cupied by someone else, a second attempt to register a callback fails.
+To receive packet events in a kernel module, it is first necessary to obtain a handle for either IPv4 or IPv6 traffic.
+This is achieved by passing NHF_INET or NHF_INET6 through to a net_protocol_lookup() call. The value returned
+from this call must then be passed into a call to net_register_hook(), along with a description of the hook to add.
+For a description of the structure passed through to the callback, please see hook_pkt_event(9S). For IP packets,
+this structure is filled out as follows:
+hpe_ifp Identifier indicating the inbound interface for packets received with the "physical in" event.
+hpe_ofp Identifier indicating the outbound interface for packets received with the "physical out" event.
+hpe_hdr Pointer to the start of the IP header (not the ethernet header).
+<beginning of page>
+hpe_mp Pointer to the start of the mblk_t chain containing the IP packet.
+hpe_mb Pointer to the mblk_t with the IP header in it.
+In addition to events describing packets as they move through the system, it is also possible to receive notification of
+events relating to network interfaces. These events are all reported back through the same callback. The list of events
+is as follows:
+plumb A new network interface has been instantiated.
+unplumb A network interface is no longer associated with this protocol.
+up At least one logical interface is now ready to receive packets.
+down There are no logical interfaces expecting to receive packets.
+address change An address has changed on a logical interface.
+ifconfig(1M), routeadm(1M), ndd(1M), read(2), write(2), bind(3SOCKET), connect(3SOCKET), getsock<hy>
+opt(3SOCKET), recv(3SOCKET), send(3SOCKET), defaultrouter(4), icmp(7P), if_tcp(7P), inet(7P), ip6(7P),
+ipsec(7P), routing(7P), tcp(7P), udp(7P), net_hook_register(9F), hook_pkt_event(9S)
+Braden, R., RFC 1122, Requirements for Internet Hosts <mi> Communication Layers, Information Sciences Institute,
+University of Southern California, October 1989.
+Postel, J., RFC 791, Internet Protocol <mi> DARPA Internet Program Protocol Specification, Information Sciences In<hy>
+stitute, University of Southern California, September 1981.
+A socket operation may fail with one of the following errors returned:
+EACCES A bind() operation was attempted with a "reserved" port number and the effective user ID of the process
+was not the privileged user.
+Setting the IP_NEXTHOP was attempted by a process lacking the PRIV_SYS_NET_CONFIG privilege.
+EADDRINUSE A bind() operation was attempted on a socket with a network address/port pair that has already
+been bound to another socket.
+EADDRNOTAVAIL A bind() operation was attempted for an address that is not configured on this machine.
+EINVAL A sendmsg() operation with a non-NULL msg_accrights was attempted.
+EINVAL A getsockopt() or setsockopt() operation with an unknown socket option name was given.
+EINVAL A getsockopt() or setsockopt() operation was attempted with the IP option field improperly formed; an
+option field was shorter than the minimum value or longer than the option buffer provided.
+EISCONN A connect() operation was attempted on a socket on which a connect() operation had already been per<hy>
+formed, and the socket could not be successfully disconnected before making the new connection.
+<beginning of page>
+EISCONN A sendto() or sendmsg() operation specifying an address to which the message should be sent was at<hy>
+tempted on a socket on which a connect() operation had already been performed.
+EMSGSIZE A send(), sendto(), or sendmsg() operation was attempted to send a datagram that was too large for an
+interface, but was not allowed to be fragmented (such as broadcasts).
+ENETUNREACH An attempt was made to establish a connection by means of connect(), or to send a datagram by
+means of sendto() or sendmsg(), where there was no matching entry in the routing table; or if an ICMP "destination
+unreachable" message was received.
+ENOTCONN A send() or write() operation, or a sendto() or sendmsg() operation not specifying an address to
+which the message should be sent, was attempted on a socket on which a connect() operation had not already been
+performed.
+ENOBUFS The system ran out of memory for fragmentation buffers or other internal data structures.
+ENOBUFS SO_SNDBUF or SO_RCVBUF exceeds a system limit.
+EINVAL Invalid length for IP_OPTIONS.
+EHOSTUNREACH Invalid address for IP_MULTICAST_IF.
+Invalid (offlink) nexthop address for IP_NEXTHOP.
+EINVAL Not a multicast address for IP_ADD_MEMBERSHIP and IP_DROP_MEMBERSHIP.
+EADDRNOTAVAIL Bad interface address for IP_ADD_MEMBERSHIP and IP_DROP_MEMBERSHIP.
+EADDRINUSE Address already joined for IP_ADD_MEMBERSHIP.
+ENOENT Address not joined for IP_DROP_MEMBERSHIP.
+ENOPROTOOPT Invalid socket type.
+EPERM No permissions.
+Raw sockets should receive ICMP error packets relating to the protocol; currently such packets are simply discard<hy>
+ed.
+Users of higher-level protocols such as TCP and UDP should be able to see received IP options.

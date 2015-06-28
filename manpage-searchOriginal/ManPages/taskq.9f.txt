@@ -1,0 +1,66 @@
+<beginning of page>
+taskq, ddi_taskq_create, ddi_taskq_destroy, ddi_taskq_dispatch, ddi_taskq_wait, ddi_taskq_suspend, taskq_suspend<hy>
+ed, ddi_taskq_resume <-> Kernel task queue operations
+#include <sys/sunddi.h>
+ddi_taskq_t *ddi_taskq_create(dev_info_t *dip, const char *name,
+ int nthreads, pri_t pri, uint_t cflags);
+void ddi_taskq_destroy(ddi_taskq_t *tq);
+int ddi_taskq_dispatch(ddi_taskq_t *tq, void (* func)(void *),
+ void *arg, uint_t dflags);
+void ddi_taskq_wait(ddi_taskq_t *tq);
+void ddi_taskq_suspend(ddi_taskq_t *tq);
+boolean_t ddi_taskq_suspended(ddi_taskq_t *tq);
+void ddi_taskq_resume(ddi_taskq_t *tq);
+Solaris DDI specific (Solaris DDI)
+dip Pointer to the device's dev_info structure. May be NULL for kernel modules that do not have an associat<hy>
+ed dev_info structure.
+name Descriptive string. Only alphanumeric characters can be used in name and spaces are not allowed. The
+name should be unique.
+nthreads Number of threads servicing the task queue. Note that the request ordering is guaranteed (tasks are pro<hy>
+cessed in the order scheduled) if the taskq is created with a single servicing thread.
+pri Priority of threads servicing the task queue. Drivers and modules should specify TASKQ_DEFAULTPRI.
+cflags Should pass 0 as flags.
+func Callback function to call.
+arg Argument to the callback function.
+dflags Possible dflags are:
+DDI_SLEEP Allow sleeping (blocking) until memory is available.
+DDI_NOSLEEP Return DDI_FAILURE immediately if memory is not available.
+tq Pointer to a task queue (ddi_taskq_t *).
+tp Pointer to a thread structure.
+A kernel task queue is a mechanism for general-purpose asynchronous task scheduling that enables tasks to be per<hy>
+formed at a later time by another thread. There are several reasons why you may utilize asynchronous task schedul<hy>
+ing: 1. You have a task that isn't time-critical, but a current code path that is. 2. You have a task that may require
+grabbing locks that a thread already holds. 3. You have a task that needs to block (for example, to wait for memo<hy>
+<beginning of page>
+ry), but a have a thread that cannot block in its current context. 4. You have a code path that can't complete because
+of a specific condition, but also can't sleep or fail. In this case, the task is immediately queued and then is executed
+after the condition disappears. 5. A task queue is just a simple way to launch multiple tasks in parallel.
+A task queue consists of a list of tasks, together with one or more threads to service the list. If a task queue has a sin<hy>
+gle service thread, all tasks are guaranteed to execute in the order they were dispatched. Otherwise they can be ex<hy>
+ecuted in any order. Note that since tasks are placed on a list, execution of one task and should not depend on the ex<hy>
+ecution of another task or a deadlock may occur. A taskq created with a single servicing thread guarantees that all
+the tasks are serviced in the order in which they are scheduled.
+The ddi_taskq_create() function creates a task queue instance.
+The ddi_taskq_dispatch() function places taskq on the list for later execution. The dflag argument specifies
+whether it is allowed sleep waiting for memory. DDI_SLEEP dispatches can sleep and are guaranteed to succeed.
+DDI_NOSLEEP dispatches are guaranteed not to sleep but may fail (return DDI_FAILURE) if resources are not
+available.
+The ddi_taskq_destroy() function waits for any scheduled tasks to complete, then destroys the taskq. The caller
+should guarantee that no new tasks are scheduled for the closing taskq.
+The ddi_taskq_wait() function waits for all previously scheduled tasks to complete. Note that this function does not
+stop any new task dispatches.
+The ddi_taskq_suspend() function suspends all task execution until ddi_taskq_resume() is called. Although
+ddi_taskq_suspend() attempts to suspend pending tasks, there are no guarantees that they will be suspended. The
+only guarantee is that all tasks dispatched after ddi_taskq_suspend() will not be executed. Because it will trigger a
+deadlock, the ddi_taskq_suspend() function should never be called by a task executing on a taskq.
+The ddi_taskq_suspended() function returns B_TRUE if taskq is suspended, and B_FALSE otherwise. It is in<hy>
+tended to ASSERT that the task queue is suspended.
+The ddi_taskq_resume() function resumes task queue execution.
+The ddi_taskq_create() function creates an opaque handle that is used for all other taskq operations. It returns a
+taskq pointer on success and NULL on failure.
+The ddi_taskq_dispatch() function returns DDI_FAILURE if it can't dispatch a task and returns DDI_SUCCESS
+if dispatch succeeded.
+The ddi_taskq_suspended() function returns B_TRUE if taskq is suspended. Otherwise B_FALSE is returned.
+All functions may be called from the user or kernel contexts.
+Addtionally, the ddi_taskq_dispatch function may be called from the interrupt context only if the DDI_NOSLEEP
+flag is set.

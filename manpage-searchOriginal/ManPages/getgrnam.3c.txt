@@ -1,0 +1,122 @@
+<beginning of page>
+getgrnam, getgrnam_r, getgrent, getgrent_r, getgrgid, getgrgid_r, setgrent, endgrent, fgetgrent, fgetgrent_r <-> group
+database entry functions
+#include <grp.h>
+struct group *getgrnam(const char *name);
+struct group *getgrnam_r(const char *name, struct group *grp,
+ char *buffer, int bufsize);
+struct group *getgrent(void);
+struct group *getgrent_r(struct group *grp, char *buffer, int bufsize);
+struct group *getgrgid(gid_t gid);
+struct group *getgrgid_r(gid_t gid, struct group *grp, char *buffer,
+ int bufsize);
+void setgrent(void);
+void endgrent(void);
+struct group *fgetgrent(FILE *f);
+struct group *fgetgrent_r(FILE *f, struct group *grp, char *buffer,
+ int bufsize);
+cc [ flag... ] file... -D_POSIX_PTHREAD_SEMANTICS [ library... ]
+int getgrnam_r(const char *name, struct group *grp, char *buffer,
+ size_t bufsize, struct group **result);
+int getgrgid_r(gid_t gid, struct group *grp, char *buffer,
+ size_t bufsize, struct group **result);
+These functions are used to obtain entries describing user groups. Entries can come from any of the sources for
+group specified in the /etc/nsswitch.conf file (see nsswitch.conf(4)).
+The getgrnam() function searches the group database for an entry with the group name specified by the character
+string parameter name.
+The getgrgid() function searches the group database for an entry with the (numeric) group id specified by gid.
+The setgrent(), getgrent(), and endgrent() functions are used to enumerate group entries from the database.
+The setgrent() function effectively rewinds the group database to allow repeated searches. It sets (or resets) the enu<hy>
+meration to the beginning of the set of group entries. This function should be called before the first call to get<hy>
+grent().
+The getgrent() function returns a pointer to a structure containing the broken-out fields of an entry in the group data<hy>
+base. When first called, getgrent() returns a pointer to a group structure containing the next group structure in the
+group database. Successive calls can be used to search the entire database.
+The endgrent() function can be called to close the group database and deallocate resources when processing is com<hy>
+plete. It is permissible, though possibly less efficient, for the process to call more group functions after calling end<hy>
+grent().
+The fgetgrent() function, unlike the other functions above, does not use nsswitch.conf. It reads and parses the next
+line from the stream f, which is assumed to have the format of the group file (see group(4)).
+The getgrnam(), getgrgid(), getgrent(), and fgetgrent() functions use thread-specific storage that is reused in each
+call to one of these functions by the same thread, making them safe to use but not recommended for multithreaded
+applications.
+The parallel functions getgrnam_r(), getgrgid_r(), getgrent_r(), and fgetgrent_r() provide reentrant interfaces for
+<beginning of page>
+these operations.
+Each reentrant interface performs the same operation as its non-reentrant counterpart, named by removing the _r
+suffix. The reentrant interfaces, however, use buffers supplied by the caller to store returned results instead of using
+thread-specific data that can be overwritten by each call. They are safe for use in both single-threaded and multi<hy>
+threaded applications.
+Each reentrant interface takes the same arguments as its non-reentrant counterpart, as well as the following addition<hy>
+al parameters. The grp argument must be a pointer to a struct group structure allocated by the caller. On successful
+completion, the function returns the group entry in this structure. Storage referenced by the group structure is allo<hy>
+cated from the memory provided with the buffer argument that is bufsize characters in size. The maximum size
+needed for this buffer can be determined with the _SC_GETGR_R_SIZE_MAX sysconf(3C) parameter. The stan<hy>
+dard-conforming versions place a pointer to the modified grp structure in the result parameter, instead of returning a
+pointer to this structure. A null pointer is returned at the location pointed to by result on error or if the requested en<hy>
+try is not found.
+For enumeration in multithreaded applications, the position within the enumeration is a process-wide property
+shared by all threads. The setgrent() function can be used in a multithreaded application but resets the enumeration
+position for all threads. If multiple threads interleave calls to getgrent_r(), the threads will enumerate disjoint sub<hy>
+sets of the group database. Like their non-reentrant counterparts, getgrnam_r() and getgrgid_r() leave the enumera<hy>
+tion position in an indeterminate state.
+Group entries are represented by the struct group structure defined in <grp.h>:
+ struct group {
+  char *gr_name; /* the name of the group */
+  char *gr_passwd; /* the encrypted group password */
+  gid_t gr_gid; /* the numerical group ID */
+  char **gr_mem; /* vector of pointers to member
+  names */
+ };
+The getgrnam(), getgrnam_r(), getgrgid(), and getgrgid_r() functions each return a pointer to a struct group if
+they successfully locate the requested entry. They return a null pointer if either the requested entry was not found or
+an error occurred. On error, errno is set to indicate the error. The standard-conforming functions getgrnam_r() and
+getgrgid_r() return 0 upon success or an error number in case of failure.
+The getgrent(), getgrent_r(), fgetgrent(), and fgetgrent_r() functions each return a pointer to a struct group if
+they successfully enumerate an entry; otherwise they return a null pointer on end-of-file or error. On error, errno is
+set to indicate the error.
+The getgrnam(), getgrgid(), getgrent(), and fgetgrent() functions use thread-specific data storage, so returned data
+must be copied before a subsequent call to any of these functions if the data are to be saved.
+When the pointer returned by the reentrant functions getgrnam_r(), getgrgid_r(), getgrent_r(), and fgetgrent_r()
+is non-null, it is always equal to the grp pointer that was supplied by the caller.
+Applications wishing to check for error situations should set errno to 0 before calling getgrnam(), getgrnam_r(),
+getgrent(), getgrent_r()getgrgid(), getgrgid_r(), fgetgrent(), and fgetgrent_r(). If these functions return a null
+pointer and errno is non-zero, an error occurred.
+The getgrent_r(), fgetgrent(), and fgetgrent_r() functions will fail if:
+EIO An I/O error has occurred.
+ERANGE Insufficient storage was supplied by buffer and bufsize to contain the data to be referenced by the result<hy>
+ing group structure.
+The getgrent_r() function will fail if:
+EMFILE There are {OPEN_MAX} file descriptors currently open in the calling process.
+<beginning of page>
+ENFILE The maximum allowable number of files is currently open in the system.
+The getgrnam(), getgrnam_r(), getgrgid(), getgrgid_r(), and getgrent() functions may fail if:
+EINTR A signal was caught during the operation.
+EIO An I/O error has occurred.
+EMFILE There are {OPEN_MAX} file descriptors currently open in the calling process.
+ENFILE The maximum allowable number of files is currently open in the system.
+The getgrnam_r() and getgrgid_r() functions may fail if:
+ERANGE Insufficient storage was supplied by buffer and bufsize to contain the data to be referenced by the result<hy>
+ing group structure.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+See below. _ MT-LevelSee Reentrant Interfaces in DESCRIPTION.
+The endgrent(), getgrent(), getgrgid(), getgrgid_r(), getgrnam(), getgrnam_r(), and setgrent() functions are
+Standard.
+Intro(3), getpwnam(3C), group(4), nsswitch.conf(4), passwd(4), attributes(5), standards(5)
+When compiling multithreaded programs, see Intro(3).
+Use of the enumeration interfaces getgrent() and getgrent_r() is discouraged; enumeration is supported for the
+group file, NIS, and NIS+, but in general is not efficient and might not be supported for all database sources. The
+semantics of enumeration are discussed further in nsswitch.conf(4).
+Previous releases allowed the use of ``+'' and ``-'' entries in /etc/group to selectively include and exclude entries
+from NIS. The primary usage of these entries is superseded by the name service switch, so the ``+/-'' form might not
+be supported in future releases.
+If required, the ``+/-'' functionality can still be obtained for NIS by specifying compat as the source for group.
+If the ``+/-'' functionality is required in conjunction with NIS+, specify both compat as the source for group and
+nisplus as the source for the pseudo-database group_compat. See group(4), and nsswitch.conf(4) for details.
+Solaris 2.4 and earlier releases provided definitions of the getgrnam_r() and getgrgid_r() functions as specified in
+POSIX.1c Draft 6. The final POSIX.1c standard changed the interface for these functions. Support for the Draft 6 in<hy>
+terface is provided for compatibility only and might not be supported in future releases. New applications and li<hy>
+braries should use the standard-conforming interface.
+For POSIX.1c-conforming applications, the _POSIX_PTHREAD_SEMANTICS and _REENTRANT flags are
+automatically turned on by defining the _POSIX_C_SOURCE flag with a value <>=>199506L.

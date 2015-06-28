@@ -1,0 +1,123 @@
+<beginning of page>
+ntfsundelete <-> recover a deleted file from an NTFS volume
+ntfsundelete [options] device
+The ntfsundelete utility can, under the right circumstances, recover a deleted file from an NTFS volume. The com<hy>
+mand has three modes of operation:
+Scan
+The default mode, scan simply reads an NTFS Volume and looks for files that have been deleted. It then displays a
+list, giving the inode number, name, and size of each deleted file.
+Undelete
+The undelete mode takes the files either matching the regular expression (option -m) or specified by the inode-ex<hy>
+pressions and recovers as much of the data as possible. It saves the result to another location.
+Copy
+The "wizard's" option. Saves a portion of the MFT to a file, which can be useful when debugging ntfsundelete.
+There are many circumstances under which ntfsundelete is unable to recover a file. For example, consider the fol<hy>
+lowing scenario. When a file is deleted the MFT Record is marked as not in use and the bitmap representing the disk
+usage is updated. If the power is not turned off immediately, the free space, where the file used to reside might get
+overwritten. Worse, the MFT Record might be reused for another file. If this happens, it is impossible to tell where
+the file was on disk.
+Even if all the clusters of a file are not in use, there is no guarantee that they have not been overwritten by some
+short-lived file.
+ntfsundelete cannot recover compressed or encrypted files. During a scan, it will display such a file as being 0% re<hy>
+coverable.
+In NTFS, all filenames are stored as Unicode. A filename is converted into the current locale for display by ntfsun<hy>
+delete. The utility has successfully displayed Chinese pictogram filenames and then correctly recovered them.
+In rare circumstances, a single MFT Record will not be large enough to hold the metadata describing a file (a file
+would have to be in hundreds of fragments for this to happen). In these cases, one MFT record might hold the file<hy>
+name, while another will hold the information about the data. ntfsundelete will not try and piece together such
+records. It will simply list unnamed files with data.
+To recover a file, ntfsundelete has to read the file's metadata. Unfortunately, when a file is deleted, the metadata can
+be left in an inconsistent state. For example, the file size might be recorded as zero; the creation date of a file might
+be set to the time it was deleted or to a random time. In such situations, ntfsundelete picks the largest file size it
+finds and writes that to disk. It also tries to set the file's creation date to the last-modified date. This date might be
+the correct last modified date, or something unexpected.
+Supported options are listed below. Most options have both single-letter and full-name forms. Multiple single-letter
+options that do not take an argument can be combined. For example, -fv is the equivalent of -f -v. A full-name option
+can be abbreviated to a unique prefix of its name.
+-b, --byte num
+Fill in the parts of unrecoverable file clusters with byte represented by num. The default is zeros.
+-C, --case
+Make filename search, when attempting a match with the --match option, case-sensitive. The default filename
+search is case-insensitive.
+-c, --copy range
+This "wizard" option writes a block of MFT FILE records to a file. The default file is mft which will be created in
+the current directory. This option can be combined with the --output and --destination options.
+<beginning of page>
+-d, --destination dir
+Specify the location of the output file for the --copy and --undelete options.
+-f, --force
+Overrides some sensible defaults, such as not overwriting an existing file. Use this option with caution.
+-h, --help
+Show a list of options with a brief description of each one.
+-i, --inodes range
+Recover the files within the specified range of inode numbers. range can be a single inode number, several numbers
+separated by commas, or a range separated by a dash (-).
+-m, --match pattern
+Filter the output by looking only for filenames that match pattern. The pattern can include the wildcards ?, matching
+exactly one character, or *, matching zero or more characters. By default, the matching is case-insensitive. To make
+the search case-sensitive, use the --case option.
+-O, --optimistic
+Recover parts of the file even if they are currently marked as in use.
+-o, --output file
+Set the name of the output file created by the --copy or --undelete options.
+-P, --parent
+Display the parent directory of a deleted file.
+-p, --percentage num
+Filter the output of the --scan option by matching only files with num percent of recoverable content.
+-q, --quiet
+Reduce the amount of output to a minimum. This option is not useful with the --scan option.
+-s, --scan
+Search through an NTFS volume and display a list of files that could be recovered. This is the default action of ntf<hy>
+sundelete. This list can be filtered by filename, size, percentage recoverable, or last modification time, using the
+--match, --size, --percent, and --time options, respectively.
+In the output from this option, the %age (percentage) field displays how much of a file can potentially be recovered.
+-S, --size range
+Filter the output of the --scan option by looking for a particular range of file sizes. range can be specified as two
+numbers separated by a hyphen (-). A unit of size can be abbreviated using the suffixes k, m, g, and t, for kilobytes,
+megabytes, gigabytes, and terabytes respectively.
+<beginning of page>
+-t, --time since
+Filter the output of the --scan option. Match only files that have been altered since this time. The time must be given
+as number and a suffix of d, w, m, or y for, respectively, days, weeks, months, or years.
+-T, --truncate
+The default behavior of ntfsundelete is to round up a file's size to the nearest cluster (which will be a multiple of
+512 bytes). In cases where the utility has complete data about the size of a file, this option restores the file to exactly
+that size.
+-u, --undelete
+Specifies undelete mode. You can specify the files to be recovered using by using --match or --inodes options. This
+option can be combined with --output, --destination, and --byte.
+When the file is recovered it will be given its original name, unless the --output option is used.
+-v, --verbose
+Increase the amount of output that ntfsundelete displays.
+-V, --version
+Display the version number, copyright, and license for ntfsundelete.
+Example 1 Searching for Deleted Files
+The following command searches for deleted files on a specific device.
+ # ntfsundelete /dev/dsk/c0d0p1
+Example 2 Scanning for Files Matching a Wildcard
+The following command searches for deleted files that match *.doc.
+ # ntfsundelete /dev/dsk/c0d0p1 -s -m '*.doc'
+Example 3 Searching for Files of a Certain Size
+The following command looks for deleted files between 5000 and 6000000 bytes, with at least 90% of the data re<hy>
+coverable, on /dev/dsk/c0d0p1.
+ # ntfsundelete /dev/dsk/c0d0p1 -S 5k-6m -p 90
+Example 4 Searching for Recently Changed Files
+The following command searches for deleted files altered in the last two days.
+ # ntfsundelete /dev/dsk/c0d0p1 -t 2d
+Example 5 Specifying an Inode Range
+The following command undeletes inodes 2, 5 and 100 to 131 of device /dev/sda1.
+<beginning of page>
+ # ntfsundelete /dev/sda1 -u -i 2,5,100-131
+Example 6 Specifying an Output File and Directory
+The following command undeletes inode number 3689, names the file work.doc, and stores it in the user's home di<hy>
+rectory.
+ # ntfsundelete /dev/dsk/c0d0p1 -u -i 3689 -o work.doc -d ~
+Example 7 Saving MFT Records
+The following command saves MFT records 3689 to 3690 to a file debug.
+ # ntfsundelete /dev/dsk/c0d0p1 -c 3689-3690 -o debug
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wntfsprogs _ Interface StabilityUncommitted
+ntfsclone(1M), ntfsresize(1M), parted(1M), attributes(5)
+http://wiki.linux-ntfs.org
+ntfsundelete was written by Richard Russon and Holger Ohmacht, with contributions from Anton Altaparmakov.

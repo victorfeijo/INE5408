@@ -1,0 +1,100 @@
+<beginning of page>
+getspnam, getspnam_r, getspent, getspent_r, setspent, endspent, fgetspent, fgetspent_r <-> get password entry
+#include <shadow.h>
+struct spwd *getspnam(const char *name);
+struct spwd *getspnam_r(const char *name, struct spwd *result,
+ char *buffer, int buflen);
+struct spwd *getspent(void);
+struct spwd *getspent_r(struct spwd *result, char *buffer,
+ int buflen);
+void setspent(void);
+void endspent(void);
+struct spwd *fgetspent(FILE *fp);
+struct spwd *fgetspent_r(FILE *fp, struct spwd *result,
+ char *buffer, int buflen);
+These functions are used to obtain shadow password entries. An entry may come from any of the sources for shad<hy>
+ow specified in the /etc/nsswitch.conf file (see nsswitch.conf(4)).
+The getspnam() function searches for a shadow password entry with the login name specified by the character string
+argument name.
+The setspent(), getspent(), and endspent() functions are used to enumerate shadow password entries from the data<hy>
+base.
+The setspent() function sets (or resets) the enumeration to the beginning of the set of shadow password entries. This
+function should be called before the first call to getspent(). Calls to getspnam() leave the enumeration position in an
+indeterminate state.
+Successive calls to getspent() return either successive entries or NULL, indicating the end of the enumeration.
+The endspent() function may be called to indicate that the caller expects to do no further shadow password retrieval
+operations; the system may then close the shadow password file, deallocate resources it was using, and so forth. It
+is still allowed, but possibly less efficient, for the process to call more shadow password functions after calling end<hy>
+spent().
+The fgetspent() function, unlike the other functions above, does not use nsswitch.conf; it reads and parses the next
+line from the stream fp, which is assumed to have the format of the shadow file (see shadow(4)).
+The getspnam(), getspent(), and fgetspent() functions use thread-specific data storage that is reused in each call to
+one of these functions by the same thread, making them safe to use but not recommended for multithreaded applica<hy>
+tions.
+The getspnam_r(), getspent_r(), and fgetspent_r() functions provide reentrant interfaces for these operations.
+Each reentrant interface performs the same operation as its non-reentrant counterpart, named by removing the _r
+suffix. The reentrant interfaces, however, use buffers supplied by the caller to store returned results, and are safe for
+use in both single-threaded and multithreaded applications.
+Each reentrant interface takes the same argument as its non-reentrant counterpart, as well as the following additional
+arguments. The result argument must be a pointer to a struct spwd structure allocated by the caller. On successful
+completion, the function returns the shadow password entry in this structure. The buffer argument must be a pointer
+to a buffer supplied by the caller. This buffer is used as storage space for the shadow password data. All of the
+pointers within the returned struct spwd result point to data stored within this buffer (see RETURN VALUES). The
+buffer must be large enough to hold all of the data associated with the shadow password entry. The buflen argument
+should give the size in bytes of the buffer indicated by buffer.
+For enumeration in multithreaded applications, the position within the enumeration is a process-wide property
+shared by all threads. The setspent() function may be used in a multithreaded application but resets the enumeration
+<beginning of page>
+position for all threads. If multiple threads interleave calls to getspent_r(), the threads will enumerate disjoint sub<hy>
+sets of the shadow password database.
+Like its non-reentrant counterpart, getspnam_r() leaves the enumeration position in an indeterminate state.
+Password entries are represented by the struct spwd structure defined in <shadow.h>:
+ struct spwd{
+  char *sp_namp; /* login name */
+  char *sp_pwdp; /* encrypted passwd */
+  int sp_lstchg; /* date of last change */
+  int sp_min; /* min days to passwd change */
+  int sp_max; /* max days to passwd change*/
+  int sp_warn; /* warning period */
+  int sp_inact; /* max days inactive */
+  int sp_expire; /* account expiry date */
+  unsigned int sp_flag; /* not used */
+ };
+See shadow(4) for more information on the interpretation of this data.
+The getspnam()and getspnam_r() functions each return a pointer to a struct spwd if they successfully locate the
+requested entry; otherwise they return NULL.
+The getspent(), getspent_r(), fgetspent(), and fgetspent() functions each return a pointer to a struct spwd if they
+successfully enumerate an entry; otherwise they return NULL, indicating the end of the enumeration.
+The getspnam(), getspent(), and fgetspent() functions use thread-specific data storage, so returned data must be
+copied before a subsequent call to any of these functions if the data is to be saved.
+When the pointer returned by the reentrant functions getspnam_r(), getspent_r(), and fgetspent_r() is non-null, it
+is always equal to the result pointer that was supplied by the caller.
+The reentrant functions getspnam_r(), getspent_r(), and fgetspent_r() will return NULL and set errno to
+ERANGE if the length of the buffer supplied by caller is not large enough to store the result. See Intro(2) for the
+proper usage and interpretation of errno in multithreaded applications.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelT{ See
+"Reentrant Interfaces" in DESCRIPTION. T}
+nispasswd(1), passwd(1), yppasswd(1), Intro(3), getlogin(3C), getpwnam(3C), nsswitch.conf(4), passwd(4),
+shadow(4), attributes(5)
+The reentrant interfaces getspnam_r(), getspent_r(), and fgetspent_r() are included in this release on an uncom<hy>
+mitted basis only, and are subject to change or removal in future minor releases.
+When compiling multithreaded applications, see Intro(3), Notes On Multithreaded Applications, for information
+about the use of the _REENTRANT flag.
+Use of the enumeration interfaces getspent() and getspent_r() is not recommended; enumeration is supported for
+the shadow file, NIS, and NIS+, but in general is not efficient and may not be supported for all database sources.
+The semantics of enumeration are discussed further in nsswitch.conf(4).
+Access to shadow password information may be restricted in a manner depending on the database source being used.
+Access to the /etc/shadow file is generally restricted to processes running with the effective uid of the file owner or
+the {PRIV_FILE_DAC_READ} privilege. Other database sources may impose stronger or less stringent restric<hy>
+tions.
+Empty fields in the database source return -1 values for all fields except sp_pwdp and sp_flag, where the value re<hy>
+turned is 0.
+<beginning of page>
+When NIS is used as the database source, the information for the shadow password entries is obtained from the
+``passwd.byname'' map. This map stores only the information for the sp_namp and sp_pwdp fields of the struct
+spwd structure. Shadow password entries obtained from NIS will contain the value -1 in the remainder of the fields.
+When NIS+ is used as the database source, and the caller lacks the permission needed to retrieve the encrypted pass<hy>
+word from the NIS+ ``passwd.org_dir'' table, the NIS+ service returns the string ``*NP*'' instead of the actual en<hy>
+crypted password string. The functions described on this page will then return the string ``*NP*'' to the caller as the
+value of the member sp_pwdp in the returned shadow password structure.

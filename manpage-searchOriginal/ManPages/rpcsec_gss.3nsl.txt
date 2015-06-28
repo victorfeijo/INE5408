@@ -1,0 +1,144 @@
+<beginning of page>
+rpcsec_gss <-> security flavor incorporating GSS-API protections
+cc [ flag... ] file... -lnsl [ library... ]
+#include <rpc/rpcsec_gss.h>
+RPCSEC_GSS is a security flavor which sits "on top" of the GSS-API (Generic Security Service API) for network
+transmissions. Applications using RPCSEC_GSS can take advantage of GSS-API security features; moreover, they
+can use any security mechanism (such as RSA public key or Kerberos) that works with the GSS-API.
+The GSS-API offers two security services beyond the traditional authentication services (AUTH_DH, AUTH_SYS,
+and AUTH_KERB): integrity and privacy. With integrity, the system uses cryptographic checksumming to ensure
+the authenticity of a message (authenticity of originator, recipient, and data); privacy provides additional security by
+encrypting data. Applications using RPCSEC_GSS specify which service they wish to use. Type of security service
+is mechanism-independent.
+Before exchanging data with a peer, an application must establish a context for the exchange. RPCSEC_GSS pro<hy>
+vides a single function for this purpose, rpc_gss_seccreate(), which allows the application to specify the security
+mechanism, Quality of Protection (QOP), and type of service at context creation. (The QOP parameter sets the cryp<hy>
+tographic algorithms to be used with integrity or privacy, and is mechanism-dependent.) Once a context is estab<hy>
+lished, applications can reset the QOP and type of service for each data unit exchanged, if desired.
+Valid mechanisms and QOPs may be obtained from configuration files or from the name service. Each mechanism
+has a default QOP.
+Contexts are destroyed with the usual RPC auth_destroy() call.
+Some of the data structures used by the RPCSEC_GSS package are shown below.
+This enum defines the types of security services the context may have. rpc_gss_seccreate() takes this as one argu<hy>
+ment when setting the service type for a session.
+ typedef enum {
+  rpc_gss_svc_default = 0,
+  rpc_gss_svc_none = 1,
+  rpc_gss_svc_integrity = 2,
+  rpc_gss_svc_privacy = 3
+ } rpc_gss_service_t ;
+Structure containing options passed directly through to the GSS-API. rpc_gss_seccreate() takes this as an argument
+when creating a context.
+ typedef struct {
+  int req_flags;  /*GSS request bits */
+  int time_req; /*requested credential lifetime */
+  gss_cred_id_t my_cred; /*GSS credential struct*/
+  gss_channel_bindings_t;
+  input_channel_bindings;
+ } rpc_gss_options_req_t ;
+This data type is used by in-kernel RPC routines, and thus is mentioned here for informational purposes only.
+ typedef struct {
+  u_int length;   
+  void *elements  
+ } *rpc_gss_OID;
+Structure containing GSS-API options returned to the calling function, rpc_gss_seccreate(). MAX_GSS_MECH
+is defined as 128.
+ typedef struct {
+  int major_status;
+  int minor_status;
+  u_int rpcsec_version /*vers. of RPCSEC_GSS */
+<beginning of page>
+  int ret_flags
+  int time_req
+  gss_ctx_id_t gss_context;
+  char actual_mechanism[MAX_GSS_MECH]; /*mechanism used*/
+ } rpc_gss_options_ret_t;
+The (mechanism-dependent, opaque) client principal type. Used as an argument to the rpc_gss_get_princi<hy>
+pal_name() function, and in the gsscred table. Also referenced by the rpc_gss_rawcred_t structure for raw cre<hy>
+dentials (see below).
+ typedef struct {
+  int len;  
+  char name[1]; 
+ } *rpc_gss_principal_t;
+Structure for raw credentials. Used by rpc_gss_getcred() and rpc_gss_set_callback().
+ typedef struct {
+  u_int version; /*RPC version # */
+  char *mechanism; /*security mechanism*/
+  char *qop; /*Quality of Protection*/
+  rpc_gss_principal_t client_principal; /*client name*/
+  char *svc_principal; /*server name*/
+  rpc_gss_service_t service; /*service (integrity, etc.)*/
+ } rpc_gss_rawcred_t;
+Structure for UNIX credentials. Used by rpc_gss_getcred() as an alternative to rpc_gss_rawcred_t.
+ typedef struct {
+  uid_t uid; /*user ID*/
+  gid_t gid; /*group ID*/
+  short gidlen;  
+  git_t *gidlist; /*list of groups*/
+ } rpc_gss_ucred_t;
+Callback structure used by rpc_gss_set_callback().
+ typedef struct {
+  u_int program; /*RPC program #*/
+  u_int version; /*RPC version #*/
+  bool_t (*callback)(); /*user-defined callback routine*/
+ } rpc_gss_callback_t;
+Structure used by a callback routine to enforce a particular QOP and service for a session. The locked field is nor<hy>
+mally set to FALSE; the server sets it to TRUE in order to lock the session. (A locked context will reject all re<hy>
+quests having different QOP and service values than those found in the raw_cred structure.) For more information,
+see the rpc_gss_set_callback(3NSL) man page.
+ typedef struct {
+  bool_t locked;
+  rpc_gss_rawcred_t *raw_cred;
+ } rpc_gss_lock_t;
+Structure used by rpc_gss_get_error() to fetch an error code when a RPCSEC_GSS routine fails.
+ typedef struct {
+  int rpc_gss_error;
+  int system_error; /*same as errno*/
+ } rpc_gss_error_t;
+<beginning of page>
+The following lists RPCSEC_GSS routines and the manual reference pages on which they are described. An (S)
+indicates it is a server-side function:
+Routine (Manual Page)
+Description
+rpc_gss_seccreate(3NSL)
+Create a secure RPCSEC_GSS context
+rpc_gss_set_defaults(3NSL)
+Switch service, QOP for a session
+rpc_gss_max_data_length(3NSL)
+Get maximum data length allowed by transport
+rpc_gss_set_svc_name(3NSL)
+Set server's principal name (S)
+rpc_gss_getcred(3NSL)
+Get credentials of caller (S)
+rpc_gss_set_callback(3NSL)
+Specify callback to see context use (S)
+rpc_gss_get_principal_name(3NSL)
+Get client principal name (S)
+rpc_gss_svc_max_data_length(3NSL)
+Get maximum data length allowed by transport (S)
+rpc_gss_get_error(3NSL)
+Get error number
+rpc_gss_get_mechanisms(3NSL)
+Get valid mechanism strings
+rpc_gss_get_mech_info(3NSL)
+Get valid QOP strings, current service
+rpc_gss_get_versions(3NSL)
+Get supported RPCSEC_GSS versions
+rpc_gss_is_installed(3NSL)
+Checks if a mechanism is installed
+<beginning of page>
+rpc_gss_mech_to_oid(3NSL)
+Maps ASCII mechanism to OID representation
+rpc_gss_qop_to_num(3NSL)
+Maps ASCII QOP, mechansim to u_int number
+The gsscred utility manages the gsscred table, which contains mappings of principal names between network and
+local credentials. See gsscred(1M).
+/etc/gss/mech List of installed mechanisms
+/etc/gss/qop List of valid QOPs
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelMT-Safe
+_ AvailabilitySUNWrsg (32-bit) _ SUNWrsgx (64-bit)
+gsscred(1M), rpc(3NSL), rpc_clnt_auth(3NSL), xdr(3NSL), attributes(5), environ(5)
+ONC+ Developer's Guide
+Linn, J. RFC 2743, Generic Security Service Application Program Interface Version 2, Update 1. Network Working
+Group. January 2000.

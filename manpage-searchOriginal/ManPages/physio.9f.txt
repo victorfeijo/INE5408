@@ -1,0 +1,39 @@
+<beginning of page>
+physio, minphys <-> perform physical I/O
+#include <sys/types.h>
+#include <sys/buf.h>
+#include <sys/uio.h>
+int physio(int(*strat)(struct buf *), struct buf *bp, dev_t dev,
+ int rw, void (*mincnt)(struct buf *), struct uio *uio);
+void minphys(struct buf *bp);
+Solaris DDI specific (Solaris DDI).
+strat Pointer to device strategy routine.
+bp Pointer to a buf(9S) structure describing the transfer. If bp is set to NULL then physio() allocates one which is
+automatically released upon completion.
+dev The device number.
+rw Read/write flag. This is either B_READ when reading from the device, or B_WRITE when writing to the de<hy>
+vice.
+mincnt Routine which bounds the maximum transfer unit size.
+uio Pointer to the uio structure which describes the user I/O request.
+bp Pointer to a buf structure.
+physio() performs unbuffered I/O operations between the device dev and the address space described in the uio
+structure.
+Prior to the start of the transfer physio() verifies the requested operation is valid by checking the protection of the
+address space specified in the uio structure. It then locks the pages involved in the I/O transfer so they can not be
+paged out. The device strategy routine, strat(), is then called one or more times to perform the physical I/O opera<hy>
+tions. physio() uses biowait(9F) to block until strat() has completed each transfer. Upon completion, or detection of
+an error, physio() unlocks the pages and returns the error status.
+physio() uses mincnt() to bound the maximum transfer unit size to the system, or device, maximum length. min<hy>
+phys() is the system mincnt() routine for use with physio() operations. Drivers which do not provide their own local
+mincnt() routines should call physio() with minphys().
+minphys() limits the value of bp->b_bcount to a sensible default for the capabilities of the system. Drivers that pro<hy>
+vide their own mincnt() routine should also call minphys() to make sure they do not exceed the system limit.
+physio() returns:
+0 Upon success.
+non-zero Upon failure.
+physio() can be called from user context only.
+strategy(9E), biodone(9F), biowait(9F), buf(9S), uio(9S)
+<beginning of page>
+Writing Device Drivers
+Since physio() calls biowait() to block until each buf transfer is complete, it is the drivers responsibility to call
+biodone(9F) when the transfer is complete, or physio() will block forever.

@@ -1,0 +1,219 @@
+<beginning of page>
+fx_dptbl <-> fixed priority dispatcher parameter table
+fx_dptbl
+The process scheduler or dispatcher is the portion of the kernel that controls allocation of the CPU to processes. The
+scheduler supports the notion of scheduling classes, where each class defines a scheduling policy used to schedule
+processes within that class. Associated with each scheduling class is a set of priority queues on which ready-to-run
+processes are linked. These priority queues are mapped by the system configuration into a set of global scheduling
+priorities, which are available to processes within the class. The dispatcher always selects for execution the process
+with the highest global scheduling priority in the system. The priority queues associated with a given class are
+viewed by that class as a contiguous set of priority levels numbered from 0 (lowest priority) to n (highest priority<em>a
+configuration-dependent value). The set of global scheduling priorities that the queues for a given class are mapped
+into might not start at zero and might not be contiguous, depending on the configuration.
+Processes in the fixed priority class are scheduled according to the parameters in a fixed-priority dispatcher parame<hy>
+ter table (fx_dptbl). The fx_dptbl table consists of an array (config_fx_dptbl[]) of parameter structures (struct fxd<hy>
+pent_t), one for each of the n priority levels used by fixed priority processes in user mode. The structures are ac<hy>
+cessed by way of a pointer, (fx_dptbl), to the array. The properties of a given priority level i are specified by the ith
+parameter structure in this array (fx_dptbl[i]).
+A parameter structure consists of the following members. These are also described in the /usr/include/sys/fx.h head<hy>
+er.
+fx_globpri The global scheduling priority associated with this priority level. The mapping between fixed-priority
+priority levels and global scheduling priorities is determined at boot time by the system configuration. fx_globpri
+can not be changed with dispadmin(1M).
+fx_quantum The length of the time quantum allocated to processes at this level in ticks (hz). The time quantum val<hy>
+ue is only a default or starting value for processes at a particular level, as the time quantum of a fixed priority
+process can be changed by the user with the priocntl(1) command or the priocntl(2) system call.
+In the high resolution clock mode (hires_tick set to 1), the value of hz is set to 1000. Increase quantums to maintain
+the same absolute time quantums.
+An administrator can affect the behavior of the fixed priority portion of the scheduler by reconfiguring the fx_dptbl.
+There are two methods available for doing this: reconfigure with a loadable module at boot-time or by using dispad<hy>
+min(1M) at run-time.
+The fx_dptbl can be reconfigured with a loadable module that contains a new fixed priority dispatch table. The mod<hy>
+ule containing the dispatch table is separate from the FX loadable module, which contains the rest of the fixed prior<hy>
+ity software. This is the only method that can be used to change the number of fixed priority priority levels or the set
+of global scheduling priorities used by the fixed priority class. The relevant procedure and source code is described
+in Replacing the fx_dptbl Loadable Module below.
+The fx_quantum values in the fx_dptbl can be examined and modified on a running system using the dispad<hy>
+min(1M) command. Invoking dispadmin for the fixed-priority class allows the administrator to retrieve the current
+fx_dptbl configuration from the kernel's in-core table or overwrite the in-core table with values from a configuration
+file. The configuration file used for input to dispadmin must conform to the specific format described as follows: <bu>
+Blank lines are ignored and any part of a line to the right of a # symbol is treated as a comment. <bu> The first non-
+blank, non-comment line must indicate the resolution to be used for interpreting the time quantum values. The reso<hy>
+lution is specified as:
+ RES=res
+where res is a positive integer between 1 and 1,000,000,000 inclusive and the resolution used is the reciprocal of res
+in seconds (for example, RES=1000 specifies millisecond resolution). Although you can specify very fine (nanosec<hy>
+ond) resolution, the time quantum lengths are rounded up to the next integral multiple of the system clock's resolu<hy>
+tion. <bu> The remaining lines in the file are used to specify the fx_quantum values for each of the fixed-priority prior<hy>
+ity levels. The first line specifies the quantum for fixed-priority level 0, the second line specifies the quantum for
+fixed-priority level 1, and so forth. There must be exactly one line for each configured fixed priority priority level.
+Each fx_quantum entry must be a positive integer specifying the desired time quantum in the resolution given by
+res.
+<beginning of page>
+See Examples for an example of an excerpt of a dispadmin configuration file.
+To change the size of the fixed priority dispatch table, you must build the loadable module that contains the dispatch
+table information. Save the existing module before using the following procedure. 1. Place the dispatch table code
+shown below in a file called fx_dptbl.c. See EXAMPLES, below, for an example of this file. 2. Compile the code
+using the given compilation and link lines supplied:
+ cc -c -0 -D_KERNEL fx_dptbl.c
+ ld -r -o FX_DPTBL fx_dptbl.o
+3. Copy the current dispatch table in /usr/kernel/sched to FX_DPTBL.bak. 4. Replace the current FX_DPTBL
+in /usr/kernel/sched. 5. Make changes in the /etc/system file to reflect the changes to the sizes of the tables. See
+system(4). The variables affected is fx_maxupri. The syntax for setting this is as follows:
+ set FX:fx_maxupri=(value for max fixed-priority user priority)
+6. Reboot the system to use the new dispatch table.
+Exercise great care in using the preceding method to replace the dispatch table. A mistake can result in panics, thus
+making the system unusable. Example 1 Configuration File Excerpt
+The following excerpt from a dispadmin configuration file illustrates the correct format. Note that, for each line
+specifying a set of parameters, there is a comment indicating the corresponding priority level. These level numbers
+indicate priority within the fixed priority class; the mapping between these fixed-priority priorities and the corre<hy>
+sponding global scheduling priorities is determined by the configuration specified in the FX_DPTBL loadable mod<hy>
+ule. The level numbers are strictly for the convenience of the administrator reading the file and, as with any com<hy>
+ment, they are ignored by dispadmin. The dispadmin command assumes that the lines in the file are ordered by
+consecutive, increasing priority level (from 0 to the maximum configured fixed-priority priority). For the sake of
+someone reading the file, the level numbers in the comments should agree with this ordering. If for some reason they
+do not, dispadmin is unaffected.
+ # Fixed Priority Dispatcher Configuration File RES=1000
+ RES=1000
+ # TIME QUANTUM PRIORITY
+ # (fx_quantum) LEVEL
+ 200 # 0
+ 200 # 1
+ 200 # 2
+ 200 # 3
+ 200 # 4
+ 200 # 5
+ 200 # 6
+ 200 # 7
+  . . .
+  . . .
+  . . .
+ 20 # 58
+ 20 # 59
+ 20 # 60
+Example 2 fx_dptbl.c File Used for Building the New fx_dptbl
+The following is an example of a fx_dptbl.c file used for building the new fx_dptbl.
+ /* BEGIN fx_dptbl.c */
+ #include <sys/proc.h>
+ #include <sys/priocntl.h>
+ #include <sys/class.h>
+ #include <sys/disp.h>
+<beginning of page>
+ #include <sys/fx.h>
+ #include <sys/fxpriocntl.h>
+ /*
+  * This is the loadable module wrapper.
+  */
+ #include <sys/modctl.h>
+ extern struct mod_ops mod_miscops;
+ /*
+  * Module linkage information for the kernel.
+  */
+ static struct modlmisc modlmisc = {
+  &mod_miscops, "Fixed priority dispatch table"
+ };
+ static struct modlinkage modlinkage = {
+  MODREV_1, &modlmisc, 0
+ };
+ _init()
+ {
+  return (mod_install(&modlinkage));
+ }
+ _info(modinfop)
+  struct modinfo *modinfop;
+ {
+  return (mod_info(&modlinkage, modinfop));
+ }
+ #define FXGPUP0 0 /* Global priority for FX user priority 0 */
+ fxdpent_t config_fx_dptbl[] = {
+ /* glbpri qntm */
+  FXGPUP0+0, 20,
+  FXGPUP0+1, 20,
+  FXGPUP0+2, 20,
+  FXGPUP0+3, 20,
+  FXGPUP0+4, 20,
+  FXGPUP0+5, 20,
+  FXGPUP0+6, 20,
+  FXGPUP0+7, 20,
+  FXGPUP0+8, 20,
+  FXGPUP0+9, 20,
+  FXGPUP0+10, 16,
+  FXGPUP0+11, 16,
+  FXGPUP0+12, 16,
+  FXGPUP0+13, 16,
+  FXGPUP0+14, 16,
+  FXGPUP0+15, 16,
+  FXGPUP0+16, 16,
+  FXGPUP0+17, 16,
+  FXGPUP0+18, 16,
+  FXGPUP0+19, 16,
+  FXGPUP0+20, 12,
+  FXGPUP0+21, 12,
+  FXGPUP0+22, 12,
+  FXGPUP0+23, 12,
+  FXGPUP0+24, 12,
+  FXGPUP0+25, 12,
+<beginning of page>
+  FXGPUP0+26, 12,
+  FXGPUP0+27, 12,
+  FXGPUP0+28, 12,
+  FXGPUP0+29, 12,
+  FXGPUP0+30, 8,
+  FXGPUP0+31, 8,
+  FXGPUP0+32, 8,
+  FXGPUP0+33, 8,
+  FXGPUP0+34, 8,
+  FXGPUP0+35, 8,
+  FXGPUP0+36, 8,
+  FXGPUP0+37, 8,
+  FXGPUP0+38, 8,
+  FXGPUP0+39, 8,
+  FXGPUP0+40, 4,
+  FXGPUP0+41, 4,
+  FXGPUP0+42, 4,
+  FXGPUP0+43, 4,
+  FXGPUP0+44, 4,
+  FXGPUP0+45, 4,
+  FXGPUP0+46, 4,
+  FXGPUP0+47, 4,
+  FXGPUP0+48, 4,
+  FXGPUP0+49, 4,
+  FXGPUP0+50, 4,
+  FXGPUP0+51, 4,
+  FXGPUP0+52, 4,
+  FXGPUP0+53, 4,
+  FXGPUP0+54, 4,
+  FXGPUP0+55, 4,
+  FXGPUP0+56, 4,
+  FXGPUP0+57, 4,
+  FXGPUP0+58, 4,
+  FXGPUP0+59, 2,
+  FXGPUP0+60 2,
+ };
+ pri_t config_fx_maxumdpri =
+  sizeof (config_fx_dptbl) / sizeof (fxdpent_t) - 1;
+ /*
+  * Return the address of config_fx_dptbl
+  */
+ fxdpent_t *
+ fx_getdptbl()
+ {
+  return (config_fx_dptbl);
+ }
+ /*
+  * Return the address of fx_maxumdpri
+  */
+ pri_t
+ fx_getmaxumdpri()
+ {
+ /*
+  * the config_fx_dptbl table.
+  */
+  return (config_fx_maxumdpri);
+ }
+priocntl(1), dispadmin(1M), priocntl(2), system(4)
+<beginning of page>
+System Administration Guide, Volume 1, System Interface Guide
+In order to improve performance under heavy system load, both the nfsd daemon and the lockd daemon utilize the
+maximum priority in the FX class. Unusual fx_dptbl configurations may have significant negative impact on the
+performance of the nfsd and lockd daemons.

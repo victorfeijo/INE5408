@@ -1,0 +1,102 @@
+<beginning of page>
+thr_keycreate, thr_keycreate_once, thr_setspecific, thr_getspecific <-> thread-specific data functions
+cc -mt [ flag... ] file... [ library... ]
+#include <thread.h>
+int thr_keycreate(thread_key_t *keyp,
+ void (*destructor)(void *));
+int thr_keycreate_once(thread_key_t *keyp,
+ void (*destructor)(void *));
+int thr_setspecific(thread_key_t key, void *value);
+int thr_getspecific(thread_key_t key, void **valuep);
+In general, thread key creation allocates a key that locates data specific to each thread in the process. The key is
+global to all threads in the process, which allows each thread to bind a value to the key once the key has been creat<hy>
+ed. The key independently maintains specific values for each binding thread. The thr_keycreate() function allo<hy>
+cates a global key namespace, pointed to by keyp, that is visible to all threads in the process. Each thread is initially
+bound to a private element of this key, which allows access to its thread-specific data.
+Upon key creation, a new key is assigned the value NULL for all active threads. Additionally, upon thread creation,
+all previously created keys in the new thread are assigned the value NULL.
+Optionally, a destructor function destructor can be associated with each key. Upon thread exit, if a key has a non-
+null destructor function and the thread has a non-null value associated with that key, the destructor function is called
+with the current associated value. If more than one destructor exists for a thread when it exits, the order of destructor
+calls is unspecified.
+An exiting thread runs with all signals blocked. All thread termination functions, including thread-specific data de<hy>
+structor functions, are called with all signals blocked.
+The thr_keycreate_once() function is identical to the thr_keycreate() function except that the key pointed to by
+keyp must be statically initialized with the value THR_ONCE_KEY before calling thr_keycreate_once() and the
+key will be created exactly once. This is equivalent to using pthread_once() to call a onetime initialization function
+that calls thr_keycreate() to create the data key.
+Once a key has been created, each thread can bind a new value to the key using thr_setspecific(). The values are
+unique to the binding thread and are individually maintained. These values continue for the life of the calling
+thread.
+Proper synchronization of key storage and access must be ensured by the caller. The value argument to thr_setspe<hy>
+cific() is generally a pointer to a block of dynamically allocated memory reserved by the calling thread for its own
+use. See EXAMPLES below.
+At thread exit, the destructor function, which is associated at time of creation, is called and it uses the specific key
+value as its sole argument.
+thr_getspecific() stores the current value bound to key for the calling thread into the location pointed to by valuep.
+If successful, thr_keycreate(), thr_keycreate_once(), thr_setspecific() and thr_getspecific() return 0. Otherwise,
+an error number is returned to indicate the error.
+If the following conditions occur, thr_keycreate() and thr_keycreate_once() return the corresponding error num<hy>
+ber:
+EAGAIN The system lacked the necessary resources to create another thread-specific data key.
+ENOMEM Insufficient memory exists to create the key.
+If the following conditions occur, thr_setspecific() returns the corresponding error number:
+ENOMEM Insufficient memory exists to associate the value with the key.
+<beginning of page>
+The thr_setspecific() function returns the corresponding error number:
+EINVAL The key value is invalid.
+Example 1 Call the thread-specific data from more than one thread without special initialization.
+In this example, the thread-specific data in this function can be called from more than one thread without special ini<hy>
+tialization. For each argument passed to the executable, a thread is created and privately bound to the string-value of
+that argument.
+ /* cc -mt thisfile.c */
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+ #include <thread.h>
+ void *thread_specific_data(void *);
+ void cleanup(void*);
+ #define MAX_ARGC 20
+ thread_t tid[MAX_ARGC];
+ int num_threads;
+ int
+ main(int argc, char *argv[]) {
+  int i;
+  num_threads = argc - 1;
+  for (i = 0; i < num_threads; i++)
+  thr_create(NULL, 0, thread_specific_data, argv[i+1], 0, &tid[i]);
+  for (i = 0; i < num_threads; i++)
+  thr_join(tid[i], NULL, NULL);
+  return (0);
+ } /* end main */
+ void *
+ thread_specific_data(void *arg) {
+  static thread_key_t key = THR_ONCE_KEY;
+  char *private_data = arg;
+  void *tsd = NULL;
+  void *data;
+  thr_keycreate_once(&key, cleanup);
+  thr_getspecific(key, &tsd);
+  if (tsd == NULL) {
+  data = malloc(strlen(private_data) + 1);
+  strcpy(data, private_data);
+  thr_setspecific(key, data);
+  thr_getspecific(key, &tsd);
+  }
+  printf("tsd for %d = %s\n", thr_self(), (char *)tsd);
+  thr_getspecific(key, &tsd);
+  printf("tsd for %d remains %s\n", thr_self(), (char *)tsd);
+  return (NULL);
+ } /* end thread_specific_data */
+ void
+ cleanup(void *v) {
+  /* application-specific clean-up function */
+  free(v);
+ }
+See attributes(5) for descriptions of the following attributes:
+<beginning of page>
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed _ MT-LevelMT-Safe
+pthread_once(3C), thr_exit(3C), attributes(5), standards(5)
+The thr_getspecific() and thr_setspecific() functions can be called either explicitly or implicitly from a thread-spe<hy>
+cific data destructor function. Calling thr_setspecific() from a destructor can result in lost storage or infinite loops.

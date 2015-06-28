@@ -1,0 +1,60 @@
+<beginning of page>
+nscd <-> name service cache daemon
+/usr/sbin/nscd [-f configuration-file] [-g] [-e cachename, yes
+ | no] [-i cachename]
+The nscd daemon is a process that provides a cache for most name service requests. The default configuration-file
+/etc/nscd.conf determines the behavior of the cache daemon. See nscd.conf(4).
+nscd provides caching for the passwd(4), group(4), hosts(4), ipnodes(4), exec_attr(4), prof_attr(4), user_attr(4),
+ethers(4), rpc(4), protocols(4), networks(4), bootparams(4), audit_user(4), auth_attr(4), services(4), net<hy>
+masks(4), printers(4), project(4) databases through standard libc interfaces, such as gethostbyname(3NSL),
+getipnodebyname(3SOCKET), gethostbyaddr(3NSL), and others. Each cache has a separate time-to-live for its
+data; modifying the local database (/etc/hosts, /etc/resolv.conf, and so forth) causes that cache to become invalidat<hy>
+ed upon the next call to nscd. The shadow file is specifically not cached. getspnam(3C) calls remain uncached as a
+result.
+nscd also acts as its own administration tool. If an instance of nscd is already running, commands are passed to the
+running version transparently.
+When running with per-user lookups enabled (see nscd.conf(4)), nscd forks one and only one child process (that is,
+a per-user nscd) on behalf of the user making the request. The per-user nscd will use the credentials of the user to
+open a per-user connection to the name repository configured for the per-user style of lookups. The lookup will be
+performed in the child process. The results are cached in the process and are available only to the same user. The
+caches are managed exactly the same as the main nscd daemon manages its own caches. Subsequent requests from
+the user will be handled by that per-user nscd until it terminates. The per-user nscd uses a configurable inactivity
+time-to-live (TTL) value and terminates itself after the inactivity TTL expires.
+The maximum number of per-user nscds that can be created by the main nscd is configurable (see nscd.conf(4)).
+After the maximum number of them are created, the main nscd will use an LRU algorithm to terminate less active
+child nscds as needed.
+The main nscd daemon creates, monitors, and manages all the child nscds. It creates a user's own nscd upon receiv<hy>
+ing the user's first per-user lookup. When the nscd daemon is started, if per-user lookups are enabled, it checks to
+ensure all conditions are met before getting ready to create a per-user nscd. When the daemon is stopped, it termi<hy>
+nates all the per-user nscds under its control.
+Per-user nscds use the same configuration as the main nscd. They read and use the same default configuration file or
+the one specified with the -f command line option. Once the configuration is read, the per-user nscd will use it for its
+entire lifetime.
+Several of the options described below require a cachename specification. Supported values for cachename are:
+passwd, group, hosts, ipnodes, exec_attr, prof_attr, user_attr, ethers, rpc, protocols, networks, bootparams,
+audit_user, auth_attr, services, netmasks, printers, and project.
+-f configuration-file
+Causes nscd to read its configuration data from the specified file.
+-g
+Prints current configuration and statistics to standard output. This is the only option executable by non-root users.
+-e cachename, yes|no
+Enables or disables the specified cache.
+-i cachename
+Invalidate the specified cache.
+Example 1 Stopping and restarting the nscd daemon.
+ example# svcadm disable system/name-service-cache
+ example# svcadm enable system/name-service-cache
+<beginning of page>
+/etc/nscd.conf Determines athe behavior of the cache daemon
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu
+svcs(1), svcadm(1M), getspnam(3C), gethostbyname(3NSL), getipnodebyname(3SOCKET), audit_user(4),
+auth_attr(4), bootparams(4), ethers(4), exec_attr(4), group(4), hosts(4), netmasks(4), networks(4),
+nscd.conf(4), nsswitch.conf(4), passwd(4), printers(4), prof_attr(4), project(4), protocols(4), rpc(4), services(4),
+user_attr(4), attributes(5)
+The output from the -g option to nscd is subject to change. Do not rely upon it as a programming interface.
+The nscd service is managed by the service management facility, smf(5), under the service identifier:
+ svc:/system/name-service-cache
+Administrative actions on this service, such as enabling, disabling, or requesting restart, can be performed using sv<hy>
+cadm(1M). The service's status can be queried using the svcs(1) command.

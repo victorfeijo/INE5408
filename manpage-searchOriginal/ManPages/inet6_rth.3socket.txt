@@ -1,0 +1,61 @@
+<beginning of page>
+inet6_rth, inet6_rth_space, inet6_rth_init, inet6_rth_add, inet6_rth_reverse, inet6_rth_segments, inet6_rth_getaddr <->
+Routing header manipulation
+cc [ flag ... ] file ... -lsocket [library]
+#include <netinet/in.h>
+socklen_t inet6_rth_space(int type, int segments);
+void *inet6_rth_init(void *bp, socklen_t bp_len, int type, int segments);
+int inet6_rth_add(void *bp, const struct, in6_addr *addr);
+int inet6_rth_reverse(const void *in, void *out);
+int inet6_rth_segments(const void *bp);
+struct in6_addr *inet6_rth_getaddr(const void *bp, int index);
+The inet6_rth functions enable users to manipulate routing headers without having knowledge of their structure.
+The iet6_rth_init() function initializes the buffer pointed to by bp to contain a routing header of the specified type
+and sets ip6r_len based on the segments parameter. The bp_len argument is used only to verify that the buffer is
+large enough. The ip6r_segleft field is set to zero and inet6_rth_add() increments it. The caller allocates the buffer
+and its size can be determined by calling inet6_rth_space().
+The inet6_rth_add() function adds the IPv6 address pointed to by addr to the end of the routing header that is being
+constructed.
+The inet6_rth_reverse() function takes a routing header extension header pointed to by the first argument and writes
+a new routing header that sends datagrams along the reverse of the route. The function reverses the order of the ad<hy>
+dresses and sets the segleft member in the new routing header to the number of segments. Both arguments can point
+to the same buffer (that is, the reversal can occur in place).
+The inet6_rth_segments() function returns the number of segments (addresses) contained in the routing header de<hy>
+scribed by bp.
+The inet6_rth_getaddr() function returns a pointer to the IPv6 address specified by index, which must have a value
+between 0 and one less than the value returned by inet6_rth_segments() in the routing header described by bp. Ap<hy>
+plications should first call inet6_rth_segments() to obtain the number of segments in the routing header.
+The inet6_rth_space() function returns the size, but the function does not allocate the space required for the ancil<hy>
+lary data routing header.
+To receive a routing header, the application must enable the IPV6_RECVRTHDR socket option:
+ int on = 1;
+ setsockopt (fd, IPPROTO_IPV6, IPV6_RECVRTHDR, &on, sizeof(on));
+Each received routing header is returned as one ancillary data object described by a cmsghdr structure with
+cmsg_type set to IPV6_RTHDR.
+To send a routing header, the application specifies it either as ancillary data in a call to sendmsg() or by using set<hy>
+sockopt(). For the sending side, this API assumes the number of occurrences of the routing header as described in
+RFC-2460. Applications can specify no more than one outgoing routing header.
+The application can remove any sticky routing header by calling setsockopt() for IPV6_RTHDR with a zero option
+length.
+When using ancillary data, a routing header is passed between the application and the kernel as follows: The
+cmsg_level member has a value of IPPROTO_IPV6 and the cmsg_type member has a value of IPV6_RTHDR.
+The contents of the cmsg_data member is implementation-dependent and should not be accessed directly by the ap<hy>
+plication, but should be accessed using the inet6_rth functions.
+The following constant is defined as a result of including the <netinet/in.h>:
+<beginning of page>
+ #define IPV6_RTHDR_TYPE_0 0 /* IPv6 Routing header type 0 */
+Source routing in IPv6 is accomplished by specifying a routing header as an extension header. There are a number of
+different routing headers, but IPv6 currently defines only the Type 0 header. See RFC-2460. The Type 0 header sup<hy>
+ports up to 127 intermediate nodes, limited by the length field in the extension header. With this maximum number
+of intermediate nodes, a source, and a destination, there are 128 hops.
+The inet6_rth_init() function returns a pointer to the buffer (bp) upon success.
+For the inet6_rth_add() function, the segleft member of the routing header is updated to account for the new ad<hy>
+dress in the routing header. The function returns 0 upon success and -1 upon failure.
+The inet6_rth_reverse() function returns 0 upon success or -1 upon an error.
+The inet6_rth_segments() function returns 0 or greater upon success and -1 upon an error.
+The inet6_rth_getaddr() function returns NULL upon an error.
+The inet6_rth_space() function returns the size of the buffer needed for the routing header.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Standard _ MT-LevelSafe
+RFC 3542- Advanced Sockets Application Programming Interface (API) for IPv6, The Internet Society. May 2003

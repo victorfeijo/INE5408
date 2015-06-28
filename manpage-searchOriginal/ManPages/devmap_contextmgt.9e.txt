@@ -1,0 +1,75 @@
+<beginning of page>
+devmap_contextmgt <-> driver callback function for context management
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+int devmap_contextmgt(devmap_cookie_t dhp, void *pvtp,
+ offset_t off, size_t len, uint_t type, uint_t rw);
+Solaris DDI specific (Solaris DDI).
+dhp An opaque mapping handle that the system uses to describe the mapping.
+pvtp Driver private mapping data.
+off User offset within the logical device memory at which the access begins.
+len Length (in bytes) of the memory being accessed.
+type Type of access operation. Possible values are:
+DEVMAP_ACCESS Memory access.
+DEVMAP_LOCK Lock the memory being accessed.
+DEVMAP_UNLOCK Unlock the memory being accessed.
+rw Direction of access. Possible values are:
+DEVMAP_READ Read access attempted.
+DEVMAP_WRITE Write access attempted.
+devmap_contextmgt() is a driver-supplied function that performs device context switching on a mapping. Device
+drivers pass devmap_contextmgt() as an argument to devmap_do_ctxmgt(9F) in the devmap_access(9E) entry
+point. The system will call devmap_contextmgt() when memory is accessed. The system expects devmap_con<hy>
+textmgt() to load the memory address translations of the mapping by calling devmap_load(9F) before returning.
+dhp uniquely identifies the mapping and is used as an argument to devmap_load(9F) to validate the mapping. off
+and len define the range to be affected by the operations in devmap_contextmgt().
+The driver must check if there is already a mapping established at off that needs to be unloaded. If a mapping exists
+at off, devmap_contextmgt() must call devmap_unload(9F) on the current mapping. devmap_unload(9F) must be
+followed by devmap_load() on the mapping that generated this call to devmap_contextmgt(). devmap_unload(9F)
+unloads the current mapping so that a call to devmap_access(9E), which causes the system to call devmap_con<hy>
+textmgt(), will be generated the next time the mapping is accessed.
+pvtp is a pointer to the driver's private mapping data that was allocated and initialized in the devmap_map(9E) entry
+point. type defines the type of operation that device drivers should perform on the memory object. If type is either
+DEVMAP_LOCK or DEVMAP_UNLOCK, the length passed to either devmap_unload(9F) or de<hy>
+vmap_load(9F) must be same as len. rw specifies the access direction on the memory object.
+A non-zero return value from devmap_contextmgt() will be returned to devmap_access(9E) and will cause the
+corresponding operation to fail. The failure may result in a SIGSEGV or SIGBUS signal being delivered to the
+<beginning of page>
+process.
+0 Successful completion.
+Non-zero An error occurred.
+Example 1 managing a device context
+The following shows an example of managing a device context.
+ struct xxcontext cur_ctx;
+ static int
+ xxdevmap_contextmgt(devmap_cookie_t dhp, void *pvtp, offset_t off,
+  size_t len, uint_t type, uint_t rw)
+ {
+  devmap_cookie_t cur_dhp;
+  struct xxpvtdata *p;
+  struct xxpvtdata *pvp = (struct xxpvtdata *)pvtp;
+  struct xx_softc *softc = pvp->softc;
+  int err;
+  mutex_enter(&softc->mutex);
+  /*
+  * invalidate the translations of current context before
+  * switching context.
+  */
+  if (cur_ctx != NULL && cur_ctx != pvp->ctx) {
+  p = cur_ctx->pvt;
+  cur_dhp = p->dhp;
+  if ((err = devmap_unload(cur_dhp, off, len)) != 0)
+  return (err);
+  }
+  /* Switch device context - device dependent*/
+  ...
+  /* Make handle the new current mapping */
+  cur_ctx = pvp->ctx;
+  /*
+  * Load the address translations of the calling context.
+  */
+  err = devmap_load(pvp->dhp, off, len, type, rw);
+  mutex_exit(&softc->mutex);
+  return (err);
+ }
+devmap_access(9E), devmap_do_ctxmgt(9F) devmap_load(9F), devmap_unload(9F)
+Writing Device Drivers

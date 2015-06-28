@@ -1,0 +1,81 @@
+<beginning of page>
+bioclone <-> clone another buffer
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+struct buf *bioclone(struct buf *bp, off_t off, size_t len, dev_t dev,
+ daddr_t blkno, int (*iodone) (struct buf *), struct buf *bp_mem,
+ int sleepflag);
+Solaris DDI specific (Solaris DDI).
+bp Pointer to the buf(9S) structure describing the original I/O request.
+off Offset within original I/O request where new I/O request should start.
+len Length of the I/O request.
+dev Device number.
+blkno Block number on device.
+iodone Specific biodone(9F) routine.
+bp_mem Pointer to a buffer structure to be filled in or NULL.
+sleepflag Determines whether caller can sleep for memory. Possible flags are KM_SLEEP to allow sleeping until
+memory is available, or KM_NOSLEEP to return NULL immediately if memory is not available.
+The bioclone() function returns an initialized buffer to perform I/O to a portion of another buffer. The new buffer
+will be set up to perform I/O to the range within the original I/O request specified by the parameters off and len. An
+offset 0 starts the new I/O request at the same address as the original request. off + len must not exceed b_bcount,
+the length of the original request. The device number dev specifies the device to which the buffer is to perform I/O.
+blkno is the block number on device. It will be assigned to the b_blkno field of the cloned buffer structure. iodone
+lets the driver identify a specific biodone(9F) routine to be called by the driver when the I/O is complete. bp_mem
+determines from where the space for the buffer should be allocated. If bp_mem is NULL, bioclone() will allocate a
+new buffer using getrbuf(9F). If sleepflag is set to KM_SLEEP, the driver may sleep until space is freed up. If
+sleepflag is set to KM_NOSLEEP, the driver will not sleep. In either case, a pointer to the allocated space is re<hy>
+turned or NULL to indicate that no space was available. After the transfer is completed, the buffer has to be freed us<hy>
+ing freerbuf(9F). If bp_mem is not NULL, it will be used as the space for the buffer structure. The driver has to en<hy>
+sure that bp_mem is initialized properly either using getrbuf(9F) or bioinit(9F).
+If the original buffer is mapped into the kernel virtual address space using bp_mapin(9F) before calling bioclone(),
+a clone buffer will share the kernel mapping of the original buffer. An additional bp_mapin() to get a kernel map<hy>
+ping for the clone buffer is not necessary.
+The driver has to ensure that the original buffer is not freed while any of the clone buffers is still performing I/O.
+The biodone() function has to be called on all clone buffers before it is called on the original buffer.
+The bioclone() function returns a pointer to the initialized buffer header, or NULL if no space is available.
+The bioclone() function can be called from user, interrup, or interrupt context. Drivers must not allow bioclone() to
+sleep if called from an interrupt routine. Example 1 Using bioclone() for Disk Striping
+A device driver can use bioclone() for disk striping. For each disk in the stripe, a clone buffer is created which per<hy>
+forms I/O to a portion of the original buffer.
+ static int
+<beginning of page>
+ stripe_strategy(struct buf *bp)
+ {
+  ...
+  bp_orig = bp;
+  bp_1 = bioclone(bp_orig, 0, size_1, dev_1, blkno_1,
+  stripe_done, NULL, KM_SLEEP);
+  fragment++;
+  ...
+  bp_n = bioclone(bp_orig, offset_n, size_n, dev_n,
+  blkno_n, stripe_done, NULL, KM_SLEEP);
+  fragment++;
+  /* submit bp_1 ... bp_n to device */
+  xxstrategy(bp_x);
+  return (0);
+ }
+ static uint_t
+ xxintr(caddr_t arg)
+ {
+  ...
+  /*
+  * get bp of completed subrequest. biodone(9F) will
+  * call stripe_done()
+  */
+  biodone(bp);
+  return (0);
+ }
+ static int
+ stripe_done(struct buf *bp)
+ {
+  ...
+  freerbuf(bp);
+  fragment--;
+  if (fragment == 0) {
+  /* get bp_orig */
+  biodone(bp_orig);
+  }
+  return (0);
+ }
+biodone(9F), bp_mapin(9F), freerbuf(9F), getrbuf(9F), buf(9S)
+Writing Device Drivers

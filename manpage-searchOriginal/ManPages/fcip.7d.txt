@@ -1,0 +1,63 @@
+<beginning of page>
+fcip <-> IP/ARP over Fibre Channel datagram encapsulation driver
+/dev/fcip
+The fcip driver is a Fibre Channel upper layer protocol module for encapsulating IP (IPv4) and ARP datagrams over
+Fibre Channel. The fcip driver is a loadable, clonable, STREAMS driver supporting the connectionless Data Link
+Provider Interface, dlpi(7P) over any Sun Fibre Channel transport layer-compliant host adapter.
+The fcip driver complies with the RFC 2625 specification for encapsulating IP/ARP datagrams over Fibre Channel,
+and allows encapsulation of IPv4 only, as specified in RFC 2625. The fcip driver interfaces with the fp(7d) Sun Fi<hy>
+bre Channel port driver.
+The cloning character-special device /dev/fcip is used to access all Fibre Channel ports capable of supporting
+IP/ARP traffic on the system.
+The fcip driver is a "style 2" Data Link Service Provider. All M_PROTO and M_PCPROTO type messages are in<hy>
+terpreted as DLPI primitives. Valid DLPI primitives are defined in <sys/dlpi.h>. Refer to dlpi(7P) for more infor<hy>
+mation on DLPI primitives.
+An explicit DL_ATTACH_REQ message must be sent to associate the opened stream with a particular Fibre
+Channel port (ppa). The ppa ID is interpreted as an unsigned long data type and indicates the corresponding Fibre
+Channel port driver instance number. An error (DL_ERROR_ACK) is returned by the driver if the ppa field value
+does not correspond to a valid port driver instance number or if the Fibre Channel port is not ONLINE. Refer to
+fp(7d) for more details on the Fibre Channel port driver.
+The values returned by the driver in the DL_INFO_ACK primitive in response to a DL_INFO_REQ from the user
+are as follows: <bu> Maximum SDU is 65280 (defined in RFC 2625). <bu> Minimum SDU is 0. <bu> DLSAP address length
+is 8. <bu> MAC type is DL_ETHER. <bu> SAP length is -2. <bu> Service mode is DL_CLDLS. <bu> Optional quality of service
+(QOS) fields are set to 0. <bu> Provider style is DL_STYLE2. <bu> Provider version is DL_VERSION_2. <bu> Broadcast
+address value is 0xFFFFFFFF.
+Once in DL_ATTACHED state, the user must send a DL_BIND_REQ to associate a particular SAP (Service Ac<hy>
+cess Point) with the stream. The fcip driver DLSAP address format consists of the 6-byte physical address compo<hy>
+nent followed immediately by the 2-byte SAP component producing an 8-byte DLSAP address. Applications
+should not be programmed to use this implementation-specific DLSAP address format, but use information re<hy>
+turned in the DL_INFO_ACK primitive to compose and decompose DLSAP addresses. The SAP length, full DL<hy>
+SAP length, and SAP/physical ordering are included within the DL_INFO_ACK. The physical address length is
+the full DLSAP address length minus the SAP length. The physical address length can also be computed by issu<hy>
+ing the DL_PHYS_ADDR_REQ primitive to obtain the current physical address associated with the stream.
+Once in the DL_BOUND state, the user can transmit frames on the fibre by sending DL_UNITDATA_REQ mes<hy>
+sages to the fcip driver. The fcip driver will route received frames up any of the open and bound streams having a
+SAP which matches the received frame's SAP type as DL_UNITDATA_IND messages. Received Fibre Channel
+frames are duplicated and routed up multiple open streams if necessary. The DLSAP address contained within the
+DL_UNITDATA_REQ and DL_UNITDATA_IND messages consists of both the SAP (type) and physical address
+(WorldWideName) components.
+In Fibre Channel, multicasting is defined as an optional service for Fibre Channel classes three and six only. If re<hy>
+quired, the Fibre Channel broadcast service can be used for multicasting. The RFC 2625 specification does not sup<hy>
+port IP multicasting or promiscuous mode.
+The fcip driver will use the FARP Fibre Channel Extended Link Service (ELS), where supported, to resolve World<hy>
+Wide Names (MAC address) to FC Port Identifiers(Port_ID). The fcip driver also supports InARP to resolve World<hy>
+Wide Name and Port_ID to an IP address.
+/dev/fcip fcip character-special device
+/kernel/drv/fcip 32-bit ELF kernel driver (x86)
+/kernel/drv/amd64/fcip 64-bit ELF kernel driver (x86)
+/kernel/drv/sparcv9/fcip 64-bit ELF kernel driver (SPARC)
+<beginning of page>
+/kernel/drv/fcip.conf fcip driver configuration file
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ ArchitectureS<hy>
+PARC _ AvailabilitySUNWfcip
+netstat(1M), prtconf(1M), driver.conf(4), fp(7d), dlpi(7P)
+Writing Device Drivers
+IP and ARP over Fibre Channel, RFC 2625 M. Rajagopal, R. Bhagwat, W. Rickard. Gadzoox Networks, June 1999
+ANSI X3.230-1994, Fibre Channel Physical and Signalling Interface (FC-PH)
+ANSI X3.272-1996, Fibre Channel Arbitrated Loop (FC-AL)
+If you use a Fibre Channel adapter with two or more ports that each share a common Node WorldWideName, the
+fcip driver will likely attach to the first port on the adapter.
+RFC 2625 requires that both source and destination WorldWideNames have their 4 bit NAA identifiers set to binary
+'0001,' indicating that an IEEE 48-bit MAC address is contained in the lower 48 bits of the network address fields.
+For additional details, see the RFC 2625 specification.

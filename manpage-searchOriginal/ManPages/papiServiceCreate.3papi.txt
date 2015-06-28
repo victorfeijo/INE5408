@@ -1,0 +1,114 @@
+<beginning of page>
+papiServiceCreate, papiServiceDestroy, papiServiceSetUserName, papiServiceSetPassword, papiServiceSetEncryp<hy>
+tion, papiServiceSetAuthCB, papiServiceSetAppData, papiServiceGetServiceName, papiServiceGetUserName, pa<hy>
+piServiceGetPassword, papiServiceGetEncryption, papiServiceGetAppData, papiServiceGetAttributeList, papiSer<hy>
+viceGetStatusMessage <-> service context manipulation
+cc [ flag... ] file... -lpapi [ library... ]
+#include <papi.h>
+papi_status_t papiServiceCreate(papi_service_t *handle,
+ char *service_name, char *user_name, char *password,
+ int (*authCB)(papi_service_t svc, void *app_data),
+ papi_encryption_t encryption, void *app_data);
+void papiServiceDestroy(papi_service_t handle);
+papi_status_t papiServiceSetUserName(papi_service_t handle,
+ char *user_name);
+papi_status_t papiServiceSetPassword(papi_service_t handle,
+ char *password);
+papi_status_t papiServiceSetEncryption(papi_service_t handle,
+ papi_encryption_t encryption);
+papi_status_t papiServiceSetAuthCB(papi_service_t handle,
+ int (*authCB)(papi_service_t s, void *app_data));
+papi_status_t papiServiceSetAppData(papi_service_t handle,
+ void *app_data);
+char *papiServiceGetServiceName(papi_service_t handle);
+char *papiServiceGetUserName(papi_service_t handle);
+char *papiServiceGetPassword(papi_service_t handle);
+papi_encryption_t papiServiceGetEncryption(papi_service_t handle);
+void *papiServiceGetAppData(papi_service_t handle);
+papi_attribute_t **papiServiceGetAttributeList(papi_service_t handle);
+char *papiServiceGetStatusMessage(papi_service_t handle);
+app_data a set of additional data to be passed to the authCB if/when it is called
+authCB a callback routine use to gather additional authentication information on behalf of the print service
+encryption whether or not encryption should be used for communication with the print service, where applicable. If
+PAPI_ENCRYPT_IF_REQUESTED is specified, encryption will be used if the print service requests it. If PA<hy>
+PI_ENCRYPT_NEVER is specified, encryption will not be used while communicating with the print service. If
+PAPI_ENCRYPT_REQUIRED or PAPI_ENCRYPT_ALWAYS is specified, encryption will be required while
+communicating with the print service
+handle a pointer to a handle to be used for all libpapi operations. This handle should be initialized to NULL prior to
+creation
+password a plain text password to be used during any required user authentication with the print service function set
+with papiServiceSetAuthCB(). This provides the callback function a means of interrogating the service context for
+user information and setting a password.
+<beginning of page>
+s the service context passed into the the authentication callback
+service_name the name of a print service to contact. This can be NULL, a print service name like "lpsched", a re<hy>
+solvable printer name, or a printer-uri like ipp://server/printers/queue.
+svc a handle (service context) used by subsequent PAPI calls to keep/pass information across PAPI calls. It generally
+contains connection, state, and authentication information.
+user_name the name of the user to act on behalf of while contacting the print service. If a value of NULL is used,
+the user name associated with the current processes UID will be used. Specifying a user name might require further
+authentication with the print service.
+The papiServiceCreate() function creates a service context for use in subsequent calls to libpapi functions. The
+context is returned in the handle argument. This context must be destroyed using papiServiceDestroy() even if the
+papiServiceCreate() call failed.
+The papiServiceSet*() functions modifies the requested value in the service context passed in. It is recommended
+that these functions be avoided in favor of supplying the information when the context is created.
+The papiServiceGetStatusMessage() function retrieves a detailed error message associated with the service con<hy>
+text. This message will apply to the last failed operation.
+The remaining papiServiceGet*() functions return the requested information associated with the service context. A
+value of NULL indicates that the requested value was not initialized or is unavailable.
+Upon successful completion, papiServiceCreate() and the papiServiceSet*() functions return PAPI_OK. Other<hy>
+wise, they return an appropriate papi_status_t indicating the type of failure.
+Upon successful completion, the papiServiceGet*() functions return a pointer to the requested data. Otherwise, they
+return NULL. Example 1 Create a PAPI service context.
+ /*
+  * program to create a PAPI service context.
+  */
+ #include <stdio.h>
+ #include <papi.h>
+ static int
+ authCB(papi_service_t svc, void *app_data)
+ {
+  char prompt[BUFSIZ];
+  char *user, *svc_name, *passphrase;
+  /* get the name of the service we are contacting */
+  if ((svc_name = papiServiceGetServiceName(svc)) == NULL)
+  return (-1);
+  /* find out who we are supposed to be */
+  if ((user = papiServiceGetUserName(svc)) == NULL) {
+  struct passwd *pw;
+  if ((pw = getpwuid(getuid())) != NULL)
+  user = pw->pw_name;
+  else
+  user = "nobody";
+  }
+  /* build the prompt string */
+  snprintf(prompt, sizeof (prompt),
+  gettext("passphrase for %s to access %s: "), user,
+  svc_name);
+<beginning of page>
+  /* ask for the passphrase */
+  if ((passphrase = getpassphrase(prompt)) != NULL)
+  papiServiceSetPassword(svc, passphrase);
+  return (0);
+ }
+ /*ARGSUSED*/
+ int
+ main(int ac, char *av[])
+ {
+  char buf[BUFSIZ];
+  papi_status_t status;
+  papi_service_t *svc = NULL;
+  status = papiServiceCreate(&svc, av[1], NULL, NULL, authCB,
+  PAPI_ENCRYPT_NEVER, NULL);
+  if (status != PAPI_OK) {
+  /* do something */
+  } else
+  printf("Failed(%s): %s: %s\n", av[1], papiStatusString(status),
+  papiStatusMessage(svc));
+  papiServiceDestroy(svc);
+ }
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stabili<hy>
+tyVolatile _ MT-LevelSafe
+libpapi(3LIB), attributes(5)

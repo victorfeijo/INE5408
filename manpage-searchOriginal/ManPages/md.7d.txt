@@ -1,0 +1,100 @@
+<beginning of page>
+md <-> user configurable pseudo device driver
+md is a user configurable pseudo device driver that provides disk concatenation, striping, mirroring, RAID5 metade<hy>
+vices, trans metadevices, and hot spare utilities. Trans devices are no longer supported and have been replaced by
+UFS logging. See mount_ufs(1M).
+The block devices access the disk using the system's normal buffering mechanism and are read and written without
+regard to physical disk records. There is also a ``raw'' device which provides for direct transmission between the
+disk and the user's read or write buffer. A single read or write call usually results in one I/O operation; raw I/O is
+therefore considerably more efficient when many bytes are transmitted. The names of the block devices are found in
+/dev/md/dsk; the names of the raw devices are found in /dev/md/rdsk. Metadevices have the appearance of whole
+disks; there are no slices (partitions).
+I/O requests (such as lseek(2)) to the metadevices must have an offset that is a multiple of 512 bytes (DEV_BSIZE),
+or the driver returns an EINVAL error. If the transfer length is not a multiple of 512 bytes, the tranfer count is round<hy>
+ed up by the driver.
+The md pseudo device drivers support all disk devices on all Solaris 2.4 or later Solaris systems.
+This section provides a list of the ioctls supported by the metadisk driver.
+The following ioctls are valid when issued to the raw metadevice, such as /dev/md/rdsk/d0. See dkio(7I) for addi<hy>
+tional information.
+DKIOCGGEOM This ioctl is used to get the disk geometry. The metadisk driver fills in the dkg_nhead,
+dkg_nsect, dkg_rpm, dkg_write_reinstruct and dkg_read_reinstruct from the first component of the metadevice
+(at metainit time). dkg_ncyl is calculated using the size of the metadevice (reported by metastat) divided by
+(dkg_nhead * dkg_nsect). The total size is always a multiple of (dkg_nhead * dkg_nsect). If the first component of a
+metadevice does not start on cylinder number 0, then the dkg_ncyl is increased by one cylinder; because DKIOCGV<hy>
+TOC reports the metadevice as starting on cylinder 1. The side effect here is that it looks like cylinder 0 is not being
+used, but all the arithmetic works out correctly. If the metadevice is not set up, then ENXIO is returned.
+DKIOCINFO When issued to the administrative device or metadevice, this ioctl sets dki_unit to the unit number of
+the metadevice, dki_ctype to a value of DKC_MD, and dki_partition to 0, because there are no slices.
+DKIOCGVTOC This ioctl returns the current vtoc. If one has not been written, then a default vtoc is returned.
+v_nparts is always 1. v_part[0].p_start is 0 if the first component of the metadevice starts on cylinder 0. Other<hy>
+wise, the p_start field is the starting sector of cylinder 1. v_part[0].p_size is the same as the total size reported by
+metastat.
+DKIOCSVTOC This ioctl stores the vtoc in the metadevice state database so it is persistent across reboots.
+The informative log messages include:
+ md: dnum: Hotspared device dev with dev
+The first device name listed has been hot spare replaced with the second device name listed.
+ md: dnum: Hotspared device dev(num,num) with dev(num,num)
+The first device number listed has been hot spare replaced with the second device number listed.
+ md: Could not load misc /dev
+The named misc module is not loadable. It is possibly missing, or something else has been copied over it.
+ md: dnum: no mem for property dev
+<beginning of page>
+Memory could not be allocated in the prop_op entry point.
+ md: db: Parsing error on 'dev'
+Set command in /kernel/drv/md.conf for the mddb.bootlist <number> is not in the correct format. metadb -p can
+be run to put the correct set commands into the /kernel/drv/md.conf file.
+ md: dnum: dev(num,num) needs maintenance
+ md: dnum: dev needs maintenance
+An I/O or open error has occurred on a device within a mirror causing a component in the mirror to change to the
+Maintenance state.
+md: dnum: dev(num,num) last erred md: dnum: dev last erred
+An I/O or open error has occurred on a device within a mirror and the data is not replicated elsewhere in the mirror.
+This is causing the component in the mirror to change to the Last Erred state.
+The warning log messages include:
+ md: State database is stale
+This error message comes when there are not enough usable replicas for the state database to be able to update
+records in the database. All accesses to the metadevice driver will fail. To fix this problem, more replicas need to be
+added or inaccessible replicas need to be deleted.
+ md: dnum: read error on devmd: dnum: write error on dev
+A read or write error has occurred on the specified submirror, at the specified device name. This happens if any read
+or write errors occur on a submirror.
+ md: dnum: read error on dev(num,num)md: dnum: write error on dev(
+ num,num)
+A read or write error has occurred on the specified submirror, at the specified device number. This happens if any
+read or write errors occur on a submirror.
+ md: State database commit failed
+ md: State database delete failed
+These messages occur when there have been device errors on components where the state database replicas reside.
+These errors only occur when more than half of the replicas have had device errors returned to them. For instance, if
+you have three components with state database replicas and two of the components report errors, then these errors
+may occur. The state database commit or delete is retried periodically. If a replica is added, then the commit or
+delete will finish and the system will be operational. Otherwise the system will timeout and panic.
+ md: dnum: Cannot load dev driver
+Underlying named driver module is not loadable (for example, sd, id, xy, or a third-party driver). This could indicate
+that the driver module has been removed.
+ md: Open error of hotspare devmd: Open error of hotspare dev(num,num)
+Named hotspare is not openable, or underlying driver is not loadable.
+<beginning of page>
+The panic log messages include:
+ md: dnum: Unknown close typemd: dnum: Unknown open type
+Metadevice is being opened/closed with an unknown open type (OTYP).
+ md: State database problem
+Failed metadevice state database commit or delete has been retried the default 100 times.
+/dev/md/dsk/dn block device (where n is the device number)
+/dev/md/rdsk/dn raw device (where n is the device number)
+/dev/md/setname/dsk/dn block device (where setname is the name of the diskset and n is the device number)
+/dev/md/setname/rdsk/dn raw device (where setname is the name of the diskset and n is the device number)
+/dev/md/admin administrative device
+/kernel/drv/md driver module
+/kernel/drv/md.conf driver configuration file
+/kernel/misc/md_stripe stripe driver misc module
+/kernel/misc/md_mirror mirror driver misc module
+/kernel/misc/md_hotspares hotspares driver misc module
+/kernel/misc/md_trans metatrans driver for UFS logging
+/kernel/misc/md_raid RAID5 driver misc module
+mdmonitord(1M), metaclear(1M), metadb(1M), metadetach(1M), metahs(1M), metainit(1M), metaoffline(1M),
+metaonline(1M), metaparam(1M), metarecover(1M), metarename(1M), metareplace(1M), metaroot(1M),
+metassist(1M), metaset(1M), metastat(1M), metasync(1M), metattach(1M), md.cf(4), md.tab(4), attributes(5),
+Solaris Volume Manager Administration Guide
+Trans metadevices have been replaced by UFS logging. Existing trans devices are not logging--they pass data direct<hy>
+ly through to the underlying device. See mount_ufs(1M) for more information about UFS logging.

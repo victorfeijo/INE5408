@@ -1,0 +1,343 @@
+<beginning of page>
+prex <-> control tracing and manipulate probe points in a process or the kernel
+prex [-o trace_file_name] [-l libraries] [-s kbytes_size] cmd
+ [cmd-args]...
+prex [-o trace_file_name] [-l libraries] [-s kbytes_size] -p pid
+prex -k [-s kbytes_size]
+The prex command is the part of the Solaris tracing architecture that controls probes in a process or the kernel. See
+tracing(3TNF) for an overview of this tracing architecture, including example source code using it.
+prex is the application used for external control of probes. It automatically preloads the libtnfprobe library. prex lo<hy>
+cates all the probes in a target executable or the kernel and provides an interface for the user to manipulate them. It
+allows a probe to be turned on for tracing, debugging, or both. Tracing generates a TNF (Trace Normal Form) trace
+file that can be converted to ASCII by tnfdump(1) and used for performance analysis. Debugging generates a line
+to standard error whenever the probe is hit at run time.
+prex does not work on static executables. It only works on dynamic executables.
+There are three ways to invoke prex: 1. Use prex to start the target application cmd. In this case, the target applica<hy>
+tion need not be built with a dependency on libtnfprobe. See TNF_PROBE(3TNF). prex sets the environment vari<hy>
+able LD_PRELOAD to load libtnfprobe into the target process. See ld(1). prex then uses the environment variable
+PATH to find the target application. 2. Attach prex to a running application. In this case, the running target applica<hy>
+tion should have libtnfprobe already linked in. Alternatively, the user may manually set LD_PRELOAD to include
+libtnfprobe.so.1 prior to invoking the target. 3. Use prex with the -k option to set prex to kernel mode. prex can
+then be used to control probes in the Solaris kernel. In kernel mode, additional commands are defined, and some
+commands that are valid in other modes are invalid. See Kernel Mode below.
+In a future release of prex, the command language may be moved to a syntax that is supported by an existing script<hy>
+ing language like ksh(1). In the meantime, the interface to prex is uncommitted. <bu> Commands should be in ASCII.
+<bu> Each command is terminated with the NEWLINE character. <bu> A command can be continued onto the next line by
+ending the previous line with the backslash ("\") character. <bu> Tokens in a command must be separated by whitespace
+(one or more spaces or tabs). <bu> The "#" character implies that the rest of the line is a comment.
+tab(); cw(2.75i) cw(2.75i) lw(2.75i) lw(2.75i) CommandResult _ % prex a.outT{ Attaches prex to your program
+and starts prex. T} prex> enable $allEnables all the probes. prex> quit resumeT{ Quits prex and resumes execu<hy>
+tion of program. T}
+There are two different methods of communicating with prex: <bu> By specifications in a control file. During start-up,
+prex searches for a file named .prexrc in the directories specified below. prex does not stop at the first one it finds.
+This way a user can override any defaults that are set up. The search order is:
+ $HOME/
+ ./
+<bu> By typing commands at the prex prompt.
+The command language for both methods is the same and is specified in USAGE. The commands that return output
+will not make sense in a control file. The output will go to standard output.
+When using prex on a target process, the target will be in one of two states, running or stopped. This can be detected
+by the presence or absence of the prex> prompt. If the prompt is absent, it means that the target process is running.
+Typing Control-C will stop the target pr ocess and return the user to the prompt. There is no guarantee that Control-
+C will return to a prex prompt immediately. For example, if the target process is stopped on a job control stop
+(SIGSTOP), then Control-C in prex will wait until the target has been continued (SIGCONT). See Signals to Tar<hy>
+get Program below for more information on signals and the target process.
+The following options are supported:
+-k kernel mode: prex is used to control probes in the Solaris kernel. In kernel mode, additional commands are de<hy>
+fined, and some commands valid in other modes are invalid. See Kernel Mode below.
+<beginning of page>
+-l libraries The libraries mentioned are linked in to the target application using LD_PRELOAD (see ld(1)). This
+option cannot be used when attaching to a running process. The argument to the -l option should be a space-separat<hy>
+ed string enclosed in double quotes. Each token in the string is a library name. It follows the LD_PRELOAD rules
+on how libraries should be specified and where they will be found.
+-o trace_file_name File to be used for the trace output. trace_file_name is assumed to be relative to the current work<hy>
+ing directory of prex (that is, the directory that the user was in when prex was started).
+If prex attaches to a process that is already tracing, the new trace_file_name (if provided) will not be used. If no
+trace_file_name is specified, the default is /$TMPDIR/trace-pid where pid is the process id of the target program. If
+TMPDIR is not set, /tmp is used.
+-s kbytes_size Maximum size of the output trace file in Kbytes. The default size of the trace kbytes_size is 4096
+(2^10) bytes or 4 Mbytes for normal usage, and 384 or 384 kbytes in kernel mode. The minimum size that can be
+specified is 128 Kbytes. The trace file can be thought of as a least recently used circular buffer. Once the file has
+been filled, newer events will overwrite the older ones.
+This section describes the usage of the prex utility.
+Probes are specified by a list of space-separated selectors. Selectors are of the form:
+ attribute=value
+(See TNF_PROBE(3TNF)). The "attribute=" is optional. If it is not specified, it defaults to "keys=".
+The attribute or value (generically called "spec") can be any of the following:
+IDENT Any sequence of letters, digits, _, \, ., % not beginning with a digit. IDENT implies an exact match.
+QUOTED_STR Usually used to escape reserved words (any commands in the command language). QUOT<hy>
+ED_STR implies an exact match and has to be enclosed in single quotes (' ').
+REGEXP An ed(1) regular expression pattern match. REGEXP has to be enclosed in slashes (/ /), A / can be in<hy>
+cluded in a REGEXP by escaping it with a backslash \.
+The following grammar explains the syntax.
+ selector_list ::= | /* empty */
+  selector_list selector
+ selector ::= spec=spec | /* whitespace around `=' opt */
+  spec
+ spec ::= IDENT |
+  QUOTED_STR |
+  REGEXP
+The terminals in the above grammar are:
+ IDENT = [a-zA-Z_\.%]{[a-zA-Z0-9_\.%]}+
+ QUOTED_STR = '[^\n']*' /* any string in single quotes */
+ REGEXP = /[^\n/]*/ /* regexp's have to be in / / */
+This is a list of the remaining grammar that is needed to understand the syntax of the command language (defined in
+next subsection):
+ filename ::= QUOTED_STR /* QUOTED_STR defined above */
+<beginning of page>
+ spec_list ::= /* empty */ |
+  spec_list spec /* spec defined above */
+ fcn_handle ::= &IDENT /* IDENT defined above */
+ set_name ::= $IDENT /* IDENT defined above */
+1. Set Creation and Set Listing
+ create $set_name selector_list
+ list sets # list the defined sets
+create can be used to define a set which contains probes that match the selector_list. The set $all is pre-defined as
+/.*/ and it matches all the probes. 2. Function Listing
+ list fcns # list the available fcn_handle
+The user can list the different functions that can be connected to probe points. Currently, only the debug function
+called &debug is available. 3. Commands to Connect and Disconnect Probe Functions
+ connect &fcn_handle $set_name
+ connect &fcn_handle selector_list
+ clear $set_name
+ clear selector_list
+The connect command is used to connect probe functions (which must be prefixed by `&') to probes. The probes
+are specified either as a single set (with a `$'), or by explicitly listing the probe selectors in the command. The probe
+function has to be one that is listed by the list fcns command. This command does not enable the probes.
+The clear command is used to disconnect all connected probe functions from the specified probes. 4. Commands to
+Toggle the Tracing Mode
+ trace $set_name
+ trace selector_list
+ untrace $set_name
+ untrace selector_list
+The trace and untrace commands are used to toggle the tracing action of a probe point (that is, whether a probe will
+emit a trace record or not if it is hit). This command does not enable the probes specified. Probes have tracing on by
+default. The most efficient way to turn off tracing is by using the disable command. untrace is useful if you want
+debug output but no tracing. If so, set the state of the probe to enabled, untraced, and the debug function connected.
+5. Commands to Enable and Disable Probes
+ enable $set_name
+ enable selector_list
+ disable $set_name
+ disable selector_list
+The enable and disable commands are used to control whether the probes perform the action that they have been set
+up for. To trace a probe, it has to be both enabled and traced (using the trace command). Probes are disabled by de<hy>
+fault. The list history command is used to list the probe control commands issued: connect, clear, trace, untrace,
+enable, and disable. These are the commands that are executed whenever a new shared object is brought in to the
+target program by dlopen(3C). See the subsection, dlopen'ed Libraries, below for more information.
+The following table shows the actions that result from specific combinations of tracing, enabling, and connecting:
+ Enabled or Tracing State Debug State Results
+ Disabled (On/Off) (Connected/Cleared) In
+ ------------------------------------------------------------
+ Enabled On Connected Tracing and
+  Debugging
+ Enabled On Cleared Tracing only
+<beginning of page>
+ Enabled Off Connected Debugging only
+ Enabled Off Cleared Nothing
+ Disabled On Connected Nothing
+ Disabled On Cleared Nothing
+ Disabled Off Connected Nothing
+ Disabled Off Cleared Nothing
+6. List History
+ list history  # lists probe control command history
+The list history command displays a list of the probe control commands previously issued in the tracing session, for
+example, connect, clear, trace, disable. Commands in the history list are executed wherever a new shared object is
+brought into the target program by dlopen(3C). 7. Commands to List Probes, List Values, or List Trace File Name
+ list spec_list probes $set_name # list probes $all
+ list spec_list probes selector_list # list name probes file=test.c
+ list values spec_list # list values keys given in spec_list
+ list tracefile # list tracefile
+The first two commands list the selected attributes and values of the specified probes. They can be used to check the
+state of a probe. The third command lists the various values associated with the selected attributes. The fourth com<hy>
+mand lists the current tracefile. 8. Help Command
+ help topic
+To get a list of the help topics that are available, invoke the help command with no arguments. If a topic argument is
+specified, help is printed for that topic. 9. Source a File
+ source filename
+The source command can be used to source a file of prex commands. source can be nested (that is, a file can source
+another file). filename is a quoted string. 10. Process Control
+ continue # resumes the target process
+ quit kill # quit prex, kill target
+ quit resume # quit prex, continue target
+ quit suspend # quit prex, leave target suspended
+ quit # quit prex (continue or kill target)
+The default quit will continue the target process if prex attached to it. Instead, if prex had started the target pro<hy>
+gram, quit will kill the target process.
+Probes in shared objects that are brought in by dlopen(3C) are automatically set up according to the command histo<hy>
+ry of prex. When a shared object is removed by a dlclose(3C), prex again needs to refresh its understanding of the
+probes in the target program. This implies that there is more work to do for dlopen(3C) and dlclose(3C) <em>so they
+will take slightly longer. If a user is not interested in this feature and doesn't want to interfere with dlopen(3C) and
+dlclose(3C), detach prex from the target to inhibit this feature.
+prex does not interfere with signals that are delivered directly to the target program. However, prex receives all sig<hy>
+nals normally generated from the terminal, for example, Control-C (SIGINT), and Control-Z (SIGSTOP), and does
+not forward them to the target program. To signal the target program, use the kill(1) command from a shell.
+Process managing applications like dbx, truss(1), and prex cannot operate on the same target program simultane<hy>
+<beginning of page>
+ously. prex will not be able to attach to a target which is being controlled by another application. A user can trace
+and debug a program serially by the following method: first attach prex to target (or start target through prex), set up
+the probes using the command language, and then type quit suspend. The user can then attach dbx to the suspended
+process and debug it. A user can also suspend the target by sending it a SIGSTOP signal, and then by typing quit
+resume to prex. In this case, the user should also send a SIGCONT signal after invoking dbx on the stopped
+process (else dbx will be hung).
+There are a few failure points that are possible when writing out events to a trace file, for example, system call fail<hy>
+ures. These failures result in a failure code being set in the target process. The target process continues normally, but
+no trace records are written. Whenever a user enters Control-C to prex to get to a prex prompt, prex will check the
+failure code in the target and inform the user if there was a tracing failure.
+If the target program does a fork(2), any probes that the child encounters will cause events to be logged to the same
+trace file. Events are annotated with a process id, so it will be possible to determine which process a particular event
+came from. In multi-threaded programs, there is a race condition with a thread doing a fork while the other threads
+are still running. For the trace file not to get corrupted, the user should either use fork1(2), or make sure that all oth<hy>
+er threads are quiescent when doing a fork(2),
+If the target program itself (not any children it may fork(2)) does an exec(2), prex detaches from the target and ex<hy>
+its. The user can reconnect prex with prex -p pid.
+A vfork(2) is generally followed quickly by an exec(2) in the child, and in the interim, the child borrows the par<hy>
+ent's process while the parent waits for the exec(2). Any events logged by the child from the parent process will ap<hy>
+pear to have been logged by the parent.
+Invoking prex with the -k flag causes prex to run in kernel mode. In kernel mode, prex controls probes in the So<hy>
+laris kernel. See tnf_kernel_probes(4) for a list of available probes in the Solaris kernel. A few prex commands are
+unavailable in kernel mode; many other commands are valid in kernel mode only.
+The -l, -o, and -p command-line options are not valid in kernel mode (that is, they may not be combined with the -k
+flag).
+The rest of this section describes the differences in the prex command language when running prex in kernel mode.
+1. prex will not stop the kernel
+When prex attaches to a running user program, it stops the user program. Obviously, it cannot do this when attach<hy>
+ing to the kernel. Instead, prex provides a ``tracing master switch'': no probes will have any effect unless the tracing
+master switch is on. This allows the user to iteratively select probes to enable, then enable them all at once by turn<hy>
+ing on the master switch.
+The command
+ ktrace [ on | off ]
+is used to inspect and set the value of the master switch. Without an argument, prex reports the current state of the
+master switch.
+Since prex will not stop or kill the kernel, the
+ quit resume
+and
+ quit kill
+commands are not valid in kernel mode. 2. No functions may be attached to probes in the kernel
+In particular, the debug function is unavailable in kernel mode. 3. Trace output is written to an in-core buffer
+In kernel mode, a trace output file is not generated directly, in order to allow probes to be placed in time-critical
+code. Instead, trace output is written to an in-core buffer, and copied out by a separate program, tnfxtract(1).
+The in-core buffer is not automatically created. The following prex command controls buffer allocation and deallo<hy>
+<beginning of page>
+cation:
+ buffer [ alloc [ size ] | dealloc ]
+Without an argument, the buffer command reports the size of the currently allocated buffer, if any. With an argu<hy>
+ment of alloc [size], prex allocates a buffer of the given size. size is in bytes, with an optional suffix of 'k' or 'm'
+specifying a multiplier of 1024 or 1048576, respectively. If no size is specified, the size specified on the command
+line with the -s option is used as a default. If the -s command line option was not used, the ``default default'' is 384
+kilobytes.
+With an argument of dealloc, prex deallocates the trace buffer in the kernel.
+prex will reject attempts to turn the tracing master switch on when no buffer is allocated, and to deallocate the buffer
+when the tracing master switch is on. prex will refuse to allocate a buffer when one is already allocated; use buffer
+dealloc first.
+prex will not allocate a buffer larger than one-half of a machine's physical memory. 4. prex supports per-process
+probe enabling in the kernel
+In kernel mode, it is possible to select a set of processes for which probes are enabled. No trace output will be writ<hy>
+ten when other processes traverse these probe points. This is called "process filter mode". By default, process filter
+mode is off, and all processes cause the generation of trace records when they hit an enabled probe.
+Some kernel events such as interrupts cannot be associated with a particular user process. By convention, these
+events are considered to be generated by process id 0.
+prex provides commands to turn process filter mode on and off, to get the current status of the process filter mode
+switch, to add and delete processes (by process id) from the process filter set, and to list the current process filter set.
+The process filter set is maintained even when process filter mode is off, but has no effect unless process filter mode
+is on.
+When a process in the process filter set exits, its process id is automatically deleted from the process filter set.
+The command:
+ pfilter [ on | off | add pidlist | delete pidlist ]
+controls the process filter switch, and process filter set membership. With no arguments, pfilter prints the current
+process filter set and the state of the process filter mode switch:
+on or off set the state of the process filter mode switch.
+add pidlist
+delete pidlist add or delete processes from the process filter set. pidlist is a comma-separated list of one or more
+process ids.
+See tracing(3TNF) for complete examples showing, among other things, the use of prex to do simple probe control.
+When either the process or kernel is started, all probes are disabled. Example 1 Set creation and set listing
+ create $out name=/out/ # $out = probes with "out" in
+  # value of "name" attribute
+ create $foo /page/ name=biodone # $foo = union of
+  # probes with "page" in value of keys attribute
+  # probes with "biodone" as value of "name" attribute
+ list sets # list the defined sets
+ list fcns # list the defined probe fcns
+Example 2 Commands to trace and connect probe functions
+ trace foobar='on' # exact match on foobar attribute
+<beginning of page>
+ trace $all # trace all probes (predefined set $all)
+ connect &debug $foo # connect debug func to probes in $foo
+Example 3 Commands to enable and disable probes
+ enable $all # enable all probes
+ enable /vm/ name=alloc # enable the specified probes
+ disable $foo # disable probes in set $foo
+ list history # list probe control commands issued
+Example 4 Process control
+ continue # resumes the target process
+ ^C # stop target; give control to prex
+ quit resume # exit prex, leave process running
+  # and resume execution of program
+Example 5 Kernel mode
+ buffer alloc 2m # allocate a 2 Megabyte buffer
+ enable $all # enable all probes
+ trace $all # trace all probes
+ ktrace on # turn tracing on
+ ktrace off # turn tracing back off
+ pfilter on # turn process filter mode on
+ pfilter add 1379 # add pid 1379 to process filter
+ ktrace on # turn tracing on
+  # (only pid 1379 will be traced)
+.prexrc local prex initialization file
+~/.prexrc user's prex initialization file
+/proc/nnnnn process files
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Availability<hy>
+SUNWtnfc
+ed(1), kill(1), ksh(1), ld(1), tnfdump(1), tnfxtract(1), truss(1), exec(2), fork(2), fork1(2), vfork(2), TNF_DE<hy>
+CLARE_RECORD(3TNF), TNF_PROBE(3TNF), dlclose(3C), dlopen(3C), gethrtime(3C), libtnfctl(3TNF),
+tnf_process_disable(3TNF), tracing(3TNF), tnf_kernel_probes(4), attributes(5)
+Currently, the only probe function that is available is the &debug function. When this function is executed, it prints
+out the arguments sent in to the probe as well as the value associated with the sunw%debug attribute in the detail
+field (if any) to stderr.
+For example, for the following probe point:
+ TNF_PROBE_2(input_values, "testapp main",
+  "sunw%debug 'have read input values successfully'",
+  tnf_long, int_input, x,
+  tnf_string, string_input, input);
+<beginning of page>
+If x was 100 and input was the string "success", then the output of the debug probe function would be:
+ probe input_values; sunw%debug "have read input values successfully";
+ int_input=100; string_input="success";
+Some non-SPARC hardware lacks a true high-resolution timer, causing gethrtime() to return the same value multi<hy>
+ple times in succession. This can lead to problems in how some tools interpret the trace file. This situation can be
+improved by interposing a version of gethrtime(), which causes these successive values to be artificially increment<hy>
+ed by one nanosecond:
+ hrtime_t
+ gethrtime()
+ {
+  static mutex_t lock;
+  static hrtime_t (*real_gethrtime)(void) = NULL;
+  static hrtime_t last_time = 0;
+  hrtime_t this_time;
+  if (real_gethrtime == NULL) {
+  real_gethrtime =
+  (hrtime_t (*)(void)) dlsym(RTLD_NEXT, "gethrtime");
+  }
+  this_time = real_gethrtime();
+  mutex_lock(&lock);
+  if (this_time <= last_time)
+  this_time = ++last_time;
+  else
+  last_time = this_time;
+  mutex_unlock(&lock);
+  return (this_time);
+ }
+Of course, this does not increase the resolution of the timer, so timestamps for individual events are still relatively
+inaccurate. But this technique maintains ordering, so that if event A causes event B, B never appears to happen be<hy>
+fore or at the same time as A.
+dbx is available with the Sun Workshop Products.
+prex should issue a notification when a process id has been automatically deleted from the filter set.
+There is a known bug in prex which can result in this message:
+ Tracing shut down in target program due to an internal
+ error - Please restart prex and target
+When prex runs as root, and the target process is not root, and the tracefile is placed in a directory where it cannot
+be removed and re-created (a directory with the sticky bit on, like /tmp),mm then the target process will not be able
+to open the tracefile when it needs to. This results in tracing being disabled.
+Changing any of the circumstances listed above should fix the problem. Either don't run prex as root, or run the tar<hy>
+get process as root, or specify the tracefile in a directory other than /tmp.

@@ -1,0 +1,117 @@
+<beginning of page>
+m_transform_layout <-> layout transformation
+cc [ flag... ] file... -llayout [ library... ]
+#include <sys/layout.h>
+int m_transform_layout(LayoutObject layout_object,
+ const char *InpBuf, const size_t ImpSize, const void *OutBuf,
+ size_t *Outsize, size_t *InpToOut, size_t *OutToInp,
+ unsigned char *Property, size_t *InpBufIndex);
+The m_transform_layout() function performs layout transformations (reordering, shaping, cell determination) or
+provides additional information needed for layout transformation (such as the expected size of the transformed lay<hy>
+out, the nesting level of different segments in the text and cross-references between the locations of the correspond<hy>
+ing elements before and after the layout transformation). Both the input text and output text are character strings.
+The m_transform_layout() function transforms the input text in InpBuf according to the current layout values in
+layout_object. Any layout value whose value type is LayoutTextDescriptor describes the attributes of the InpBuf
+and OutBuf arguments. If the attributes are the same for both InpBuf and OutBuf, a null transformation is performed
+with respect to that specific layout value.
+The InpBuf argument specifies the source text to be processed. The InpBuf may not be NULL, unless there is a need
+to reset the internal state.
+The InpSize argument is the number of bytes within InpBuf to be processed by the transformation. Its value will not
+change after return from the transformation. InpSize set to <mi>1 indicates that the text in InpBuf is delimited by a null
+code element. If InpSize is not set to <mi>1, it is possible to have some null elements in the input buffer. This might be
+used, for example, for a "one shot" transformation of several strings, separated by nulls.
+Output of this function may be one or more of the following depending on the setting of the arguments:
+OutBuf Any transformed data is stored in OutBuf, converted to ShapeCharset.
+Outsize The number of bytes in OutBuf.
+InpToOut A cross-reference from each InpBuf code element to the transformed data. The cross-reference relates to
+the data in InpBuf starting with the first element that InpBufIndex points to (and not necessarily starting from the be<hy>
+ginning of the InpBuf).
+OutToInp A cross-reference to each InpBuf code element from the transformed data. The cross-reference relates to
+the data in InpBuf starting with the first element that InpBufIndex points to (and not necessarily starting from the be<hy>
+ginning of the InpBuf).
+Property A weighted value that represents peculiar input string transformation properties with different connotations
+as explained below. If this argument is not a null pointer, it represents an array of values with the same number of
+elements as the source substring text before the transformation. Each byte will contain relevant "property" informa<hy>
+tion of the corresponding element in InpBuf starting from the element pointed by InpBufIndex. The four rightmost
+bits of each "property" byte will contain information for bidirectional environments (when ActiveDirectional is
+True) and they will mean "NestingLevels." The possible value from 0 to 15 represents the nesting level of the corre<hy>
+sponding element in the InpBuf starting from the element pointed by InpBufIndex. If ActiveDirectional is false the
+content of NestingLevel bits will be ignored. The leftmost bit of each "property" byte will contain a "new cell indi<hy>
+cator" for composed character environments, and will have a value of either 1 (for an element in InpBuf that is trans<hy>
+formed to the beginning of a new cell) or 0 (for the "zero-length" composing character elements, when these are
+grouped into the same presentation cell with a non-composing character). Here again, each element of "property"
+pertains to the elements in the InpBuf starting from the element pointed by InpBufIndex. (Remember that this is not
+necessarily the beginning of InpBuf). If none of the transformation properties is required, the argument Property can
+be NULL. The use of "property" can be enhanced in the future to pertain to other possible usage in other environ<hy>
+ments.
+The InpBufIndex argument is an offset value to the location of the transformed text. When m_transform_layout() is
+<beginning of page>
+called, InpBufIndex contains the offset to the element in InpBuf that will be transformed first. (Note that this is not
+necessarily the first element in InpBuf). At the return from the transformation, InpBufIndex contains the offset to the
+first element in the InpBuf that has not been transformed. If the entire substring has been transformed successfully,
+InpBufIndex will be incremented by the amount defined by InpSize.
+Each of these output arguments may be NULL to specify that no output is desired for the specific argument, but at
+least one of them should be set to a non-null value to perform any significant work.
+The layout object maintains a directional state that keeps track of directional changes, based on the last segment
+transformed. The directional state is maintained across calls to the layout transformation functions and allows stream
+data to be processed with the layout functions. The directional state is reset to its initial state whenever any of the
+layout values TypeOfText, Orientation, or ImplicitAlg is modified by means of a call to m_setvalues_layout().
+The layout_object argument specifies a LayoutObject returned by the m_create_layout() function.
+The OutBufargument contains the transformed data. This argument can be specified as a null pointer to indicate that
+no transformed data is required.
+The encoding of the OutBuf argument depends on the ShapeCharset layout value defined in layout_object. If the
+ActiveShapeEditing layout value is not set (False), the encoding of OutBuf is guaranteed to be the same as the
+codeset of the locale associated with the LayoutObject defined by layout_object.
+On input, the OutSize argument specifies the size of the output buffer in number of bytes. The output buffer should
+be large enough to contain the transformed result; otherwise, only a partial transformation is performed. If the Ac<hy>
+tiveShapeEditing layout value is set (True) the OutBuf should be allocated to contain at least the InpSize multiplied
+by ShapeCharsetSize.
+On return, the OutSize argument is modified to the actual number of bytes placed in OutBuf.
+When the OutSize argument is specified as zero, the function calculates the size of an output buffer large enough to
+contain the transformed text, and the result is returned in this field. The content of the buffers specified by InpBuf
+and OutBuf, and the value of InpBufIndex, remain unchanged. If OutSize = NULL, the EINVAL error condition
+should be returned.
+If the InpToOut argument is not a null pointer, it points to an array of values with the same number of bytes in
+InpBuf starting with the one pointed by InpBufIndex and up to the end of the substring in the buffer. On output, the
+nth value in InpToOut corresponds to the nth byte in InpBuf. This value is the index (in units of bytes) in OutBufthat
+identifies the transformed ShapeCharset element of the nth byte in InpBuf. In the case of multibyte encoding, the
+index points (for each of the bytes of a code element in the InpBuf) to the first byte of the transformed code element
+in the OutBuf.
+InpToOut may be specified as NULL if no index array from InpBuf to OutBuf is desired.
+If the OutToInp argument is not a null pointer, it points to an array of values with the same number of bytes as con<hy>
+tained in OutBuf. On output, the nth value in OutToInp corresponds to the nth byte in OutBuf This value is the index
+in InpBuf, starting with the byte pointed to by InpBufIndex, that identifies the logical code element of the nth byte in
+OutBuf. In the case of multibyte encoding, the index will point for each of the bytes of a transformed code element
+in the OutBuf to the first byte of the code element in the InpBuf.
+OutToInp may be specified as NULL if no index array from OutBuf to InpBuf is desired.
+To perform shaping of a text string without reordering of code elements, the layout_object should be set with input
+and output layout value TypeOfText set to TEXT_VISUAL and both in and out of Orientation set to the same val<hy>
+ue.
+If successful, the m_transform_layout() function returns 0. If unsuccessful, the returned value is <mi>1 and the errno
+is set to indicate the source of error. When the size of OutBuf is not large enough to contain the entire transformed
+text, the input text state at the end of the uncompleted transformation is saved internally and the error condition
+E2BIG is returned in errno.
+The m_transform_layout() function may fail if:
+E2BIG The output buffer is full and the source text is not entirely processed.
+<beginning of page>
+EBADF The layout values are set to a meaningless combination or the layout object is not valid.
+EILSEQ Transformation stopped due to an input code element that cannot be shaped or is invalid. The InpBufIndex
+argument is set to indicate the code element causing the error. The suspect code element is either a valid code ele<hy>
+ment but cannot be shaped into the ShapeCharset layout value, or is an invalid code element not defined by the
+codeset of the locale of layout_object. The mbtowc() and wctomb() functions, when used in the same locale as the
+LayoutObject, can be used to determine if the code element is valid.
+EINVAL Transformation stopped due to an incomplete composite sequence at the end of the input buffer, or OutSize
+contains NULL.
+ERANGE More than 15 embedding levels are in source text or InpBuf contain unbalanced directional layout infor<hy>
+mation (push/pop) or an incomplete composite sequence has been detected in the input buffer at the beginning of the
+string pointed to by InpBufIndex.
+An incomplete composite sequence at the end of the input buffer is not always detectable. Sometimes, the fact that
+the sequence is incomplete will only be detected when additional character elements belonging to the composite se<hy>
+quence are found at the beginning of the next input buffer.
+A LayoutObject will have a meaningful combination of default layout values. Whoever chooses to change the de<hy>
+fault layout values is responsible for making sure that the combination of layout values is meaningful. Otherwise, the
+result of m_transform_layout() might be unpredictable or implementation-specific with errno set to EBADF.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Standard _ MT-LevelMT-Safe
+attributes(5), standards(5)

@@ -1,0 +1,151 @@
+<beginning of page>
+dumpadm <-> configure operating system crash dump
+/usr/sbin/dumpadm [-nuy] [-c content-type] [-d dump-device]
+ [-m mink | minm | min%] [-s savecore-dir]
+ [-r root-dir]
+The dumpadm program is an administrative command that manages the configuration of the operating system crash
+dump facility. A crash dump is a disk copy of the physical memory of the computer at the time of a fatal system er<hy>
+ror. When a fatal operating system error occurs, a message describing the error is printed to the console. The operat<hy>
+ing system then generates a crash dump by writing the contents of physical memory to a predetermined dump de<hy>
+vice, which is typically a local disk partition. The dump device can be configured by way of dumpadm. Once the
+crash dump has been written to the dump device, the system will reboot.
+Fatal operating system errors can be caused by bugs in the operating system, its associated device drivers and load<hy>
+able modules, or by faulty hardware. Whatever the cause, the crash dump itself provides invaluable information to
+your support engineer to aid in diagnosing the problem. As such, it is vital that the crash dump be retrieved and giv<hy>
+en to your support provider. Following an operating system crash, the savecore(1M) utility is executed automatically
+during boot to retrieve the crash dump from the dump device, and write it to a pair of files in your file system named
+unix.X and vmcore.X, where X is an integer identifying the dump. Together, these data files form the saved crash
+dump. The directory in which the crash dump is saved on reboot can also be configured using dumpadm.
+For systems with a UFS root file system, the default dump device is configured to be an appropriate swap partition.
+Swap partitions are disk partitions reserved as virtual memory backing store for the operating system. Thus, no per<hy>
+manent information resides in swap to be overwritten by the dump. See swap(1M). For systems with a ZFS root file
+system, dedicated ZFS volumes are used for swap and dump areas. For further information about setting up a dump
+area with ZFS, see the ZFS Administration Guide. To view the current dump configuration, use the dumpadm
+command with no arguments:
+ example# dumpadm
+  Dump content: kernel pages
+  Dump device: /dev/dsk/c0t0d0s1 (swap)
+ Savecore directory: /var/crash/saturn
+  Savecore enabled: yes
+When no options are specified, dumpadm prints the current crash dump configuration. The example shows the set
+of default values: the dump content is set to kernel memory pages only, the dump device is a swap disk partition, the
+directory for savecore files is set to /var/crash/hostname, and savecore is set to run automatically on reboot.
+When one or more options are specified, dumpadm verifies that your changes are valid, and if so, reconfigures the
+crash dump parameters and displays the resulting configuration. You must be root to view or change dump parame<hy>
+ters.
+The following options are supported:
+-c content-type
+Modify the dump configuration so that the crash dump consists of the specified dump content. The content should be
+one of the following:
+kernel
+Kernel memory pages only.
+all
+All memory pages.
+curproc
+Kernel memory pages, and the memory pages of the process whose thread was currently executing on the CPU on
+which the crash dump was initiated. If the thread executing on that CPU is a kernel thread not associated with any
+user process, only kernel pages will be dumped.
+<beginning of page>
+-d dump-device
+Modify the dump configuration to use the specified dump device. The dump device may one of the following:
+dump-device
+A specific dump device specified as an absolute pathname, such as /dev/dsk/cNtNdNsN when the system is running
+a UFS root file system. Or, specify a ZFS volume, such as /dev/zvol/dsk/rpool/dump, when the system is running a
+ZFS root file system.
+swap
+If the special token swap is specified as the dump device, dumpadm examines the active swap entries and selects
+the most appropriate entry to configure as the dump device. See swap(1M). Refer to the NOTES below for details
+of the algorithm used to select an appropriate swap entry. When the system is first installed with a UFS root file sys<hy>
+tem, dumpadm uses the value for swap to determine the initial dump device setting. A given ZFS volume cannot be
+configured for both the swap area and the dump device.
+-m mink | minm | min%
+Create a minfree file in the current savecore directory indicating that savecore should maintain at least the specified
+amount of free space in the file system where the savecore directory is located. The min argument can be one of the
+following:
+k
+A positive integer suffixed with the unit k specifying kilobytes.
+m
+A positive integer suffixed with the unit m specifying megabytes.
+%
+A % symbol, indicating that the minfree value should be computed as the specified percentage of the total current
+size of the file system containing the savecore directory.
+The savecore command will consult the minfree file, if present, prior to writing the dump files. If the size of these
+files would decrease the amount of free disk space below the minfree threshold, no dump files are written and an er<hy>
+ror message is logged. The administrator should immediately clean up the savecore directory to provide adequate
+free space, and re-execute the savecore command manually. The administrator can also specify an alternate directo<hy>
+ry on the savecore command-line.
+-n
+Modify the dump configuration to not run savecore automatically on reboot. This is not the recommended system
+configuration; if the dump device is a swap partition, the dump data will be overwritten as the system begins to
+swap. If savecore is not executed shortly after boot, crash dump retrieval may not be possible.
+-r root-dir
+Specify an alternate root directory relative to which dumpadm should create files. If no -r argument is specified, the
+default root directory / is used.
+-s savecore-dir
+Modify the dump configuration to use the specified directory to save files written by savecore. The directory should
+be an absolute path and exist on the system. If upon reboot the directory does not exist, it will be created prior to the
+execution of savecore. See the NOTES section below for a discussion of security issues relating to access to the
+savecore directory. The default savecore directory is /var/crash/hostname where hostname is the output of the -n op<hy>
+<beginning of page>
+tion to the uname(1) command.
+-u
+Forcibly update the kernel dump configuration based on the contents of /etc/dumpadm.conf. Normally this option is
+used only on reboot when starting svc:/system/dumpadm:default, when the dumpadm settings from the previous
+boot must be restored. Your dump configuration is saved in the configuration file for this purpose. If the configura<hy>
+tion file is missing or contains invalid values for any dump properties, the default values are substituted. Following
+the update, the configuration file is resynchronized with the kernel dump configuration.
+-y
+Modify the dump configuration to automatically run savecore on reboot. This is the default for this dump setting.
+Example 1 Reconfiguring The Dump Device To A Dedicated Dump Device:
+The following command reconfigures the dump device to a dedicated dump device:
+ example# dumpadm -d /dev/dsk/c0t2d0s2
+  Dump content: kernel pages
+  Dump device: /dev/dsk/c0t2d0s2 (dedicated)
+  Savecore directory: /var/crash/saturn
+  Savecore enabled: yes
+The following exit values are returned:
+0
+Dump configuration is valid and the specified modifications, if any, were made successfully.
+1
+A fatal error occurred in either obtaining or modifying the dump configuration.
+2
+Invalid command line options were specified.
+/dev/dump
+Dump device.
+/etc/dumpadm.conf
+Contains configuration parameters for dumpadm. Modifiable only through that command.
+savecore-directory/minfree
+Contains minimum amount of free space for savecore-directory. See savecore(1M).
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsr
+<beginning of page>
+svcs(1), uname(1), savecore(1M), svcadm(1M), swap(1M), attributes(5), smf(5)
+The system crash dump service is managed by the service management facility, smf(5), under the service identifier:
+ svc:/system/dumpadm:default
+Administrative actions on this service, such as enabling, disabling, or requesting restart, can be performed using sv<hy>
+cadm(1M). The service's status can be queried using the svcs(1) command.
+When the special swap token is specified as the argument to dumpadm -d the utility will attempt to configure the
+most appropriate swap device as the dump device. dumpadm configures the largest swap block device as the dump
+device; if no block devices are available for swap, the largest swap entry is configured as the dump device. If no
+swap entries are present, or none can be configured as the dump device, a warning message will be displayed. While
+local and remote swap files can be configured as the dump device, this is not recommended.
+In the event that the dump device is also a swap device, and the swap device is deleted by the administrator using the
+swap -d command, the swap command will automatically invoke dumpadm -d swap in order to attempt to config<hy>
+ure another appropriate swap device as the dump device. If no swap devices remain or none can be configured as the
+dump device, the crash dump will be disabled and a warning message will be displayed. Similarly, if the crash dump
+is disabled and the administrator adds a new swap device using the swap -a command, dumpadm -d swap will be
+invoked to re-enable the crash dump using the new swap device.
+Once dumpadm -d swap has been issued, the new dump device is stored in the configuration file for subsequent re<hy>
+boots. If a larger or more appropriate swap device is added by the administrator, the dump device is not changed; the
+administrator must re-execute dumpadm -d swap to reselect the most appropriate device fom the new list of swap
+devices.
+If the dumpadm -m option is used to create a minfree file based on a percentage of the total size of the file system
+containing the savecore directory, this value is not automatically recomputed if the file system subsequently changes
+size. In this case, the administrator must re-execute dumpadm -m to recompute the minfree value. If no such file
+exists in the savecore directory, savecore will default to a free space threshold of one megabyte. If no free space
+threshold is desired, a minfree file containing size 0 can be created.
+If, upon reboot, the specified savecore directory is not present, it will be created prior to the execution of savecore
+with permissions 0700 (read, write, execute by owner only) and owner root. It is recommended that alternate
+savecore directories also be created with similar permissions, as the operating system crash dump files themselves
+may contain secure information.

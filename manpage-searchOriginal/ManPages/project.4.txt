@@ -1,0 +1,78 @@
+<beginning of page>
+project <-> project file
+The project file is a local source of project information. The project file can be used in conjunction with other
+project sources, including the NIS maps project.byname and project.bynumber and the LDAP database project.
+Programs use the getprojent(3PROJECT) routines to access this information.
+The project file contains a one-line entry for each project recognized by the system, of the form:
+ projname:projid:comment:user-list:group-list:attributes
+where the fields are defined as:
+projname The name of the project. The name must be a string that consists of alphanumeric characters, underline (_)
+characters, hyphens (-), and periods (.). The period, which is reserved for projects with special meaning to the oper<hy>
+ating system, can be used only in the names of default projects for users. projname cannot contain colons (:) or new<hy>
+line characters.
+projid The project's unique numerical ID (PROJID) within the system. The maximum value of the projid field is
+MAXPROJID. Project IDs below 100 are reserved for the use of the operating system.
+comment The project's description.
+user-list A comma-separated list of users allowed in the project. With the exception of the special projects referred
+to below, an empty field indicates no users are allowed. See note about the use of wildcards below.
+group-list A comma-separated list of groups of users allowed in the project. With the exception of the special
+projects referred to below, an empty field indicates no groups are allowed. See note about the use of wildcards be<hy>
+low.
+attributes A semicolon-separated list of name value pairs. Each pair has the following format:
+name[=value]
+where name is the arbitrary string specifying the key's name and value is the optional key value. An explanation of
+the valid name-value pair syntax is provided in the USAGE section of this page. The expected most frequent use of
+the attribute field is for the specification of resource controls. See resource_controls(5) for a description of the re<hy>
+source controls supported in the current release of the Solaris operating system. You can also use the attribute field
+for resource caps (see rcapd(1M)) and for the project.pool attribute (see setproject(3PROJECT)).
+Null entries (empty fields) in the user-list and group-list fields, which normally mean "no users" and "no groups", re<hy>
+spectively, have a different meaning in the entries for three special projects, user.username, group.groupname, and
+default. See getprojent(3PROJECT) for a description of these projects.
+Wildcards can be used in user-list and group-list fields of the project database entry. The asterisk (*), allows all users
+or groups to join the project. The exclamation mark followed by the asterisk (!*), excludes all users or groups from
+the project. The exclamation mark (!) followed by a username or groupname excludes the specified user or group
+from the project. See EXAMPLES, below.
+Malformed entries cause routines that read this file to halt, in which case project assignments specified further along
+are never made. Blank lines are treated as malformed entries in the project file, and cause getprojent(3PROJECT)
+and derived interfaces to fail. Example 1 Sample project File
+The following is a sample project file:
+ system:0:System:::
+ user.root:1:Super-User:::
+ noproject:2:No Project:::
+ default:3::::
+<beginning of page>
+ group.staff:10::::
+ beatles:100:The Beatles:john,paul,george,ringo::task.max-lwps=
+  (privileged,100,signal=SIGTERM),(privileged,110,deny);
+  process.max-file-descriptor
+Note that the two line breaks in the line that begins with beatles are not valid in a project file. They are shown here
+only to allow the example to display on a printed or displayed page. Each entry must be on one and only one line.
+An example project entry for nsswitch.conf(4) is:
+ project: files nis
+With these entries, the project beatles will have members john, paul, george, and ringo, and all projects listed in
+the NIS project table are effectively incorporated after the entry for beatles.
+The beatles project has two values set on the task.max-lwps resource control. When a task in the beatles project re<hy>
+quests (via one of its member processes) its 100th and 110th LWPs, an action associated with the encountered
+threshold triggers. Upon the request for the 100th LWP, the process making the request is sent the signal SIGTERM
+and is granted the request for an additional lightweight process (LWP). At this point, the threshold for 110 LWPs be<hy>
+comes the active threshold. When a request for the 110th LWP in the task is made, the requesting process is denied
+the request--no LWP will be created. Since the 110th LWP is never granted, the threshold remains active, and all
+subsequent requests for an 110th LWP will fail. (If LWPs are given up, then subsequent requests will succeed, unless
+they would take the total number of LWPs across the task over 110.) The process.max-file-descriptor resource con<hy>
+trol is given no values. This means that processes entering this project will only have the system resource control
+value on this rctl.
+Example 2 Project Entry with Wildcards
+The following entries use wildcards:
+ notroot:200:Shared Project:*,!root::
+ notused:300:Unused Project::!*:
+In this example, any user except "root" is a member of project "notroot". For the project "notused", all groups are ex<hy>
+cluded.
+The project database offers a reasonably flexible attribute mechanism in the final name-value pair field. Name-value
+pairs are separated from one another with the semicolon (;) character. The name is in turn distinguished from the
+(optional) value by the equals (=) character. The value field can contain multiple values separated by the comma (,)
+character, with grouping support (into further values lists) by parentheses. Each of these values can be composed of
+the upper and lower case alphabetic characters, the digits '0' through '9', and the punctuation characters hyphen (-),
+plus (+), period (.), slash (/), and underscore (_). Example resource control value specifications are provided in EX<hy>
+AMPLES, above, and in resource_controls(5) and getprojent(3PROJECT).
+newtask(1), projects(1), prctl(1), getprojent(3PROJECT), setrctl(2), unistd.h(3HEAD), nsswitch.conf(4), re<hy>
+source_controls(5)

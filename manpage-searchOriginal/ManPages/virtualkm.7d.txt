@@ -1,0 +1,86 @@
+<beginning of page>
+virtualkm <-> Virtual keyboard and mouse
+/dev/kbd
+/dev/mouse
+#include <sys/types.h>
+#include <sys/kbio.h>
+int ioctl(int fildes, int command, ... /*arg*/);
+A virtual keyboard or mouse is an abstraction of one or more physical keyboards or mice (USB or PS2) connected to
+a system. Input streams for these physical devices are coalesced into a single input stream and appear as a single
+device to the upper layers.
+/dev/kbd is the virtual keyboard device file. Inputs from multiple keyboards are coalesced into a single input stream,
+meaning that all keyboards appear as a single keyboard to a console or window system and accordingly, are treated
+as a single device. The virtual keyboard layout is consistent with the layout of the first keyboard plugged into the
+system. Note that on x86 platforms, the virtual keyboard layout can be overloaded by eeprom(1M).
+/dev/mouse is the virtual mouse device file. Inputs from multiple mice are coalesced into a single input stream,
+meaning that all mice appear as single mouse to the window system.
+Commands from applications are dispatched by the virtual keyboard/mouse facility to the underlying physical de<hy>
+vices and will succeed provided that one of the underlying devices responds with success. For example, a single
+command issued to turn on LED's will turn on corresponding LED's for all underlying physical keyboards.
+Although physical keyboards/mice are linked to the virtual keyboard/mouse facility, each may be opened separately
+by accessing its associated device file. (For example, /dev/usb/hid0 for a usb mouse). Directly accessing a device
+file can be useful for multi-seat, gok(1) or similar purposes.
+When a single physical device is opened via its associated device file, it is automatically removed from the single
+virtual input stream. When closed, it is automatically re- coalesced into the single virtual input stream.
+Under the virtualkm facility, the PS/2 mouse is coalesced into a virtual mouse single input stream and can be ac<hy>
+cessed using the /dev/mouse file. (Note that in previous releases, the PS/2 mouse was accessed via the /dev/kd<hy>
+mouse physical device file). In the current release, you use the /dev/kdmouse file to directly access the physical
+PS/2 mouse.
+The virtual mouse provides the following event ID's for mouse capability changes:
+MOUSE_CAP_CHANGE_NUM_BUT This event is reported when the total number of mouse buttons changes.
+The Firm_event.value is set to the new button total, which is the maximum number of all mice buttons. Other fields
+are ignored.
+MOUSE_CAP_CHANGE_NUM_WHEEL This event is reported when the total number of mouse wheels
+changes. The Firm_event.value is set to the new wheel total. Other fields are ignored. The event value
+(Firm_event.value) can be 0 (no wheel), 1 (vertical wheel), or 2 (vertical and horizontal wheel).
+The Firm_event structure is described in <sys/vuid_event.h>. As with other events, firm events are received using
+read(2).
+Event ID's are used by applications (including certain mouse demo applications) that are programmed to graphically
+represent the actual number of buttons and wheels on a mouse. When an application of this type receives a
+Firm_event with a ID MOUSE_CAP_CHANGE_NUM_BUT or MOUSE_CAP_CHANGE_NUM_WHEEL event,
+it is instructed to update its state information using the new value. Consider, for example, a mouse demo application
+whose sole function is to display a mouse with buttons that graphically correspond to the actual number of buttons
+on the mouse. If, for example, the system has a single two-button USB mouse attached, the application, by default,
+will graphically display the mouse with a left and a right button. However, if a another three-button USB mouse is
+hot-plugged into the system, a MOUSE_CAP_CHANGE_NUM_BUT Firm event with Firm_event.value of three
+instructs the demo application to update the mouse display to indicate three buttons.
+<beginning of page>
+KIOCSETFREQ Sets the frequency for either keyboard beeper or console beeper. To set the corresponding beeper
+frequency, arg must point to a freq_request structure:
+ struct freq_request {
+  enum fr_beep_type type; /* beep type */
+  int16_t freq; /* frequency */
+ };
+Where type is the corresponding beeper type defined as:
+ enum fr_beep_type { CONSOLE_BEEP =1, KBD_BEEP =2 };
+and freq is the frequency value to be set as the beeper frequency indicated by type. This value should be between 0
+and 32767 with border inclusive.
+/dev/kbd Virtual Keyboard device file.
+/dev/mouse Virtual Mouse device file.
+/dev/kdmouse Physical PS/2 mouse device file.
+/dev/usb/hid* Physical USB keyboard/mouse device file.
+/etc/dacf.conf Device auto-configuration file.
+See attributes(5) for descriptions of the following attributes:
+tab() box; lw(2.75i) lw(2.75i) lw(2.75i) lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE ArchitectureSPARC,
+x86 AvailabilityT{ SUNWckr, SUNWcsd, SUNWusb, SUNWpsdcr, SUNWcakr.i T} Interface StabilityEvolving
+kbd(1), eeprom(1M), read(2), attributes(5), hid(7D), usba(7D), kb(7M), usbkbm(7M), usbms(7M), vuid<hy>
+mice(7M)
+See gok(1) in the GNOME man pages, available in the SUNWgnome package.
+The messages described below may appear on the system console as well as being logged. All messages are for<hy>
+matted in the following manner:
+ WARNING: Error message...
+conskbd: keyboard is not available for system debugging: device_path.
+Errors were encountered while entering kmdb during initialization for debugger mode. As a result, the keyboard is
+not available.
+conskbd: keyboard is not available: <device_path>
+Errors were encountered while exiting kmdb during un-initialization for debugger mode. As a result, the keyboard is
+not available.
+Failed to relink the mouse <device_path> underneath virtual mouse
+An error was encountered and the mouse is unavailable. (When a mouse is physically opened via a physical device
+file such as /dev/usb/hid0, it is removed from the single virtual input stream (/dev/mouse). When closed, it is re-co<hy>
+alesced into a single virtual input stream beneath /dev/mouse. If an error is encountered, (for example, the mouse
+<beginning of page>
+has been physically removed), it is unavailable beneath /dev/mouse.
+Currently, the virtualkm device supports only USB and PS2 keyboards and mice.
+The virtualkm device maintains complete compatibility on select legacy systems, (including Ultra 10's), that are
+equipped with serial keyboard/mouse.

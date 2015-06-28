@@ -1,0 +1,226 @@
+<beginning of page>
+share_nfs <-> make local NFS file systems available for mounting by remote systems
+share [-d description] [-F nfs] [-o specific_options] pathname
+The share utility makes local file systems available for mounting by remote systems. It starts the nfsd(1M) and
+mountd(1M) daemons if they are not already running.
+If no argument is specified, then share displays all file systems currently shared, including NFS file systems and file
+systems shared through other distributed file system packages.
+The following options are supported:
+-d description
+Provide a comment that describes the file system to be shared.
+-F nfs
+Share NFS file system type.
+-o specific_options
+Specify specific_options in a comma-separated list of keywords and attribute-value-assertions for interpretation by
+the file-system-type-specific command. If specific_options is not specified, then by default sharing is read-write to
+all clients. specific_options can be any combination of the following:
+aclok
+Allows the NFS server to do access control for NFS Version 2 clients (running SunOS 2.4 or earlier). When aclok is
+set on the server, maximal access is given to all clients. For example, with aclok set, if anyone has read permissions,
+then everyone does. If aclok is not set, minimal access is given to all clients.
+anon=uid
+Set uid to be the effective user ID of unknown users. By default, unknown users are given the effective user ID
+UID_NOBODY. If uid is set to <mi>1, access is denied.
+charset=access_list
+Where charset is one of: euc-cn, euc-jp, euc-jpms, euc-kr, euc-tw, iso8859-1, iso8859-2, iso8859-5, iso8859-6,
+iso8859-7, iso8859-8, iso8859-9, iso8859-13, iso8859-15, koi8-r.
+Clients that match the access_list for one of these properties will be assumed to be using that character set and file
+and path names will be converted to UTF-8 for the server.
+index=file
+Load file rather than a listing of the directory containing this file when the directory is referenced by an NFS URL.
+log=tag
+Enables NFS server logging for the specified file system. The optional tag determines the location of the related log
+files. The tag is defined in etc/nfs/nfslog.conf. If no tag is specified, the default values associated with the global
+tag in etc/nfs/nfslog.conf is used. Support of NFS server logging is only available for NFS Version 2 and Version 3
+requests.
+none=access_list
+Access is not allowed to any client that matches the access list. The exception is when the access list is an asterisk
+(*), in which case ro or rw can override none.
+<beginning of page>
+nosub
+Prevents clients from mounting subdirectories of shared directories. For example, if /export is shared with the no<hy>
+sub option on server fooey then a NFS client cannot do:
+ mount -F nfs fooey:/export/home/mnt
+NFS Version 4 does not use the MOUNT protocol. The nosub option only applies to NFS Version 2 and Version 3
+requests.
+nosuid
+By default, clients are allowed to create files on the shared file system with the setuid or setgid mode enabled. Speci<hy>
+fying nosuid causes the server file system to silently ignore any attempt to enable the setuid or setgid mode bits.
+public
+Moves the location of the public file handle from root (/) to the exported directory for WebNFS-enabled browsers
+and clients. This option does not enable WebNFS service; WebNFS is always on. Only one file system per server
+may use this option. Any other option, including the -ro=list and -rw=list options can be included with the public
+option.
+ro
+Sharing is read-only to all clients.
+ro=access_list
+Sharing is read-only to the clients listed in access_list; overrides the rw suboption for the clients specified. See ac<hy>
+cess_list below.
+root=access_list
+Only root users from the hosts specified in access_list have root access. See access_list below. By default, no host
+has root access, so root users are mapped to an anonymous user ID (see the anon=uid option described above). Net<hy>
+groups can be used if the file system shared is using UNIX authentication ( AUTH_SYS).
+root_mapping=uid
+For a client that is allowed root access, map the root UID to the specified user id.
+rw
+Sharing is read-write to all clients.
+rw=access_list
+Sharing is read-write to the clients listed in access_list; overrides the ro suboption for the clients specified. See ac<hy>
+cess_list below.
+sec=mode[:mode]...
+Sharing uses one or more of the specified security modes. The mode in the sec=mode option must be a node name
+supported on the client. If the sec= option is not specified, the default security mode used is AUTH_SYS. Multiple
+sec= options can be specified on the command line, although each mode can appear only once. The security modes
+are defined in nfssec(5).
+Each sec= option specifies modes that apply to any subsequent window=, rw, ro, rw=, ro= and root= options that
+are provided before another sec=option. Each additional sec= resets the security mode context, so that more win<hy>
+dow=, rw, ro, rw=, ro= and root= options can be supplied for additional modes.
+<beginning of page>
+sec=none
+If the option sec=none is specified when the client uses AUTH_NONE, or if the client uses a security mode that is
+not one that the file system is shared with, then the credential of each NFS request is treated as unauthenticated. See
+the anon=uid option for a description of how unauthenticated requests are handled.
+secure
+This option has been deprecated in favor of the sec=dh option.
+window=value
+When sharing with sec=dh, set the maximum life time (in seconds) of the RPC request's credential (in the authenti<hy>
+cation header) that the NFS server allows. If a credential arrives with a life time larger than what is allowed, the NFS
+server rejects the request. The default value is 30000 seconds (8.3 hours).
+The access_list argument is a colon-separated list whose components may be any number of the following:
+hostname
+The name of a host. With a server configured for DNS or LDAP naming in the nsswitch "hosts" entry, any hostname
+must be represented as a fully qualified DNS or LDAP name.
+netgroup
+A netgroup contains a number of hostnames. With a server configured for DNS or LDAP naming in the nsswitch
+"hosts" entry, any hostname in a netgroup must be represented as a fully qualified DNS or LDAP name.
+domain name suffix
+To use domain membership the server must use DNS or LDAP to resolve hostnames to IP addresses; that is, the
+"hosts" entry in the /etc/nsswitch.conf must specify "dns" or "ldap" ahead of "nis" or "nisplus", since only DNS and
+LDAP return the full domain name of the host. Other name services like NIS or NIS+ cannot be used to resolve
+hostnames on the server because when mapping an IP address to a hostname they do not return domain information.
+For example,
+ NIS or NIS+ 172.16.45.9 --> "myhost"
+and
+ DNS or LDAP 172.16.45.9 -->
+  "myhost.mydomain.mycompany.com"
+The domain name suffix is distinguished from hostnames and netgroups by a prefixed dot. For example,
+rw=.mydomain.mycompany.com
+A single dot can be used to match a hostname with no suffix. For example,
+rw=.
+matches "mydomain" but not "mydomain.mycompany.com". This feature can be used to match hosts resolved
+through NIS and NIS+ rather than DNS and LDAP.
+network
+The network or subnet component is preceded by an at-sign (@). It can be either a name or a dotted address. If a
+name, it is converted to a dotted address by getnetbyname(3SOCKET). For example,
+<beginning of page>
+=@mynet
+would be equivalent to:
+=@172.16 or =@172.16.0.0
+The network prefix assumes an octet-aligned netmask determined from the zeroth octet in the low-order part of the
+address up to and including the high-order octet, if you want to specify a single IP address (see below). In the case
+where network prefixes are not byte-aligned, the syntax allows a mask length to be specified explicitly following a
+slash (/) delimiter. For example,
+=@theothernet/17 or =@172.16.132/22
+...where the mask is the number of leftmost contiguous significant bits in the corresponding IP address.
+When specifying individual IP addresses, use the same @ notation described above, without a netmask specification.
+For example:
+ =@172.16.132.14
+Multiple, individual IP addresses would be specified, for example, as:
+ root=@172.16.132.20:@172.16.134.20
+A prefixed minus sign (<mi>) denies access to that component of access_list. The list is searched sequentially until a
+match is found that either grants or denies access, or until the end of the list is reached. For example, if host "terra"
+is in the "engineering" netgroup, then
+ rw=-terra:engineering
+denies access to terra but
+ rw=engineering:-terra
+grants access to terra.
+The following operands are supported:
+pathname
+The pathname of the file system to be shared.
+Example 1 Sharing A File System With Logging Enabled
+The following example shows the /export file system shared with logging enabled:
+ example% share -o log /export
+The default global logging parameters are used since no tag identifier is specified. The location of the log file, as
+well as the necessary logging work files, is specified by the global entry in /etc/nfs/nfslog.conf. The nfslogd(1M)
+daemon runs only if at least one file system entry in /etc/dfs/dfstab is shared with logging enabled upon starting or
+rebooting the system. Simply sharing a file system with logging enabled from the command line does not start the
+nfslogd(1M).
+<beginning of page>
+The following exit values are returned:
+0
+Successful completion.
+>0
+An error occurred.
+/etc/dfs/fstypes
+list of system types, NFS by default
+/etc/dfs/sharetab
+system record of shared file systems
+/etc/nfs/nfslogtab
+system record of logged file systems
+/etc/nfs/nfslog.conf
+logging configuration file
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wnfssu
+mount(1M), mountd(1M), nfsd(1M), nfslogd(1M), share(1M), unshare(1M), getnetbyname(3SOCKET), nfs<hy>
+log.conf(4), netgroup(4), attributes(5), nfssec(5)
+If the sec= option is presented at least once, all uses of the window=, rw, ro, rw=, ro= and root= options must come
+after the first sec= option. If the sec= option is not presented, then sec=sys is implied.
+If one or more explicit sec= options are presented, sys must appear in one of the options mode lists for accessing us<hy>
+ing the AUTH_SYS security mode to be allowed. For example:
+ share -F nfs /var
+ share -F nfs -o sec=sys /var
+grants read-write access to any host using AUTH_SYS, but
+ share -F nfs -o sec=dh /var
+grants no access to clients that use AUTH_SYS.
+Unlike previous implementations of share_nfs, access checking for the window=, rw, ro, rw=, and ro= options is
+done per NFS request, instead of per mount request.
+Combining multiple security modes can be a security hole in situations where the ro= and rw= options are used to
+control access to weaker security modes. In this example,
+ share -F nfs -o sec=dh,rw,sec=sys,rw=hosta /var
+<beginning of page>
+an intruder can forge the IP address for hosta (albeit on each NFS request) to side-step the stronger controls of
+AUTH_DES. Something like:
+ share -F nfs -o sec=dh,rw,sec=sys,ro /var
+is safer, because any client (intruder or legitimate) that avoids AUTH_DES only gets read-only access. In general,
+multiple security modes per share command should only be used in situations where the clients using more secure
+modes get stronger access than clients using less secure modes.
+If rw=, and ro= options are specified in the same sec= clause, and a client is in both lists, the order of the two op<hy>
+tions determines the access the client gets. If client hosta is in two netgroups - group1 and group2 - in this example,
+the client would get read-only access:
+ share -F nfs -o ro=group1,rw=group2 /var
+In this example hosta would get read-write access:
+ share -F nfs -o rw=group2,ro=group1 /var
+If within a sec= clause, both the ro and rw= options are specified, for compatibility, the order of the options rule is
+not enforced. All hosts would get read-only access, with the exception to those in the read-write list. Likewise, if the
+ro= and rw options are specified, all hosts get read-write access with the exceptions of those in the read-only list.
+The ro= and rw= options are guaranteed to work over UDP and TCP but may not work over other transport
+providers.
+The root= option with AUTH_SYS is guaranteed to work over UDP and TCP but may not work over other trans<hy>
+port providers.
+The root= option with AUTH_DES is guaranteed to work over any transport provider.
+There are no interactions between the root= option and the rw, ro, rw=, and ro= options. Putting a host in the root
+list does not override the semantics of the other options. The access the host gets is the same as when the root= op<hy>
+tions is absent. For example, the following share command denies access to hostb:
+ share -F nfs -o ro=hosta,root=hostb /var
+The following gives read-only permissions to hostb:
+ share -F nfs -o ro=hostb,root=hostb /var
+The following gives read-write permissions to hostb:
+ share -F nfs -o ro=hosta,rw=hostb,root=hostb /var
+If the file system being shared is a symbolic link to a valid pathname, the canonical path (the path which the symbol<hy>
+ic link follows) are shared. For example, if /export/foo is a symbolic link to /export/bar (/export/foo -> /ex<hy>
+port/bar), the following share command results in /export/bar as the shared pathname (and not /export/foo).
+ example# share -F nfs /export/foo
+<beginning of page>
+An NFS mount of server:/export/foo results in server:/export/bar really being mounted.
+This line in the /etc/dfs/dfstab file shares the /disk file system read-only at boot time:
+ share -F nfs -o ro /disk
+The same command entered from the command line does not share the /disk file system unless there is at least one
+file system entry in the /etc/dfs/dfstab file. The mountd(1M) and nfsd(1M) daemons only run if there is a file sys<hy>
+tem entry in /etc/dfs/dfstab when starting or rebooting the system.
+The mountd(1M) process allows the processing of a path name the contains a symbolic link. This allows the pro<hy>
+cessing of paths that are not themselves explicitly shared with share_nfs. For example, /export/foo might be a sym<hy>
+bolic link that refers to /export/bar which has been specifically shared. When the client mounts /export/foo the
+mountd processing follows the symbolic link and responds with the /export/bar. The NFS Version 4 protocol does
+not use the mountd processing and the client's use of /export/foo does not work as it does with NFS Version 2 and
+Version 3 and the client receives an error when attempting to mount /export/foo.

@@ -1,0 +1,277 @@
+<beginning of page>
+cfgadm_sata <-> SATA hardware-specific commands for cfgadm
+/usr/sbin/cfgadm [-f] [-y | -n] [-v] [-o hardware_options]
+ -c function ap_id...
+/usr/sbin/cfgadm [-f] [-y | -n] [-v] [-o hardware_options]
+ -x hardware_function ap_id...
+/usr/sbin/cfgadm [-v] [-a] [-s listing_options]
+ [-o hardware_options] [-l [ap_id | ap_type]...]
+/usr/sbin/cfgadm [-v] [-o harware_options] -t ap_id...
+/usr/sbin/cfgadm [-v] [-o hardware_options] -h [ap_id]...
+The SATA hardware specific library, /usr/lib/cfgadm/sata.so.1, provides the functionality for SATA hot plugging
+through the cfgadm command. cfgadm operates on attachment points, which are locations in the system where
+hardware resources can be dynamically reconfigured. See cfgadm(1M) for information regarding attachment points.
+Each SATA controller's and port multiplier's device port is represented by an attachment point in the device tree.
+SATA devices, connected and configured in the system are shown as the attachment point name extension. The
+terms "attachment point" and "SATA port" are used interchangeably in the following description.
+Attachment points are named through ap_ids. All the SATA attachment points ap_id consist of a string in the fol<hy>
+lowing form:
+ sataX/P[.M][::dsk/cXtYd0]
+where
+X is the SATA controller number
+P is the SATA controller's device port number (0 to 31)
+M is the port multiplier's device port number (0 to 14) the port multiplier host port number (15). It is used only
+when the port multiplier is attached to the SATA controller's device port.
+dev/cXtYd0 identifies the attached SATA device
+Y is a target number
+In general, the device identifier is derived from the corresponding logical link for the device in /dev. Because only
+one LUN (LUN 0) is supported by the SATA device, the "d" component of the device string will always have num<hy>
+ber 0 (zero).
+For example, the logical ap_id of the device port 4 of the port multiplier connected to the device port 5 of the SATA
+controller 2 would be:
+ sata2/5.4
+If the SATA disk or CD/DVD device is connected to this attachment point, and the device is configured, the ap_id
+would be:
+ sata2/5.4::dsk/c2t645d0
+The cXtYd0 string identifying a device has one-to-one correspondence to the device attachment point.
+A simple listing of attachment points in the system will include all SATA device ports and attached devices. For ex<hy>
+<beginning of page>
+ample:
+ #cfgadm -l
+ Ap_Id Type Receptacle Occupant Condition
+  sata0/0::dev/c0t0d0 disk connected configured ok
+  sata0/1::dev/c0t1d0 disk connected configured ok
+  sata0/2::dev/c0t2d0 cd-dvd connected configured ok
+  sata0/3 sata-port empty unconfigured ok
+  sata1/0 sata-port disconnected unconfigured unknown
+  sata1/1 sata port disconnected unconfigured unknown
+  sata1/2 sata port empty unconfigured ok
+  sata1/3.15 sata-pmult connected configured ok
+  sata1/3.0::dev/c0t512d0 disk connected configured ok
+  sata1/3.1 sata-port empty unconfigured ok
+  sata1/3.2 sata-port empty unconfigured ok
+  sata1/3.3 sata-port empty unconfigured ok
+  usb0/1 unknown empty unconfigured ok
+  usb0/2 unknown empty unconfigured ok
+See cfgadm(1M)for more information regarding listing of attachment points.
+The receptacle state for attachment point at the SATA port have the following meanings:
+empty The SATA port is powered-on and enabled. No device presence was detected on this port.
+disconnected The SATA port is not enabled or the SATA device presence was detected but no communication with
+the device was established, or the port has failed.
+connected The SATA device is detected on the port the communication with the device is established.
+The occupant (device attached to the SATA port) state have the following meanings:
+configured The attached SATA device is configured and ready to use by the operating system.
+unconfigured No device is attached, or the SATA device attached to the SATA port was not yet configured. To con<hy>
+figure it, run the command "cfgadm -c configure ap_id".
+The attachment point (SATA port) condition have the following meanings:
+ok The SATA port is powered-on and enabled, and is ready for use.
+failed The SATA port failed. It may be disabled and/or powered-off by the system. It is unusable and its condition is
+unknown. It may be due to the device plugged-in.
+unknown The SATA port is disabled and its condition is unknown.
+A "state table" is the combination of an attachment point receptacle state, an occupant state, and an attachment point
+(SATA port) condition. The valid states are:
+empty/unconfigured/ok
+The SATA port is enabled and active. No device presence was detected.
+disconnected/unconfigured/ok
+The SATA port is enabled and a device presence was detected but no communications with the device was estab<hy>
+<beginning of page>
+lished.
+disconnected/unconfigured/unknown
+The SATA Port is disabled and its condition is unknown.
+disconnected/unconfigured/failed
+The SATA Port is disabled and unusable. The port was disabled by the system due to a system-detected failure.
+connected/unconfigured/ok
+The SATA Port is enabled and active. A device presence was detected and the communication with a device was es<hy>
+tablished. The device is not configured to be used by the OS.
+connected/configured/ok
+The device is present and configured, and is ready to use by the OS.
+cfgadm defines several types of operations besides listing (-l). These operations include testing, (-t), invoking con<hy>
+figuration state changes, (-c), invoking hardware specific functions (-x), and obtaining configuration administration
+help messages (-h).
+-c function
+The following generic functions are defined for the SATA hardware specific library. For SATA port attachment
+point, the following configuration state change operations are supported:
+connect
+Enable (activate) the SATA port and establish the communication with an attached device. This operation implies
+powering-on the port if necessary.
+disconnect
+Unconfigure the attached device, if it is not already unconfigured, and disable (deactivate) the SATA port. A subse<hy>
+quent "connect" command enables SATA port operation but does not bring a device to the "configured" state.
+For a SATA device attached to the SATA port following state change operations are supported:
+configure Configure new device for use by the operating system if it is not already configured. This command also
+implies connect operation, if necessary.
+unconfigure Unconfigure the device connected to the SATA port if it is not already unconfigured.
+The configure and unconfigure operations cannot be used for an attachment point where the port multiplier is con<hy>
+nected. Port multipliers are configured and unconfigured automatically by the system. However, configure and un<hy>
+configure operations apply to all SATA devices connected to the port multiplier's device ports.
+-f
+Not supported.
+-h ap_id
+SATA specific help can be obtained by using the help option with any SATA attachment point.
+-l [-v]
+The -l option works as described in cfgadm(1M). When paired with the -v option, the "Information" field contains
+<beginning of page>
+the following SATA-specific information: <bu> Mfg: manufacturer string <bu> Product: product string <bu> No: product Serial
+Number
+-o hardware_options
+No hardware specific options are currently defined.
+-s listing_options
+Attachment points of class SATA can be listed by using the select suboption. See cfgadm(1M).
+-t ap_id
+Perform self-test of the SATA port, if supported by the SATA controller. If a port self-test operation is not supported
+by the SATA controller, an error message is issued.
+-x hardware_function
+Perform hardware specific function.
+Some of the following commands used on the SATA ports or the SATA controller may affect any SATA devices that
+have been attached, as noted. ap_id refers to SATA port or the entire SATA controller, as noted. If the operation im<hy>
+plies unconfiguring a device, but it cannot be unconfigured (that is, the device contains a mounted filesystem), an er<hy>
+ror message is issued and the operation is not performed. An error message will be also issued if the SATA con<hy>
+troller does not support specified operation.
+sata_reset_device ap_id
+Reset the SATA device attached to ap_id SATA port. The SATA port state does not change.
+sata_reset_port ap_id
+Reset the SATA port specified by ap_id. If a SATA device is attached to the port, it is also reset. This operation may
+be also performed on the port to which a port multiplier is connected. If a port multiplier is connected to the SATA
+controller port, the SATA devices attached to the port multiplier may not be reset
+sata_reset_all ap_id
+Reset SATA controller specified by the controller number part in ap_id and all attached devices and re-enumerate all
+connected devices, including port multipliers and devices connected to port multipliers' device ports.
+This operations implies unconfiguring all attached devices prior to the operation. Any newly enumerated devices
+will be left unconfigured.
+sata_port_deactivate ap_id
+Force the deactivation of the port when all else fails. This is meant as an emergency step; use with caution.
+sata_port_activate ap_id
+Force the activation of a port. This is meant for emergency situations on a port which was deactivated to recover
+from errors.
+sata_port_self_test ap_id
+Perform self-test operation on the SATA controller. This operation implies unconfiguring all devices and resetting
+the SATA controller.
+<beginning of page>
+-v
+Execute in verbose mode.
+The following Transitions table reports the state transitions resulting from the -c operations and hotplugging actions:
+ current state operation possible new state
+ ------------- --------- ------------------
+ empty/
+ unconfigured/ok device plug-in connected/unconfigured/ok, or
+  disconnected/unconfigured/ok, or
+  disconnected/unconfigured/failed
+ empty/
+ unconfigured/ok -c unconfigure error message, no state change
+ empty/
+ unconfigured/ok -c configure error message, no state change
+ empty/
+ unconfigured/ok -c connect error message, no state change
+ empty/
+ unconfigured/ok -c disconnect disconnected/unconfigured/unknown, or
+  disconnected/unconfigured/failed
+ disconnected/
+ unconfigured/ok device unplug no state change
+ disconnected/
+ unconfigured/ok -c unconfigure error message, no state change
+ disconnected/
+ unconfigured/ok -c configure error message, no state change
+ disconnected/
+ unconfigured/ok -c connect error message, no state change
+ disconnected/
+ unconfigured/ok -c disconnect error message, no state change
+ disconnected/
+ unconfigured/
+ unknown
+ (no disk plugged) -c configure error message, state change to
+  empty/unconfigured/ok, or
+  disconnected/unconfigured/failed
+ disconnected/
+ unconfigured/
+ unknown -c configure state change to
+ (disk plugged) connected/configured/ok or,
+  connected/unconfigured/ok, or
+  disconnected/unconfigured/failed and
+  possible error message
+ disconnected/
+ unconfigured/
+ unknown -c connect empty/unconfigured/ok, or
+  connected/unconfigured/ok, or
+  disconnected/unconfigured/ok, or
+  disconnected/unconfigured/unknown, or
+  disconnected/unconfigured/failed
+ disconnected/
+ unconfigured/
+ unknown -c disconnect error message, no state change
+<beginning of page>
+ disconnected/
+ unconfigured/
+ failed any command error message, no state change
+  other than
+  -x commands
+ connected/
+ unconfigured/ok disk unplug error message and state:
+  empty/unconfigured/ok, or
+  disconnected/unconfigured/failed
+ connected/
+ unconfigured/ok -c configure connected/unconfigured/ok, or
+  connected/configured/ok, or
+  disconnected/unconfigured/ok, or
+  disconnected/unconfigured/failed
+ connected/
+ unconfigured/ok -c unconfigure error message, no state change
+ connected/
+ unconfigured/ok -c connect error message, no state change
+ connected/
+ unconfigured/ok -c disconnect disconnected/unconfigured/unknown, or
+  disconnected/unconfigured/failed
+ connected/
+ configured/ok disk unplug error message and state:
+  empty/unconfigured/ok, or
+  disconnected/unconfigured/failed
+ connected/
+ configured/ok -c configure error message, no state change
+ connected/
+ configured/ok -c unconfigure error message, if device cannot be
+  unconfigured, no state change, or
+  connected/unconfigured/ok, or
+  disconnected/unconfigured/ok, or
+  disconnected/unconfigured/failed
+ connected/
+ configured/ok -c connect error message, no state change
+ connected/
+ configured/ok -c disconnect error message, if device cannot be
+  unconfigured, no state change, or
+  disconnected/unconfigured/unknown, or
+  disconnected/unconfigured/failed
+Example 1 Configuring a Disk
+The following command configures a disk attached to SATA controller 0, port 0:
+ example# cfgadm -c configure sata0/0
+This command should be issued only when there is a device connected to the SATA port.
+Example 2 Unconfiguring a Disk
+<beginning of page>
+The following command unconfigures a disk attached to SATA controller 0, port 3:
+ example# cfgadm -c unconfigure sata0/3::dsk/c0t3d0
+The device identifying string is shown when the attachment point receptacle state is "connected" and occupant state
+is "configured".
+Example 3 Encountering a Mounted File System While Unconfiguring a Disk
+The following command illustrates encountering a mounted file system while unconfiguring a disk:
+ example# cfgadm -c unconfigure sata1/5::dsk/c01t35d0
+The system responds with the following:
+ cfgadm: Component system is busy, try again: failed to offline:
+ /devices/pci@0,0/pci8086,244e@1e/pci1095,3124@1/sd@5,0
+  Resource Information
+ ------------------ --------------------------
+ /dev/dsk/c1t5d0s0 mounted filesystem "/mnt"
+/usr/lib/cfgadm/sata.so.1 Hardware specific library for generic SATA hot plugging.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsl
+cfgadm(1M), config_admin(3CFGADM), libcfgadm(3LIB), attributes(5)
+The emergency "sata_port_deactivate" operation is not supported on ports with attached disks containing critical
+partitions such as root (/), /usr, swap, or /var. The deactivate operation should not be attempted on such ports. Incor<hy>
+rect usage can result in a system hang and require a reboot.
+Hotplugging operations are not supported by all SATA controllers.
+If SATA connectors are the hot-pluggable type and the SATA controller supports hotplugging, a SATA device can be
+hotplugged at any time. The system detects the event and establishes the communication with the device. The device
+has to be configured by the explicit "cfgadm -c configure ap_id" command.
+If the SATA connectors are the hot-pluggable type and the SATA controller supports hotplugging, unplugging a de<hy>
+vice without unconfiguring it may result in system hang or data loss. If a device is unconfigured but receptacle state
+is not in a disconnected state, unplugging a device from the SATA port will result in error message.
+The connectors on some SATA devices do not conform to SATA hotplug specifications. Performing hotplug opera<hy>
+tions on such devices can cause damage to the SATA controller and/or the SATA device.

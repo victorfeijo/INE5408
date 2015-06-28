@@ -1,0 +1,372 @@
+<beginning of page>
+audio <-> generic audio device interface
+#include <sys/audio.h>
+An audio device is used to play and/or record a stream of audio data. Since a specific audio device may not support
+all functionality described below, refer to the device-specific manual pages for a complete description of each hard<hy>
+ware device. An application can use the AUDIO_GETDEV ioctl(2) to determine the current audio hardware associ<hy>
+ated with /dev/audio.
+The audio framework provides a software mixing engine (audio mixer) for all audio devices, allowing more than one
+process to play or record audio at the same time.
+It is no longer possible to disable the mixing function. Applications must not assume that they have exclusive access
+to the audio device.
+The audio mixer supports multi-stream Codecs. These devices have DSP engines that provide sample rate conver<hy>
+sion, hardware mixing, and other features. The use of such hardware features is opaque to applications.
+Digital audio data represents a quantized approximation of an analog audio signal waveform. In the simplest case,
+these quantized numbers represent the amplitude of the input waveform at particular sampling intervals. To achieve
+the best approximation of an input signal, the highest possible sampling frequency and precision should be used.
+However, increased accuracy comes at a cost of increased data storage requirements. For instance, one minute of
+monaural audio recorded in <*m>-Law format (pronounced mew-law) at 8 KHz requires nearly 0.5 megabytes of stor<hy>
+age, while the standard Compact Disc audio format (stereo 16-bit linear PCM data sampled at 44.1 KHz) requires
+approximately 10 megabytes per minute.
+Audio data may be represented in several different formats. An audio device's current audio data format can be de<hy>
+termined by using the AUDIO_GETINFO ioctl(2) described below.
+An audio data format is characterized in the audio driver by four parameters: Sample Rate, Encoding, Precision, and
+Channels. Refer to the device-specific manual pages for a list of the audio formats that each device supports. In addi<hy>
+tion to the formats that the audio device supports directly, other formats provide higher data compression. Applica<hy>
+tions may convert audio data to and from these formats when playing or recording.
+Sample rate is a number that represents the sampling frequency (in samples per second) of the audio data.
+The audio mixer always configures the hardware for the highest possible sample rate for both play and record. This
+ensures that none of the audio streams require compute-intensive low pass filtering. The result is that high sample
+rate audio streams are not degraded by filter ing.
+Sample rate conversion can be a compute-intensive operation, depending on the number of channels and a device's
+sample rate. For example, an 8KHz signal can be easily converted to 48KHz, requiring a low cost up sampling by 6.
+However, converting from 44.1KHz to 48KHz is compute intensive because it must be up sampled by 160 and then
+down sampled by 147. This is only done using integer multipliers.
+Applications can greatly reduce the impact of sample rate conversion by carefully picking the sample rate. Applica<hy>
+tions should always use the highest sample rate the device supports. An application can also do its own sample rate
+conversion (to take advantage of floating point and accelerated instruction or use small integers for up and down
+sampling.
+All modern audio devices run at 48 kHz or a multiple thereof, hence just using 48 kHz may be a reasonable compro<hy>
+mise if the application is not prepared to select higher sample rates.
+An encoding parameter specifies the audio data representation. <*m>-Law encoding corresponds to CCITT G.711, and is
+the standard for voice data used by telephone companies in the United States, Canada, and Japan. A-Law encoding
+is also part of CCITT G.711 and is the standard encoding for telephony elsewhere in the world. A-Law and <*m>-Law
+audio data are sampled at a rate of 8000 samples per second with 12-bit precision, with the data compressed to 8-bit
+samples. The resulting audio data quality is equivalent to that of standard analog telephone service.
+Linear Pulse Code Modulation (PCM) is an uncompressed, signed audio format in which sample values are directly
+proportional to audio signal voltages. Each sample is a 2's complement number that represents a positive or negative
+amplitude.
+Precision indicates the number of bits used to store each audio sample. For instance, u-Law and A-Law data are
+stored with 8-bit precision. PCM data may be stored at various precisions, though 16-bit is the most common.
+<beginning of page>
+Multiple channels of audio may be interleaved at sample boundaries. A sample frame consists of a single sample
+from each active channel. For example, a sample frame of stereo 16-bit PCM data consists of two 16-bit samples,
+corresponding to the left and right channel data.
+The audio mixer sets the hardware to the maximum number of channels supported. If a mono signal is played or
+recorded, it is mixed on the first two (usually the left and right) channels only. Silence is mixed on the remaining
+channels
+The audio mixer supports the following audio formats:
+ Encoding Precision Channels
+ Signed Linear PCM 32-bit Mono or Stereo
+ Signed Linear PCM 16-bit Mono or Stereo
+ Signed Linear PCM 8-bit Mono or Stereo
+ u-Law 8-bit Mono or Stereo
+ A-Law 8-bit Mono or Stereo
+The audio mixer converts all audio streams to 24-bit Linear PCM before mixing. After mixing, conversion is made
+to the best possible Codec format. The conversion process is not compute intensive and audio applications can
+choose the encoding format that best meets their needs.
+Note that the mixer discards the low order 8 bits of 32-bit Signed Linear PCM in order to perform mixing. (This is
+done to allow for possible overflows to fit into 32-bits when mixing multiple streams together.) Hence, the maximum
+effective precision is 24-bits.
+The device /dev/audio is a device driver that dispatches audio requests to the appropriate underlying audio hard<hy>
+ware. The audio driver is implemented as a STREAMS driver. In order to record audio input, applications open(2)
+the /dev/audio device and read data from it using the read(2) system call. Similarly, sound data is queued to the au<hy>
+dio output port by using the write(2) system call. Device configuration is performed using the ioctl(2) interface.
+Because some systems may contain more than one audio device, application writers are encouraged to query the
+AUDIODEV environment variable. If this variable is present in the environment, its value should identify the path
+name of the default audio device.
+The audio device is not treated as an exclusive resource. Each process may open the audio device once.
+Each open() completes as long as there are channels available to be allocated. If no channels are available to be allo<hy>
+cated: <bu> if either the O_NDELAY or O_NONBLOCK flags are set in the open() oflag argument, then -1 is immedi<hy>
+ately returned, with errno set to EBUSY. <bu> if neither the O_NDELAY nor the O_NONBLOCK flag are set, then
+open() hangs until the device is available or a signal is delivered to the process, in which case a -1 is returned with
+errno set to EINTR.
+Upon the initial open() of the audio channel, the audio mixer sets the data format of the audio channel to the default
+state of 8-bit, 8Khz, mono u-Law data. If the audio device does not support this configuration, it informs the audio
+mixer of the initial configuration. Audio applications should explicitly set the encoding characteristics to match the
+audio data requirements, and not depend on the default configuration.
+The read() system call copies data from the system's buffers to the application. Ordinarily, read() blocks until the
+user buffer is filled. The I_NREAD ioctl (see streamio(7I)) may be used to determine the amount of data that may
+be read without blocking. The device may alternatively be set to a non-blocking mode, in which case read() com<hy>
+pletes immediately, but may return fewer bytes than requested. Refer to the read(2) manual page for a complete de<hy>
+scription of this behavior.
+When the audio device is opened with read access, the device driver immediately starts buffering audio input data.
+Since this consumes system resources, processes that do not record audio data should open the device write-only
+(O_WRONLY).
+The transfer of input data to STREAMS buffers may be paused (or resumed) by using the AUDIO_SETINFO ioctl
+to set (or clear) the record.pause flag in the audio information structure (see below). All unread input data in the
+STREAMS queue may be discarded by using the I_FLUSH STREAMS ioctl. See streamio(7I). When changing
+record parameters, the input stream should be paused and flushed before the change, and resumed afterward. Other<hy>
+wise, subsequent reads may return samples in the old format followed by samples in the new format. This is particu<hy>
+larly important when new parameters result in a changed sample size.
+<beginning of page>
+Input data can accumulate in STREAMS buffers very quickly. At a minimum, it will accumulate at 8000 bytes per
+second for 8-bit, 8 KHz, mono, u-Law data. If the device is configured for 16-bit linear or higher sample rates, it will
+accumulate even faster. If the application that consumes the data cannot keep up with this data rate, the STREAMS
+queue may become full. When this occurs, the record.error flag is set in the audio information structure and input
+sampling ceases until there is room in the input queue for additional data. In such cases, the input data stream con<hy>
+tains a discontinuity. For this reason, audio recording applications should open the audio device when they are pre<hy>
+pared to begin reading data, rather than at the start of extensive initialization.
+The write() system call copies data from an application's buffer to the STREAMS output queue. Ordinarily, write()
+blocks until the entire user buffer is transferred. The device may alternatively be set to a non-blocking mode, in
+which case write() completes immediately, but may have transferred fewer bytes than requested. See write(2).
+Although write() returns when the data is successfully queued, the actual completion of audio output may take con<hy>
+siderably longer. The AUDIO_DRAIN ioctl may be issued to allow an application to block until all of the queued
+output data has been played. Alternatively, a process may request asynchronous notification of output completion by
+writing a zero-length buffer (end-of-file record) to the output stream. When such a buffer has been processed, the
+play.eof flag in the audio information structure is incremented.
+The final close(2) of the file descriptor hangs until all of the audio output has drained. If a signal interrupts the
+close(), or if the process exits without closing the device, any remaining data queued for audio output is flushed and
+the device is closed immediately.
+The consumption of output data may be paused (or resumed) by using the AUDIO_SETINFO ioctl to set (or clear)
+the play.pause flag in the audio information structure. Queued output data may be discarded by using the I_FLUSH
+STREAMS ioctl. (See streamio(7I)).
+Output data is played from the STREAMS buffers at a default rate of at least 8000 bytes per second for <*m>-Law, A-
+Law or 8-bit PCM data (faster for 16-bit linear data or higher sampling rates). If the output queue becomes empty,
+the play.error flag is set in the audio information structure and output is stopped until additional data is written. If an
+application attempts to write a number of bytes that is not a multiple of the current sample frame size, an error is
+generated and the bad data is thrown away. Additional writes are allowed.
+The I_SETSIG STREAMS ioctl enables asynchronous notification, through the SIGPOLL signal, of input and
+output ready condition changes. The O_NONBLOCK flag may be set using the F_SETFL fcntl(2) to enable non-
+blocking read() and write() requests. This is normally sufficient for applications to maintain an audio stream in the
+background.
+It is sometimes convenient to have an application, such as a volume control panel, modify certain characteristics of
+the audio device while it is being used by an unrelated process.
+The /dev/audioctl pseudo-device is provided for this purpose. Any number of processes may open /dev/audioctl si<hy>
+multaneously. However, read() and write() system calls are ignored by /dev/audioctl. The AUDIO_GETINFO and
+AUDIO_SETINFO ioctl commands may be issued to /dev/audioctl to determine the status or alter the behavior of
+/dev/audio. Note: In general, the audio control device name is constructed by appending the letters "ctl" to the path
+name of the audio device.
+Applications that open the audio control pseudo-device may request asynchronous notification of changes in the
+state of the audio device by setting the S_MSG flag in an I_SETSIG STREAMS ioctl. Such processes receive a
+SIGPOLL signal when any of the following events occur: <bu> An AUDIO_SETINFO ioctl has altered the device
+state. <bu> An input overflow or output underflow has occurred. <bu> An end-of-file record (zero-length buffer) has been
+processed on output. <bu> An open() or close() of /dev/audio has altered the device state. <bu> An external event (such as
+speakerbox's volume control) has altered the device state.
+The state of the audio device may be polled or modified using the AUDIO_GETINFO and AUDIO_SETINFO
+ioctl commands. These commands operate on the audio_info structure as defined, in <sys/audio.h>, as follows:
+ /*
+ * This structure contains state information for audio device
+ * IO streams
+ */
+ struct audio_prinfo {
+  /*
+  * The following values describe the
+  * audio data encoding
+  */
+<beginning of page>
+  uint_t sample_rate; /* samples per second */
+  uint_t channels; /* number of interleaved channels */
+  uint_t precision; /* number of bits per sample */
+  uint_t encoding; /* data encoding method */
+  /*
+  * The following values control audio device
+  * configuration
+  */
+  uint_t gain; /* volume level */
+  uint_t port; /* selected I/O port */
+  uint_t buffer_size; /* I/O buffer size */
+  /*
+  * The following values describe the current device
+  * state
+  */
+  uint_t samples; /* number of samples converted */
+  uint_t eof; /* End Of File counter (play only) */
+  uchar_t pause; /* non-zero if paused, zero to resume */
+  uchar_t error; /* non-zero if overflow/underflow */
+  uchar_t waiting; /* non-zero if a process wants access */
+  uchar_t balance; /* stereo channel balance */
+  /*
+  * The following values are read-only device state
+  * information
+  */
+  uchar_t open;/* non-zero if open access granted */
+  uchar_t active; /* non-zero if I/O active */
+  uint_t avail_ports; /* available I/O ports */
+  uint_t mod_ports; /* modifiable I/O ports */
+ };
+ typedef struct audio_prinfo audio_prinfo_t;
+  /*
+  * This structure is used in AUDIO_GETINFO and AUDIO_SETINFO ioctl
+  * commands
+  */
+ struct audio_info {
+  audio_prinfo_t record;/* input status info */
+  audio_prinfo_t play;/* output status info */
+  uint_t monitor_gain; /* input to output mix */
+  uchar_toutput_muted; /* non-zero if output muted */
+  uint_t hw_features; /* supported H/W features */
+  uint_t sw_features;/* supported S/W features */
+  uint_t sw_features_enabled;
+  /* supported S/W features enabled */
+ };
+ typedef struct audio_info audio_info_t;
+ /* Audio encoding types */
+ #define AUDIO_ENCODING_ULAW (1) /* u-Law encoding */
+ #define AUDIO_ENCODING_ALAW (2) /* A-Law encoding */
+ #define AUDIO_ENCODING_LINEAR (3) /* Signed Linear PCM encoding */
+ /*
+ * These ranges apply to record, play, and
+ * monitor gain values
+  */
+ #define AUDIO_MIN_GAIN (0)/* minimum gain value */
+ #define AUDIO_MAX_GAIN (255) /* maximum gain value */
+ /*
+ * These values apply to the balance field to adjust channel
+ * gain values
+  */
+<beginning of page>
+ #define AUDIO_LEFT_BALANCE(0) /* left channel only */
+ #define AUDIO_MID_BALANCE (32) /* equal left/right balance */
+ #define AUDIO_RIGHT_BALANCE (64) /* right channel only */
+ /*
+ * Define some convenient audio port names
+ * (for port, avail_ports and mod_ports)
+  */
+ /* output ports (several might be enabled at once) */
+ #define AUDIO_SPEAKER (0x01)/* built-in speaker */
+ #define AUDIO_HEADPHONE (0x02)/* headphone jack */
+ #define AUDIO_LINE_OUT (0x04)/* line out */
+ #define AUDIO_SPDIF_OUT (0x08)/* SPDIF port */
+ #define AUDIO_AUX1_OUT (0x10)/* aux1 out */
+ #define AUDIO_AUX2_OUT (0x20)/* aux2 out */
+ /* input ports (usually only one may be
+ * enabled at a time)
+  */
+ #define AUDIO_MICROPHONE (0x01) /* microphone */
+ #define AUDIO_LINE_IN (0x02) /* line in */
+ #define AUDIO_CD(0x04) /* on-board CD inputs */
+ #define AUDIO_SPDIF_IN (0x08) /* SPDIF port */
+ #define AUDIO_AUX1_IN (0x10) /* aux1 in */
+ #define AUDIO_AUX2_IN (0x20) /* aux2 in */
+ #define AUDIO_CODEC_LOOPB_IN (0x40) /* Codec inter.loopback */
+ /* These defines are for hardware features */
+ #define AUDIO_HWFEATURE_DUPLEX (0x00000001u)
+ /*simult. play & cap. supported */
+ #define AUDIO_HWFEATURE_MSCODEC (0x00000002u)
+ /* multi-stream Codec */
+ /* These defines are for software features *
+ #define AUDIO_SWFEATURE_MIXER (0x00000001u)
+  /* audio mixer audio pers. mod. */
+ /*
+ * Parameter for the AUDIO_GETDEV ioctl
+ * to determine current audio devices
+ */#define MAX_AUDIO_DEV_LEN(16)
+ struct audio_device {
+  char name[MAX_AUDIO_DEV_LEN];
+  char version[MAX_AUDIO_DEV_LEN];
+  char config[MAX_AUDIO_DEV_LEN];
+ };
+ typedef struct audio_device audio_device_t;
+The play.gain and record.gain fields specify the output and input volume levels. A value of AUDIO_MAX_GAIN
+indicates maximum volume. Audio output may also be temporarily muted by setting a non-zero value in the out<hy>
+put_muted field. Clearing this field restores audio output to the normal state.
+The monitor_gain field is present for compatibility, and is no longer supported. See dsp(7I) for more detail.
+Likewise, the play.port, play.ports, play.mod_ports, record.port, record.ports, and record.mod_ports are no longer
+supported. See dsp(7I) for more detail.
+The play.balance and record.balance fields are fixed to AUDIO_MID_BALANCE. Changes to volume levels for
+different channels can be made using the interfaces in dsp(7I).
+The play.pause and record.pause flags may be used to pause and resume the transfer of data between the audio de<hy>
+vice and the STREAMS buffers. The play.error and record.error flags indicate that data underflow or overflow has
+occurred. The play.active and record.active flags indicate that data transfer is currently active in the corresponding
+<beginning of page>
+direction.
+The play.open and record.open flags indicate that the device is currently open with the corresponding access permis<hy>
+sion. The play.waiting and record.waiting flags provide an indication that a process may be waiting to access the de<hy>
+vice. These flags are set automatically when a process blocks on open(), though they may also be set using the AU<hy>
+DIO_SETINFO ioctl command. They are cleared only when a process relinquishes access by closing the device.
+The play.samples and record.samples fields are zeroed at open() and are incremented each time a data sample is
+copied to or from the associated STREAMS queue. Some audio drivers may be limited to counting buffers of sam<hy>
+ples, instead of single samples for their samples accounting. For this reason, applications should not assume that the
+samples fields contain a perfectly accurate count. The play.eof field increments whenever a zero-length output buffer
+is synchronously processed. Applications may use this field to detect the completion of particular segments of audio
+output.
+The record.buffer_size field controls the amount of input data that is buffered in the device driver during record oper<hy>
+ations. Applications that have particular requirements for low latency should set the value appropriately. Note how<hy>
+ever that smaller input buffer sizes may result in higher system overhead. The value of this field is specified in bytes
+and drivers will constrain it to be a multiple of the current sample frame size. Some drivers may place other require<hy>
+ments on the value of this field. Refer to the audio device-specific manual page for more details. If an application
+changes the format of the audio device and does not modify the record.buffer_size field, the device driver may use a
+default value to compensate for the new data rate. Therefore, if an application is going to modify this field, it should
+modify it during or after the format change itself, not before. When changing the record.buffer_size parameters, the
+input stream should be paused and flushed before the change, and resumed afterward. Otherwise, subsequent reads
+may return samples in the old format followed by samples in the new format. This is particularly important when
+new parameters result in a changed sample size. If you change the record.buffer_size for the first packet, this proto<hy>
+col must be followed or the first buffer will be the default buffer size for the device, followed by packets of the re<hy>
+quested change size.
+The record.buffer_size field may be modified only on the /dev/audio device by processes that have it opened for
+reading.
+The play.buffer_size field is currently not supported.
+The audio data format is indicated by the sample_rate, channels, precision and encoding fields. The values of these
+fields correspond to the descriptions in the AUDIO FORMATS section of this man page. Refer to the audio device-
+specific manual pages for a list of supported data format combinations.
+The data format fields can be modified only on the /dev/audio device.
+If the parameter changes requested by an AUDIO_SETINFO ioctl cannot all be accommodated, ioctl() returns with
+errno set to EINVAL and no changes are made to the device state.
+All of the streamio(7I) ioctl commands may be issued for the /dev/audio device. Because the /dev/audioctl device
+has its own STREAMS queues, most of these commands neither modify nor report the state of /dev/audio if issued
+for the /dev/audioctl device. The I_SETSIG ioctl may be issued for /dev/audioctl to enable the notification of au<hy>
+dio status changes, as described above.
+The audio device additionally supports the following ioctl commands:
+AUDIO_DRAIN The argument is ignored. This command suspends the calling process until the output STREAMS
+queue is empty and all queued samples have been played, or until a signal is delivered to the calling process. It may
+not be issued for the /dev/audioctldevice. An implicit AUDIO_DRAIN is performed on the final close() of
+/dev/audio.
+AUDIO_GETDEV The argument is a pointer to an audio_device_t structure. This command may be issued for ei<hy>
+ther /dev/audio or /dev/audioctl. The returned value in the name field will be a string that will identify the current
+/dev/audio hardware device, the value in version will be a string indicating the current version of the hardware, and
+config will be a device-specific string identifying the properties of the audio stream associated with that file descrip<hy>
+tor. Refer to the audio device-specific manual pages to determine the actual strings returned by the device driver.
+AUDIO_GETINFO The argument is a pointer to an audio_info_t structure. This command may be issued for ei<hy>
+ther /dev/audio or /dev/audioctl. The current state of the /dev/audio device is returned in the structure.
+Values return pertain to a logical view of the device as seen by and private to the process, and do not necessarily re<hy>
+<beginning of page>
+flect the actual hardware device itself.
+AUDIO_SETINFO The argument is a pointer to an audio_info_t structure. This command may be issued for either
+the /dev/audio or the /dev/audioctl device with some restrictions. This command configures the audio device ac<hy>
+cording to the supplied structure and overwrites the existing structure with the new state of the device. Note: The
+play.samples, record.samples, play.error, record.error, and play.eof fields are modified to reflect the state of the de<hy>
+vice when the AUDIO_SETINFO is issued. This allows programs to automatically modify these fields while re<hy>
+trieving the previous value.
+As with AUDIO_SETINFO, the settings managed by this ioctl deal with a logical view of the device which is pri<hy>
+vate to the process, and don't necessarily have any impact on the hardware device itself.
+Certain fields in the audio information structure, such as the pause flags, are treated as read-only when /dev/audio is
+not open with the corresponding access permission. Other fields, such as the gain levels and encoding information,
+may have a restricted set of acceptable values. Applications that attempt to modify such fields should check the re<hy>
+turned values to be sure that the corresponding change took effect. The sample_rate, channels, precision, and encod<hy>
+ing fields treated as read-only for /dev/audioctl, so that applications can be guaranteed that the existing audio for<hy>
+mat will stay in place until they relinquish the audio device. AUDIO_SETINFO will return EINVAL when the de<hy>
+sired configuration is not possible, or EBUSY when another process has control of the audio device.
+All of the logical device state is reset when the corresponding I/O stream of /dev/audio is closed.
+The audio_info_t structure may be initialized through the use of the AUDIO_INITINFO macro. This macro sets all
+fields in the structure to values that are ignored by the AUDIO_SETINFO command. For instance, the following
+code switches the output port from the built-in speaker to the headphone jack without modifying any other audio pa<hy>
+rameters:
+ audio_info_t info;
+ AUDIO_INITINFO();
+ info.play.port = AUDIO_HEADPHONE;
+ err = ioctl(audio_fd, AUDIO_SETINFO, );
+This technique eliminates problems associated with using a sequence of AUDIO_GETINFO followed by AU<hy>
+DIO_SETINFO.
+An open() will fail if:
+EBUSY The requested play or record access is busy and either the O_NDELAY or O_NONBLOCK flag was set in
+the open() request.
+EINTR The requested play or record access is busy and a signal interrupted the open() request.
+An ioctl() will fail if:
+EINVAL The parameter changes requested in the AUDIO_SETINFO() ioctl are invalid or are not supported by the
+device.
+The physical audio device names are system dependent and are rarely used by programmers. Programmers should
+use the following generic device names:
+/dev/audio Symbolic link to the system's primary audio device
+/dev/audioctl Symbolic link to the control device for /dev/audio
+/dev/sound/0 First audio device in the system
+<beginning of page>
+/dev/sound/0ctl Audio control device for /dev/sound/0
+/usr/share/audio/samples Audio files
+See attributes(5) for a description of the following attributes:
+tab() box; cw(1.82i) |cw(3.68i) lw(1.82i) |lw(3.68i) ATTRIBUTE TYPEATTRIBUTE VALUE _ ArchitectureS<hy>
+PARC, x86 _ AvailabilitySUNWcsu, SUNWaudd, SUNWaudh _ Stability LevelObsolete Uncommitted
+close(2), fcntl(2), ioctl(2), open(2), poll(2), read(2), write(2), attributes(5), dsp(7I), streamio(7I)
+Due to a feature of the STREAMS implementation, programs that are terminated or exit without closing the audio
+device may hang for a short period while audio output drains. In general, programs that produce audio output should
+catch the SIGINT signal and flush the output stream before exiting.

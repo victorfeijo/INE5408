@@ -1,0 +1,69 @@
+<beginning of page>
+pam_sm_chauthtok <-> service provider implementation for pam_chauthtok
+cc [ flag ...] file ... -lpam [ library ... ]
+#include <security/pam_appl.h>
+#include <security/pam_modules.h>
+int pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc,
+ const char **argv);
+In response to a call to pam_chauthtok() the PAM framework calls pam_sm_chauthtok(3PAM) from the modules
+listed in the pam.conf(4) file. The password management provider supplies the back-end functionality for this inter<hy>
+face function.
+The pam_sm_chauthtok() function changes the authentication token associated with a particular user referenced by
+the authentication handle pamh.
+The following flag may be passed to pam_chauthtok():
+PAM_SILENT The password service should not generate any messages.
+PAM_CHANGE_EXPIRED_AUTHTOK The password service should only update those passwords that have
+aged. If this flag is not passed, the password service should update all passwords.
+PAM_PRELIM_CHECK The password service should only perform preliminary checks. No passwords should be
+updated.
+PAM_NO_AUTHTOK_CHECK The password service should not perform conformance checks on the structure of
+the password. Conformance checks do not apply to verification that the same password was entered during both
+passes.
+PAM_UPDATE_AUTHTOK The password service should update passwords.
+Note that PAM_PRELIM_CHECK and PAM_UPDATE_AUTHTOK cannot be set at the same time.
+Upon successful completion of the call, the authentication token of the user will be ready for change or will be
+changed, depending upon the flag, in accordance with the authentication scheme configured within the system.
+The argc argument represents the number of module options passed in from the configuration file pam.conf(4). The
+argv argument specifies the module options, which are interpreted and processed by the password management ser<hy>
+vice. Please refer to the specific module man pages for the various available options.
+It is the responsibility of pam_sm_chauthtok() to determine if the new password meets certain strength require<hy>
+ments. pam_sm_chauthtok() may continue to re-prompt the user (for a limited number of times) for a new pass<hy>
+word until the password entered meets the strength requirements.
+Before returning, pam_sm_chauthtok() should call pam_get_item() and retrieve both PAM_AUTHTOK and
+PAM_OLDAUTHTOK. If both are NULL, pam_sm_chauthtok() should set them to the new and old passwords as
+entered by the user.
+Upon successful completion, PAM_SUCCESS must be returned. The following values may also be returned:
+PAM_PERM_DENIED No permission.
+PAM_AUTHTOK_ERR Authentication token manipulation error.
+PAM_AUTHTOK_RECOVERY_ERR Old authentication token cannot be recovered.
+<beginning of page>
+PAM_AUTHTOK_LOCK_BUSY Authentication token lock busy.
+PAM_AUTHTOK_DISABLE_AGING Authentication token aging disabled.
+PAM_USER_UNKNOWN User unknown to password service.
+PAM_TRY_AGAIN Preliminary check by password service failed.
+See attributes(5) for description of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability
+Stable _ MT-LevelMT-Safe with exceptions
+ping(1M), pam(3PAM), pam_chauthtok(3PAM), pam_get_data(3PAM), pam_get_item(3PAM), pam_set_da<hy>
+ta(3PAM), libpam(3LIB), pam.conf(4), attributes(5)
+The PAM framework invokes the password services twice. The first time the modules are invoked with the flag,
+PAM_PRELIM_CHECK. During this stage, the password modules should only perform preliminary checks. For
+example, they may ping remote name services to see if they are ready for updates. If a password module detects a
+transient error such as a remote name service temporarily down, it should return PAM_TRY_AGAIN to the PAM
+framework, which will immediately return the error back to the application. If all password modules pass the prelim<hy>
+inary check, the PAM framework invokes the password services again with the flag, PAM_UPDATE_AUTHTOK.
+During this stage, each password module should proceed to update the appropriate password. Any error will again
+be reported back to application.
+If a service module receives the flag PAM_CHANGE_EXPIRED_AUTHTOK, it should check whether the pass<hy>
+word has aged or expired. If the password has aged or expired, then the service module should proceed to update the
+password. If the status indicates that the password has not yet aged or expired, then the password module should re<hy>
+turn PAM_IGNORE.
+If a user's password has aged or expired, a PAM account module could save this information as state in the authenti<hy>
+cation handle, pamh, using pam_set_data(). The related password management module could retrieve this informa<hy>
+tion using pam_get_data() to determine whether or not it should prompt the user to update the password for this
+particular module.
+The interfaces in libpam are MT-Safe only if each thread within the multithreaded application uses its own PAM
+handle.
+If the PAM_REPOSITORY item_type is set and a service module does not recognize the type, the service module
+does not process any information, and returns PAM_IGNORE. If the PAM_REPOSITORY item_type is not set, a
+service module performs its default action.

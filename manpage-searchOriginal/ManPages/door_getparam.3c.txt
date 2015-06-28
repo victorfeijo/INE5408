@@ -1,0 +1,67 @@
+<beginning of page>
+door_getparam, door_setparam <-> retrieve and set door parameters
+cc -mt [ flag... ] file... [ library... ]
+#include <door.h>
+int door_getparam(int d, int param, size_t *out);
+int door_setparam(int d, int param, size_t val);
+The door_getparam() function retrieves the value of param for the door descriptor d and writes it through the point<hy>
+er out. The door_setparam() function sets the value of param for the door descriptor d to val. The param argument
+names the parameter to view or change and can be one of the following values:
+DOOR_PARAM_DATA_MAX This parameter represents the maximum amount of data that can be passed to the
+door routine. Any attempt to call door_call(3C) on a door with a data_size value larger than the door's
+DOOR_PARAM_DATA_MAX parameter will fail with ENOBUFS. At door creation time, this parameter is ini<hy>
+tialized to SIZE_MAX and can be set to any value from 0 to SIZE_MAX, inclusive. This parameter must be greater
+than or equal to the DOOR_PARAM_DATA_MIN parameter.
+DOOR_PARAM_DATA_MIN This parameter represents the the minimum amount of data that can be passed to the
+door routine. Any attempt to call door_call(3C) on a door with a data_size value smaller than the door's
+DOOR_PARAM_DATA_MIN parameter will fail with ENOBUFS. At door creation time, this parameter is initial<hy>
+ized to 0, and can be set to any value from 0 to SIZE_MAX, inclusive. This parameter must be less than or equal to
+the DOOR_PARAM_DATA_MAX parameter.
+DOOR_PARAM_DESC_MAX This parameter represents the the maximum number of argument descriptors that
+can be passed to the door routine. Any attempt to call door_call(3C) on a door with a desc_num value larger than
+the door's DOOR_PARAM_DESC_MAX parameter will fail with ENFILE. If the door was created with the
+DOOR_REFUSE_DESC flag, this parameter is initialized to 0 and cannot be changed to any other value. Other<hy>
+wise, it is initialized to INT_MAX and can be set to any value from 0 to INT_MAX, inclusive.
+The door_setparam() function can only affect doors that were created by the current process.
+Upon successful completion, 0 is returned. Otherwise, -1 is returned and errno is set to indicate the error.
+The door_getparam() function will fail if:
+EBADF The d argument is not a door descriptor.
+EFAULT The out argument is not a valid address.
+EINVAL The param argument is not a recognized parameter.
+EOVERFLOW The value of the parameter is larger than the SIZE_MAX. This condition can occur only if the call<hy>
+ing process is 32-bit and the door targets a 64-bit process or the kernel.
+The door_setparam() function will fail if:
+EBADF The d argument is not a door descriptor or has been revoked.
+EINVAL The param argument is not a recognized parameter, or the requested change would make
+DOOR_PARAM_DATA_MIN greater than DOOR_PARAM_DATA_MAX.
+ENOTSUP The param argument is DOOR_PARAM_DESC_MAX, d was created with the
+DOOR_REFUSE_DESC flag, and val is not zero.
+<beginning of page>
+EPERM The d argument was not created by this process.
+ERANGE The val argument is not in supported range of param.
+Example 1 Set up a door with a fixed request size.
+ typedef struct my_request {
+  int request;
+ ar buffer[4096];
+ } my_request_t;
+ fd = door_create(my_handler, DOOR_REFUSE_DESC);
+ if (fd < 0)
+  /* handle error */
+ if (door_setparam(fd, DOOR_PARAM_DATA_MIN,
+  sizeof (my_request_t)) < 0 ||
+  door_setparam(fd, DOOR_PARAM_DATA_MAX,
+  sizeof (my_request_t)) < 0)
+  /* handle error */
+ /*
+  * the door will only accept door_call(3DOOR)s with a
+  * data_size which is exactly sizeof (my_request_t).
+  */
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stabili<hy>
+tyStable _ MT-LevelMT-Safe
+door_call(3C), door_create(3C), attributes(5)
+The parameters that can be manipulated by door_setparam() are not the only limitation on the size of requests. If
+the door server thread's stack size is not large enough to hold all of the data requested plus room for processing the
+request, the door call will fail with E2BIG.
+The DOOR_PARAM_DATA_MIN parameter will not prevent DOOR_UNREF_DATA notifications from being
+sent to the door.

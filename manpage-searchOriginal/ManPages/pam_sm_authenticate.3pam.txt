@@ -1,0 +1,50 @@
+<beginning of page>
+pam_sm_authenticate <-> service provider implementation for pam_authenticate
+cc [ flag... ] file... -lpam [ library... ]
+#include <security/pam_appl.h>
+#include <security/pam_modules.h>
+int pam_sm_authenticate(pam_handle_t *pamh, int flags,
+ int argc, const char **argv);
+In response to a call to pam_authenticate(3PAM), the PAM framework calls pam_sm_authenticate() from the
+modules listed in the pam.conf(4) file. The authentication provider supplies the back-end functionality for this inter<hy>
+face function.
+The pam_sm_authenticate() function is called to verify the identity of the current user. The user is usually required
+to enter a password or similar authentication token depending upon the authentication scheme configured within the
+system. The user in question is specified by a prior call to pam_start(), and is referenced by the authentication han<hy>
+dle pamh.
+If the user is unknown to the authentication service, the service module should mask this error and continue to
+prompt the user for a password. It should then return the error, PAM_USER_UNKNOWN.
+The following flag may be passed in to pam_sm_authenticate():
+PAM_SILENT The authentication service should not generate any messages.
+PAM_DISALLOW_NULL_AUTHTOK The authentication service should return
+PAM_AUTH_ERR The user has a null authentication token.
+The argc argument represents the number of module options passed in from the configuration file pam.conf(4). argv
+specifies the module options, which are interpreted and processed by the authentication service. Please refer to the
+specific module man pages for the various available options. If any unknown option is passed in, the module should
+log the error and ignore the option.
+Before returning, pam_sm_authenticate() should call pam_get_item() and retrieve PAM_AUTHTOK. If it has
+not been set before and the value is NULL, pam_sm_authenticate() should set it to the password entered by the user
+using pam_set_item().
+An authentication module may save the authentication status (success or reason for failure) as state in the authentica<hy>
+tion handle using pam_set_data(3PAM). This information is intended for use by pam_setcred().
+Upon successful completion, PAM_SUCCESS must be returned. In addition, the following values may be returned:
+PAM_MAXTRIES Maximum number of authentication attempts exceeded.
+PAM_AUTH_ERR Authentication failure.
+PAM_CRED_INSUFFICIENT Cannot access authentication data due to insufficient credentials.
+PAM_AUTHINFO_UNAVAIL Underlying authentication service can not retrieve authentication information.
+PAM_USER_UNKNOWN User not known to underlying authentication module.
+PAM_IGNORE Ignore underlying authentication module regardless of whether the control flag is required,option<hy>
+al, or sufficient1.
+<beginning of page>
+See attributes(5) for description of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability
+Stable _ MT-LevelMT-Safe with exceptions
+pam(3PAM), pam_authenticate(3PAM), pam_get_item(3PAM), pam_set_data(3PAM), pam_set_item(3PAM),
+pam_setcred(3PAM), pam_start(3PAM), libpam(3LIB), pam.conf(4), attributes(5)
+Modules should not retry the authentication in the event of a failure. Applications handle authentication retries and
+maintain the retry count. To limit the number of retries, the module can return a PAM_MAXTRIES error.
+The interfaces in libpam are MT-Safe only if each thread within the multithreaded application uses its own PAM
+handle.
+If the PAM_REPOSITORY item_type is set and a service module does not recognize the type, the service module
+does not process any information, and returns PAM_IGNORE. If the PAM_REPOSITORY item_type is not set, a
+service module performs its default action.

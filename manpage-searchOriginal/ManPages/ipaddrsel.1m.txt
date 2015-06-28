@@ -1,0 +1,111 @@
+<beginning of page>
+ipaddrsel <-> configure IPv6 default address selection
+/usr/sbin/ipaddrsel
+/usr/sbin/ipaddrsel -f file
+/usr/sbin/ipaddrsel -d
+Use the ipaddrsel utility to configure the IPv6 default address selection policy table. The policy table is a longest-
+matching-prefix lookup table that is used for IPv6 source address selection and for destination address ordering
+when resolving names to AF_INET6 addresses. For a description of how the policy table is used for source address
+selection, see inet6(7P). For a description of how the policy table is used for destination address ordering, see getad<hy>
+drinfo(3SOCKET).
+The unmodified policy table is valid for all typical IPv6 deployments. Modify the table only if a circumstance exists
+for which the default behavior of the IPv6 source address selection or destination address ordering mechanism is un<hy>
+satisfactory. See the section for examples of such circumstances. You should carefully consider your addressing
+strategy before you change the table from the provided default.
+When the ipaddrsel command is issued without any arguments, the address selection policy currently in use is print<hy>
+ed. The format of the output is compatible with the format of the configuration file that the -f option accepts. Note -
+If the usesrc subcommand to ifconfig(1M) is applied to a particular physical interface, the selection policy specified
+by usesrc overrides the source address selection policies specified by ipaddrsel. This is true for packets that are lo<hy>
+cally generated and for applications that do not choose a non-zero source address using bind(3SOCKET).
+The configuration file that the -f option accepts can contain either comment lines or policy entries. Comment lines
+have a '#' character as the first non-blank character. and they are ignored by the ipaddrsel utility. Policy entry lines
+have the following format:
+ prefix/prefix_length precedence label [# comment]
+The prefix must be an IPv6 prefix in a format consistent with inet(3SOCKET). The prefix_length is an integer rang<hy>
+ing from 0 to 128. The IPv6 source address selection and destination address ordering algorithms determine the
+precedence or label of an address by doing a longest-prefix-match lookup using the prefixes in this table, much like
+next-hop determination for a destination is done by doing a longest-prefix-match lookup using an IP routing table.
+The precedence is a non-negative integer that represents how the destination address ordering mechanism will sort
+addresses returned from name lookups. In general, addresses with a higher precedence will be in front of addresses
+with a lower precedence. Other factors, such as destinations with undesirable source addresses can, however, over<hy>
+ride these precedence values.
+The label is a string of at most fifteen characters, not including the NULL terminator. The label allows particular
+source address prefixes to be used with destination prefixes of the same label. Specifically, for a particular destina<hy>
+tion address, the IPv6 source address selection algorithm prefers source addresses whose label is equal that of the
+destination.
+The label may be followed by an optional comment.
+The file must contain a default policy entry, which is an entry with ::0/0 as its prefix and prefix_length. This is to en<hy>
+sure that all possible addresses match a policy.
+The ippadrsel utility supports the following options:
+-f file Replace the address selection policy table with the policy specified in the file.
+-d Revert the kernel's address selection policy table back to the default table. Invoking ipaddrsel in this way only
+changes the currently running kernel's policy table, and does not alter the configuration file /etc/inet/ipaddrsel.conf.
+To revert the configuration file back to its default settings, use ipaddrsel -d, then dump the contents of the table to
+the configuration file by redirecting the output of ipaddrsel to /etc/inet/ipaddrsel.conf.
+ example# ipaddrsel -d
+ example# ipaddrsel > /etc/inet/ipaddrsel.conf
+<beginning of page>
+Example 1 The Default Policy in /etc/inet/ipaddrsel.conf
+The following example is the default policy that is located in /etc/inet/ipaddrsel.conf:
+ # Prefix Precedence Label
+ ::1/128 50 Loopback
+ ::/96 20 IPv4_Compatible
+ ::ffff:0.0.0.0/96 10 IPv4
+ 2002::/16 30 6to4
+ ::/0 40 Default
+Example 2 Assigning a Lower Precedence to Link-local and Site-local Addresses
+By default, the destination address ordering rules sort addresses of smaller scope before those of larger scope. For
+example, if a name resolves to a global and a site-local address, the site local address would be ordered before the
+global address. An administrator can override this ordering rule by assigning a lower precedence to addresses of
+smaller scope, as the following table demonstrates.
+ # Prefix Precedence Label
+ ::1/128 50 Loopback
+ ::/0 40 Default
+ 2002::/16 30 6to4
+ fec0::/10 27 Site-Local
+ fe80::/10 23 Link-Local
+ ::/96 20 IPv4_Compatible
+ ::ffff:0.0.0.0/96 10 IPv4
+Example 3 Assigning Higher Precedence to IPv4 Destinations
+By default, IPv6 addresses are ordered in front of IPv4 addresses in name lookups. ::ffff:0.0.0.0/96 has the lowest
+precedence in the default table. In the following example, IPv4 addresses are assigned higher precedence and are or<hy>
+dered in front of IPv6 destinations:
+ # Prefix Precedence Label
+ ::1/128 50 Loopback
+ ::/0 40 Default
+ 2002::/16 30 6to4
+ ::/96 20 IPv4_Compatible
+ ::ffff:0.0.0.0/96 60 IPv4
+Example 4 Ensuring that a Particular Source Address is Used
+This example ensures that a particular source address is used only when communicating with destinations in a par<hy>
+ticular network.
+The following policy table assigns a label of 5 to a particular source address on the local system,
+2001:1111:1111::1. The table assigns the same label to a network, 2001:2222:2222::/48. The result of this policy is
+that the 2001:1111:1111::1 source address will only be used when communicating with destinations contained in
+the 2001:2222:2222::/48 network. For this example, this network is the ClientNet, which could represent a particu<hy>
+lar client's network.
+ # Prefix Precedence Label
+ ::1/128 50 Loopback
+ 2001:1111:1111::1/128 40 ClientNet
+ 2001:2222:2222::/48 40 ClientNet
+ ::/0 40 Default
+<beginning of page>
+ 2002::/16 30 6to4
+ ::/96 20 IPv4_Compatible
+ ::ffff:0.0.0.0/96 10 IPv4
+This example assumes that the local system has one physical interface, and that all global prefixes are assigned to
+that physical interface.
+ipaddrsel returns the following exit values:
+0 ipaddrsel successfully completed.
+>0 An error occurred. If a failure is encountered, the kernel's current policy table is unchanged.
+/etc/inet/ipaddrsel.conf The file that contains the IPv6 default address selection policy to be installed at boot time.
+This file is loaded before any Internet services are started.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu _ Interface StabilityEvolving
+nscd(1M), inet(3SOCKET), getaddrinfo(3SOCKET), ipaddrsel.conf(4), attributes(5), inet6(7P)
+The ipnodes cache kept by nscd(1M) contains addresses that are ordered using the destination address ordering al<hy>
+gorithm, which is one of the reasons why ipaddrsel is called before nscd in the boot sequence. If ipaddrsel is used
+to change the address selection policy after nscd has started, you should invalidate the nscd ipnodes cache invalidat<hy>
+ed by invoking the following command:
+ example# /usr/sbin/nscd -i ipnodes

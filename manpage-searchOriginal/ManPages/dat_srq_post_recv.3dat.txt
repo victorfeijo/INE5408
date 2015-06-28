@@ -1,0 +1,87 @@
+<beginning of page>
+dat_srq_post_recv <-> add receive buffers to shared receive queue
+cc [ flag... ] file... -ldat [ library... ]
+#include <dat/udat.h>
+DAT_RETURN
+ dat_srq_post_recv (
+ IN DAT_SRQ_HANDLE srq_handle,
+ IN DAT_COUNT num_segments,
+ IN DAT_LMR_TRIPLET *local_iov,
+ IN DAT_DTO_COOKIE user_cookie
+ )
+srq_handle A handle for an instance of the SRQ.
+num_segments The number of lmr_triplets in local_iov. Can be 0 for receiving a zero-size message.
+local_iov An I/O Vector that specifies the local buffer to be filled. Can be NULL for receiving a zero-size message.
+user_cookie A user-provided cookie that is returned to the Consumer at the completion of the Receive DTO. Can be
+NULL.
+The dat_srq_post_recv() function posts the receive buffer that can be used for the incoming message into the lo<hy>
+cal_iov by any connected EP that uses SRQ.
+The num_segments argument specifies the number of segments in the local_iov. The local_iov segments are filled in
+the I/O Vector order until the whole message is received. This ensures that all the front segments of the local_iov I/O
+Vector are completely filled, only one segment is partially filled, if needed, and all segments that follow it are not
+filled at all. The actual order of segment fillings is left to the implementation.
+The user_cookie argument allows Consumers to have unique identifiers for each DTO. These identifiers are com<hy>
+pletely under user control and are opaque to the Provider. There is no requirement on the Consumer that the value
+user_cookie should be unique for each DTO. The user_cookie is returned to the Consumer in the Completion event
+for the posted Receive.
+The completion of the posted Receive is reported to the Consumer asynchronously through a DTO Completion event
+based on the configuration of the EP that dequeues the posted buffer and the specified completion_flags value for So<hy>
+licited Wait for the matching Send. If EP Recv Completion Flag is DAT_COMPLE<hy>
+TION_UNSIGNALLED_FLAG, which is the default value for SRQ EP, then all posted Recvs will generate com<hy>
+pletions with Signal Notifications.
+A Consumer should not modify the local_iov or its content until the DTO is completed. When a Consumer does not
+adhere to this rule, the behavior of the Provider and the underlying Transport is not defined. Providers that allow
+Consumers to get ownership of the local_iov but not the memory it specified back after the dat_srq_post_recv() re<hy>
+turns should document this behavior and also specify its support in Provider attributes. This behavior allows Con<hy>
+sumer full control of the local_iov content after dat_srq_post_recv() returns. Because this behavior is not guaran<hy>
+teed by all Providers, portable Consumers shall not rely on this behavior. Consumers shall not rely on the Provider
+copying local_iov information.
+The DAT_SUCCESS return of the dat_srq_post_recv() is at least the equivalent of posting a Receive operation di<hy>
+rectly by native Transport. Providers shall avoid resource allocation as part of dat_srq_post_recv() to ensure that
+this operation is nonblocking.
+The completion of the Receive posted to the SRQ is equivalent to what happened to the Receive posted to the End<hy>
+point for the Endpoint that dequeued the Receive buffer from the Shared Receive queue.
+The posted Recv DTO will complete with signal, equivalently to the completion of Recv posted directly to the End<hy>
+point that dequeued the Recv buffer from SRQ with DAT_COMPLETION_UNSIGNALLED_FLAG value not set
+for it.
+The posted Recv DTOs will complete in the order of Send postings to the other endpoint of each connection whose
+local EP uses SRQ. There is no ordering among different connections regardless if they share SRQ and recv_evd or
+<beginning of page>
+not.
+If the reported status of the Completion DTO event corresponding to the posted RDMA Read DTO is not
+DAT_DTO_SUCCESS, the content of the local_iov is not defined and the transfered_length in the DTO Comple<hy>
+tion event is not defined.
+The operation is valid for all states of the Shared Receive Queue.
+The dat_srq_post_recv() function is asynchronous, nonblocking, and its thread safety is Provider-dependent.
+DAT_SUCCESS The operation was successful.
+DAT_INVALID_HANDLE The srq_handle argument is an invalid DAT handle.
+DAT_INSUFFICIENT_RESOURCES The operation failed due to resource limitations.
+DAT_INVALID_PARAMETER Invalid parameter. For example, one of the IOV segments pointed to a memory
+outside its LMR.
+DAT_PROTECTION_VIOLATION Protection violation for local or remote memory access.
+Protection Zone mismatch between an LMR of one of the local_iov segments and the SRQ.
+DAT_PRIVILEGES_VIOLATION Privileges violation for local or remote memory access. One of the LMRs
+used in local_iov was either invalid or did not have the local write privileges.
+For the best Recv operation performance, the Consumer should align each buffer segment of local_iov to the Opti<hy>
+mal Buffer Alignment attribute of the Provider. For portable applications, the Consumer should align each buffer
+segment of local_iov to the DAT_OPTIMAL_ALIGNMENT.
+Since any of the Endpoints that use the SRQ can dequeue the posted buffer from SRQ, Consumers should post a buf<hy>
+fer large enough to handle incoming message on any of these Endpoint connections.
+The buffer posted to SRQ does not have a DTO completion flag value. Posting Recv buffer to SRQ is semantically
+equivalent to posting to EP with DAT_COMPLETION_UNSIGNALLED_FLAG is not set. The configuration of
+the Recv Completion flag of an Endpoint that dequeues the posted buffer defines how DTO completion is generated.
+If the Endpoint Recv Completion flag is DAT_COMPLETION_SOLICITED_WAIT_FLAG then matching Send
+DTO completion flag value for Solicited Wait determines if the completion will be Signalled or not. If the Endpoint
+Recv Completion flag is not DAT_COMPLETION_SOLICITED_WAIT_FLAG, the posted Recv completion will
+be generated with Signal. If the Endpoint Recv Completion flag is DAT_COMPLETION_EVD_THRESH<hy>
+OLD_FLAG, the posted Recv completion will be generated with Signal and dat_evd_wait threshold value controls
+if the waiter will be unblocked or not.
+Only the Endpoint that is in Connected or Disconnect Pending states can dequeue buffers from SRQ. When an End<hy>
+point is transitioned into Disconnected state, all the buffers that it dequeued from SRQ are queued on the Endpoint
+recv_evd. All the buffers that the Endpoint has not completed by the time of transition into Disconnected state and
+that have not completed message reception will be flushed.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Standard: uDAPL, 1.2 _ MT-LevelUnsafe
+dat_srq_create(3DAT), dat_srq_free(3DAT), dat_srq_query(3DAT), dat_srq_resize(3DAT),
+dat_srq_set_lw(3DAT), libdat(3LIB), attributes(5)

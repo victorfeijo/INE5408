@@ -1,0 +1,74 @@
+<beginning of page>
+ppgsz <-> set preferred page size for stack, heap, and/or other anonymous segments
+/usr/bin/ppgsz [-F] -o option[,option] cmd | -p pid...
+The ppgsz utility sets the preferred page size for stack, heap, and/or other anonymous segments for the target
+process(es), that is, the launched cmd or the process(es) in the pid list. ppgsz stops the target process(es) while
+changing the page size. See memcntl(2).
+The following options are supported:
+-F Force. Sets the preferred page size options(s) for target process(es) even if controlled by other process(es). Cau<hy>
+tion should be exercised when using the -F flag. See proc(1).
+-o option[,option] The options are:
+heap=size This option specifies the preferred page size for the heap of the target process(es). heap is defined to be
+the bss (uninitialized data) and the brk area that immediately follows the bss (see brk(2)). The preferred heap page
+size is set for the existing heap and for any additional heap memory allocated in the future. See NOTES.
+stack=size This option specifies the preferred page size for the stack of the target process(es). The preferred stack
+page size is set for the existing stack and newly allocated parts of the stack as it expands.
+anon=size This option specifies the preferred page size for all existing MAP_PRIVATE anonymous segments of the
+target process(es), other than heap and stack, which are large enough to fit at least one aligned page of the specified
+size. For the segments that are large enough, the preferred page size is set starting at the first size-aligned address in
+the segment. The anon preferred pagesize is not applied to MAP_PRIVATE anonymous segments created in the fu<hy>
+ture. See MAP_ANON in mmap(2).
+Anonymous memory refers to MAP_PRIVATE pages that are not directly associated with a file in some filesystem.
+The ppgsz command uses memcntl(2) to set the preferred page size for anonymous segments. See MC_HAT_AD<hy>
+VISE in memcntl(2).
+At least one of the above options must be specified.
+size must be a supported page size (see pagesize(1)) or 0, in which case the system will select an appropriate page
+size. See memcntl(2).
+size defaults to bytes and can be specified in octal (0), decimal, or hexadecimal (0x). The numeric value can be qual<hy>
+ified with K, M, G, or T to specify Kilobytes, Megabytes, Gigabytes, or Terabytes, respectively. 4194304,
+0x400000, 4096K, 0x1000K, and 4M are different ways to specify 4 Megabytes.
+-p pid Sets the preferred page size option(s) for the target process(es) in the process-id (pid) list following the -p op<hy>
+tion. The pid list can also consist of names in the /proc directory. Only the process owner or the super-user is permit<hy>
+ted to set page size.
+cmd is interpreted if -p is not specified. ppgsz launches cmd and applies page size option(s) to the new process.
+The heap and stack preferred page sizes are inherited. Child process(es) created (see fork(2)) from the launched
+process or the target process(es) in the pid list after ppgsz completes will inherit the preferred heap and stack page
+sizes. The preferred page sizes of all segments are set back to the default system page size on exec(2) (see getpage<hy>
+size(3C)). The preferred page size for all other anonymous segments is not inherited by children of the launched or
+target process(es).
+Example 1 Setting the preferred heap and stack page size
+The following example sets the preferred heap page size to 4M and the preferred stack page size to 512K for all
+ora<em>owned processes running commands that begin with ora:
+ example% ppgsz -o heap=4M,stack=512K -p `pgrep -u ora '^ora'`
+<beginning of page>
+Example 2 Setting the preferred anonymous page size
+The following example sets the preferred page size of existing qualifying anonymous segments to 512k for process
+ID 953:
+ example% ppgsz -o anon=512k -p 953
+If cmd is specified and successfully invoked (see exec(2)), the exit status of ppgsz will be the exit status of cmd.
+Otherwise, ppgsz will exit with one of the following values:
+0 Successfully set preferred page size(s) for processes in the pid list.
+125 An error occurred in ppgsz. Errors include: invalid argument,  invalid page size(s) specified, and failure to set
+preferred page size(s) for one or more processes in the pid list or cmd.
+126 cmd was found but could not be invoked.
+127 cmd could not be found.
+/proc/* Process files.
+/usr/lib/ld/map.bssalign A template link-editor mapfile for aligning bss (see NOTES).
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wesu (32-bit) SUNWesxu (64-bit) _ Interface StabilityEvolving
+ld(1), mpss.so.1(1), pagesize(1), pgrep(1), pmap(1), proc(1), brk(2), exec(2), fork(2), memcntl(2), mmap(2),
+sbrk(2), getpagesize(3C), proc(4), attributes(5)
+Linker and Libraries Guide
+Due to resource constraints, the setting of the preferred page size does not necessarily guarantee that the target
+process(es) will get the preferred page size. Use pmap(1) to view the actual heap and stack page sizes of the target
+process(es) (see pmap -s option).
+Large pages are required to be mapped at addresses that are multiples of the size of the large page. Given that the
+heap is typically not large page aligned, the starting portions of the heap (below the first large page aligned address)
+are mapped with the system memory page size. See getpagesize(3C).
+To provide a heap that will be mapped with a large page size, an application can be built using a link-editor (ld(1))
+mapfile containing the bss segment declaration directive. Refer to the section Mapfile Option in the Linker and Li<hy>
+braries Guide for more details of this directive and the template mapfile provided in /usr/lib/ld/map.bssalign. Users
+are cautioned that an alignment specification may be machine-specific and may lose its benefit on different hardware
+platforms. A more flexible means of requesting the most optimal underlying page size may evolve in future releases.
+mpss.so.1(1), a preloadable shared object, can also be used to set the preferred stack and/or heap page sizes.

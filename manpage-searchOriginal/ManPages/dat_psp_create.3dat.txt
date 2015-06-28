@@ -1,0 +1,78 @@
+<beginning of page>
+dat_psp_create <-> create a persistent Public Service Point
+cc [ flag... ] file... -ldat [ library... ]
+#include <dat/udat.h>
+DAT_RETURN
+ dat_psp_create(
+ IN DAT_IA_HANDLE ia_handle,
+ IN DAT_CONN_QUAL conn_qual,
+ IN DAT_EVD_HANDLE evd_handle,
+ IN DAT_PSP_FLAGS psp_flags,
+ OUT DAT_PSP_HANDLE *psp_handle
+ )
+ia_handle Handle for an instance of DAT IA.
+conn_qual Connection Qualifier of the IA on which the Public Service Point is listening.
+evd_handle Event Dispatcher that provides the Connection Requested Events to the Consumer. The size of the event
+queue for the Event Dispatcher controls the size of the backlog for the created Public Service Point.
+psp_flags Flag that indicates whether the Provider or Consumer creates an Endpoint per arrived Connection Request.
+The value of DAT_PSP_PROVIDER indicates that the Consumer wants to get an Endpoint from the Provider; a
+value of DAT_PSP_CONSUMER means the Consumer does not want the Provider to provide an Endpoint for each
+arrived Connection Request.
+psp_handle Handle to an opaque Public Service Point.
+The dat_psp_create() function creates a persistent Public Service Point that can receive multiple requests for con<hy>
+nection and generate multiple Connection Request instances that are delivered through the specified Event Dispatch<hy>
+er in Notification events.
+The dat_psp_create() function is blocking. When the Public Service Point is created, DAT_SUCCESS is returned
+and psp_handle contains a handle to an opaque Public Service Point Object.
+There is no explicit backlog for a Public Service Point. Instead, Consumers can control the size of backlog through
+the queue size of the associated Event Dispatcher.
+The psp_flags parameter allows Consumers to request that the Provider create an implicit Endpoint for each incom<hy>
+ing Connection Request, or request that the Provider should not create one per Connection Request. If the Provider
+cannot satisfy the request, the operation shall fail and DAT_MODEL_NOT_SUPPORTED is returned.
+All Endpoints created by the Provider have DAT_HANDLE_NULL for the Protection Zone and all Event Dis<hy>
+patchers. The Provider sets up Endpoint attributes to match the Active side connection request. The Consumer can
+change Endpoint parameters. Consumers should change Endpoint parameters, especially PZ and EVD, and are ad<hy>
+vised to change parameters for local accesses prior to the connection request acceptance with the Endpoint.
+DAT_SUCCESS The operation was successful.
+DAT_INSUFFICIENT_RESOURCES The operation failed due to resource limitations.
+DAT_INVALID_HANDLE The ia_handle or evd_handle parameter is invalid.
+DAT_INVALID_PARAMETER The conn_qual or psp_flags parameter is invalid.
+DAT_CONN_QUAL_IN_USE The specified Connection Qualifier was in use.
+<beginning of page>
+DAT_MODEL_NOT_SUPPORTED The requested Model was not supported by the Provider.
+Two uses of a Public Service Point are as follows:
+Model 1 For this model, the Provider manipulates a pool of Endpoints for a Public Service Point. The Provider can
+use the same pool for more than one Public Service Point. <bu> The DAT Consumer creates a Public Service Point with
+a flag set to DAT_PSP_PROVIDER. <bu> The Public Service Point does the following: <bu> Collects native transport in<hy>
+formation reflecting a received Connection Reques <bu> Creates an instance of Connection Reques <bu> Creates a Connec<hy>
+tion Request Notice (event) that includes the Connection Request instance (thatwhich includes, among others, Public
+Service Point, its Connection Qualifier, Provider-generated Local Endpoint, and information about remote Endpoint)
+<bu> Delivers the Connection Request Notice to the Consumer-specified target (CNO) evd_handle
+The Public Service Point is persistent and continues to listen for incoming requests for connection. <bu> Upon receiving
+a connection request, or at some time subsequent to that, the DAT Consumer can modify the provided local Endpoint
+to match the Connection Request and must either accept() or reject() the pending Connection Request. <bu> If accept<hy>
+ed, the provided Local Endpoint is now in a "connected" state and is fully usable for this connection, pending only
+any native transport mandated RTU (ready-to-use) messages. This includes binding it to the IA port if that was not
+done previously. The Consumer is notified that the Endpoint is in Connected state by a Connection Established
+Event on the Endpoint connect_evd_handle. <bu> If rejected, control of the Local Endpoint point is returned back to the
+Provider and its ep_handle is no longer usable by the Consumer.
+Model 2 For this model, the Consumer manipulates a pool of Endpoints. Consumers can use the same pool for more
+than one Service Point. <bu> DAT Consumer creates a Public Service Point with a flag set to DAT_PSP_CONSUMER.
+<bu> Public Service Point: <bu> Collects native transport information reflecting a received Connection Request <bu> Creates an
+instance of Connection Request <bu> Creates a Connection Request Notice (event) that includes the Connection Request
+instance (which includes, among others, Public Service Point, its Connection Qualifier, Provider-generated Local
+Endpoint and information about remote Endpoint) <bu> Delivers the Connection Request Notice to the Consumer-speci<hy>
+fied target (CNO) evd_handle
+The Public Service Point is persistent and continues to listen for incoming requests for connection. <bu> The Consumer
+creates a pool of Endpoints that it uses for accepting Connection Requests. Endpoints can be created and modified at
+any time prior to accepting a Connection Request with that Endpoint. <bu> Upon receiving a connection request or at
+some time subsequent to that, the DAT Consumer can modify its local Endpoint to match the Connection Request
+and must either accept() or reject() the pending Connection Request. <bu> If accepted, the provided Local Endpoint is
+now in a "connected" state and is fully usable for this connection, pending only any native transport mandated RTU
+messages. This includes binding it to the IA port if that was not done previously. The Consumer is notified that the
+Endpoint is in Connected state by a Connection Established Event on the Endpoint connect_evd_handle. <bu> If reject<hy>
+ed, the Consumer does not have to provide any Endpoint for dat_cr_reject(3DAT).
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Standard: uDAPL, 1.1, 1.2 _ MT-LevelSafe
+dat_cr_reject(3DAT), libdat(3LIB), attributes(5)

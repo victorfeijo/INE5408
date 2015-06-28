@@ -1,0 +1,149 @@
+<beginning of page>
+getpwnam, getpwnam_r, getpwent, getpwent_r, getpwuid, getpwuid_r, setpwent, endpwent, fgetpwent, fgetpwent_r
+<-> get password entry
+#include <pwd.h>
+struct passwd *getpwnam(const char *name);
+struct passwd *getpwnam_r(const char *name, struct passwd *pwd,
+ char *buffer, int buflen);
+struct passwd *getpwent(void);
+struct passwd *getpwent_r(struct passwd *pwd, char *buffer,
+ int buflen);
+struct passwd *getpwuid(uid_t uid);
+struct passwd *getpwuid_r(uid_t uid, struct passwd *pwd,
+ char *buffer, int buflen);
+void setpwent(void);
+void endpwent(void);
+struct passwd *fgetpwent(FILE *f);
+struct passwd *fgetpwent_r(FILE *f, struct passwd *pwd,
+ char *buffer, int buflen);
+cc [ flag...] file... -D_POSIX_PTHREAD_SEMANTICS [ library... ]
+int getpwnam_r(const char *name, struct passwd *pwd, char *buffer,
+ size_t bufsize, struct passwd **result);
+int getpwuid_r(uid_t uid, struct passwd *pwd, char *buffer,
+ size_t bufsize, struct passwd **result);
+These functions are used to obtain password entries. Entries can come from any of the sources for passwd specified
+in the /etc/nsswitch.conf file (see nsswitch.conf(4)).
+The getpwnam() function searches for a password entry with the login name specified by the character string pa<hy>
+rameter name.
+The getpwuid() function searches for a password entry with the (numeric) user ID specified by the uid parameter.
+The setpwent(), getpwent(), and endpwent() functions are used to enumerate password entries from the database.
+The setpwent() function sets (or resets) the enumeration to the beginning of the set of password entries. This func<hy>
+tion should be called before the first call to getpwent(). Calls to getpwnam() and getpwuid() leave the enumeration
+position in an indeterminate state. Successive calls to getpwent() return either successive entries or a null pointer, in<hy>
+dicating the end of the enumeration.
+The endpwent() function may be called to indicate that the caller expects to do no further password retrieval opera<hy>
+tions; the system may then close the password file, deallocate resources it was using, and so forth. It is still allowed,
+but possibly less efficient, for the process to call more password functions after calling endpwent().
+The fgetpwent() function, unlike the other functions above, does not use nsswitch.conf but reads and parses the
+next line from the stream f, which is assumed to have the format of the passwd file. See passwd(4).
+The getpwnam(), getpwuid(), getpwent(), and fgetpwent() functions use thread-specific data storage that is reused
+in each call to one of these functions by the same thread, making them safe to use but not recommended for multi<hy>
+threaded applications.
+The parallel functions getpwnam_r(), getpwuid_r(), getpwent_r(), and fgetpwent_r() provide reentrant interfaces
+for these operations.
+Each reentrant interface performs the same operation as its non-reentrant counterpart, named by removing the "_r"
+<beginning of page>
+suffix. The reentrant interfaces, however, use buffers supplied by the caller to store returned results instead of using
+thread-specific data that can be overwritten by each call. They are safe for use in both single-threaded and multi<hy>
+threaded applications.
+Each reentrant interface takes the same parameters as its non-reentrant counterpart, as well as the following addi<hy>
+tional parameters. The pwd parameter must be a pointer to a struct passwd structure allocated by the caller. On suc<hy>
+cessful completion, the function returns the password entry in this structure. The parameter buffer is a pointer to a
+buffer supplied by the caller, used as storage space for the password data. All pointers within the returned struct
+passwd pwd point to data stored within this buffer; see passwd Structure below. The buffer must be large enough to
+hold all the data associated with the password entry. The parameter buflen (or bufsize for the standard-conforming
+versions; see standards(5)) should give the size in bytes of buffer. The maximum size needed for this buffer can be
+determined with the {_SC_GETPW_R_SIZE_MAX} sysconf(3C) parameter. The standard-conforming versions
+place a pointer to the modified pwd structure in the result parameter, instead of returning a pointer to this structure.
+A null pointer is returned at the location pointed to by result on error or if the requested entry is not found.
+For enumeration in multithreaded applications, the position within the enumeration is a process-wide property
+shared by all threads. The setpwent() function can be used in a multithreaded application but resets the enumeration
+position for all threads. If multiple threads interleave calls to getpwent_r(), the threads will enumerate disjoint sub<hy>
+sets of the password database.
+Like their non-reentrant counterparts, getpwnam_r() and getpwuid_r() leave the enumeration position in an inde<hy>
+terminate state.
+Password entries are represented by the struct passwd structure defined in <pwd.h>:
+ struct passwd {
+  char *pw_name; /* user's login name */
+  char *pw_passwd; /* no longer used */
+  uid_t pw_uid; /* user's uid */
+  gid_t pw_gid; /* user's gid */
+  char *pw_age; /* not used */
+  char *pw_comment; /* not used */
+  char *pw_gecos; /* typically user's full name */
+  char *pw_dir; /* user's home dir */
+  char *pw_shell; /* user's login shell */
+ };
+The pw_passwd member should not be used as the encrypted password for the user; use getspnam() or getsp<hy>
+nam_r() instead. See getspnam(3C).
+The getpwnam(), getpwnam_r(), getpwuid(), and getpwuid_r() functions each return a pointer to a struct passwd
+if they successfully locate the requested entry. A null pointer is returned if the requested entry is not found, or an er<hy>
+ror occurs. On error, errno is set to indicate the error.
+Applications wishing to check for error situations should set errno to 0 before calling getpwnam(), getpwnam_r(),
+getpwuid(), getpwuid_r(), getpwent(), getpwent_r(), fgetpwent(), and fgetpwent_r(). If these non-reentrant func<hy>
+tions return a null pointer and errno is non-zero, an error occurred.
+The standard-conforming functions getpwnam_r() and getpwuid_r() can return 0 even on an error, particularly in
+the case where the requested entry is not found. The application needs to check the return value and that the pwd
+pointer is non-null. Otherwise, an error value is returned to indicate the error.
+The getpwent(), getpwent_r(), fgetpwent(), and fgetpwent_r() functions each return a pointer to a struct passwd
+if they successfully enumerate an entry; otherwise they return a null pointer on end-of-file or error. On error, errno
+is set to indicate the error.
+See Intro(2) for the proper usage and interpretation of errno in multithreaded applications.
+The getpwnam(), getpwuid(), getpwent(), and fgetpwent() functions use thread-specific data storage, so returned
+data must be copied before a subsequent call to any of these functions if the data is to be saved.
+When the pointer returned by the reentrant functions getpwnam_r(), getpwuid_r(), getpwent_r(), and fgetp<hy>
+went_r() is non-null, it is always equal to the pwd pointer that was supplied by the caller.
+The getpwent_r(), fgetpwent(), and fgetpwent_r() functions will fail if:
+<beginning of page>
+EIO An I/O error has occurred.
+ERANGE Insufficient storage was supplied by buffer and bufsize to contain the data to be referenced by the result<hy>
+ing passwd structure.
+The getpwent_r() function will fail if:
+EMFILE There are {OPEN_MAX} file descriptors currently open in the calling process.
+ENFILE The maximum allowable number of files is currently open in the system.
+The getpwnam(), getpwnam_r(), getpwuid(), getpwuid_r(), getpwent(), setpwent(), and endpwent() functions
+may fail if:
+EIO An I/O error has occurred.
+The getpwnam(), getpwnam_r(), getpwuid(), getpwuid_r(), getpwent(), and setpwent() functions may fail if:
+EMFILE There are {OPEN_MAX} file descriptors currently open in the calling process.
+ENFILE The maximum allowable number of files is currently open in the system.
+The getpwnam(), getpwnam_r(), getpwuid(), and getpwuid_r() functions may fail if:
+EINTR A signal was caught during the execution of the function call.
+The getpwnam_r() and getpwuid_r() functions may fail if:
+ERANGE Insufficient storage was supplied by buffer and bufsize to contain the data to be referenced by the result<hy>
+ing passwd structure.
+Three names associated with the current process can be determined: getpwuid(geteuid()) returns the name associat<hy>
+ed with the effective user ID of the process; getlogin() returns the name associated with the current login activity;
+and getpwuid(getuid()) returns the name associated with the real user ID of the process.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed _ MT-LevelSee Reentrant Interfaces in DESCRIPTION. _ StandardSee below.
+For endpwent(), getpwent(), getpwnam(), getpwnam_r(), getpwuid(), getpwuid_r(), and setpwent(), see stan<hy>
+dards(5).
+nispasswd(1), passwd(1), yppasswd(1), Intro(2), Intro(3), cuserid(3C), getgrnam(3C), getlogin(3C), getsp<hy>
+nam(3C), nsswitch.conf(4), passwd(4), shadow(4), attributes(5), standards(5)
+When compiling multithreaded programs, see Intro(3).
+Use of the enumeration interfaces getpwent() and getpwent_r() is discouraged; enumeration is supported for the
+passwd file, NIS, and NIS+, but in general is not efficient and might not be supported for all database sources. The
+semantics of enumeration are discussed further in nsswitch.conf(4).
+Previous releases allowed the use of `+' and `-' entries in /etc/passwd to selectively include and exclude NIS entries.
+<beginning of page>
+The primary usage of these `+/-' entries is superseded by the name service switch, so the `+/-' form might not be
+supported in future releases.
+If required, the `+/-' functionality can still be obtained for NIS by specifying compat as the source for passwd.
+If the `+/-' functionality is required in conjunction with NIS+, specify both compat as the source for passwd and
+nisplus as the source for the pseudo-database passwd_compat. See passwd(4), shadow(4), and nsswitch.conf(4)
+for details.
+If the `+/-' is used, both /etc/shadow and /etc/passwd should have the same `+' and `-' entries to ensure consistency
+between the password and shadow databases.
+If a password entry from any of the sources contains an empty uid or gid field, that entry will be ignored by the files,
+NIS, and NIS+ name service switch backends, causing the user to appear unknown to the system.
+If a password entry contains an empty gecos, home directory, or shell field, getpwnam() and getpwnam_r() return a
+pointer to a null string in the respective field of the passwd structure.
+If the shell field is empty, login(1) automatically assigns the default shell. See login(1).
+Solaris 2.4 and earlier releases provided definitions of the getpwnam_r() and getpwuid_r() functions as specified in
+POSIX.1c Draft 6. The final POSIX.1c standard changed the interface for these functions. Support for the Draft 6 in<hy>
+terface is provided for compatibility only and might not be supported in future releases. New applications and li<hy>
+braries should use the standard-conforming interface.
+For POSIX.1c-conforming applications, the _POSIX_PTHREAD_SEMANTICS and _REENTRANT flags are
+automatically turned on by defining the _POSIX_C_SOURCE flag with a value <>=>199506L.

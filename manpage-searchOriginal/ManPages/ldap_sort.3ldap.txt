@@ -1,0 +1,39 @@
+<beginning of page>
+ldap_sort, ldap_sort_entries, ldap_sort_values, ldap_sort_strcasecmp <-> LDAP entry sorting functions
+cc[ flag... ] file... -lldap[ library... ]
+#include <lber.h>
+#include <ldap.h>
+ldap_sort_entries(LDAP *ld, LDAPMessage **chain, char *attr,
+ int (*cmp)());
+ldap_sort_values(LDAP *ld, char **vals, int (*cmp)());
+ldap_sort_strcasecmp(char *a, char *b);
+These functions are used to sort lists of entries and values retrieved from an LDAP server. ldap_sort_entries() is
+used to sort a chain of entries retrieved from an LDAP search call either by DN or by some arbitrary attribute in the
+entries. It takes ld, the LDAP structure, which is only used for error reporting, chain, the list of entries as returned
+by ldap_search_s(3LDAP) or ldap_result(3LDAP). attr is the attribute to use as a key in the sort or NULL to sort
+by DN, and cmp is the comparison function to use when comparing values (or individual DN components if sorting
+by DN). In this case, cmp should be a function taking two single values of the attr to sort by, and returning a value
+less than zero, equal to zero, or greater than zero, depending on whether the first argument is less than, equal to, or
+greater than the second argument. The convention is the same as used by qsort(3C), which is called to do the actual
+sorting.
+ldap_sort_values() is used to sort an array of values from an entry, as returned by ldap_get_values(3LDAP). It
+takes the LDAP connection structure ld, the array of values to sort vals, and cmp, the comparison function to use
+during the sort. Note that cmp will be passed a pointer to each element in the vals array, so if you pass the normal
+char ** for this parameter, cmp should take two char **'s as arguments (that is, you cannot pass strcasecmp or its
+friends for cmp). You can, however, pass the function ldap_sort_strcasecmp() for this purpose.
+For example:
+  LDAP *ld;
+  LDAPMessage *res;
+  /* ... call to ldap_search_s(), fill in res, retrieve sn attr ... */
+  /* now sort the entries on surname attribute */
+  if ( ldap_sort_entries( ld, &res, "sn", ldap_sort_strcasecmp ) != 0 )
+   ldap_perror( ld, "ldap_sort_entries" );
+See attributes(5) for a description of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE AvailabilitySUNWcsl
+(32-bit) SUNWcslx (64-bit) Interface StabilityEvolving
+ldap(3LDAP), ldap_search(3LDAP), ldap_result(3LDAP), qsort(3C), attributes(5)
+The ldap_sort_entries() function applies the comparison function to each value of the attribute in the array as re<hy>
+turned by a call to ldap_get_values(3LDAP), until a mismatch is found. This works fine for single-valued attributes,
+but may produce unexpected results for multi-valued attributes. When sorting by DN, the comparison function is ap<hy>
+plied to an exploded version of the DN, without types. The return values for all of these functions are declared in the
+<ldap.h> header file. Some functions may allocate memory which must be freed by the calling application.

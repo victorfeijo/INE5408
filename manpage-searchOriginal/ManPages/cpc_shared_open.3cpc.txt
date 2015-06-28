@@ -1,0 +1,52 @@
+<beginning of page>
+cpc_shared_open, cpc_shared_bind_event, cpc_shared_take_sample, cpc_shared_rele, cpc_shared_close <-> use CPU
+performance counters on processors
+cc [ flag... ] file... <mi>lcpc [ library... ]
+#include <libcpc.h>
+int cpc_shared_open(void);
+int cpc_shared_bind_event(int fd, cpc_event_t *event, int flags);
+int cpc_shared_take_sample(int fd, cpc_event_t *event);
+int cpc_shared_rele(int fd);
+void cpc_shared_close(int fd);
+The cpc_shared_open() function allows the caller to access the hardware counters in such a way that the perfor<hy>
+mance of the currently bound CPU can be measured. The function returns a file descriptor if successful. Only one
+such open can be active at a time on any CPU.
+The cpc_shared_bind_event(), cpc_shared_take_sample(), and cpc_shared_rele() functions are directly analo<hy>
+gous to the corresponding cpc_bind_event(), cpc_take_sample(), and cpc_rele() functions described on the
+cpc_bind_event(3CPC)manual page, except that they operate on the counters of a particular processor.
+If a thread wishes to access the counters using this interface, it must do so using a thread bound to an lwp, (see the
+THR_BOUND flag to thr_create(3C)), that has in turn bound itself to a processor using processor_bind(2).
+Unlike the cpc_bind_event(3CPC) family of functions, no counter context is attached to those lwps, so the perfor<hy>
+mance counter samples from the processors reflects the system-wide usage, instead of per-lwp usage.
+The first successful invocation of cpc_shared_open() will immediately invalidate all existing performance counter
+context on the system, and prevent all subsequent attempts to bind counter context to lwps from succeeding any<hy>
+where on the system until the last caller invokes cpc_shared_close().
+This is because it is impossible to simultaneously use the counters to accurately measure per-lwp and system-wide
+events, so there is an exclusive interlock between these uses.
+Access to the shared counters is mediated by file permissions on a cpc pseudo device. Only a user with the
+{PRIV_SYS_CONFIG} privilege is allowed to access the shared device. This control prevents use of the counters
+on a per-lwp basis to other users.
+The CPC_BIND_LWP_INHERIT and CPC_BIND_EMT_OVF flags are invalid for the shared interface.
+On success, the functions (except for cpc_shared_close()) return 0. On failure, the functions return -1 and set errno
+to indicate the reason.
+EACCES The caller does not have appropriate privilege to access the CPU performance counters system-wide.
+EAGAIN For cpc_shared_open(), this value implies that the counters on the bound cpu are busy because they are
+already being used to measure system-wide events by some other caller.
+EAGAIN Otherwise, this return value implies that the counters are not available because the thread has been un<hy>
+bound from the processor it was bound to at open time. Robust programs should be coded to expect this behavior,
+and should invoke cpc_shared_close(), before retrying the operation.
+EINVAL The counters cannot be accessed on the current CPU because the calling thread is not bound to that CPU
+using processor_bind(2).
+ENOTSUP The caller has attempted an operation that is illegal or not supported on the current platform.
+<beginning of page>
+ENXIO The current machine either has no performance counters, or has been configured to disallow access to them
+system-wide.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelMT-Safe
+_ Interface StabilityObsolete
+processor_bind(2), cpc(3CPC), cpc_bind_cpu(3CPC), cpc_bind_event(3CPC), cpc_set_sample(3CPC), cpc_un<hy>
+bind(3CPC), libcpc(3LIB), thr_create(3C), attributes(5)
+The cpc_shared_open(), cpc_shared_bind_event(), cpc_shared_take_sample(), cpc_shared_rele(), and
+cpc_shared_close() functions exist for binary compatibility only. Source containing these functions will not com<hy>
+pile. These functions are obsolete and might be removed in a future release. Applications should use
+cpc_bind_cpu(3CPC), cpc_set_sample(3CPC), and cpc_unbind(3CPC) instead.

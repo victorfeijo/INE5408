@@ -1,0 +1,68 @@
+<beginning of page>
+scsi_hba_attach_setup, scsi_hba_attach, scsi_hba_detach <-> SCSI HBA attach and detach routines
+#include <sys/scsi/scsi.h>
+int scsi_hba_attach_setup(dev_info_t *dip, ddi_dma_attr_t *hba_dma_attr,
+ scsi_hba_tran_t *hba_tran, int hba_flags);
+int scsi_hba_attach(dev_info_t *dip, ddi_dma_lim_t *hba_lim,
+ scsi_hba_tran_t *hba_tran, int hba_flags, void *hba_options);
+int scsi_hba_detach(dev_info_t *dip);
+Solaris architecture specific (Solaris DDI).
+dip Pointer to the dev_info_t structure that refers to the instance of the HBA device.
+hba_lim Pointer to a ddi_dma_lim(9S) structure.
+hba_tran Pointer to a scsi_hba_tran(9S) structure.
+hba_flags Flag modifiers. The defined flag values are SCSI_HBA_TRAN_CLONE, SCSI_HBA_TRAN_SCB, and
+SCSI_HBA_TRAN_CDB.
+hba_options Optional features provided by the HBA driver for future extensions; must be NULL.
+hba_dma_attr Pointer to a ddi_dma_attr(9S) structure.
+The scsi_hba_attach_setup() function is the recommended interface over the scsi_hba_attach() function.
+The scsi_hba_attach() function registers the hba_lim DMA limits and the hba_tran transport vectors of each in<hy>
+stance of the HBA device defined by dip. The scsi_hba_attach_setup() function registers the hba_dma_attr DMA
+attributes and the hba_tran transport vectors of each instance of the HBA device defined by dip. The HBA driver can
+pass different DMA limits or DMA attributes and the transport vectors for each instance of the device to support any
+constraints imposed by the HBA itself.
+The scsi_hba_attach() and scsi_hba_attach_setup() functions use the dev_bus_ops field in the dev_ops(9S) struc<hy>
+ture. The HBA driver should initialize this field to NULL before calling scsi_hba_attach() or scsi_hba_attach_set<hy>
+up().
+If SCSI_HBA_TRAN_CLONE is requested in hba_flags, the hba_tran structure is cloned once for each target that
+is attached to the HBA. The structure is cloned before the tran_tgt_init(9E) entry point is called to initialize a tar<hy>
+get. At all subsequent HBA entry points, including tran_tgt_init(9E), the scsi_hba_tran_t structure passed as an ar<hy>
+gument or found in a scsi_address structure is the cloned scsi_hba_tran_t structure,which allows the HBA to use
+the tran_tgt_private field in the scsi_hba_tran_t structure to point to per-target data. The HBA should free only the
+same scsi_hba_tran_t structure allocated when the HBA detaches. All cloned scsi_hba_tran_t structures that are
+allocated by the system are freed by the system.
+The flags SCSI_HBA_TRAN_CDB and SCSI_HBA_TRAN_SCB are only valid when tran_setup_pkt() is used.
+See tran_setup_pkt(9E) for information on using these flags.
+The scsi_hba_attach() and scsi_hba_attach_setup() functions attach a number of integer-valued properties to dip,
+unless properties of the same name are already attached to the node. An HBA driver should retrieve these configura<hy>
+tion parameters via ddi_prop_get_int(9F), and respect any settings for features provided the HBA.
+scsi-options Optional SCSI configuration bits
+<beginning of page>
+SCSI_OPTIONS_DR If not set, the HBA should not grant Disconnect privileges to target devices.
+SCSI_OPTIONS_TAG If not set, the HBA should not operate in Command Tagged Queueing mode.
+SCSI_OPTIONS_PARITY If not set, the HBA should not operate in parity mode.
+SCSI_OPTIONS_QAS If not set, the HBA should not make use of the Quick Arbitration Select feature. Consult
+your Sun hardware documentation to determine whether your machine supports QAS.
+SCSI_OPTIONS_FAST If not set, the HBA should not operate the bus in FAST SCSI mode.
+SCSI_OPTIONS_FAST20 If not set, the HBA should not operate the bus in FAST20 SCSI mode.
+SCSI_OPTIONS_FAST40 If not set, the HBA should not operate the bus in FAST40 SCSI mode.
+SCSI_OPTIONS_FAST80 If not set, the HBA should not operate the bus in FAST80 SCSI mode.
+SCSI_OPTIONS_FAST160 If not set, the HBA should not operate the bus in FAST160 SCSI mode.
+SCSI_OPTIONS_FAST320 If not set, the HBA should not operate the bus in FAST320 SCSI mode.
+SCSI_OPTIONS_WIDE If not set, the HBA should not operate the bus in WIDE SCSI mode.
+SCSI_OPTIONS_SYNC If not set, the HBA should not operate the bus in synchronous transfer mode.
+scsi-reset-delay SCSI bus or device reset recovery time, in milliseconds.
+scsi-selection-timeout Default SCSI selection phase timeout value, in milliseconds. Please refer to individual HBA
+man pages for any HBA-specific information
+The scsi_hba_detach() function removes the reference to the DMA limits or attributes structure and the transport
+vector for the given instance of an HBA driver.
+The scsi_hba_attach(), scsi_hba_attach_setup(), and scsi_hba_detach() functions return DDI_SUCCESS if the
+function call succeeds, and return DDI_FAILURE on failure.
+The scsi_hba_attach() and scsi_hba_attach_setup() functions should be called from attach(9E). The scsi_hba_de<hy>
+tach() function should be called from detach(9E).
+attach(9E), detach(9E), tran_setup_pkt(9E), tran_tgt_init(9E), ddi_prop_get_int(9F), ddi_dma_attr(9S),
+ddi_dma_lim(9S), dev_ops(9S), scsi_address(9S), scsi_hba_tran(9S)
+Writing Device Drivers
+It is the HBA driver's responsibility to ensure that no more transport requests will be taken on behalf of any SCSI
+target device driver after scsi_hba_detach() is called.
+The scsi_hba_attach() function is obsolete and will be discontinued in a future release. This function is replaced by
+scsi_hba_attach_setup().

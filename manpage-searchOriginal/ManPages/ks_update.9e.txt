@@ -1,0 +1,39 @@
+<beginning of page>
+ks_update <-> dynamically update kstats
+#include <sys/types.h>
+#include <sys/kstat.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+int prefix_ks_update(kstat_t *ksp, int rw);
+Solaris DDI specific (Solaris DDI)
+ksp Pointer to a kstat(9S) structure.
+rw Read/Write flag. Possible values are
+KSTAT_READ Update kstat structure statistics from the driver.
+KSTAT_WRITE Update driver statistics from the kstat structure.
+The kstat mechanism allows for an optional ks_update() function to update kstat data. This is useful for drivers
+where the underlying device keeps cheap hardware statistics, but extraction is expensive. Instead of constantly keep<hy>
+ing the kstat data section up to date, the driver can supply a ks_update() function which updates the kstat's data sec<hy>
+tion on demand. To take advantage of this feature, set the ks_update field before calling kstat_install(9F).
+The ks_update() function must have the following structure:
+ static int
+ xx_kstat_update(kstat_t *ksp, int rw)
+ {
+  if (rw == KSTAT_WRITE) {
+   /* update the native stats from ksp->ks_data */
+   /* return EACCES if you don't support this */
+  } else {
+   /* update ksp->ks_data from the native stats */
+  }
+  return (0);
+ }
+In general, the ks_update() routine may need to refer to provider-private data; for example, it may need a pointer to
+the provider's raw statistics. The ks_private field is available for this purpose. Its use is entirely at the provider's
+discretion.
+No kstat locking should be done inside the ks_update() routine. The caller will already be holding the kstat's
+ks_lock (to ensure consistent data) and will prevent the kstat from being removed.
+ks_update() should return
+0 For success.
+EACCES If KSTAT_WRITE is not allowed.
+EIO For any other error.
+kstat_create(9F), kstat_install(9F), kstat(9S)
+Writing Device Drivers

@@ -1,0 +1,255 @@
+<beginning of page>
+slp_api <-> Service Location Protocol Application Programming Interface
+cc [ flag ... ] file ... -lslp [ library ... ]
+#include <slp.h>
+The slp_api is a C language binding that maps directly into the Service Location Protocol ("SLP") defined by
+RFC 2614. This implementation requires minimal overhead. With the exception of the SLPDereg() and SLPDe<hy>
+lAttrs() functions, which map into different uses of the SLP deregister request, there is one C language func<hy>
+tion per protocol request. Parameters are for the most part character buffers. Memory management is kept simple
+because the client allocates most memory and client callback functions are required to copy incoming parameters in<hy>
+to memory allocated by the client code. Any memory returned directly from the API functions is deallocated using
+the SLPFree() function.
+To conform with standard C practice, all character strings passed to and returned through the API are null-terminat<hy>
+ed, even though the SLP protocol does not use null-terminated strings. Strings passed as parameters are UTF-8 but
+they may still be passed as a C string (a null-terminated sequence of bytes.) Escaped characters must be encoded by
+the API client as UTF-8. In the common case of US-ASCII, the usual one byte per character C strings work. API
+functions assist in escaping and unescaping strings.
+Unless otherwise noted, parameters to API functions and callbacks are non-NULL. Some parameters may have other
+restrictions. If any parameter fails to satisfy the restrictions on its value, the operation returns a PARAME<hy>
+TER_BAD error.
+Query strings, attribute registration lists, attribute deregistration lists, scope lists, and attribute selection lists follow
+the syntax described in RFC 2608. The API reflects the strings passed from clients directly into protocol requests,
+and reflects out strings returned from protocol replies directly to clients. As a consequence, clients are responsible
+for formatting request strings, including escaping and converting opaque values to escaped byte-encoded strings.
+Similarly, on output, clients are required to unescape strings and convert escaped string-encoded opaques to binary.
+The SLPEscape() and SLPUnescape() functions can be used for escaping SLP reserved characters, but they per<hy>
+form no opaque processing.
+Opaque values consist of a character buffer that contains a UTF-8-encoded string, the first characters of which are
+the non UTF-8 encoding "". Subsequent characters are the escaped values for the original bytes in the opaque. The
+escape convention is relatively simple. An escape consists of a backslash followed by the two hexadecimal digits en<hy>
+coding the byte. An example is "2c" for the byte 0x2c. Clients handle opaque processing themselves, since the algo<hy>
+rithm is relatively simple and uniform.
+The system properties established in slp.conf(4), the configuration file, are accessible through the SLPGetProper<hy>
+ty() and SLPSetProperty() functions. The SLPSetProperty() function modifies properties only in the running
+process, not in the configuration file. Errors are checked when the property is used and, as with parsing the configu<hy>
+ration file, are logged at the LOG_INFO priority. Program execution continues without interruption by substituting
+the default for the erroneous parameter. In general, individual agents should rarely be required to override these
+properties, since they reflect properties of the SLP network that are not of concern to individual agents. If changes
+are required, system administrators should modify the configuration file.
+Properties are global to the process, affecting all threads and all handles created with SLPOpen().
+The only API functions that return memory specifically requiring deallocation on the part of the client are SLPPars<hy>
+eSrvURL(), SLPFindScope(), SLPEscape(), and SLPUnescape(). Free this memory with SLPFree() when it is no
+longer needed. Do not free character strings returned by means of the SLPGetProperty() function.
+Any memory passed to callbacks belongs to the library, and it must not be retained by the client code. Otherwise,
+crashes are possible. Clients must copy data out of the callback parameters. No other use of the memory in callback
+parameters is allowed.
+If a handle parameter to an API function is opened asynchronously, the API function calls on the handle to check
+the other parameters, opens the appropriate operation, and returns immediately. If an error occurs in the process of
+starting the operation, the error code is returned. If the handle parameter is opened synchronously, the function call
+is blocked until all results are available, and it returns only after the results are reported through the callback func<hy>
+tion. The return code indicates whether any errors occurred during the operation.
+The callback function is called whenever the API library has results to report. The callback code is required to check
+the error code parameter before looking at the other parameters. If the error code is not SLP_OK, the other parame<hy>
+ters may be NULL or otherwise invalid. The API library can terminate any outstanding operation on which an error
+occurs. The callback code can similarly indicate that the operation should be terminated by passing back
+SLP_FALSE to indicate that it is not interested in receiving more results. Callback functions are not permitted to re<hy>
+<beginning of page>
+cursively call into the API on the same SLPHandle. If an attempt is made to call into the API, the API function re<hy>
+turns SLP_HANDLE_IN_USE. Prohibiting recursive callbacks on the same handle simplifies implementation of
+thread safe code, since locks held on the handle will not be in place during a second outcall on the handle.
+The total number of results received can be controlled by setting the net.slp.maxResults parameter.
+On the last call to a callback, whether asynchronous or synchronous, the status code passed to the callback has value
+SLP_LAST_CALL. There are four reasons why the call can terminate:
+DA reply received A reply from a DA has been received and therefore nothing more is expected.
+Multicast terminated The multicast convergence time has elapsed and the API library multicast code is giving up.
+Multicast null results Nothing new has been received during multicast for awhile and the API library multicast
+code is giving up on that (as an optimization).
+Maximum results The user has set the net.slp.maxResults property and that number of replies has been collected
+and returned.
+The API library reads slp.conf(4), the default configuration file, to obtain the operating parameters. You can specify
+the location of this file with the SLP_CONF_FILE environment variable. If you do not set this variable, or the file it
+refers to is invalid, the API will use the default configuration file at /etc/inet/slp.conf instead.
+The data structures used by the SLP API are as follows:
+ typedef enum {
+  SLP_LIFETIME_DEFAULT = 10800,
+  SLP_LIFETIME_MAXIMUM = 65535
+ } SLPURLLifetime;
+The enumeration SLPURLLifetime contains URL lifetime values, in seconds, that are frequently used.
+SLP_LIFETIME_DEFAULT is 3 hours, while SLP_LIFETIME_MAXIMUM is 18 hours, which corresponds to
+the maximum size of the lifetime field in SLP messages. Note that on registration SLP_LIFETIME_MAXIMUM
+causes the advertisement to be continually reregistered until the process exits.
+ typedef enum {
+  SLP_FALSE = 0,
+  SLP_TRUE = 1
+ } SLPBoolean;
+The enumeration SLPBoolean is used as a Boolean flag.
+ typedef struct srvurl {
+  char *s_pcSrvType;
+  char *s_pcHost;
+  int s_iPort;
+  char *s_pcNetFamily;
+  char *s_pcSrvPart;
+ } SLPSrvURL;
+The SLPSrvURL structure is filled in by the SLPParseSrvURL() function with information parsed from a charac<hy>
+ter buffer containing a service URL. The fields correspond to different parts of the URL, as follows:
+s_pcSrvType A pointer to a character string containing the service type name, including naming authority.
+s_pcHost A pointer to a character string containing the host identification information.
+<beginning of page>
+s_iPort The port number, or zero, if none. The port is only available if the transport is IP.
+s_pcNetFamily A pointer to a character string containing the network address family identifier. Possible values are
+"ipx" for the IPX family, "at" for the Appletalk family, and "", the empty string, for the IP address family.
+s_pcSrvPart The remainder of the URL, after the host identification.
+The host and port should be sufficient to open a socket to the machine hosting the service; the remainder of the URL
+should allow further differentiation of the service.
+ typedef void* SLPHandle;
+The SLPHandle type is returned by SLPOpen() and is a parameter to all SLP functions. It serves as a handle for all
+resources allocated on behalf of the process by the SLP library. The type is opaque.
+Include a function pointer to a callback function specific to a particular API operation in the parameter list when the
+API function is invoked. The callback function is called with the results of the operation in both the synchronous
+and asynchronous cases. When the callback function is invoked, the memory included in the callback parameters is
+owned by the API library, and the client code in the callback must copy out the contents if it wants to maintain the
+information longer than the duration of the current callback call.
+Each callback parameter list contains parameters for reporting the results of the operation, as well as an error code
+parameter and a cookie parameter. The error code parameter reports the error status of the ongoing (for asynchro<hy>
+nous) or completed (for synchronous) operation. The cookie parameter allows the client code that starts the opera<hy>
+tion by invoking the API function to pass information down to the callback without using global variables. The call<hy>
+back returns an SLPBoolean to indicate whether the API library should continue processing the operation. If the
+value returned from the callback is SLP_TRUE, asynchronous operations are terminated. Synchronous operations
+ignore the return since the operation is already complete.
+ typedef void SLPRegReport(SLPHandle hSLP,
+  SLPError errCode,
+  void *pvCookie);
+SLPRegReport() is the callback function to the SLPReg(), SLPDereg(), and SLPDelAttrs() functions. The SL<hy>
+PRegReport() callback has the following parameters:
+hSLP TheSLPHandle() used to initiate the operation.
+errCode An error code indicating if an error occurred during the operation.
+pvCookie Memory passed down from the client code that called the original API function, starting the operation. It
+may be NULL.
+ typedef SLPBoolean SLPSrvTypeCallback(SLPHandle hSLP,
+  const char* pcSrvTypes,
+  SLPError errCode,
+  void *pvCookie);
+The SLPSrvTypeCallback() type is the type of the callback function parameter to the SLPFindSrvTypes() func<hy>
+tion. The results are collated when the hSLP handle is opened either synchronously or asynchronously. The SLPSrv<hy>
+TypeCallback() callback has the following parameters:
+hSLP The SLPHandle used to initiate the operation.
+pcSrvTypes A character buffer containing a comma-separated, null-terminated list of service types.
+<beginning of page>
+errCode An error code indicating if an error occurred during the operation. The callback should check this error
+code before processing the parameters. If the error code is other than SLP_OK, then the API library may choose to
+terminate the outstanding operation.
+pvCookie emory passed down from the client code that called the original API function, starting the operation. It can
+be NULL.
+ typedef SLPBoolean SLPSrvURLCallback(SLPHandle hSLP,
+  const char* pcSrvURL,
+  unsigned short usLifetime,
+  SLPError errCode,
+  void *pvCookie);
+The SLPSrvURLCallback() type is the type of the callback function parameter to the SLPFindSrvs() function.
+The results are collated, regardless of whether the hSLP was opened collated or uncollated. The SLPSrvURLCall<hy>
+back() callback has the following parameters:
+hSLP The SLPHandle used to initiate the operation.
+pcSrvURL A character buffer containing the returned service URL.
+usLifetime An unsigned short giving the life time of the service advertisement. The value must be an unsigned inte<hy>
+ger less than or equal to SLP_LIFETIME_MAXIMUM.
+errCode An error code indicating if an error occurred during the operation. The callback should check this error
+code before processing the parameters. If the error code is other than SLP_OK, then the API library may choose to
+terminate the outstanding operation.
+pvCookie Memory passed down from the client code that called the original API function, starting the operation. It
+can be NULL.
+ typedef SLPBoolean SLPAttrCallback(SLPHandle hSLP,
+  const char* pcAttrList,
+  SLPError errCode,
+  void *pvCookie);
+The SLPAttrCallback() type is the type of the callback function parameter to the SLPFindAttrs() function.
+The behavior of the callback differs depending upon whether the attribute request was by URL or by service type. If
+the SLPFindAttrs() operation was originally called with a URL, the callback is called once, in addition to the last
+call, regardless of whether the handle was opened asynchronously or synchronously. The pcAttrList parameter con<hy>
+tains the requested attributes as a comma-separated list. It is empty if no attributes match the original tag list.
+If the SLPFindAttrs() operation was originally called with a service type, the value of pcAttrList and the calling be<hy>
+havior depend upon whether the handle was opened asynchronously or synchronously. If the handle was opened
+asynchronously, the callback is called every time the API library has results from a remote agent. The pcAttrList pa<hy>
+rameter is collated between calls, and contains a comma-separated list of the results from the agent that immediately
+returned. If the handle was opened synchronously, the results are collated from all returning agents, the callback is
+called once, and the pcAttrList parameter is set to the collated result.
+SLPAttrCallback() callback has the following parameters:
+hSLP The SLPHandle used to initiate the operation.
+<beginning of page>
+pcAttrList A character buffer containing a comma-separated and null-terminated list of attribute id/value assign<hy>
+ments, in SLP wire format.
+errCode An error code indicating if an error occurred during the operation. The callback should check this error
+code before processing the parameters. If the error code is other than SLP_OK, then the API library may choose to
+terminate the outstanding operation.
+pvCookie Memory passed down from the client code that called the original API function, starting the operation. It
+can be NULL.
+An interface that is part of the SLP API may return one of the following values.
+SLP_LAST_CALL The SLP_LAST_CALL code is passed to callback functions when the API library has no
+more data for them and therefore no further calls will be made to the callback on the currently outstanding operation.
+The callback uses this to signal the main body of the client code that no more data will be forthcoming on the opera<hy>
+tion, so that the main body of the client code can break out of data collection loops. On the last call of a callback
+during both a synchronous and asynchronous call, the error code parameter has value SLP_LAST_CALL, and the
+other parameters are all NULL. If no results are returned by an API operation, then only one call is made, with the
+error parameter set to SLP_LAST_CALL.
+SLP_OK The SLP_OK code indicates that the no error occurred during the operation.
+SLP_LANGUAGE_NOT_SUPPORTED No DA or SA has service advertisement information in the language re<hy>
+quested, but at least one DA or SA might have information for that service in another language.
+SLP_PARSE_ERROR The SLP message was rejected by a remote SLP agent. The API returns this error only
+when no information was retrieved, and at least one SA or DA indicated a protocol error. The data supplied through
+the API may be malformed or damaged in transit.
+SLP_INVALID_REGISTRATION The API may return this error if an attempt to register a service was rejected by
+all DAs because of a malformed URL or attributes.SLP does not return the error if at least one DA accepts the regis<hy>
+tration.
+SLP_SCOPE_NOT_SUPPORTED The API returns this error if the UA or SA has been configured with the
+net.slp.useScopes list of scopes and the SA request did not specify one or more of these allowable scopes, and no
+others. It may also be returned by a DA if the scope included in a request is not supported by a DA.
+SLP_AUTHENTICATION_ABSENT This error arises when the UA or SA failed to send an authenticator for re<hy>
+quests or registrations when security is enabled and thus required.
+SLP_AUTHENTICATION_FAILED This error arises when a authentication on an SLP message received from a
+remote SLP agent failed.
+SLP_INVALID_UPDATE An update for a nonexisting registration was issued, or the update includes a service type
+or scope different than that in the initial registration.
+SLP_REFRESH_REJECTED The SA attempted to refresh a registration more frequently than the minimum re<hy>
+fresh interval. The SA should call the appropriate API function to obtain the minimum refresh interval to use.
+SLP_NOT_IMPLEMENTED An outgoing request overflowed the maximum network MTU size. The request
+should be reduced in size or broken into pieces and tried again.
+<beginning of page>
+SLP_BUFFER_OVERFLOW An outgoing request overflowed the maximum network MTU size. The request
+should be reduced in size or broken into pieces and tried again.
+SLP_NETWORK_TIMED_OUT When no reply can be obtained in the time specified by the configured timeout
+interval, this error is returned.
+SLP_NETWORK_INIT_FAILED If the network cannot initialize properly, this error is returned.
+SLP_MEMORY_ALLOC_FAILED If the API fails to allocate memory, the operationis aborted and returns this.
+SLP_PARAMETER_BAD If a parameter passed into an interface is bad, this error is returned.
+SLP_NETWORK_ERROR The failure of networking during normal operations causes this error to be returned.
+SLP_INTERNAL_SYSTEM_ERROR A basic failure of the API causes this error to be returned. This occurs
+when a system call or library fails. The operation could not recover.
+SLP_HANDLE_IN_USE In the C API, callback functions are not permitted to recursively call into the API on the
+same SLPHandle, either directly or indirectly. If an attempt is made to do so, this error is returned from the called
+API function
+SLPOpen() open an SLP handle
+SLPClose() close an open SLP handle
+SLPReg() register a service advertisement
+SLPDereg() deregister a service advertisement
+SLPDelAttrs() delete attributes
+SLPFindSrvTypes() return service types
+SLPFindSrvs() return service URLs
+SLPFindAttrs() return service attributes
+SLPGetRefreshInterval() return the maximum allowed refresh interval for SAs
+SLPFindScopes() return list of configured and discovered scopes
+SLPParseSrvURL() parse service URL
+SLPEscape() escape special characters
+<beginning of page>
+SLPUnescape() translate escaped characters into UTF-8
+SLPGetProperty() return SLP configuration property
+SLPSetProperty() set an SLP configuration property
+slp_strerror() map SLP error code to message
+SLPFree() free memory
+When SLP_CONF_FILE is set, use this file for configuration.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wslpu _ CSICSI-enabled _ MT-LevelSafe
+slpd(1M), slp.conf(4), slpd.reg(4), attributes(5)
+System Administration Guide: Network Services
+Guttman, E., Perkins, C., Veizades, J., and Day, M. RFC 2608, Service Location Protocol, Version 2. The Internet
+Society. June 1999.
+Kempf, J. and Guttman, E. RFC 2614, An API for Service Location. The Internet Society. June 1999.

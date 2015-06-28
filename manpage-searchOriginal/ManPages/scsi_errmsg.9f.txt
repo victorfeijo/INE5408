@@ -1,0 +1,73 @@
+<beginning of page>
+scsi_errmsg <-> display a SCSI request sense message
+#include <sys/scsi/scsi.h>
+void scsi_errmsg(struct scsi_device *devp, struct scsi_pkt *pktp,
+ char *drv_name, int severity, daddr_t blkno, daddr_t err_blkno,
+ struct scsi_key_strings *cmdlist, struct scsi_extended_sense *sensep);
+Solaris DDI specific (Solaris DDI).
+devp Pointer to the scsi_device(9S) structure.
+pktp Pointer to a scsi_pkt(9S) structure.
+drv_name String used by scsi_log(9F).
+severity Error severity level, maps to severity strings below.
+blkno Requested block number.
+err_blkno Error block number.
+cmdlist An array of SCSI command description strings.
+sensep A pointer to a scsi_extended_sense(9S) structure.
+The scsi_errmsg() function interprets the request sense information in the sensep pointer and generates a standard
+message that is displayed using scsi_log(9F). The first line of the message is always a CE_WARN, with the continu<hy>
+ation lines being CE_CONT. sensep may be NULL, in which case no sense key or vendor information is displayed.
+The driver should make the determination as to when to call this function based on the severity of the failure and the
+severity level that the driver wants to report.
+The scsi_device(9S) structure denoted by devp supplies the identification of the device that requested the display.
+severity selects which string is used in the "Error Level:" reporting, according to the following table:
+tab(); cw(2.68i) cw(2.76i) cw(.06i) lw(2.68i) lw(2.76i) lw(.06i) Severity Value:String: SCSI_ERR_ALLAll SC<hy>
+SI_ERR_UNKNOWNUnknown SCSI_ERR_INFOInformational SCSI_ERR_RECOVERERecovered SC<hy>
+SI_ERR_RETRYABLRetryable SCSI_ERR_FATALFatal
+blkno is the block number of the original request that generated the error. err_blkno is the block number where the
+error occurred. cmdlist is a mapping table for translating the SCSI command code in pktp to the actual command
+string.
+The cmdlist is described in the structure below:
+ struct scsi_key_strings {
+  int key;
+  char *message;
+ };
+For a basic SCSI disk, the following list is appropriate:
+<beginning of page>
+ static struct scsi_key_strings scsi_cmds[] = {
+  0x00, "test unit ready",
+  0x01, "rezero/rewind",
+  0x03, "request sense",
+  0x04, "format",
+  0x07, "reassign",
+  0x08, "read",
+  0x0a, "write",
+  0x0b, "seek",
+  0x12, "inquiry",
+  0x15, "mode select",
+  0x16, "reserve",
+  0x17, "release",
+  0x18, "copy",
+  0x1a, "mode sense",
+  0x1b, "start/stop",
+  0x1e, "door lock",
+  0x28, "read(10)",
+  0x2a, "write(10)",
+  0x2f, "verify",
+  0x37, "read defect data",
+  0x3b, "write buffer",
+  -1, NULL
+ };
+The scsi_errmsg() function may be called from user, interrupt, or kernel context. Example 1 Generating error in<hy>
+formation.
+This entry:
+ scsi_errmsg(devp, pkt, "sd", SCSI_ERR_INFO, bp->b_blkno,
+  err_blkno, sd_cmds, rqsense);
+Generates:
+ WARNING: /sbus@1,f8000000/esp@0,800000/sd@1,0 (sd1):
+ Error for Command: read Error Level: Informational
+ Requested Block: 23936 Error Block: 23936
+ Vendor: QUANTUM Serial Number: 123456
+ Sense Key: Unit Attention
+ ASC: 0x29 (reset), ASCQ: 0x0, FRU: 0x0
+cmn_err(9F), scsi_log(9F), scsi_device(9S), scsi_extended_sense(9S), scsi_pkt(9S)
+Writing Device Drivers

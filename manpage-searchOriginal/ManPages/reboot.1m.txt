@@ -1,0 +1,109 @@
+<beginning of page>
+reboot <-> restart the operating system
+/usr/sbin/reboot [-dlnq] [boot_arguments]
+/usr/sbin/reboot [-f [-e environment] | -p] [-dlnq] [boot_arguments]
+The reboot utility restarts the kernel. The kernel is loaded into memory by the PROM monitor, which transfers con<hy>
+trol to the loaded kernel.
+On x86 systems, when the -f flag is specified, the running kernel will load the next kernel into memory, then transfer
+control to the newly loaded kernel. This form of reboot is shown in the second synopsis, above.
+Although reboot can be run by the super-user at any time, shutdown(1M) is normally used first to warn all users
+logged in of the impending loss of service. See shutdown(1M) for details.
+The reboot utility performs a sync(1M) operation on the disks, and then a multi-user reboot is initiated. See
+init(1M) for details. On x86 systems, reboot may also update the boot archive as needed to ensure a successful re<hy>
+boot.
+The reboot utility normally logs the reboot to the system log daemon, syslogd(1M), and places a shutdown record in
+the login accounting file /var/adm/wtmpx. These actions are inhibited if the -n or -q options are present.
+Normally, the system reboots itself at power-up or after crashes.
+The following options are supported:
+-d
+Force a system crash dump before rebooting. See dumpadm(1M) for information on configuring system crash
+dumps.
+-e
+If -f is present, reboot to the specified boot environment.
+-f
+Fast reboot, bypassing firmware and boot loader. The new kernel will be loaded into memory by the running kernel,
+and control will be transferred to the newly loaded kernel. If disk or kernel arguments are specified, they must be
+specified before other boot arguments.
+This option is currently available only on x86 systems.
+Service svc:/system/boot-config:default is enabled by default. It requires solaris.system.shutdown as action_au<hy>
+thorization and value_authorization. When the config/fastreboot_default property is set to true, reboot will be<hy>
+have as reboot -f. The value of this property can be changed using svccfg(1M) and svcadm(1M), to control the de<hy>
+fault reboot behavior.
+See EXAMPLES for details.
+-l
+Suppress sending a message to the system log daemon, syslogd(1M) about who executed reboot.
+-n
+Avoid calling sync(2) and do not log the reboot to syslogd(1M) or to /var/adm/wtmpx. The kernel still attempts to
+sync filesystems prior to reboot, except if the -d option is also present. If -d is used with -n, the kernel does not at<hy>
+tempt to sync file systems.
+-p
+Reboot to prom. This flag can be used to reboot the system through firmware without changing the default reboot
+behavior as denoted by the config/fastreboot_default property setting in system/boot-config service.
+<beginning of page>
+This option is currently available only on x86 systems. The -p and -f options are mutually exclusive.
+-q
+Quick. Reboot quickly and ungracefully, without shutting down running processes first.
+The following operands are supported:
+boot_arguments
+An optional boot_arguments specifies arguments to the uadmin(2) function that are passed to the boot program and
+kernel upon restart. The form and list of arguments is described in the boot(1M) and kernel(1M) man pages.. If the
+arguments are specified, whitespace between them is replaced by single spaces unless the whitespace is quoted for
+the shell. If the boot_arguments begin with a hyphen, they must be preceded by the -- delimiter (two hyphens) to de<hy>
+note the end of the reboot argument list.
+Example 1 Passing the -r and -v Arguments to boot
+In the following example, the delimiter -- (two hyphens) must be used to separate the options of reboot from the ar<hy>
+guments of boot(1M).
+ example# reboot -dl -- -rv
+Example 2 Rebooting Using a Specific Disk and Kernel
+The following example reboots using a specific disk and kernel.
+ example# reboot disk1 kernel.test/unix
+Example 3 Fast Rebooting
+The following examples use the -f option to perform fast reboots.
+If service svc:/system/boot-config:default is enabled and property config/fastreboot_default is set to true, the -f
+option can be omitted.
+The following command reboots to the default entry in the GRUB (see grub(5)) menu file menu.lst.
+ example# reboot -f
+The following command reboots to another UFS root disk.
+ example# reboot -f -- '/dev/dsk/c1d0s0'
+The following command reboots to another ZFS root pool.
+ example# reboot -f -- 'rpool/ROOT/root2'
+The following command reboots to mykernel on the same disk with -k option.
+<beginning of page>
+ example# reboot -f -- '/platform/i86pc/mykernel/amd64/unix -k'
+The following command reboots to mykernel off another root disk mounted on /mnt.
+ example# reboot -f -- '/mnt/platform/i86pc/mykernel/amd64/unix -k'
+The following command reboots to /platform/i86pc/kernel/$ISADIR/unix on another boot environment named
+second_root.
+ example# reboot -f -e second_root
+The following command reboots to the same kernel with -kv options.
+ example# reboot -f -- '-kv'
+The following commands disable the fast-reboot-by-default behavior.
+ example# svccfg -s "system/boot-config:default" \
+ setprop config/fastreboot_default=false
+ example# svcadm refresh svc:/system/boot-config:default
+The following commands re-enable the fast-reboot-by-default behavior.
+ example# svccfg -s "system/boot-config:default" \
+ setprop config/fastreboot_default=true
+ example# svcadm refresh svc:/system/boot-config:default
+Example 4 Rebooting to a Particular GRUB Menu
+The following commands will reboot to entry 2 in the GRUB menu.
+ example# bootadm list-menu
+  the location for the active GRUB menu is: /rpool/boot/grub/menu.lst
+  default 0
+  timeout 10
+  0 zfsbe1
+  1 zfsbe1 failsafe
+  2 zfsbe2
+  3 zfsbe2 Solaris xVM
+  4 zfsbe2 failsafe
+ example# reboot 2
+/var/adm/wtmpx
+login accounting file
+<beginning of page>
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu
+mdb(1), boot(1M), dumpadm(1M), fsck(1M), halt(1M), init(1M), kernel(1M), shutdown(1M), svcadm(1M),
+svccfg(1M), sync(1M), syslogd(1M), sync(2), uadmin(2), reboot(3C), attributes(5), grub(5)
+The reboot utility does not execute the scripts in /etc/rcnum.d or execute shutdown actions in inittab(4). To ensure a
+complete shutdown of system services, use shutdown(1M) or init(1M) to reboot a Solaris system.

@@ -1,0 +1,571 @@
+<beginning of page>
+NIS+LDAPmapping <-> configuration file for mapping between NIS+ and LDAP
+/var/nis/NIS+LDAPmapping
+The /var/nis/NIS+LDAPmapping configuration file contains the mapping between NIS+ objects, particularly table
+entries, and LDAP entries and attributes. This information can come from LDAP, from this file, from the
+rpc.nisd(1M) command line, or from a combination of all three. The values in this file supersede those obtained
+from the LDAP server, but values from the command line supersede those in the file.
+Each line in the file can be up to 8191 bytes long, not counting the newline. There can be an indefinite number of
+continuation lines. A continuation is indicated by a '\' (backslash) in the last position, immediately before the new<hy>
+line of a line. Characters are escaped, that is, exempted from special interpretation, when preceeded by a backslash
+character.
+The '#' (hash) character starts a comment. White space is either ASCII space or a horizontal tab. In general, lines
+consist of optional white space, an attribute name, at least one white space character, and an attribute value.
+The default rpc.nisd(4) configuration file at /etc/default/rpc.nisd and the template file at /var/nis/NIS+LDAPmap<hy>
+ping.template are sufficient for the minimum NIS+ installation. The following assumptions are made: 1. The NIS+
+standard directories, tables, and groups created by nissetup(1M) or nisserver(1M) should be mapped. However, the
+timezone.org_dir and client_info.org_dir tables should not be mapped. 2. The NIS+ objects for which the
+rpc.nisd is a master are mapped both to and from LDAP. 3. Those NIS+ objects for which the rpc.nisd is a replica
+are mapped from LDAP. 4. The LDAP server is running on the local machine, and it can be reached at port 389 on
+the 127.0.0.1 IP address. 5. The authentication method is none, meaning that all LDAP calls, whether for reading
+or writing, are unauthenticated. There is no transport layer security. 6. The default values for TTLs and LDAP con<hy>
+tainer locations and object classes are valid. 7. The LDAP server supports RFC 2307bis. You want to use the RFC
+2307bis object classes and attributes. See Notes 8. The nisplusObject attribute, the nisplusObjectContainer object
+class, and the ou=nisPlus container have been created. 9. You do not need to store or retrieve table entry owner,
+group owner, entry access rights, or entry object TTL in or from LDAP. For more information on these pseudo-col<hy>
+umns, see the discussion of zo_owner, and the like, in the description of the nisplusLDAPcolumnFromAttribute
+attribute. 10. NIS+ principal names and RPC netnames (the cname and auth_name columns, respectively, in the
+cred.org_dir table) should be derived from the owner of the cred table. For example, if the owner is
+npadm.my.dom.ain., the cname and auth_name values for entries created from LDAP data will be of the form:
+ user-or-host.my.dom.ain.
+and
+ unix.uid-or-host@my.dom.ain
+respectively.
+If these assumptions are true, you can enable mapping by copying the /var/nis/NIS+LDAPmapping.template file
+to /var/nis/NIS+LDAPmapping and restart the rpc.nisd. If you want to either upload NIS+ data to LDAP, or down<hy>
+load LDAP data to NIS+, see the description of the nisplusLDAPinitialUpdateAction attribute on rpc.nisd(4).
+If one or more of the assumptions are false, do the following: 1. To remove mappings, identify the database id of the
+NIS+ object that should not be mapped, then delete or comment out the nisplusLDAPdatabaseIdMapping, nis<hy>
+plusLDAPentryTtl, nisplusLDAPobjectDN, nisplusLDAPattributeFromColumn, and nisplusLDAPcolumn<hy>
+FromAttribute attributes for that database id.
+To add mappings, find an existing mapping for a NIS+ object similar to the one you want to map, and then use that
+mapping as a template to create the nisplusLDAPdatabaseIdMapping, nisplusLDAPentryTtl, nisplusLDAPob<hy>
+jectDN, nisplusLDAPattributeFromColumn, and nisplusLDAPcolumnFromAttribute attributes for the new map<hy>
+ping. The new mapping must have a unique database id.
+To enable mapping of the timezone or client_info tables, consult your LDAP server documentation about how to
+create attributes and object classes, and set up the following. The following is LDIF data for ldapadd(1). Attribute
+and object class OIDs are examples only.
+For client_info:
+ dn: cn=schema
+ changetype: modify
+ add: attributetypes
+ attributetypes: ( 1.3.6.1.4.1.42.2.27.5.42.42.12.0 \
+<beginning of page>
+  NAME 'nisplusClientInfoAttr' \
+  DESC 'NIS+ client_info table client column' \
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 SINGLE-VALUE )
+ attributetypes: ( 1.3.6.1.4.1.42.2.27.5.42.42.12.1 \
+  NAME 'nisplusClientInfoInfo' \
+  DESC 'NIS+ client_info table info column' \
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+ attributetypes: ( 1.3.6.1.4.1.42.2.27.5.42.42.12.2 \
+  NAME 'nisplusClientInfoFlags' \
+  DESC 'NIS+ client_info table flags column' \
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+ dn: cn=schema
+ changetype: modify
+ add: objectclasses
+ objectclasses: ( 1.3.6.1.4.1.42.2.27.5.42.42.13.0 \
+  NAME 'nisplusClientInfoData' \
+  DESC 'NIS+ client_info table data' \
+  SUP top STRUCTURAL MUST ( cn ) \
+  MAY (nisplusClientInfoAttr $ nisplusClientInfoInfo $ \
+  nisplusClientInfoFlags))
+For the ou=ClientInfo container, substitute your actual search base for searchBase):
+ dn: ou=ClientInfo,searchBase
+ ou: ClientInfo
+ objectClass: top
+ objectClass: organizationalUnit
+For timezone:
+ dn: cn=schema
+ changetype: modify
+ add: attributetypes
+ attributetypes: ( 1.3.6.1.4.1.42.2.27.5.42.42.15.0 \
+  NAME 'nisplusTimeZone' \
+  DESC 'tzone column from NIS+ timezone table' \
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+ dn: cn=schema
+ changetype: modify
+ add: objectclasses
+ objectclasses: ( 1.3.6.1.4.1.42.2.27.5.42.42.16.0 \
+  NAME 'nisplusTimeZoneData' \
+  DESC 'NIS+ timezone table data' \
+  SUP top STRUCTURAL MUST ( cn ) \
+  MAY ( nisplusTimeZone $ description ) )
+For the ou=Timezone container:
+ dn: ou=Timezone,searchBase
+ ou: Timezone
+ objectClass: top
+ objectClass: organizationalUnit
+Uncomment the mapping attributes for timezone and client_info in the mapping file, and restart the rpc.nisd(1M)
+daemon. 2. To disable write mapping, edit the nisplusLDAPobjectDN value for the appropriate database id. Re<hy>
+move the writeObjectSpec value, leaving only the readObjectSpec value. Make sure there are no trailing colons.
+To disable read mapping, remove the readObjectSpec, leaving the database id, two colons, and the writeObject<hy>
+Spec value. 3. Replicas cannot write-map objects. Remove disable read mapping, remove mapping entirely for the
+relevant database ids, as described above. 4. Change the preferredServerList value to the correct server ad<hy>
+dress(es) and port(s). If configuration data is retrieved fromLDAP, also edit the nisplusLDAPpreferredServerList
+value. 5. Edit the authenticationMethod attribute value to the authentication method that you want to use. If con<hy>
+figuration data is retrieved from LDAP, edit the nisplusLDAPconfigAuthenticationMethod value. If the method is
+anything other than none, you will need to specify one or more of the following, depending upon the method.
+<beginning of page>
+nisplusLDAPconfigProxyUser
+nisplusLDAPproxyUser
+The bind-DN to use for authentication.
+nisplusLDAPconfigProxyPassword
+nisplusLDAPproxyPassword
+The password or key for the bind-DN and method. Make sure that the file containing the password or key is protect<hy>
+ed from access by unauthorized users.
+To use transport layer security, set nisplusLDAPconfigTLS or nisplusLDAPTLS to ssl, and set nisplusLDAPcon<hy>
+figTLSCertificateDBPath or nisplusLDAPTLSCertificateDBPath to the file containing the certificate DB. In or<hy>
+der to successfully use authentication and transport layer security, the server must also support the chosen values. 6.
+To change the TTLs, edit the nisplusLDAPentryTtl for the appropriate database id.
+To change LDAP container locations or object classes, edit the nisplusLDAPobjectDN value for the appropriate
+database id. 7. To determine which object classes and attributes are supported, consult your LDAP server documen<hy>
+tation. If you are using the iPlanet directory server, see idsconfig(1M) for information to set up RFC 2307bis object
+classes and attributes. 8. Refer to your LDAP server documentation for how to create attributes and object classes,
+and set up the following:
+ dn: cn=schema
+ changetype: modify
+ add: attributetypes
+ attributetypes: ( 1.3.6.1.4.1.42.2.27.5.42.42.1.0 \
+  NAME 'nisplusObject' \
+  DESC 'An opaque representation of a NIS+ object' \
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.5 SINGLE-VALUE )
+ dn: cn=schema
+ changetype: modify
+ add: objectclasses
+ objectclasses: ( 1.3.6.1.4.1.42.2.27.5.42.42.2.0 \
+  NAME 'nisplusObjectContainer' \
+  SUP top STRUCTURAL DESC 'Abstraction of a NIS+ object' \
+  MUST ( cn $ nisplusObject ) )
+ou=nisPlus is a container assumed to reside at the defaultSearchBase. See rpc.nisd(4). The following LDIF input
+to ldapadd(1) will create the ou=nisPlus container. Replace dc=some,dc=domain with your actual base.
+ dn: ou=nisPlus,dc=some,dc=domain
+ ou: nisPlus
+ objectClass: top
+ objectClass: organizationalUnit
+The nisplusObjectContainer, nisplusObject, and ou=nisPlus labels are suggestions. If you change nisplusObject<hy>
+Container, or ou=nisPlus, edit the mapping file to reflect this. To change nisplusObject, for example, to myObject,
+add nisplusObject=myObject to the filterAttrValList and attrValList portions of the readObjectSpec and
+writeObjectSpec of the nisplusLDAPobjectDN value for the mapping. See the description of nisplusLDAPob<hy>
+jectDN below. 9. Refer to your LDAP server documentation for how to create attributes and object classes, and set
+up the following. The following is LDIF data for ldapadd(1). Attribute and object class OIDs are examples only.
+ dn: cn=schema
+ changetype: modify
+ add: attributetypes
+ attributetypes: ( 1.3.6.1.4.1.42.2.27.5.42.42.4.0 \
+  NAME 'nisplusEntryOwner' \
+  DESC 'Opaque representation of NIS+ entry owner' \
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+ attributetypes: ( 1.3.6.1.4.1.42.2.27.5.42.42.4.1 \
+  NAME 'nisplusEntryGroup' \
+  DESC 'Opaque representation of NIS+ entry group' \
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+<beginning of page>
+ attributetypes: ( 1.3.6.1.4.1.42.2.27.5.42.42.4.2 \
+  NAME 'nisplusEntryAccess' \
+  DESC 'Opaque representation of NIS+ entry access' \
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+ attributetypes: ( 1.3.6.1.4.1.42.2.27.5.42.42.4.3
+  NAME 'nisplusEntryTtl' \
+  DESC 'Opaque representation of NIS+ entry TTL' \
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+ dn: cn=schema
+ changetype: modify
+ add: objectclasses
+ objectclasses: ( 1.3.6.1.4.1.42.2.27.5.42.42.5.0 \
+  NAME 'nisplusEntryData' \
+  SUP top STRUCTURAL DESC 'NIS+ entry object non-column data' \
+  MUST ( cn ) MAY ( nisplusEntryOwner $ nisplusEntryGroup $ \
+  nisplusEntryAccess $ nisplusEntryTtl ) )
+Edit the mapping file to enable storing entry owner, group, access, and TTL in LDAP. The template mapping file
+/var/nis/NIS+LDAPmapping.template has commented-out sections for the passwd and cred database ids that
+show how this can be done. 10. To preserve the cname and auth_name column data when cred.org_dir entries are
+stored in NIS+, you can create the nisplusPrincipalName and nisplusNetname attributes. See your LDAP server
+documentation for how to create attributes and object classes, and set up the following:
+ dn: cn=schema
+ changetype: modify
+ add: attributetypes
+ attributetypes: ( 1.3.6.1.4.1.42.2.27.5.42.42.7.0 \
+  NAME 'nisplusPrincipalName' \
+  DESC 'NIS+ principal name' \
+  EQUALITY caseIgnoreIA5Match SINGLE-VALUE \
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )
+ attributetypes: ( 1.3.6.1.4.1.42.2.27.5.42.42.9.0 \
+  NAME 'nisplusNetname' \
+  DESC 'Secure RPC netname' \
+  EQUALITY caseIgnoreIA5Match SINGLE-VALUE \
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )
+ dn: cn=schema
+ changetype: modify
+ add: objectclasses
+ objectclasses: ( 1.3.6.1.4.1.42.2.27.5.42.42.10.0
+  NAME 'nisplusAuthName' \
+  SUP top AUXILLIARY DESC 'NIS+ authentication identifiers' \
+  MAY ( nisplusPrincipalName $ nisplusNetname ) )
+Edit the mapping file to use the new nisplusPrincipalName and nisplusNetname. The template
+/var/nis/NIS+LDAPmapping file contains commented-out sections that support the nisplusPrincipalName and
+nisplusNetname attributes. See the nisplusLDAPobjectDN, nisplusLDAPattributeFromColumn and nis<hy>
+plusLDAPcolumnFromAttribute attribute values for the credlocal, creduser, and crednode database ids .
+The following attributes are recognized. Any values specified for these attributes in the file, including an empty val<hy>
+ue, override values obtained from LDAP.
+There are several attributes that can have multiple values, one for each database id. Depending on the source, the
+multiple values are specified in the following ways:
+LDAP Multi-valued attributes, where each value corresponds to one database id.
+File One line, which may be continued, for each value (database id). The line starts with the name of the attribute
+Command
+ -x option for each value (database id).
+<beginning of page>
+Unless otherwise noted, all elements of the syntaxes below may be surrounded by white space. Separator characters
+and white space must be escaped if they are part of syntactic elements.
+nisplusLDAPdatabaseIdMapping
+Maps a database id to a NIS+ object. If the object name is not fully qualified, that is, it does not end in a dot, the nis<hy>
+plusLDAPbaseDomain is appended. See rpc.nisd(4). There is no default value. The syntax of the value is:
+ databaseId ":" objectspec
+where
+databaseId Label identifying a subset of a NIS+ object for mapping purposes.
+objectspec objectname | "[" indexlist "]" tablename
+objectname The name of a NIS+ object (including tables)
+tablename The name of a NIS+ table
+indexlist colspec ["," colspec]
+colspec colname "=" colvalue
+colname The name of a column in the table
+colvalue colvaluestring | \" colvaluestring \"
+The [indexlist]tablename form is intended for those cases where it is necessary to select a subset of a NIS+ table.
+The subset are those NIS+ entries that match the indexlist. If there are multiple indexed specifications for a particu<hy>
+lar NIS+ table, they are tried in the order retrieved until one matches. Note that retrieval order usually is unspecified
+for multi-valued LDAP attributes. Hence, if using indexed specifications when nisplusLDAPdatabaseIdMapping
+is retrieved from LDAP, make sure that the subset match is unambiguous.
+If the colvaluestring contains white space or commas, it must either be surrounded by double quotes, or the special
+characters must be escaped.Wildcards are allowed in the colvaluestring. If the objectname or tablename is not ful<hy>
+ly qualified, the nisplusLDAPbaseDomain value is appended. If the objectname is empty the value of nis<hy>
+plusLDAPbaseDomain is substituted.
+The following example shows how to associate the passwd database id with the passwd.org_dir table:
+ passwd:passwd.org_dir
+The following example shows how to associate the LOCAL entries in the cred.org_dir table with the credlocal
+database id:
+ credlocal:[auth_type=LOCAL]cred.org_dir
+The following example shows how to use the creduser database id for those entries in the cred.org_dir table that
+represent credentials (keys) for users. That is, they have a netname (auth_name) of the type unix.<numeric-
+id>@domain.
+ creduser:[auth_type="D*",auth_name="unix.[0-9]*"]cred.org_dir
+nisplusLDAPentryTtl
+Establish TTLs for NIS+ entries derived from LDAP. The syntax of the value is:
+<beginning of page>
+ databaseId ":" initialTTLlo ":" initialTTLhi ":" runningTTL
+initialTTLlo The lower limit for the initial TTL (in seconds) for data read from disk when the rpc.nisd starts, or
+from LDAP during an initial down-load. See rpc.nisd(4) for the description of the nisplusLDAPinitialUpdate at<hy>
+tribute. If initialTTLhi also is specified, the actual initialTTL will be randomly selected from the interval initialT<hy>
+TLlo to initialTTLhi, inclusive. If the field is left empty, it yields the default value of 1800 seconds.
+initialTTLhi The upper limit for the initial TTL. If left empty, it defaults to 5400.
+runningTTL The TTL (in seconds) for data retrieved from LDAP while the rpc.nisd is running. Leave the field
+empty to obtain the default value of 3600 seconds.
+If there is no specification of TTLs for a particular databaseId, the default values are used. If the initialTTLlo and
+initialTTLhi have the same value, the effect will be that all data known to the rpc.nisd at startup times out at the
+same time. Depending on NIS+ data lookup patterns, this could cause spikes in rpc.nisd-to-LDAP traffic. In order to
+avoid that, you can specify different initialTTLlo and initialTTLhi values and obtain a spread in initial TTLs. The
+NIS+ object TTL is a separate and distinct entity used for other purposes, notably the TTL of NIS+ directory objects
+in the shared directory cache managed by the nis_cachemgr(1M). There is no connection between the nis<hy>
+plusLDAPentryTtl and object TTL values for a NIS+ object.
+The following example shows how to specify that entries in the NIS+ hosts table read from LDAP should be valid
+for four hours. When the rpc.nisd restarts, the disk database entries are valid for between two and three hours.
+ hosts:7200:10800:14400
+nisplusLDAPobjectDN
+Specifies the connection between a databaseId and the LDAP directory. The syntax of the value is:
+ databaseId ":" objectDN *( ";" objectDN )
+objectDN readObjectSpec [":"[writeObjectSpec]]
+readObjectSpec [baseAndScope [filterAttrValList]]
+writeObjectSpec [baseAndScope [attrValList [":" deleteDisp]]]
+baseAndScope [baseDN] ["?" [scope]]
+filterAttrValList ["?" [filter | attrValList]]
+scope "base" | "one" | "sub"
+attrValList attribute "=" value *("," attribute "=" value)
+deleteDisp "always" | perDbId | "never"
+perDbId "dbid" "=" delDatabaseId
+<beginning of page>
+delDatabaseId database id per nisplusLDAPdatabaseIdMapping above.
+The baseDN defaults to the value of the defaultSearchBase attribute. If the baseDN ends in a comma, the default<hy>
+SearchBase is appended.
+scope defaults to one. It has no meaning and is ignored in a writeObjectSpec. The filter is an LDAP search filter.
+There is no default value. The attrValList is a list of attribute and value pairs. There is no default value. As a con<hy>
+venience, if an attrValList is specified in a readObjectSpec, it is converted to a search filter by ANDing together
+the attributes and values. For example, the attribute and value list:
+ objectClass=posixAccount,objectClass=shadowAccount
+is converted to the filter:
+ (&(objectClass=posixAccount)(objectClass=shadowAccount))
+Entry objects are mapped by means of the relevant table mapping rules in the nisplusLDAPattributeFromColumn
+and nisplusLDAPcolumnFromAttribute attributes. Entry objects do not have explicit nisplusLDAPobjectDN at<hy>
+tributes.
+If a writeObjectSpec is omitted, and there is no trailing colon, the effect is to not attempt writes at all. If there is a
+trailing colon after the readObjectSpec, it is implied that the writeObjectSpec is the same as the readObjectSpec.
+Note that writes only are attempted by a master server for the mapped NIS+ object. Replicas silently ignore any
+writeObjectSpec:s.
+The deleteDisp specifies how NIS+ object deletion should be reflected in LDAP. The following values are recog<hy>
+nized:
+always Always attempt to remove the LDAP entry. This is the default.
+dbid=delDatabaseId Set the mapped entries to values specified by the nisplusLDAPattributeFromColumn at<hy>
+tribute values for delDatabaseId. This only makes sense for the databaseId:s corresponding to NIS+ tables or sub<hy>
+sets of tables. For other NIS+ objects, if dbid= is specified, the action will be always. In the delDatabaseId, dele<hy>
+tion of individual attributes can be specified by leaving the RHS of the = in a mapping rule empty. The delDataba<hy>
+seId rule set should specify a dn. Otherwise, the rpc.nisd might try to derive a dn by performing an LDAP lookup
+on the attributes and values from the rule set, quite possibly with unexpected results.
+never Upon NIS+ object deletion, the corresponding LDAP data is left unchanged. If the NIS+ object is an entry,
+this means that the only effect of the deletion is to temporarily remove it from the rpc.nisd's cache.
+The following is an example of how to get the ipnodes table entries from the ou=Hosts container under the default
+search base, and write to the same place.
+ ipnodes:ou=Hosts,?one?objectClass=ipHost:
+The following example shows how to obtain the passwd table entries from the ou=People containers under the de<hy>
+fault search base, and also from dc=another,dc=domain. The latter is an example of the equivalent of and replace<hy>
+ment for a NIS+ table path. Writes should only be attempted to the first objectDN. NIS+ entry deletions for the first
+objectDN are not reflected in LDAP:
+ passwd:ou=People,?one?objectClass=shadowAccount,\
+  objectClass=posixAccount::never;\
+  ou=People,dc=another,dc=domain,?one?\
+  objectClass=shadowAccount,\
+  objectClass=posixAccount
+The following example shows how to obtain the passwd table entries from the ou=People container under the de<hy>
+fault search base. Upon NIS+ entry deletion, update the LDAP entry per the passwd_delete database id:
+ passwd:ou=People,?one?objectClass=shadowAccount,\
+  objectClass=posixAccount::\
+  dbid=passwd_delete
+<beginning of page>
+where nisplusLDAPattributeFromColumn for passwd_delete could be:
+ passwd_delete:\
+  dn=("uid=%s,", name), \
+  uid=name, \
+  userPassword=("*NP*"), \
+  uidNumber=uid, \
+  gidNumber=gid, \
+  gecos=("INVALID: %s", gcos), \
+  homeDirectory=home, \
+  loginShell=("/bin/false"), \
+  (shadowLastChange,shadowMin,shadowMax, \
+  shadowWarning, shadowInactive,shadowExpire, \
+  shadowFlag)=(shadow, ":"), \
+  nisplusEntryOwner=zo_owner, \
+  nisplusEntryGroup=zo_group, \
+  nisplusEntryAccess=zo_access
+nisplusLDAPcolumnFromAttribute
+ Specifies how a NIS+ table and column value is derived from LDAP attribute values. The syntax is:
+ databaseId ":" colattrspec *("," colattrspec)
+The format of colattrspec is shown below in the discussion of the column and attribute conversion syntax.
+The following is an example of how to map by direct copy and assignment the value of the ipHostNumber attribute
+to the addr column:
+ addr=ipHostNumber
+Formats for the column and attribute conversion syntax are discussed below, including examples of complex at<hy>
+tribute to column conversions..
+There are four special pseudo-columns that are used to indicate non-column entry object data:
+zo_owner The NIS+ principal that owns the entry object. By default, the zo_owner value is inherited from the table.
+zo_group The NIS+ group owner of the entry object. By default, the zo_group value is inherited from the table.
+zo_access The NIS+ access rights to the entry. Table column rights are stored in the table. By default, the zo_access
+value is inherited from the table.
+zo_ttl The NIS+ TTL for the entry. This is not the TTL for the entry when cached by the rpc.nisd. By default, the
+zo_ttl value is inherited from the table.
+The default /var/nis/NIS+LDAPmapping.template assumes the existence of the following corresponding LDAP at<hy>
+tributes in the containers for the passwd and cred tables:
+ nisplusEntryOwner
+ nisplusEntryGroup
+ nisplusEntryAccess
+ nisplusEntryTtl
+These attributes are not part of any schema specified in an RFC or similar document. They must be created if they
+are to be used. They are assumed to belong to the as nisplusEntryData object class, and they contain a single string
+value. The format of this string is private, and subject to change without notice.
+For most tables, the non-column entry data can be inherited from the containing table, and the pseudo-columns
+should be left unmapped. Notable exceptions are the passwd and cred tables, if individual users have access to mod<hy>
+ify their own passwd and cred entries. This would usually be the case if the site is not running the rpc.nispass<hy>
+wdd(1M) daemon.
+<beginning of page>
+nisplusLDAPattributeFromColumn
+Specifies how an LDAP attribute value is derived from NIS+ table and column values. The syntax is:
+ databaseId ":" colattrspec *("," colattrspec )
+The format of colattrspec is shown below in the discussion of the column and attribute conversion syntax.
+As a special case, if the dn attribute value derived from a colattrspec ends in a comma (','), the baseDN from the
+writeObjectSpec is appended.
+The following is an example of how to map the value of the addr column to the ipHostNumber attribute by direct
+copy and assignment:
+ ipHostNumber=addr
+All relevant attributes, including the dn, must be specified. Non-column entry object data can be mapped as noted
+under the discussion of nisplusLDAPcolumnFromAttribute above.
+The general format of a colattrspec is:
+ colattrspec = lhs "=" rhs
+ lhs = lval | namespeclist
+ rhs = rval | [namespec]
+ namespeclist = namespec | "(" namespec *("," namespec) ")"
+The lval and rval syntax are defined below at Values. The format of a namespec is:
+namespec ["ldap:"] attrspec [searchTriple] | ["nis+:"] colspec [objectspec]
+colspec column | "(" column ")"
+attrspec attribute | "(" attribute ")"
+searchTriple ":" [baseDN] ["?" [scope] ["?" [filter]]]
+baseDN Base DN for search
+filter LDAP search filter
+objectspec objectspec per nisplusLDAPdatabaseIdMapping
+The repository specification in a namespec defaults as follows: <bu> For assignments to a column, nis+: on the LHS,
+ldap: on the RHS. NIS+ column values on the RHS are those that exist before the NIS+ entry is modified. <bu> For as<hy>
+signments to an attribute, ldap: on the LHS, nis+: on the RHS. LDAP attribute values on the RHS are those that ex<hy>
+ist before the LDAP entry is modified.
+Enclosing the column or attribute name in parenthesis denotes a list of column or attribute values. For attributes, the
+meaning is the list of all attributes of that name, and the interpretation depends on the context. See the discussion at
+Values. This list specification is ignored when a searchTriple or objectspec is supplied.
+For columns, the (colname) syntax is used to map multiple attribute instances to multiple NIS+ entries.
+The searchTriple can be used to specify an attribute from a location other than the read or write target. The defaults
+are as follows:
+<beginning of page>
+baseDN If omitted, the default is the current objectDN. If the baseDN ends in a comma, the value of the default<hy>
+SearchBase attribute is appended.
+scope one
+filter Empty
+Similarly, the objectspec can be used to specify a column value from a NIS+ table other than the one implicitly indi<hy>
+cated by the databaseId. If searchTriple or objectspec is explicitly specified in a namespec, the retrieval or assign<hy>
+ment, whether from or to LDAP or NIS+, is performed without checking if read and write are enabled for the LDAP
+container or NIS+ table.
+Omitting the namespec in an rhs is only allowed if the lhs is one or more attributes. The effect is to delete the speci<hy>
+fied attribute(s). In all other situations, an omitted namespec means that the rule is ignored.
+The filter can be a value. See Values. For example, to find the ipHostNumber using the cn, you could specify the
+following in the filter field:
+ ldap:ipHostNumber:?one?("cn=%s", (cname, "%s.*"))
+In order to remove ambiguity, the unmodified value of a single column or attribute must be specified as the following
+when used in the filter field.
+ ("%s", namespec)
+If the filter is not specified, the scope will be base, and the baseDN is assumed to be the DN of the entry that con<hy>
+tains the attribute to be retrieved or modified. To use previously existing column or attribute values in the mapping
+rules requires a lookup to find those values. Obviously, this will add to the time required to perform the modification.
+Also, there is a window between the time when a value is retrieved, and then slightly later, stored back. If the values
+have changed in the mean time, the change may be overwritten.
+When colattrspecs are grouped into rule sets, in the value of a nisplusLDAPcolumnFromAttribute or nis<hy>
+plusLDAPattributeFromColumn attribute, the evaluation of the colattrspecs proceed in the listed order. However,
+evaluation may be done in parallel for multiple colattrspecs. If there is an error when evaluating a certain colattr<hy>
+spec, including retrieval or assignment of entry or column values, the extent to which the other colattrspec rules are
+evaluated is unspecified
+Where wildcard support is available, it is of the following limited form:
+* Matches any number of characters.
+[x] Matches the character x.
+[x-y] Matches any character in the range x to y, inclusive..
+Combinations such as [a-cA-C0123] are also allowed.This example would match any one of a, b, c, A, B, C, 0, 1, 2,
+or 3.
+ substringextract = "(" namespec "," matchspec ")"
+ name = column or attribute name
+ matchspec =
+The matchspec is a string like the scanf(3C) format string, except that there may be at most one format specifier, a
+single %s. The output value of the substringextract is the substring matching the location of the %s.
+If there is no %s in the formatstring, it must instead be a single character, which is assumed to be a field separator
+for the namespec. The output values are the field values. Wild cards are supported. If there is no match, the output
+<beginning of page>
+value is the empty string, "".
+For example, if the column cname has the value user.some.domain.name., the value of the expression:
+ (cname, "%s.*")
+is user, which can be used to extract the user name from a NIS+ principal name.
+Similarly, use this expression to extract the third of the colon-separated fields of the shadow column:
+ (shadow, "*:*:%s:*")
+This form can be used to extract all of the shadow fields. However, a simpler way to specify that special case is:
+ (shadow, ":")
+ lval = "(" formatspec "," namespec *("," namespec) ")"
+ rval = "(" formatspec ["," namelist ["," elide] ] ")"
+ namelist = name_or_sse *( "," name_or_sse)
+ name_or_sse = namespec | substringextract
+ formatspec =
+ formatstring = A string combining text and % field specifications
+ elide =
+ singlechar = Any character
+This syntax is used to produce rval values that incorporate column or attribute values, in a manner like printf(3C),
+or to perform assignments to lval like scanf(3C). One important restriction is that the format specifications,% plus a
+single character, use the designations from ber_encode(3LDAP). Thus, while %s is used to extract a string value,
+%i causes BER conversion from an integer. Formats other than %s, for instance, %i, are only meaningfully defined
+in simple format strings without any other text.
+The following ber_printf() format characters are recognized:
+ b i B n o s
+If there are too few format specifiers, the format string may be repeated as needed.
+When used as an lval, there is a combination of pattern matching and assignment, possibly to multiple columns or
+attributes.
+For example, in an assignment to an attribute, if the value of the addr column is 1.2.3.4, the rval:
+ ("ipNetworkNumber=%s,", addr)
+produces the value ipNetworkNumber=1.2.3.4,, while:
+ ("(%s,%s,%s)", host, user, domain)
+results in (assuming host="xyzzy", user="-", domain="x.y.z") "(xyzzy,-,x.y.z)". The elide character feature is
+used with attribute lists. For example:
+ ("%s,", (mgrprfc822mailmember), ",")
+concatenates all mgrprfc822mailmember values into one comma-separated string, and then elides the final trailing
+comma. Thus, for
+ mgrprfc822mailmember=usera
+ mgrprfc822mailmember=userb
+<beginning of page>
+ mgrprfc822mailmember=userc
+the value would be usera,userb,userc.
+If the NIS+ column intval is in binary format, that is, the B column flag is set, and it is to be interpreted as an inte<hy>
+ger, the following:
+ ("%i", intval)
+produces a value suitable for assignment to an integer-valued attribute.
+The nisPublicKey attribute encodes the algorithm type and number (equivalent to the auth_type column) and the
+public key as a single string such as {dh192-0}xxxxxxxx (public key truncated for clarity). The following will ex<hy>
+tract the corresponding auth_type and public_data values:
+ ("{%s}%s", auth_type, public_data)
+As a special case, to combine an LHS extraction with an RHS implicit list creates multiple entries and values. For
+example,
+ ("(%s,%s,%s)", host, user, domain)=(nisNetgroupTriple)
+creates one NIS+ entry for each nisNetgroupTriple value.
+The assignment syntax, also found at Column and Attribute Conversion Syntax, is as follows:
+ colattrspec = lhs "=" rhs
+ lhs = lval | namespeclist
+ rhs = rval | namespec
+ namespeclist = namespec | "(" namespec *("," namespec) ")"
+By using the syntax defined above, the general form of a simple assignment, which is a one-to-one mapping of col<hy>
+umn to attribute, would be:
+ ("%s", colname)=("%s", attrname)
+As a convenient short-hand, this can also be written as:
+ colname=attrname
+A list specification, which is a name enclosed in parenthesis, can be used to make many-to-many assignments. The
+expression:
+ (colname)=(attrname)
+where there are multiple instances of attrname, creates one NIS+ entry for each such instance, differentiated by
+their colname values. The following combinations of lists are allowed, but they are not particularly useful:
+(attrname)=(colname) Equivalent to attrname=colname
+attrname=(colname) Equivalent to attrname=colname
+(colname)=attrname Equivalent to colname=attrname
+<beginning of page>
+colname=(attrname) Equivalent to colname=attrname
+If a multi-valued RHS is assigned to a single-valued LHS, the LHS value will be the first of the RHS values. If the
+RHS is an attribute list, the first attribute is the first one returned by the LDAP server when queried. Otherwise, the
+definition of "first" is implementation dependent.
+Finally, the LHS might be an explicit list of columns or attributes, such as:
+ (name1,name2,name3)
+If the RHS is single-valued, this assigns the RHS value to all entities in the list. If the RHS is multi-valued, the first
+value is assigned to the first entity of the list, the second value to the second entity, and so on. Excess values or enti<hy>
+ties are silently ignored. Example 1 Assigning an Attribute Value to a Column
+The following example illustrates how to assign the value of the ipHostNumber attribute to the addr column
+ addr=ipHostNumber
+Example 2 Creating Multiple NIS+ Entries from Multi-Valued LDAP Attributes
+An LDAP entry with:
+ cn=name1
+ cn=name2
+ cn=name3
+and the following assignments:
+ cname=cn
+ (name)=(cn
+creates three NIS+ entries (other attributes/columns omitted for clarity):
+ cname=name1, name=name1
+ cname=name1, name=name2
+ cname=name1, name=name3
+Example 3 Assigning String Constants
+The following expression sets the auth_type column to LOCAL:
+ auth_type=("LOCAL")
+Example 4 Splitting Column Values to Multi-Valued Attributes
+The expansion column contains a comma-separated list of alias member names. In the following example, the ex<hy>
+pression assigns each such member name to an instance of mgrprfc822mailmember:
+ (mgrprfc822mailmember)=(expansion, ",")
+Example 5 Splitting Column Values to Multiple Attributes
+The shadow column contains a colon-separated list of fields. The following assigns the value of the first field to
+shadowLastChange, the value of the second field to shadowMin, and so forth.
+<beginning of page>
+ (shadowLastChange,shadowMin,shadowMax,shadowWarning,\
+  shadowInactive,shadowExpire,shadowFlag)=(shadow, ":")
+/var/nis/NIS+LDAPmapping
+Default mapping file used by rpc.nisd(1M).
+/var/nis/NIS+LDAPmapping.template
+Template file covering the standard NIS+ directories and tables.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wnisr _ Interface StabilityObsolete
+nisldapmaptest(1M), nisserver(1M), nissetup(1M), rpc.nisd(1M), ber_encode(3LDAP), rpc.nisd(4), at<hy>
+tributes(5)
+System Administration Guide: Naming and Directory Services (DNS, NIS, and LDAP)
+RFC 2307bis is an IETF informational document in draft stage that defines an approach for using LDAP as a nam<hy>
+ing service.

@@ -1,0 +1,179 @@
+<beginning of page>
+process <-> process contract type
+/system/contract/process
+Process contracts allow processes to create a fault boundary around a set of subprocesses and observe events which
+occur within that boundary.
+Process contracts are managed using the contract(4) file system and the libcontract(3LIB) library. The process con<hy>
+tract type directory is /system/contract/process.
+A process contract is created when an LWP that has an active process contract template calls fork(2). Initially, the
+child process created by fork() is the only resource managed by the contract. When an LWP that does not have an
+active process contract template calls fork(), the child process created by fork() is added as a resource to the process
+contract of which the parent was a member.
+The following events types are defined:
+CT_PR_EV_EMPTY
+The last member of the process contract exited.
+CT_PR_EV_FORK
+A new process has been added to the process contract.
+CT_PR_EV_EXIT
+A member of the process contract exited.
+CT_PR_EV_CORE
+A process failed and dumped core. This could also occur if the process would have dumped core had appropriate
+coreadm(1M) options been enabled and core file size was unlimited.
+CT_PR_EV_SIGNAL
+A process received a fatal signal from a process, other than the owner of the process contract, that is a member of a
+different process contract.
+CT_PR_EV_HWERR
+A process was killed because of an uncorrectable hardware error.
+The following common contract terms, defined in contract(4), have process-contract specific attributes:
+critical event set
+The default value for the critical event set is (CT_PR_EV_EMPTY | CT_PR_EV_HWERR).
+An attempt by a user without the {PRIV_CONTRACT_EVENT} privilege in its effective set to add an event, other
+than CT_PR_EV_EMPTY, to the critical event set which is not present in the fatal set, or if the CT_PR_PGONLY
+parameter is set and the same user attempts to add any event, other than CT_PR_EV_EMPTY, to the critical event
+set, fails.
+informative event set
+The default value for the informative event set is (CT_PR_EV_CORE | CT_PR_EV_SIGNAL).
+The following contract terms can be read from or written to a process contract template using the named libcon<hy>
+tract(3LIB) interfaces. These contract terms are in addition to those described in contract(4).
+<beginning of page>
+creator's aux
+Auxiliary contract description. The purpose of this field is to provide the contract creator with a way to differentiate
+process contracts it creates under the same service FMRI. Use ct_pr_tmpl_set_svc_aux(3CONTRACT) to set this
+term. The default value is an empty string. The contents of this field should be limited to 7-bit ASCII values.
+fatal event set
+Defines a set of events which, when generated, causes all members of the process contract to be killed with
+SIGKILL, or the intersection of the contract and the containing process group if the CT_PR_PGRPONLY parame<hy>
+ter is set. Set this term with ct_pr_tmpl_set_fatal(3CONTRACT). The fatal event set is restricted to
+CT_PR_EV_CORE, CT_PR_EV_SIGNAL, and CT_PR_EV_HWERR. For CT_PR_EV_CORE and
+CT_PR_EV_SIGNAL events, the scope of SIGKILL is limited to those processes which the contract author or the
+event source could have normally sent signals to.
+The default value for the fatal event set is CT_PR_EV_HWERR.
+If a user without the {PRIV_CONTRACT_EVENT} privilege in its effective set removes an event from the fatal
+event set which is present in the critical event set, the corresponding event is automatically removed from the critical
+event set and added to the informative event set.
+parameter set
+Defines miscellaneous other settings. Use ct_pr_tmpl_set_param(3CONTRACT) to set this term.
+The default parameter set is empty.
+The value is a bit vector comprised of some or all of:
+CT_PR_INHERIT
+If set, indicates that the process contract is to be inherited by the process contract the contract owner is a member of
+if the contract owner exits before explicitly abandoning the process contract.
+If not set, the process contract is automatically abandoned when the owner exits.
+CT_PR_NOORPHAN
+If set, all processes in a process contract are sent SIGKILL if the process contract is abandoned, either explicitly or
+because the holder died and CT_PR_INHERIT was not set. The scope of SIGKILL is limited to those processes
+which the contract author or the event source could have normally sent signals to.
+If this is not set and the process contract is abandoned, the process contract is orphaned, that is, continues to exist
+without owner.
+CT_PR_PGRPONLY
+If set, only those processes within the same process group and process contract as a fatal error-generating process
+are killed.
+If not set, all processes within the process contract are killed if a member process encounters an error specified in the
+fatal set.
+If a user without the {PRIV_CONTRACT_EVENT} privilege in its effective set adds CT_PR_PGRPONLY to a
+template's parameter set, any events other than CT_PR_EV_EMPTY are automatically removed from the critical
+event set and added to the informative event set.
+CT_PR_REGENT
+If set, the process contract can inherit unabandoned contracts left by exiting member processes.
+If not set, indicates that the process contract should not inherit contracts from member processes. If a process exits
+before abandoning a contract it owns and is a member of a process contract which does not have CT_PR_REGENT
+set, the system automatically abandons the contract.
+<beginning of page>
+If a regent process contract has inherited contracts and is abandoned by its owner, its inherited contracts are aban<hy>
+doned.
+service FMRI
+Specifies the service FMRI associated with the process contract. Use ct_pr_tmpl_set_svc_fmri(3CONTRACT) to
+set this term. The default is to inherit the value from the creator's process contract. When this term is uninitialized,
+ct_pr_tmpl_get_svc_fmri(3CONTRACT) returns the token string inherited: to indicate the value has not been set
+and is inherited. Setting the service FMRI to inherited: clears the current (B value and the term is inherited from
+the creator's process contract. To set this term a process must have {PRIV_CONTRACT_IDENTITY} in its effec<hy>
+tive set.
+transfer contract
+Specifies the ID of an empty process contract held by the caller whose inherited process contracts are to be trans<hy>
+ferred to the newly created contract. Use ct_pr_tmpl_set_transfer(3CONTRACT) to set the tranfer contract. At<hy>
+tempts to specify a contract not held by the calling process, or a contract which still has processes in it, fail.
+The default transfer term is 0, that is, no contract.
+In addition to the standard items, the status object read from a status file descriptor contains the following items to
+obtain this information respectively:
+service contract ID
+Specifies the process contract id which defined the service FMRI term. Use ct_pr_status_get_svc_ctid(3CON<hy>
+TRACT) to read the term's value. It can be used to determine if the service FMRI was inherited as in the example
+below.
+ ctid_t ctid; /* our contract id */
+ int fd; /* fd of ctid's status file */
+ ct_stathdl_(Bt status;
+ ctid_t svc_ctid;
+ if (ct_status_read(fd, CTD_FIXED, &status) == 0) {
+  if (ct_pr_status_get_svc_ctid(status, &svc_ctid) == 0) {
+  if (svc_ctid == ctid)
+  /* not inherited */
+  else
+  /* inherited */
+  }
+  ct_status_free(status);
+ }
+If CTD_ALL is specified, the following items are also available:
+Member list
+The PIDs of processes which are members of the process contract. Use ct_pr_status_get_members(3CONTRACT)
+for this information.
+Inherited contract list
+The IDs of contracts which have been inherited by the process contract. Use ct_pr_status_get_contracts(3CON<hy>
+TRACT) to obtain this information.
+<beginning of page>
+Service FMRI (term)
+Values equal to the terms used when the contract was written. The Service FMRI term of the process contract of a
+process en(Btering a zone has the value svc:/system/zone_enter:default when read from the non-global zone.
+contract creator
+Specifies the process that created the process contract. Use ct_pr_status_get_svc_creator(3CONTRACT) to read
+the term's value.
+creator's aux (term)
+Values equal to the terms used when the contract was written.
+The following standard status items have different meanings in some situations:
+Ownership state
+If the process contract has a state of CTS_OWNED or CTS_INHERITED and is held by an entity in the global
+zone, but contains processes in a non-global zone, it appears to have the state CTS_OWNED when observed by pro<hy>
+cesses in the non-global zone.
+Contract holder
+If the process contract has a state of CTS_OWNED or CTS_INHERITED and is held by an entity in the global
+zone, but contains processes in a non-global zone, it appears to be held by the non-global zone's zsched when ob<hy>
+served by processes in the non-global zone.
+In addition to the standard items, an event generated by a process contract contains the following information:
+Generating PID
+The process ID of the member process which experienced the event, or caused the contract event to be generated (in
+the case of CT_PR_EV_EMPTY). Use ct_pr_event_get_pid(3CONTRACT) to obtain this information.
+If the event type is CT_PR_EV_FORK, the event contains:
+Parent PID
+The process ID which forked [Generating PID]. Use ct_pr_event_get_ppid(3CONTRACT) to obtain this informa<hy>
+tion.
+If the event type is CT_PR_EV_EXIT, the event contains:
+Exit status
+The exit status of the process. Use ct_pr_event_get_exitstatus(3CONTRACT) to obtain this information.
+If the event type is CT_PR_EV_CORE, the event can contain:
+Process core name
+The name of the per-process core file. Use ct_pr_event_get_pcorefile(3CONTRACT) to obtain this information.
+Global core name
+The name of the process's zone's global core file. Use ct_pr_event_get_gcorefile(3CONTRACT) to obtain this in<hy>
+formation.
+<beginning of page>
+Zone core name
+The name of the system-wide core file in the global zone. Use ct_pr_event_get_zcorefile(3CONTRACT) to obtain
+this information.
+See coreadm(1M) for more information about per-process, global, and system-wide core files.
+If the event type is CT_PR_EV_SIGNAL, the event contains:
+Signal
+The number of the signal which killed the process. Use ct_pr_event_get_signal(3CONTRACT) to obtain this infor<hy>
+mation.
+It can contain:
+sender
+The PID of the process which sent the signal. Use ct_pr_event_get_sender(3CONTRACT) to obtain this informa<hy>
+tion.
+/usr/include/sys/contract/process.h
+Contains definitions of event-type macros.
+ctrun(1), ctstat(1), ctwatch(1), coreadm(1M), close(2), fork(2), ioctl(2), open(2), poll(2), ct_pr_event_get_exit<hy>
+status(3CONTRACT), ct_pr_event_get_gcorefile(3CONTRACT), ct_pr_event_get_pcorefile(3CONTRACT),
+ct_pr_event_get_pid(3CONTRACT), ct_pr_event_get_ppid(3CONTRACT), ct_pr_event_get_signal(3CON<hy>
+TRACT), ct_pr_event_get_zcorefile(3CONTRACT), ct_pr_status_get_contracts(3CONTRACT), ct_pr_sta<hy>
+tus_get_members(3CONTRACT), ct_pr_status_get_param(3CONTRACT), ct_pr_tmpl_set_fatal(3CON<hy>
+TRACT), ct_pr_tmpl_set_param(3CONTRACT), ct_pr_tmpl_set_transfer(3CONTRACT), ct_tmpl_set_cook<hy>
+ie(3CONTRACT), ct_tmpl_set_critical(3CONTRACT), ct_tmpl_set_informative(3CONTRACT), libcon<hy>
+tract(3LIB), contract(4), privileges(5)

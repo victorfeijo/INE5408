@@ -1,0 +1,78 @@
+<beginning of page>
+volmgt_acquire <-> reserve removable media device
+cc [ flag ... ] file ... -lvolmgt [ library ... ]
+#include <sys/types.h>
+#include <volmgt.h>
+int volmgt_acquire(char *dev, char *id, int ovr, char **err, pid_t *pidp);
+This function is obsolete. The management of removable media by the Volume Management feature, including vold,
+has been replaced by software that supports the Hardware Abstraction Layer (HAL). Programmatic support for HAL
+is through the HAL APIs, which are documented on the HAL web site. See hal(5). The return value of this function
+is undefined.
+The volmgt_acquire() routine reserves the removable media device specified as dev. volmgt_acquire() operates in
+two different modes, depending on whether or not volume management is running.
+If volume management is running, volmgt_acquire() attempts to reserve the removable media device specified as
+dev. Specify dev as either a symbolic device name (for example, floppy0) or a physical device pathname (for exam<hy>
+ple, /dsk/unnamed_floppy).
+If volume management is not running, volmgt_acquire() requires callers to specify a physical device pathname for
+dev. Specifying dev as a symbolic device name is not acceptable. In this mode, volmgt_acquire() relies entirely
+on the major and minor numbers of the device to determine whether or not the device is reserved.
+If dev is free, volmgt_acquire() updates the internal device reservation database with the caller's process id (pid)
+and the specified id string.
+If dev is reserved by another process, the reservation attempt fails and volmgt_acquire(): <bu> sets errno to EBUSY
+<bu> fills the caller's id value in the array pointed to by err <bu> fills in the pid to which the pointer pidp points with the
+pid of the process which holds the reservation, if the supplied pidp is non-zero
+If the override ovr is non-zero, the call overrides the device reservation.
+The return from this function is undefined.
+The volmgt_acquire() routine fails if one or more of the following are true:
+EINVAL One of the specified arguments is invalid or missing.
+EBUSY dev is already reserved by another process (and ovr was not set to a non-zero value)
+Example 1 Using volmgt_acquire()
+In the following example, volume management is running and the first floppy drive is reserved, accessed and re<hy>
+leased.
+ #include <volmgt.h>
+ char *errp;
+ if (!volmgt_acquire("floppy0", "FileMgr", 0, NULL,
+  &errp, NULL)) {
+  /* handle error case */
+  ...
+ }
+ /* floppy acquired - now access it */
+ if (!volmgt_release("floppy0")) {
+  /* handle error case */
+  ...
+ }
+Example 2 Using volmgt_acquire() To Override A Lock On Another Process
+<beginning of page>
+The following example shows how callers can override a lock on another process using volmgt_acquire().
+ char *errp, buf[20];
+ int override = 0;
+ pid_t pid;
+ if (!volmgt_acquire("floppy0", "FileMgr", 0, &errp,
+  &pid)) {
+  if (errno == EBUSY) {
+  (void) printf("override %s (pid=%ld)?\n",
+  errp, pid); {
+  (void) fgets(buf, 20, stdin);
+  if (buf[0] == 'y') {
+  override++;
+  }
+  } else {
+  /* handle other errors */
+  ...
+  }
+ }
+ if (override) {
+  if (!volmgt_acquire("floppy0", "FileMgr", 1,
+  &errp, NULL)) {
+  /* really give up this time! */
+  ...
+  }
+ }
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelMT-Safe
+_ Interface StabilityObsolete
+free(3C), malloc(3C), volmgt_release(3VOLMGT), attributes(5), hal(5)
+When returning a string through err, volmgt_acquire() allocates a memory area using malloc(3C). Use free(3C) to
+release the memory area when no longer needed.
+The ovr argument is intended to allow callers to override the current device reservation. It is assumed that the calling
+application has determined that the current reservation can safely be cleared. See EXAMPLES.

@@ -1,0 +1,363 @@
+<beginning of page>
+virt-install <-> install guest operating system on xVM system
+/usr/bin/virt-install [options]
+The virt-install program enables you to install a guest operating system on a machine running Solaris xVM.
+virt-install allows you to enter information about a guest as a set of command-line options that enable you to speci<hy>
+fy the following: <bu> Name of your guest domain. This name serves as the label of the guest operating system and will
+be the name of the file that stores the guest's configuration. For network-based installs, the name of the domain must
+match its real hostname. <bu> Amount of RAM to be allocated to the guest, in MB. Solaris domains should use 512MB
+minimum. <bu> Path to the disk image of the guest. This path is exported as an entire disk to your guest. It is on the
+xVM control domain and can be to a physical disk, a flat file, or any device that provides a block device interface;
+for example, a ZFS volume or a Solaris Volume Manager volume. <bu> If the path specified in the preceding bullet does
+not already exist, the size, in GB, of the virtual disk for your guest. <bu> You must choose whether to enable graphics
+support for the domain. Note that paravirtualized Solaris domains do not currently support a graphical console in
+this manner. <bu> URI for the location of the installation software. This can be an NFS path, or the path to a local direc<hy>
+tory or ISO. Some operating systems do not yet support ISO installs. Some operating systems require that the install
+host be fully qualified (for example, my.nfs.server.com) for the install to work. Examples of acceptable installation
+paths are:
+ nfs:my.nfs.server.com:/home/install/test/tree
+ /export/solarisdvd.iso
+After entering required information, installation starts. If you enabled graphics, a Virtual Network Computing
+(VNC) window opens and presents the graphical installer. If graphics are not enabled, the text installer is displayed.
+You can connect to the graphical console by finding the correct display with the command:
+ % virsh vncdisplay dom-name
+...and then running:
+ % vncviewer localhost:d
+...where d is the display returned by the preceding virsh vncdisplay command.
+Autoconfiguration data (see the --autocf option, below) is presented to the guest as a floppy device. For Solaris, this
+can be a UFS or PCFS file system image containing sysidcfg(4) and Jumpstart profile data.
+To run virt-install, you must become superuser or assume the Primary Administrator role.
+The following options are supported:
+--autocf=location
+Specifies location of autoconfiguration data for the guest.
+For fully virtualized guests installing from an ISO file or DVD, location specifies the pathname of a disk image to be
+presented to the guest as the floppy device fda. The following is the path to a local filename containing a floppy im<hy>
+age:
+ /path/to/guest/autocf.img
+This option is ignored for fully virtualized guests installing over a network using PXE. Such a guest will retrieve any
+autoconfiguration data over the network. For paravirtualized guests, support for this option is guest-specific.
+For Solaris paravirtualized guests installing over NFS, this option allows you to specify the NFS pathname to a di<hy>
+rectory containing a sysidcfg(4) file along with a Solaris Jumpstart profile. The following is the path to a NFS direc<hy>
+tory containing Solaris autoconfiguration data:
+<beginning of page>
+ nfs:netinstall:/export/guests/guest.autocf
+For OpenSolaris paravirtualized guests installing using an OpenSolaris AI (Automated Installer) server using the
+opensolaris os-variant flag, specify a set of comma-separated name/value pairs used by AI. These are:
+ install_service=[install_service_name]
+ install_media=[HTTP server containing AI image]
+At present, only install_service is required. install_media can be used to override the install_media path specified
+in the --location option (see below). Additional name/value pairs can be appended should the AI server require
+them.
+At such time as the OpenSolaris AI supports the ability of clients to self-discover the AI install service, an empty
+string should be used for install_service to indicate an AI install is desired.
+For fully virtualized guests (HVM domains), use the --pxe argument to perform AI installs.
+See EXAMPLES for an example of the use of the OpenSolaris AI.
+-b bridge, --bridge=bridge
+Bridge to which to connect the network interface. If you do not specify a bridge, the system attempts to determine
+the default. This should be the name of the interface in the control domain through which to route the domain's net<hy>
+working traffic, for example, bge0. This option is obsolete. Use the -w/--network option, instead.
+-c cdrom, --cdrom=cdrom
+File to use as a virtual CD-ROM device for fully virtualized guests. This option works with HVM domains and is ig<hy>
+nored with paravirtualized domains. It can be path to an ISO image, or to a CD-ROM device. It can also be a URL
+from which to fetch or access a minimal boot ISO image. The URLs take the same format as described for the --lo<hy>
+cation argument. If this option is omitted then either the --location argument must be entered, to specify a location
+for the kernel and initrd, or the --pxe option used, to install from the network.
+--check-cpu
+Check that VCPUs do not exceed physical CPUs and warn if they do.
+--connect=URI
+Connect to hypervisor at URI.
+--cpuset=cpuset
+Specify which physical CPUs the guest can use. cpuset is a comma-separated list of numbers, which can be specified
+in ranges. For example:
+0,2,3,5 Use processors 0, 2, 3, and 5
+1-3,5,6-8 Use processors 1, 2, 3, 5, 6, 7, and 8
+-d, --debug
+Display debugging information. The debugging information is stored in $HOME/.virtinst/virt-install.log, even if
+this option is omitted. In this path, $HOME is the home directory of the user invoking virt-install, such as / or
+/root.
+<beginning of page>
+--disk path=... [options]
+Specify a disk to attach to the guest domain. This is a comma-separated list of options, which must start with the
+path argument. For example:
+ --disk path=/guest/root.img,sparse=true
+The available argument and options are:
+path=...
+Path to the file, disk partition, or logical volume to use as the backing store for the guest's virtual disk.
+perms=ro
+The disk should be read-only.
+device=disk|cdrom|floppy
+The disk should be presented as a normal hard disk, CD-ROM, or floppy disk.
+size=...
+Size of the disk in Gb, if it does not yet exist.
+sparse=true|false
+Where appropriate, mark the disk as sparse or fully-allocated.
+-f pathname, --file=pathname
+Path to the file, disk partition, or logical volume to use as the backing store for the guest's virtual disk. If the path
+does not exist, then --file-size option should also be specified, allowing the disk to be created.
+-h, --help
+Display list of virt-install options.
+--import
+Skip the OS installation process, and build a guest around an existing disk image. The device used for booting is the
+first device specified by means of the --disk or --file options.
+-k keymap, --keymap=keymap
+Request that the virtual console be configured to run with a non-English keyboard layout.
+-l location, --location=location
+Installation source for paravirtualized guest. Fully virtualized guests must use either --location to specify a kernel
+and initrd or the --cdrom option to specify an ISO/CDROM image. The location argument can take the forms,
+nfs:host:/path, or a file system path in the control domain, as described above.
+--livecd
+Treat the CD-ROM media as a live CD.
+<beginning of page>
+-m mac_addr, --mac=mac_addr
+Specifies a fixed MAC address for the guest. If this parameter is omitted, or the value random is specified, a suitable
+address will be randomly generated. For xVM virtual machines it is required that the first 3 pairs in the MAC ad<hy>
+dress be the sequence 00:16:3e. This option could be used when performing PXE or NFS-based installations of So<hy>
+laris guests. This option is obsolete. Use the -w/--network option, instead.
+-n name, --name=name
+Name of the new guest virtual machine instance. This must be unique among all guests known to the hypervisor on
+this machine, including those not currently active.
+--noacpi
+Disables Advanced Configuration and Power Interface (ACPI) for fully virtualized guest. Overrides configuration
+setting stored in systems specified by --os-type and --os-variant options.
+--noapic
+Disables Advanced Programmable Interrupt Controller (APIC) for fully virtualized guest. Overrides configuration
+setting stored in systems specified by --os-type and --os-variant options.
+--noautoconsole
+Do not automatically try to connect to the guest console. The default behavior is to launch a VNC client to display
+the graphical console, or to run the virsh console command to display the text console. Use of this option disables
+this behavior.
+Use of this option should be combined with the --wait option, as described below.
+--nodisks
+Request a virtual machine without any local disk storage, typically used for running "Live CD" images or installing
+to network storage (iSCSI or NFS root). This disables all interactive prompts for disk setup.
+--nographics
+Disable all interactive prompts for the guest virtual console. No graphical console will be allocated for the guest. A
+text-based console will always be available on the first serial port (or equivalent paravirtualised console device).
+--nonetworks
+Do not create network interfaces for the guest.
+--nonsparse
+Request creation of a non-sparse file for the guest virtual disk. Note that use of this option causes guest creation to
+be significantly slower than otherwise.
+--noreboot
+Do not automatically reboot the guest domain after the first stage of installation.
+--os-type=os_type
+Optimize the guest configuration for a type of operating system. This option attempts to pick the most suitable ACPI
+and APIC settings, select optimally supported mouse drivers, and generally accommodate other operating system pe<hy>
+culiarities. See "OS Types and OS Variants", below for a list of acceptable values.
+For optimal guest operating system performance, you should specify the --os-type and --os-variant options.
+<beginning of page>
+--os-variant=os_variant
+The OS variant for fully virtualized guests. See "OS Types and OS Variants", below for a list of acceptable values.
+For optimal guest operating system performance, you should specify the --os-type and --os-variant options.
+-p, --paravirt
+Indicates that guest is paravirtualized. If the host supports both paravirtualization and full virtualization, and neither
+this parameter nor the --hvm option are specified, this will be prompted for interactively.
+--pxe
+Use the PXE boot protocol to load the initial ramdisk and kernel for starting the guest installation process. If this op<hy>
+tion is omitted, then either the --location or --cdrom options must be entered, to specify a location for the kernel and
+initrd.
+-r mem_amount, --ram=mem_amount
+Memory to allocate for guest instance, in megabytes.
+-s filesize, --file-size=filesize
+Size of the file to create for the guest virtual disk, if the path specified with the --file does not already exist. The file<hy>
+size is specified in gigabytes, with fractional numbers allowed. The storage for the file will not be pre-allocated un<hy>
+less the --nonsparse option is also specified.
+--sdl
+Use Simple DirectMedia Layer (SDL) for graphics support. This option works with some guest domains, including
+HVM, but not with Solaris.
+--sound
+Use sound device emulation. Does not work on Solars xVM.
+-u UUID, --uuid=UUID
+Specifies UUID, as a 32-digit hexadecimal number, for the guest. if no UUID is specified, the system generates a
+random UUID. If you enter a UUID, keep in mind that it is intended to be a globally unique value.
+-v, --hvm
+Specifies that the guest is a Hardware-assisted Virtual Machine (HVM). Requests the use of full virtualization, if
+both paravirtualization and full virtualization are available on the host. This parameter might not be available if con<hy>
+necting to a hypervisor on a machine without hardware virtualization support.
+This guest should be fully virtualized.
+--vcpus=vcpus
+Number of Virtual (VCPUs) to configure for your guest.
+--vnc
+Use Virtual Network Computing (VNC) for graphics support. This option works with HVM domains but not with
+paravirtualized domains. Unless the --vncport parameter is also provided, the VNC server will run on the first free
+port number at 5900 or above. The actual VNC display allocated can be obtained using the vncdisplay subcommand
+to virsh(1M).
+<beginning of page>
+--vncport=vncport
+Request a permanent, statically assigned port number for the guest VNC console. Use of this option is discouraged
+as another guest might automatically choose to run on the specified port, creating a conflict.
+-w property_list, --network=property_list
+Describes a virtual interface by means of a list of property-value pairs, each pair separated by a comma. Supported
+properties are:
+bridge=bridge
+Bridge to which to connect the virtual interface. If you do not specify a bridge, the system attempts to determine the
+default. This should be the name of the interface in the control domain through which to route the domain's network<hy>
+ing traffic, for example, bge0. This property makes the -b/--bridge option obsolete.
+mac=mac_addr
+Specifies a fixed MAC address for the guest. If this parameter is omitted, or the value RANDOM is specified, a suit<hy>
+able address will be randomly generated. For Solaris xVM virtual machines it is required that the first three pairs in
+the MAC address be the sequence 00:16:3e. This property is required when performing PXE or NFS-based installa<hy>
+tions of Solaris guests. This property makes the -m/--mac option obsolete.
+capped-bandwidth=bandwidth
+Sets bandwidth of this interface. Bandwidth should be specified as an integer with one of the scale suffixes (K, M,
+or G for Kbps, Mbps, or Gbps, respectively). Bandwidth will be rounded up to 1.2M, if the input is smaller than that
+figure.
+vlanid=vid
+Sets VLAN ID of this interface to vid.
+If this option is omitted, a single NIC will be created in the guest. If there is a bridge device in the host with a physi<hy>
+cal interface enslaved, this interface will be used for connectivity. This option can be specified multiple times to set<hy>
+up more than one NIC. Do not mix it with any one of the -b/--bridge and -m/--mac options.
+--wait=num_minutes
+If a VNC viewer could not be launched for a graphical installation, and the guest is a Windows domain, virt-install
+waits indefinitely for the guest to finish installation.
+For the domain to correctly reboot during install, virt-install must stay running until installation is complete. This
+happens by default when virt-install connects to the console. If the --noautoconsole option is used, or you need to
+disconnect from the console, use this option to keep virt-install running. A value of -1 will wait indefinitely. A value
+of 0 will exit immediately (and thus implies --noautoconsole).
+It is recommended that scripts use:
+ --wait=-1 --noautoconsole
+...as needed.
+-x extra_args, --extra-args=extra_args
+When installing paravirtualized guests, specifies additional arguments to pass to the installer.
+The following are the valid OS type and OS variant values for --os-type and --os-variant options described above.
+ os-type os-variant
+ ------- ----------
+<beginning of page>
+ linux (Linux 2.x series)
+  rhel2.1
+  rhel3
+  rhel4
+  rhel5
+  fedora5
+  fedora6
+  fedora7
+  fedora8
+  fedora9
+  fedora10
+  fedora11
+  ubuntuhardy
+  ubuntuintrepid
+  ubuntujaunty
+  sles10
+  debianEtch
+  debianLenny
+  generic24
+  generic26
+ windows (Microsoft Windows 9x or later)
+  winxp
+  winxp64
+  win2k
+  win2k3
+  win2k8
+  vista
+ unix (Traditional UNIX BSD or SysV derivatives)
+  freebsd6
+  freebsd7
+  openbsd4
+ solaris (Solaris 9 or later)
+  solaris9
+  solaris10
+  opensolaris
+ other (Not in one of groups above)
+  msdos
+  netware4
+  netware5
+  netware6
+  generic
+For Windows 7, use vista. Example 1 Installing Solaris onto a Local Disk from an ISO
+The following command installs a paravirtualized Solaris guest from an ISO file.
+ # virt-install --name solaris2 --ram 1024 --nographics \
+  --file /dev/md/dsk/solaris2-disk \
+  --os-type=solaris os-variant=solaris10 \
+  --location /export/isos/nv75-dvd.iso
+Example 2 Installing Microsoft Windows
+The following command installs a Microsoft Windows guest using a local file as a root disk.
+ # virt-install --hvm --name windows1 --ram 1024 \
+  --cdrom //en_winxp_pro_with_sp2.iso \
+<beginning of page>
+  --file /guests/windows1-disk --file-size 10 \
+  --os-type=windows os-variant=winxp \
+  --vnc
+Example 3 Installing Paravirtualized Solaris Guest from an NFS Server
+The following command installs a Solaris paravirtualized xVM guest, 500 MB of RAM, 6 GB of disk, from an NFS
+server, in text-only mode:
+ # virt-install \
+  --paravirt \
+  --name demo \
+  --ram 500 \
+  --file /export/guests/demo/images/demo.img \
+  --file-size 6 \
+  --nographics \
+  --mac=00:16:3e:2f:8a:1a \
+  --os-type=solaris os-variant=opensolaris \
+  --location nfs:netinstall:/export/s10u6/combined.s10x_u6wos/latest \
+  --autocf=nfs:netinstall:/export/guests/demo/autocf
+Example 4 Installing xVM Guest Using ZFS zvol
+The following command installs an xVM guest, using a ZFS zvol, booting from the host CD-ROM, using the VNC
+server/viewer:
+ # virt-install \
+  --hvm --name demo \
+  --ram 500 \
+  --file /dev/zvol/dsk/guests/root \
+  --vnc \
+  --hvm \
+  --os-type=solaris os-variant=opensolaris \
+  --autocf=/export/guests/demo/images/autocf.img \
+  --cdrom /dev/dsk/c2t0d0s2
+Example 5 Installing Paravirtualized Guest over HTTP
+The following command installs a paravirtualized Fedora guest domain over HTTP using the text installer:
+ # virt-install -n demo -x 'console=hvc0' --paravirt \
+ -f /dev/zvol/dsk/guests/root \
+ -l http://mirror.cc.vt.edu/pub/fedora/linux/releases/8/Fedora/x86_64/os/ \
+ --os-type=linux os-variant=fedora8 \
+ -r 512 --nographics
+Example 6 Installing Red Hat Enterprise Linux Guest over NFS
+The following sequence of commands installs a Red Hat Enterprise Linux guest over NFS using the text installer:
+ # mount -F hsfs /rhel.iso /mnt
+ # share -o ro /mnt
+ # virt-install -n pv-rhel -r 1024 -l nfs:mydom0:/mnt \
+  --os-type=linux os-variant=rhel4 \
+  -f /dev/zvol/dsk/pv-rhel.zvol -p --nographics
+<beginning of page>
+Example 7 Installing with Kickstart Automation
+The following command installs a RedHat guest using the media in the dom0 CD-ROM, utilizing kickstart to auto<hy>
+mate the installation process.
+ # virt-install \
+  --name rhat \
+  --ram 500 \
+  --file /dev/zvol/dsk/rhat.zvol \
+  --paravirt \
+  --location /dev/dsk/c2t0d0s2 \
+  --os-type=linux os-variant=rhel5 \
+  --extra-args "ks=/export/install/rhat/ks.cfg"
+Example 8 Installing an HVM Solaris Domain Using Network Boot
+The following commands install HVM Solaris domains using network boot (PXE).
+ # virt-install -n pxe-domu -r 1024 --hvm --mac 00:16:3e:2f:8a:1a \
+ --os-type=solaris --os-variant=opensolaris \
+ -f /dev/zvol/dsk/guests/root \
+ --vnc --pxe --vcpus=4
+ # virt-install -n domu-221 -r 1024 --hvm \
+ --mac `~johnlev/bin/maca domu-221` --os-type=solaris \
+ --os-variant=opensolaris -f /iscsi/nevada-hvm --vnc --pxe --vcpus=4
+Example 9 Installing with OpenSolaris AI
+The following command installs an OpenSolaris guest using the x86_install AI install service from a specified in<hy>
+stall media.
+ # virt-install --name osol \
+ --location http://10.0.0.1:5555/space/images/osol_111b \
+ --ram 1024 \
+ --file /rpool/guests/osol.raw \
+ --os-variant=opensolaris \
+ --autocf install_service=myservice
+The following command installs an OpenSolaris guest, under conditions in which the guest is able to self-discover
+its install service:
+ # virt-install --name osol \
+ --location http://10.0.0.1:5555/space/images/osol_111b \
+ --ram 1024 \
+ --file /rpool/guests/osol.raw \
+ --os-variant=opensolaris \
+ --autocf ""
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wxvmu _ Interface StabilityVolatile
+<beginning of page>
+virsh(1M), virt-clone(1M), xend(1M), xentop(1M), xenstored(1M), xm(1M), sysidcfg(4), attributes(5), xVM(5)

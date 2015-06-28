@@ -1,0 +1,58 @@
+<beginning of page>
+lgrp_affinity_get, lgrp_affinity_set <-> get of set lgroup affinity
+cc [ flag ... ] file... -llgrp [ library ... ]
+#include <sys/lgrp_user.h>
+lgrp_affinity_t lgrp_affinity_get(idtype_t idtype, id_t id,
+ lgrp_id_t lgrp);
+int lgrp_affinity_set(idtype_t idtype, id_t id, lgrp_id_t lgrp,
+ lgrp_affinity_t affinity);
+The lgrp_affinity_get() function returns the affinity that the LWP or set of LWPs specified by the idtype and id argu<hy>
+ments have for the given lgroup.
+The lgrp_affinity_set() function sets the affinity that the LWP or set of LWPs specified by idtype and id have for the
+given lgroup. The lgroup affinity can be set to LGRP_AFF_STRONG, LGRP_AFF_WEAK, or
+LGRP_AFF_NONE.
+If the idtype is P_PID, the affinity is retrieved for one of the LWPs in the process or set for all the LWPs of the
+process with process ID (PID) id. The affinity is retrieved or set for the LWP of the current process with LWP ID id
+if idtype is P_LWPID. If id is P_MYID, then the current LWP or process is specified.
+The operating system uses the lgroup affinities as advice on where to run a thread and allocate its memory and fac<hy>
+tors this advice in with other constraints. Processor binding and processor sets can restrict which lgroups a thread
+can run on, but do not change the lgroup affinities.
+Each thread can have an affinity for an lgroup in the system such that the thread will tend to be scheduled to run on
+that lgroup and allocate memory from there whenever possible. If the thread has affinity for more than one lgroup,
+the operating system will try to run the thread and allocate its memory on the lgroup for which it has the strongest
+affinity, then the next strongest, and so on up through some small, system-dependent number of these lgroup affini<hy>
+ties. When multiple lgroups have the same affinity, the order of preference among them is unspecified and up to the
+operating system to choose. The lgroup with the strongest affinity that the thread can run on is known as its "home
+lgroup" (see lgrp_home(3LGRP)) and is usually the operating system's first choice of where to run the thread and
+allocate its memory.
+ There are different levels of affinity that can be specified by a thread for a particuliar lgroup. The levels of affinity
+are the following from strongest to weakest:
+ LGRP_AFF_STRONG /* strong affinity */
+ LGRP_AFF_WEAK /* weak affinity */
+ LGRP_AFF_NONE /* no affinity */
+The LGRP_AFF_STRONG affinity serves as a hint to the operating system that the calling thread has a strong
+affinity for the given lgroup. If this is the thread's home lgroup, the operating system will avoid rehoming it to an<hy>
+other lgroup if possible. However, dynamic reconfiguration, processor offlining, processor binding, and processor
+set binding and manipulation are examples of events that can cause the operating system to change the thread's
+home lgroup for which it has a strong affinity.
+The LGRP_AFF_WEAK affinity is a hint to the operating system that the calling thread has a weak affinity for the
+given lgroup. If a thread has a weak affinity for its home lgroup, the operating system interpets this to mean that
+thread does not mind whether it is rehomed, unlike LGRP_AFF_STRONG. Load balancing, dynamic reconfigura<hy>
+tion, processor binding, or processor set binding and manipulation are examples of events that can cause the operat<hy>
+ing system to change a thread's home lgroup for which it has a weak affinity.
+The LGRP_AFF_NONE affinity signifies no affinity and can be used to remove a thread's affinity for a particuliar
+lgroup. Initially, each thread has no affinity to any lgroup. If a thread has no lgroup affinities set, the operating sys<hy>
+tem chooses a home lgroup for the thread with no affinity set.
+Upon successful completion, lgrp_affinity_get() returns the affinity for the given lgroup.
+Upon successful completion, lgrp_affinity_set() return 0.
+Otherwise, both functions return <mi>1 and set errno to indicate the error.
+The lgrp_affinity_get() and lgrp_affinity_set() functions will fail if:
+<beginning of page>
+EINVAL The specified lgroup, affinity, or ID type is not valid.
+EPERM The effective user of the calling process does not have appropriate privileges, and its real or effective user
+ID does not match the real or effective user ID of one of the LWPs.
+ESRCH The specified lgroup or LWP(s) was not found.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stabili<hy>
+tyEvolving _ MT-LevelMT-Safe
+lgrp_home(3LGRP), liblgrp(3LIB), attributes(5)

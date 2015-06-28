@@ -1,0 +1,89 @@
+<beginning of page>
+adbgen <-> generate adb script
+/usr/lib/adb/adbgen [-m model] filename.adb ...
+adbgen makes it possible to write adb(1) scripts that do not contain hard-coded dependencies on structure member
+offsets. The input to adbgen is a file named filename.adb that contains header information, then a null line, then the
+name of a structure, and finally an adb script. adbgen only deals with one structure per file; all member names are
+assumed to be in this structure. The output of adbgen is an adb script in filename. adbgen operates by generating a
+C program which determines structure member offsets and sizes, which in turn generate the adb script.
+The header lines, up to the null line, are copied verbatim into the generated C program. Typically, these are #include
+statements, which include the headers containing the relevant structure declarations.
+The adb script part may contain any valid adb commands (see adb(1)), and may also contain adbgen requests, each
+enclosed in braces ({}). Request types are: <bu> Print a structure member. The request form is {member,format}. mem<hy>
+ber is a member name of the structure given earlier, and format is any valid adb format request or any of the adb<hy>
+gen format specifiers (such as {POINTER}) listed below. For example, to print the p_pid field of the proc structure
+as a decimal number, you would write {p_pid,d}. <bu> Print the appropriate adb format character for the given adbgen
+format specifier. This action takes the data model into consideration. The request form is {format specifier}. The
+valid adbgen format specifiers are:
+{POINTER} pointer value in hexadecimal
+{LONGDEC} long value in decimal
+{ULONGDEC} unsigned long value in decimal
+{ULONGHEX} unsigned long value in hexadecimal
+{LONGOCT} long value in octal
+{ULONGOCT} unsigned long value in octal
+<bu> Reference a structure member. The request form is {*member,base}. member is the member name whose value is
+desired, and base is an adb register name which contains the base address of the structure. For example, to get the
+p_pid field of the proc structure, you would get the proc structure address in an adb register, for example <f, and
+write {*p_pid,<f}. <bu> Tell adbgen that the offset is valid. The request form is {OFFSETOK}. This is useful after in<hy>
+voking another adb script which moves the adb dot. <bu> Get the size of the structure. The request form is {SIZEOF}.
+adbgen replaces this request with the size of the structure. This is useful in incrementing a pointer to step through an
+array of structures. <bu> Calculate an arbitrary C expression. The request form is {EXPR,expression}. adbgen replaces
+this request with the value of the expression. This is useful when more than one structure is involved in the script. <bu>
+Get the offset to the end of the structure. The request form is {END}. This is useful at the end of the structure to get
+adb to align the dot for printing the next structure member.
+adbgen keeps track of the movement of the adb dot and generates adb code to move forward or backward as neces<hy>
+sary before printing any structure member in a script. adbgen's model of the behavior of adb's dot is simple: it is as<hy>
+sumed that the first line of the script is of the form struct_address/adb text and that subsequent lines are of the form
++/adb text. The adb dot then moves in a sane fashion. adbgen does not check the script to ensure that these limita<hy>
+tions are met. adbgen also checks the size of the structure member against the size of the adb format code and
+warns if they are not equal.
+The following option is supported:
+-m model Specifies the data type model to be used by adbgen for the macro. This affects the outcome of the {format
+specifier} requests described under DESCRIPTION and the offsets and sizes of data types. model can be ilp32 or
+lp64. If the -m option is not given, the data type model defaults to ilp32.
+The following operand is supported:
+<beginning of page>
+filename.adb Input file that contains header information, followed by a null line, the name of the structure, and final<hy>
+ly an adb script.
+Example 1 A sample adbgen file.
+For an include file x.h which contained
+ struct x {
+  char *x_cp;
+  char x_c;
+  int x_i;
+ };
+then , an adbgen file (call it script.adb) to print the file x.h would be:
+ #include "x.h"
+ x
+ ./"x_cp"16t"x_c"8t"x_i"n{x_cp,{POINTER}}{x_c,C}{x_i,D}
+After running adbgen as follows,
+ % /usr/lib/adb/adbgen script.adb
+the output file script contains:
+ ./"x_cp"16t"x_c"8t"x_i"nXC3+D
+For a macro generated for a 64-bit program using the lp64 data model as follows,
+ % /usr/lib/adb/adbgen/ -m lp64 script.adb
+the output file script would contain:
+ ./"x_cp"16t"x_c"8t"x_i"nJC3+D
+To invoke the script, type:
+ example% adb program
+ x$<script
+/usr/platform/platform-name/lib/adb/*
+platform-specific adb scripts for debugging the 32-bit kernel
+<beginning of page>
+/usr/platform/platform-name/lib/adb/sparcv9/*
+platform-specific adb scripts for debugging the 64-bit SPARC V9 kernel
+/usr/lib/adb/*
+adb scripts for debugging the 32-bit kernel
+/usr/lib/adb/sparcv9/*
+adb scripts for debugging the 64-bit SPARC V9 kernel
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wesu
+adb(1), uname(1), kadb(1M), attributes(5)
+Warnings are given about structure member sizes not equal to adb format items and about badly formatted requests.
+The C compiler complains if a structure member that does not exist is referenced. It also complains about an amper<hy>
+sand before array names; these complaints may be ignored.
+platform-name can be found using the -i option of uname(1).
+adb syntax is ugly; there should be a higher level interface for generating scripts.
+Structure members which are bit fields cannot be handled because C will not give the address of a bit field. The ad<hy>
+dress is needed to determine the offset.

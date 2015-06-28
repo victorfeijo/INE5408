@@ -1,0 +1,131 @@
+<beginning of page>
+tracing <-> overview of tnf tracing system
+tnf tracing is a set of programs and API's that can be used to present a high-level view of the performance of an
+executable, a library, or part of the kernel. tracing is used to analyze a program's performance and identify the con<hy>
+ditions that produced a bug.
+The core elements of tracing are:
+TNF_PROBE_*() The TNF_PROBE_*() macros define "probes" to be placed in code which, when enabled and
+executed, cause information to be added to a trace file. See TNF_PROBE(3TNF). If there are insufficient
+TNF_PROBE_* macros to store all the data of interest for a probe, data may be grouped into records. See
+TNF_DECLARE_RECORD(3TNF).
+prex Displays and controls probes in running software. See prex(1).
+kernel probes A set of probes built into the Solaris kernel which capture information about system calls, multi<hy>
+threading, page faults, swapping, memory management, and I/O. You can use these probes to obtain detailed traces
+of kernel activity under your application workloads. See tnf_kernel_probes(4).
+tnfxtract A program that extracts the trace data from the kernel's in-memory buffer into a file. See tnfxtract(1).
+tnfdump A program that displays the information from a trace file. See tnfdump(1).
+libtnfctl A library of interfaces that controls probes in a process. See libtnfctl(3TNF). prex(1) also utilizes this li<hy>
+brary. Other tools and processes use the libtnfctl interfaces to exercise fine control over their own probes.
+tnf_process_enable() A routine called by a process to turn on tracing and probe functions for the current process.
+See tnf_process_enable(3TNF).
+tnf_process_disable() A routine called by a process to turn off tracing and probe functions for the current process.
+See tnf_process_disable(3TNF).
+tnf_thread_enable() A routine called by a process to turn on tracing and probe functions for the currently running
+thread. See tnf_thread_enable(3TNF).
+tnf_thread_disable() A routine called by a process to turn off tracing and probe functions for the currently running
+thread. See tnf_thread_disable(3TNF).
+Example 1 Tracing a Process
+The following function in some daemon process accepts job requests of various types, queueing them for later ex<hy>
+ecution. There are two "debug probes" and one "production probe." Note that probes which are intended for debug<hy>
+ging will not be compiled into the final version of the code; however, production probes are compiled into the final
+product.
+  /*
+  * To compile in all probes (for development):
+  * cc -DTNF_DEBUG ...
+  *
+  * To compile in only production probes (for release):
+  * cc ...
+  *
+  * To compile in no probes at all:
+  * cc -DNPROBE ...
+  */
+ #include <tnf/probe.h>
+<beginning of page>
+ void work(long, char *);
+ enum work_request_type { READ, WRITE, ERASE, UPDATE };
+ static char *work_request_name[] = {"read", "write", "erase", "update"};
+ main()
+ {
+  long i;
+  for (i = READ; i <= UPDATE; i++)
+  work(i, work_request_name[i]);
+ }
+ void work(long request_type, char *request_name)
+ {
+  static long q_length;
+  TNF_PROBE_2_DEBUG(work_start, "work",
+   "XYZ%debug 'in function work'",
+   tnf_long, request_type_arg, request_type,
+   tnf_string, request_name_arg, request_name);
+  /* assume work request is queued for later processing */
+  q_length++;
+  TNF_PROBE_1(work_queue, "work queue",
+   "XYZ%work_load heavy",
+   tnf_long, queue_length, q_length);
+  TNF_PROBE_0_DEBUG(work_end, "work", "");
+ }
+The production probe "work_queue," which remains compiled in the code, will, when enabled, log the length of the
+work queue each time a request is received.
+The debug probes "work_start" and "work_end, " which are compiled only during the development phase, track en<hy>
+try to and exit from the work() function and measure how much time is spent executing it. Additionally, the debug
+probe "work_start" logs the value of the two incoming arguments request_type and request_name. The runtime
+overhead for disabled probes is low enough that one can liberally embed them in the code with little impact on per<hy>
+formance.
+For debugging, the developer would compile with -DTNF_DEBUG, run the program under control of prex(1), en<hy>
+able the probes of interest (in this case, all probes), continue the program until exit, and dump the trace file:
+ % cc
+ -DTNF_DEBUG -o daemon daemon.c # compile in all probes
+ % prex daemon # run program under prex control
+ Target process stopped
+ Type "continue" to resume the target, "help" for help ...
+ prex> list probes $all # list all probes in program
+ <probe list output here>
+ prex> enable $all # enable all probes
+ prex> continue # let target process execute
+ <program output here>
+ prex: target process finished
+ % ls /tmp/trace-* # trace output is in trace-<pid>
+ /tmp/trace-4194
+ % tnfdump /tmp/trace-4194 # get ascii output of trace file
+ <trace records output here>
+For the production version of the system, the developer simply compiles without -DTNF_DEBUG.
+Example 2 Tracing the Kernel
+Kernel tracing is similar to tracing a process; however, there are some differences. For instance, to trace the kernel,
+you need superuser privileges. The following example uses prex(1) and traces the probes in the kernel that capture
+system call information.
+<beginning of page>
+ Allocate kernel
+ trace buffer and capture trace data:
+ root# prex -k
+ Type "help" for help ...
+ prex> buffer alloc 2m # allocate kernel trace buffer
+ Buffer of size 2097152 bytes allocated
+ prex> list probes $all # list all kernel probes
+ <probe list output here>
+ prex> list probes syscall # list syscall probes
+  # (keys=syscall)
+ <syscall probes list output here>
+ prex> enable syscall # enable only syscall probes
+ prex> ktrace on # turn on kernel tracing
+ <Run your application in another window at this point>
+ prex> ktrace off # turn off kernel tracing
+ prex> quit # exit prex
+ Extract the kernel's trace buffer into a file:
+ root# tnfxtract /tmp/ktrace # extract kernel trace buffer
+ Reset kernel tracing:
+ root# prex -k
+ prex> disable $all # disable all probes
+ prex> untrace $all # untrace all probes
+ prex> buffer dealloc # deallocate kernel trace buffer
+ prex> quit
+CAUTION: Do not deallocate the trace buffer until you have extracted it into a trace file. Otherwise, you will lose
+the trace data that you collected from your experiment!
+Examine the kernel trace file:
+ root# tnfdump /tmp/ktrace # get ascii dump of trace file
+ <trace records output here>
+prex can also attach to a running process, list probes, and perform a variety of other tasks.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Availability<hy>
+SUNWtnfd _ MT LevelMT-Safe
+prex(1), tnfdump(1), tnfxtract(1), TNF_DECLARE_RECORD(3TNF), TNF_PROBE(3TNF), libtnfctl(3TNF),
+tnf_process_disable(3TNF), tnf_kernel_probes(4), attributes(5)

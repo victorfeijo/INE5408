@@ -1,0 +1,285 @@
+<beginning of page>
+raidctl <-> RAID hardware utility
+raidctl -C "disks" [-r raid_level] [-z capacity] [-s stripe_size] [-f]
+ controller
+raidctl -d [-f] volume
+raidctl -F filename [-f] controller...
+raidctl -a {set | unset} -g disk {volume | controller}
+raidctl -p "param=value" [-f] volume
+raidctl -c [-f] [-r raid_level] disk1 disk2 [disk3...]
+raidctl -l -g disk controller
+raidctl -l volume
+raidctl -l controller...
+raidctl [-l]
+raidctl -S [volume | controller]
+raidctl -S -g disk controller
+raidctl -h
+The raidctl utility is a hardware RAID configuration tool that supports different RAID controllers by providing a
+CLI (command-line interface) to end-users to create, delete or display RAID volume(s). The utility can also used to
+set properties of a volume, assign hot-spare (HSP) disks to volumes or controllers, and to update
+firmware/fcode/BIOS for RAID controllers.
+The raidctl utility requires privileges that are controlled by the underlying file-system permissions. Only privileged
+users can manipulate the RAID system configuration. If a non-privileged user attempts to run raidctl, the command
+fails with an exit status of 1.
+The raidctl utility, as described in this man page, defines a broad set of command line options to provide manage<hy>
+ment for full-featured RAID controllers. However, support for a given option depends on two elements: <bu> the pres<hy>
+ence of a software driver <bu> the firmware level of the RAID device
+The dependency on a software driver is due to the design of raidctl. The utility is built on a common library that en<hy>
+ables the insertion of plug-in modules for different drivers. Currently, the Solaris operating system is shipped with a
+plug-in for the mpt driver. This plug-in does not support all of the raidctl options. On a given storage device, op<hy>
+tions might be further limited by the device's firmware level.
+The level of support for the various raidctl options cannot be determined by raidctl. The user must rely on the docu<hy>
+mentation for his RAID controller or hardware platform.
+Currently, raidctl Currently, raidctl provides some level of support for the following RAID controllers: <bu> LSI1020
+SCSI HBA <bu> LSI1030 SCSI HBA <bu> LSI1064 SAS HBA <bu> LSI1068 SAS HBA
+All of the above HBAs are maintained by the mpt driver, on X86-32/64 and SPARC platforms.
+The following options are supported:
+-C "disks" [-r raid_level] [-z capacity] [-s stripe_size] [-f] controller
+Create a RAID volume using specified disks.
+When creating a RAID volume using this option, the identity of the newly created volume is automatically generated
+and raidctl reports it to the user.
+The argument specified by this option contains the elements used to form the volume that will be created. Elements
+can be either disks or sub-volumes, where disks are separated by space(s) and a sub-volume is a set of disks grouped
+by parenthesis. All disks should be in C.ID.L expression (for example, 0.1.2 represents a physical disk of channel 0,
+<beginning of page>
+target id 1, and logical unit number 2). The argument must match the RAID level specified by the -r option, even if
+it's omitted. This means the argument can only be:
+for RAID 0
+At least 2 disks
+for RAID 1
+Only 2 disks
+for RAID 1E
+At least 3 disks
+for RAID 5
+At least 3 disks
+for RAID 10
+At least 2 sub-volumes, each sub-volume must be formed by 2 disks
+for RAID 50
+At least 2 sub-volumes, each sub-volume must be formed by at least 3 disks, and the disk amount in each sub-vol<hy>
+ume should be the same
+For example, the expression "0.0.0 0.1.0" means that the 2 specified disks form a RAID volume, which can either be
+a RAID 0 or a RAID 1 volume. "(0.0.0 0.1.0)(0.2.0 0.3.0)" means that the first 2 disks and the last 2 disks form 2
+sub-volumes, and that these 2 sub-volumes form a RAID 10 volume. See the EXAMPLES section for more sam<hy>
+ples.
+The -r option specifies the RAID level of the volume that will be created. Possible levels are 0, 1, 1E, 5, 10, 50. If
+this option is omitted, raidctl creates a RAID 1 volume by default.
+The -z option specifies the capacity of the volume that will be created. The unit can be tera-bytes, giga-bytes, or
+mega-bytes (for example, 2t, 10g, 20m, and so on). If this option is omitted, raidctl calculates the maximum capaci<hy>
+ty of the volume that can be created by the specified disks and uses this value to create the volume.
+The -s option specifies the stripe size of the volume that will be created. The possible values are 512, 1k, 2k, 4k, 8k,
+16k, 32k, 64k, or 128k. If this option is omitted, raidctl chooses an appropriate value for the volume (for example,
+64k).
+In some cases, the creation of a RAID volume may cause data on specified disks to be lost (for instance, on
+LSI1020, LSI1030, SAS1064, or SAS1068 HBAs), and raidctl prompts the user for confirmation about the creation.
+Use the -f option to force the volume creation without prompting the user for confirmation.
+The controller argument is used to identify which RAID controller the specified disks belongs. The -l option can be
+used to list the controller's ID number.
+-d [-f] volume
+Delete the RAID volume specified as volume. The volume is specified in canonical form (for example, c0t0d0).
+When a volume is deleted, all data is lost. Therefore, unless the -f option is specified, raidctl prompts the user for
+confirmation before deleting the volume.
+When a RAID 1 volume is deleted from a LSI1020, LSI1030, SAS1064, or SAS1068 HBA, the primary and sec<hy>
+ondary disks are "split". If the volume was in SYNCING state, the primary will contain the data, and the secondary
+will not. If the volume state was OPTIMAL, both disks will contain a complete image of the data.
+<beginning of page>
+-F filename [-f] controller...
+Update the firmware running on the specified controller(s). The raidctl utility prompts the user for confirmation of
+this action, unless the -f option is provided.
+-a {set | unset} -g disk {volume | controller}
+If the volume is specified, raidctl sets or unsets the disk as a local hot-spare disk dedicated to the volume, depending
+on the value specified by the -a option. If the controller is specified, raidctl sets or unsets the disk as a global hot-
+spare disk.
+-p "param=value" [-f] volume
+Change the property value for a given RAID volume. This option can be used to change cache write policy or to ac<hy>
+tivate a volume. When changing the cache write policy, param should be the string wp (SET_WR_POLICY), and
+value can be either on or off. When used to activate a volume, param should be state and value should be activate.
+Changing a RAID volume's property may affect the internal behavior of the RAID controller, so raidctl prompts the
+user for a confirmation before applying the change, unless the -f option is specified.
+-c [-f] [-r raid_level] disk1 disk2 [disk3...]
+Create a volume using the specified disks. This is an alternative to the -C option with similar functionality. This op<hy>
+tion is preserved for compatibility reasons, but only works with LSI1020, LSI1030, SAS1064, and SAS1068 HBAs
+to create RAID 0, RAID 1, or RAID 1E volumes. For other HBAs, the user can only use the -C option.
+The -r option can be used to specify the RAID level of the target volume. If the -r option is omitted, raidctl will cre<hy>
+ate a RAID 1 volume.
+Disks must be specified in Solaris canonical format (for example, c0t0d0).
+Creating a RAID 1 volume with this option replaces the contents of disk2 with the contents of disk1.
+When the user creates a RAID volume with this option, the RAID volume assumes the identity of disk1. Other disks
+become invisible and the RAID volume appears as one disk.
+Creating a volume with this option is by default interactive. The user must answer a prompt affirmatively to create
+the volume. Use the -f option to force the volume creation without prompting the user for confirmation.
+-l -g disk controller
+Display information about the specified disk of the given controller. The output includes the following information:
+Disk
+Displays the disk in C.ID.L expression disk.
+Vendor
+Displays the vendor ID string.
+Product
+Displays the product ID string.
+Capacity
+Displays the total capacity of the disk.
+Status
+Displays the current status of disk. The status can be either "GOOD" (operating normally), "FAILED" (non-func<hy>
+<beginning of page>
+tional), or "MISSING" (disk not present).
+HSP
+Indicates if the disk has been set as a global hot-spare disk, local hot-spare disk, or a normal one. If it is a local hot-
+spare disk, all volumes which this disk is assigned to are displayed.
+GUID
+GUID string for the specified disk. This is an additional datum and might be unavailable in some cases.
+-l volume
+Display information about the specified volume. The output includes the following information:
+Volume
+Displays volume in canonical format.
+Sub
+Displays sub-volumes, if the specified volume is of RAID 10 or RAID 50 volume.
+Disk
+Displays all disks that form the specified volume.
+Stripe Size
+Displays the stripe size of the volume.
+Status
+Displays the status of the specified volume, or the sub-volumes or disks that form the specified volume. For an in<hy>
+active volume, the status should be INACTIVE; otherwise it can be OPTIMAL (operating optimally), DEGRAD<hy>
+ED (operating with reduced functionality), FAILED (non-functional), or SYNC (disks are syncing). For a disk, the
+status can be GOOD, FAILED, or MISSING.
+Cache
+Indicates whether the cache is applied to I/O write activities. The cache can be either "ON" or "OFF".
+RAID level
+Displays the RAID level. The RAID level can be either 0, 1, 1E, 5, 10, or 50.
+-l controller ...
+Display information about the specified controller(s). The output includes the following information:
+Controller
+Displays the RAID controller's ID number.
+Type
+Displays the RAID controller's product type.
+<beginning of page>
+fw_version
+Displays the controller's firmware version.
+[-l]
+List all RAID related objects that the raidctl utility can manipulate, including all available RAID controllers, RAID
+volumes, and physical disks. The -l option can be omitted.
+The output includes the following information:
+Controller
+Displays the RAID controller's ID number.
+Volume
+Displays the logical RAID volume name.
+Disk
+Displays the RAID disk in C.ID.L expression.
+-S [volume | controller]
+Takes a snapshot of the RAID configuration information including all available RAID devices, RAID controllers,
+volumes, and disks.
+Each line of the output specifies a RAID device and its related information, separated by space(s). All volumes and
+disks belong to the last specified controller.
+The output lists the following information:
+Controller
+Displays the controller ID number, and the controller type string in double-quotation marks.
+Volume
+Displays the RAID volume name, number of component disks, the C.ID.L expression of the component disks, the
+RAID level, and the status. The status can be either OPTIMAL, DEGRADED, FAILED, or SYNCING.
+Disk
+Displays the C.ID.L expression of the disk, and the status. The status can be either GOOD, FAILED, or HSP (disk
+has been set as a stand-by disk).
+If a volume or a controller is specified, a snapshot is only taken of the information for the specified volume or con<hy>
+troller.
+-S -g disk controller
+Takes a snapshot of the information for the specified disk.
+-h
+Print out the usage string.
+Example 1 Creating the RAID Configuration
+The following command creates a RAID 0 volume of 10G on controller 0, and the stripe size will be set to 64k:
+<beginning of page>
+ # raidctl -C "0.0.0 0.2.0" -r 0 -z 10g -s 64k 0
+The following command creates a RAID 1 volume on controller 2:
+ # raidctl -C "0.0.0 1.1.0" -r 1 2
+The following command creates a RAID 5 volume on controller 2:
+ # raidctl -C "0.0.0 0.1.0 0.2.0" -r 5 2
+The following command creates a RAID 10 volume on controller 0:
+ # raidctl -C "(0.0.0 0.1.0)(0.2.0 0.3.0)" -r 10 0
+The following command creates a RAID 50 volume on controller 0:
+ # raidctl -C "(0.0.0 0.1.0 0.2.0)(0.3.0 0.4.0 0.5.0)" -r 50 0
+Example 2 Displaying the RAID Configuration
+The following command displays all available controllers, volumes, and disks:
+ # raidctl -l
+ Controller: 0
+ Controller: 2
+  Volume:c2t0d0
+  Disk: 0.0.0
+  Disk: 0.1.0
+  Disk: 0.2.0
+  Disk: 0.3.0(HSP)
+The following command displays information about controller 2:
+ # raidctl -l 2
+ Controller Type Fw_version
+ --------------------------------------------------------------
+ c2 LSI 1030 1.03.39.00
+The following command displays information about the specified volume:
+ # raidctl -l c2t0d0
+ Volume Size Stripe Status Cache RAID
+<beginning of page>
+  Sub Size Level
+  Disk
+ --------------------------------------------------------------
+ c2t0d0 10240M 64K OPTIMAL ON RAID5
+  0.0.0 5120M GOOD
+  0.1.0 5120M GOOD
+  0.2.0 5120M GOOD
+The following command displays information about disk 0.0.0 on controller 0:
+ # raidctl -l -g 0.0.0 0
+ Disk Vendor Product Firmware Capacity Status HSP
+ --------------------------------------------------------------------
+ 0.0.0 HITACHI H101473SCSUN72G SQ02 68.3G GOOD N/A
+ GUID:2000000cca02536c
+Example 3 Deleting the RAID Configuration
+The following command deletes a volume:
+ # raidctl -d c0t0d0
+Example 4 Updating Flash Images on the Controller
+The following command updates flash images on the controller 0:
+ # raidctl -F lsi_image.fw 0
+Example 5 Setting or Unsetting a Hot-Spare Disk
+The following command sets disk 0.3.0 on controller 2 as a global hot-spare disk:
+ # raidctl -a set -g 0.3.0 2
+The following command sets disk 0.3.0 on controller 2 as a local hot-spare disk to volume c2t0d0:
+ # raidctl -a set -g 0.3.0 c2t0d0
+The following command converts disk 0.3.0 on controller 2 from a global hot-spare disk to a normal one:
+ # raidctl -a unset -g 0.3.0 2
+The following command removes disk 0.3.0 from being a local hot-spare disk from volume c2t0d0:
+ # raidctl -a unset -g 0.3.0 c2t0d0
+Example 6 Setting the Volume's Property
+<beginning of page>
+The following command sets the write policy of the volume to "off":
+ # raidctl -a set -p "wp=off" c0t0d0
+Example 7 Creating Volumes with the -c Option
+The following command creates a RAID 1 volume:
+ # raidctl -c c0t0d0 c0t1d0
+The following command creates a RAID 0 volume:
+ # raidctl -c -r 0 c0t1d0 c0t2d0 c0t3d0
+Example 8 Taking a Snapshot of the RAID Configuration
+The following command takes a snapshot of all RAID devices:
+ # # raidctl -S
+ 1 "LSI 1030"
+ c1t1d0 2 0.2.0 0.3.0 1 DEGRADED
+ 0.2.0 GOOD
+ 0.3.0 FAILED
+The following command takes a snapshot about volume c1t0d0:
+ # raidctl -S c1t0d0
+ c1t0d0 2 0.0.0 0.1.0 1 OPTIMAL
+The following command takes a snapshot about disk 0.1.0 on controller 1:
+ # raidctl -S -g 0.1.0 1
+ 0.1.0 GOOD
+The following exit values are returned:
+0
+Successful completion.
+1
+Invalid command line input or permission denied.
+<beginning of page>
+2
+Request operation failed.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu _ Interface Stability Committed
+attributes(5), mpt(7D)
+System Administration Guide: Basic Administration
+Do not create raid volumes on internal SAS disks if you are going to use the Solaris Multipathing I/O feature (also
+known as MPxIO). Creating a new raid volume under Solaris Multipathing will give your root device a new GUID
+which does not match the GUID for the existing devices. This will cause a boot failure since your root device entry
+in /etc/vfstab will not match.
+The -z option is not supported on systems that use the mpt driver and LSI RAID controllers.

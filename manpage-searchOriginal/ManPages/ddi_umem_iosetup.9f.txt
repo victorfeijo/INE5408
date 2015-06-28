@@ -1,0 +1,47 @@
+<beginning of page>
+ddi_umem_iosetup <-> Setup I/O requests to application memory
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+struct buf *ddi_umem_iosetup(ddi_umem_cookie_t cookie,off_t off,
+ size_t len, int direction, dev_t dev, daddr_t blkno, 
+ int (*iodone) (struct buf *), int sleepflag);
+Solaris DDI specific (Solaris DDI)
+cookie The kernel memory cookie allocated by ddi_umem_lock(9F).
+off Offset from the start of the cookie.
+len Length of the I/O request in bytes.
+direction Must be set to B_READ for reads from the device or B_WRITE for writes to the device.
+dev Device number
+blkno Block number on device.
+iodone Specific biodone(9F) routine.
+sleepflag Determines whether caller can sleep for memory. Possible flags are DDI_UMEM_SLEEP to allow sleep<hy>
+ing until memory is available, or DDI_UMEM_NOSLEEP to return NULL immediately if memory is not avail<hy>
+able.
+The ddi_umem_iosetup(9F) function is used by drivers to setup I/O requests to application memory which has been
+locked down using ddi_umem_lock(9F).
+The ddi_umem_iosetup(9F) function returns a pointer to a buf(9S) structure corresponding to the memory cookie
+cookie. Drivers can setup multiple buffer structures simultaneously active using the same memory cookie. The
+buf(9S) structures can span all or part of the region represented by the cookie and can overlap each other. The
+buf(9S) structure can be passed to ddi_dma_buf_bind_handle(9F) to initiate DMA transfers to or from the locked
+down memory.
+The off parameter specifies the offset from the start of the cookie. The len parameter represents the length of region
+to be mapped by the buffer. The direction parameter must be set to either B_READ or B_WRITE, to indicate the
+action that will be performed by the device. (Note that this direction is in the opposite sense of the VM system's di<hy>
+rection of DDI_UMEMLOCK_READ and DDI_UMEMLOCK_WRITE.) The direction must be compatible with
+the flags used to create the memory cookie in ddi_umem_lock(9F). For example, if ddi_umem_lock() is called
+with the flags parameter set to DDI_UMEMLOCK_READ, the direction parameter in ddi_umem_iosetup() should
+be set to B_WRITE.
+The dev parameter specifies the device to which the buffer is to perform I/O.The blkno parameter represents the
+block number on the device. It will be assigned to the b_blkno field of the returned buffer structure. The iodone pa<hy>
+rameter enables the driver to identify a specific biodone(9F) routine to be called by the driver when the I/O is com<hy>
+plete. The sleepflag parameter determines if the caller can sleep for memory. DDI_UMEM_SLEEP allocations
+may sleep but are guaranteed to succeed. DDI_UMEM_NOSLEEP allocations do not sleep but may fail (return
+NULL) if memory is currently not available.
+After the I/O has completed and the buffer structure is no longer needed, the driver calls freerbuf(9F) to free the
+buffer structure.
+<beginning of page>
+The ddi_umem_iosetup(9F) function returns a pointer to the initialized buffer header, or NULL if no space is avail<hy>
+able.
+The ddi_umem_iosetup(9F) function can be called from any context only if flag is set to
+DDI_UMEM_NOSLEEP. If DDI_UMEM_SLEEP is set, ddi_umem_iosetup(9F) can be called from user and
+kernel context only.
+ddi_umem_lock(9F), ddi_dma_buf_bind_handle(9F), freerbuf(9F), physio(9F), buf(9S)

@@ -1,0 +1,102 @@
+<beginning of page>
+netdir, netdir_getbyname, netdir_getbyaddr, netdir_free, netdir_options, taddr2uaddr, uaddr2taddr, netdir_perror,
+netdir_sperror, netdir_mergeaddr <-> generic transport name-to-address translation
+cc [ flag... ] file... -lnsl [ library...]
+#include <netdir.h>
+int netdir_getbyname(struct netconfig *config,
+ struct nd_hostserv *service, struct nd_addrlist **addrs);
+int netdir_getbyaddr(struct netconfig *config,
+ struct nd_hostservlist **service, struct netbuf *netaddr);
+void netdir_free(void *ptr, int struct_type);
+int netdir_options(struct netconfig *config, int option, int fildes,
+ char *point_to_args);
+char *taddr2uaddr(struct netconfig *config, struct netbuf *addr);
+struct netbuf *uaddr2taddr(struct netconfig *config, char *uaddr);
+void netdir_perror(char *s);
+char *netdir_sperror(void);
+The netdir functions provide a generic interface for name-to-address mapping that will work with all transport pro<hy>
+tocols. This interface provides a generic way for programs to convert transport specific addresses into common
+structures and back again. The netconfig structure, described on the netconfig(4) manual page, identifies the trans<hy>
+port.
+The netdir_getbyname() function maps the machine name and service name in the nd_hostserv structure to a col<hy>
+lection of addresses of the type understood by the transport identified in the netconfig structure. This function re<hy>
+turns all addresses that are valid for that transport in the nd_addrlist structure. The nd_hostserv structure contains
+the following members:
+ char *h_host; /* host name */
+ char *h_serv; /* service name */
+The nd_addrlist structure contains the following members:
+ int n_cnt; /* number of addresses */
+ struct netbuf *n_addrs;
+The netdir_getbyname() function accepts some special-case host names. The host names are defined in <netdir.h>.
+The currently defined host names are:
+HOST_SELF Represents the address to which local programs will bind their endpoints. HOST_SELF differs from
+the host name provided by gethostname(3C), which represents the address to which remote programs will bind their
+endpoints.
+HOST_ANY Represents any host accessible by this transport provider. HOST_ANY allows applications to specify
+a required service without specifying a particular host name.
+HOST_SELF_CONNECT Represents the host address that can be used to connect to the local host.
+HOST_BROADCAST Represents the address for all hosts accessible by this transport provider. Network requests
+to this address are received by all machines.
+All fields of the nd_hostserv structure must be initialized.
+<beginning of page>
+To find the address of a given host and service on all available transports, call the netdir_getbyname() function with
+each struct netconfig structure returned by getnetconfig(3NSL).
+The netdir_getbyaddr() function maps addresses to service names. The function returns service, a list of host and
+service pairs that yield these addresses. If more than one tuple of host and service name is returned, the first tuple
+contains the preferred host and service names:
+ struct nd_hostservlist {
+  int *h_cnt; /* number of hostservs found */
+  struct hostserv *h_hostservs;
+ }
+The netdir_free() structure is used to free the structures allocated by the name to address translation functions. The
+ptr parameter points to the structure that has to be freed. The parameter struct_type identifies the structure:
+ struct netbuf ND_ADDR
+ struct nd_addrlist ND_ADDRLIST
+ struct hostserv ND_HOSTSERV
+ struct nd_hostservlist ND_HOSTSERVLIST
+The free() function is used to free the universal address returned by the taddr2uaddr() function.
+The netdir_options() function is used to do all transport-specific setups and option management. fildes is the associ<hy>
+ated file descriptor. option, fildes, and pointer_to_args are passed to the netdir_options() function for the transport
+specified in config. Currently four values are defined for option:
+ ND_SET_BROADCAST
+ ND_SET_RESERVEDPORT
+ ND_CHECK_RESERVEDPORT
+ ND_MERGEADDR
+The taddr2uaddr() and uaddr2taddr() functions support translation between universal addresses and TLI type
+netbufs. The taddr2uaddr() function takes a struct netbuf data structure and returns a pointer to a string that con<hy>
+tains the universal address. It returns NULL if the conversion is not possible. This is not a fatal condition as some
+transports do not support a universal address form.
+The uaddr2taddr() function is the reverse of the taddr2uaddr() function. It returns the struct netbuf data structure
+for the given universal address.
+If a transport provider does not support an option, netdir_options returns -1 and the error message can be printed
+through netdir_perror() or netdir_sperror().
+The specific actions of each option follow.
+ND_SET_BROADCAST Sets the transport provider up to allow broadcast if the transport supports broadcast. fildes
+is a file descriptor into the transport, that is, the result of a t_open of /dev/udp. pointer_to_args is not used. If this
+completes, broadcast operations can be performed on file descriptor fildes.
+ND_SET_RESERVEDPORT Allows the application to bind to a reserved port if that concept exists for the trans<hy>
+port provider. fildes is an unbound file descriptor into the transport. If pointer_to_args is NULL, fildes is bound to a
+reserved port. If pointer_to_args is a pointer to a netbuf structure, an attempt is made to bind to any reserved port on
+the specified address.
+ND_CHECK_RESERVEDPORT Used to verify that the address corresponds to a reserved port if that concept ex<hy>
+ists for the transport provider. fildes is not used. pointer_to_args is a pointer to a netbuf structure that contains the
+address. This option returns 0 only if the address specified in pointer_to_args is reserved.
+ND_MERGEADDR Used to take a ``local address'' such as a 0.0.0.0 TCP address and return a ``real address'' to
+which client machines can connect. fildes is not used. pointer_to_args is a pointer to a struct nd_mergearg which
+has the following members:
+ char s_uaddr; /* server's universal address */
+<beginning of page>
+ char c_uaddr; /* client's universal address */
+ char m_uaddr; /* the result */
+If s_uaddr is an address such as 0.0.0.0.1.12, and the call is successful m_uaddr is set to an address such as
+192.11.109.89.1.12. For most transports, m_uaddr is identical to s_uaddr.
+The netdir_perror() function prints an error message in standard output that states the cause of a name-to-address
+mapping failure. The error message is preceded by the string given as an argument.
+The netdir_sperror() function returns a string with an error message that states the cause of a name-to-address map<hy>
+ping failure.
+The netdir_sperror() function returns a pointer to a buffer which contains the error message string. The buffer is
+overwritten on each call. In multithreaded applications, thise buffer is implemented as thread-specific data.
+The netdir_getbyaddr() function returns 0 on success and a non-zero value on failure.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelSafe
+gethostname(3C), getnetconfig(3NSL), getnetpath(3NSL), netconfig(4), attributes(5)

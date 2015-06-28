@@ -1,0 +1,192 @@
+<beginning of page>
+csx_event_handler <-> PC Card driver event handler
+#include <sys/pccard.h>
+int32_t prefixevent_handler(event_t event, int32_t priority,
+ event_callback_args_t *args);
+Solaris architecture specific (Solaris DDI)
+event The event.
+priority The priority of the event.
+args A pointer to the event_callback_t structure.
+Each instance of a PC Card driver must register an event handler to manage events associated with its PC Card. The
+driver event handler is registered using the event_handler field of the client_req_t structure passed to csx_Regis<hy>
+terClient(9F). The driver may also supply a parameter to be passed to its event handler function using the
+event_callback_args.client_data field. Typically, this argument is the driver instance's soft state pointer. The driver
+also registers which events it is interested in receiving through the EventMask field of the client_req_t structure.
+Each event is delivered to the driver with a priority, priority. High priority events with CS_EVENT_PRI_HIGH set
+in priority are delivered above lock level, and the driver must use its high-level event mutex initialized with the
+iblk_cookie returned by csx_RegisterClient(9F) to protect such events. Low priority events with
+CS_EVENT_PRI_LOW set in priority are delivered below lock level, and the driver must use its low-level event
+mutex initialized with a NULL interrupt cookie to protect these events.
+csx_RegisterClient(9F) registers the driver's event handler, but no events begin to be delivered to the driver until af<hy>
+ter a successful call to csx_RequestSocketMask(9F).
+In all cases, Card Services delivers an event to each driver instance associated with a function on a multiple function
+PC Card.
+The events and their indications are listed below; they are always delivered as low priority unless otherwise noted:
+CS_EVENT_REGISTRATION_COMPLETE
+A registration request processed in the background has been completed.
+CS_EVENT_CARD_INSERTION
+A PC Card has been inserted in a socket.
+CS_EVENT_CARD_READY
+A PC Card's READY line has transitioned from the busy to ready state.
+CS_EVENT_CARD_REMOVAL
+A PC Card has been removed from a socket. This event is delivered twice; first as a high priority event, followed by
+delivery as a low priority event. As a high priority event, the event handler should only note that the PC Card is no
+longer present to prevent accesses to the hardware from occurring. As a low priority event, the event handler should
+release the configuration and free all I/O, window and IRQ resources for use by other PC Cards.
+CS_EVENT_BATTERY_LOW
+The battery on a PC Card is weak and is in need of replacement.
+<beginning of page>
+CS_EVENT_BATTERY_DEAD
+The battery on a PC Card is no longer providing operational voltage.
+CS_EVENT_PM_RESUME
+Card Services has received a resume notification from the system's Power Management software.
+CS_EVENT_PM_SUSPEND
+Card Services has received a suspend notification from the system's Power Management software.
+CS_EVENT_CARD_LOCK
+A mechanical latch has been manipulated preventing the removal of the PC Card from the socket.
+CS_EVENT_CARD_UNLOCK
+A mechanical latch has been manipulated allowing the removal of the PC Card from the socket.
+CS_EVENT_EJECTION_REQUEST
+A request that the PC Card be ejected from a socket using a motor-driven mechanism.
+CS_EVENT_EJECTION_COMPLETE
+A motor has completed ejecting a PC Card from a socket.
+CS_EVENT_ERASE_COMPLETE
+A queued erase request that is processed in the background has been completed.
+CS_EVENT_INSERTION_REQUEST
+A request that a PC Card be inserted into a socket using a motor-driven mechanism.
+CS_EVENT_INSERTION_COMPLETE
+A motor has completed inserting a PC Card in a socket.
+CS_EVENT_CARD_RESET
+A hardware reset has occurred.
+CS_EVENT_RESET_REQUEST
+A request for a physical reset by a client.
+CS_EVENT_RESET_COMPLETE
+A reset request that is processed in the background has been completed.
+CS_EVENT_RESET_PHYSICAL
+A reset is about to occur.
+<beginning of page>
+CS_EVENT_CLIENT_INFO
+A request that the client return its client information data. If GET_CLIENT_INFO_SUBSVC(args->client_in<hy>
+fo.Attributes) is equal to CS_CLIENT_INFO_SUBSVC_CS, the driver should fill in the other fields in the
+client_info structure as described below, and return CS_SUCCESS. Otherwise, it should return CS_UNSUPPORT<hy>
+ED_EVENT.
+args->client_data.Attributes
+Must be OR'ed with CS_CLIENT_INFO_VALID.
+args->client_data.Revision
+Must be set to a driver-private version number.
+args->client_data.CSLevel
+Must be set to CS_VERSION.
+args->client_data.RevDate
+Must be set to the revision date of the PC Card driver, using CS_CLIENT_INFO_MAKE_DATE(day, month,
+year). day must be the day of the month, month must be the month of the year, and year must be the year, offset
+from a base of 1980. For example, this field could be set to a revision date of July 4 1997 with CS_CLIENT_IN<hy>
+FO_MAKE_DATE(4, 7, 17).
+args->client_data.ClientName
+A string describing the PC Card driver should be copied into this space.
+args->client_data.VendorName
+A string supplying the name of the PC Card driver vendor should be copied into this space.
+args->client_data.DriverName
+A string supplying the name of the PC Card driver will be copied into this space by Card Services after the PC Card
+driver has successfully processed this event; the driver does not need to initialize this field.
+CS_EVENT_WRITE_PROTECT
+The write protect status of the PC Card in the indicated socket has changed. The current write protect state of the
+PC Card is in the args->info field:
+CS_EVENT_WRITE_PROTECT_WPOFF
+Card is not write protected.
+CS_EVENT_WRITE_PROTECT_WPON
+Card is write protected.
+The structure members of event_callback_args_t are:
+ void *info; /* event-specific information */
+ void *client_data; /* driver-private data */
+ client_info_t client_info; /* client information*/
+The structure members of client_info_t are:
+<beginning of page>
+ unit32_t Attributes; /* attributes */
+ unit32_t Revisions; /* version number */
+ uint32_t CSLevel; /* Card Services version */
+ uint32_t RevDate; /* revision date */
+ char ClientName[CS_CLIENT_INFO_MAX_NAME_LEN];
+  /*PC Card driver description */
+ char VendorName[CS_CLIENT_INFO_MAX_NAME_LEN];
+  /*PC Card driver vendor name */
+ char DriverName[MODMAXNAMELEN];
+  /* PC Card driver name */
+CS_SUCCESS The event was handled successfully.
+CS_UNSUPPORTED_EVENT Driver does not support this event.
+CS_FAILURE Error occurred while handling this event.
+This function is called from high-level interrupt context in the case of high priority events, and from kernel context
+in the case of low priority events.
+ static int
+ xx_event(event_t event, int priority, event_callback_args_t *args)
+ {
+  int rval;
+  struct xxx *xxx = args->client_data;
+  client_info_t *info = &args->client_info;
+  switch (event) {
+  case CS_EVENT_REGISTRATION_COMPLETE:
+  ASSERT(priority & CS_EVENT_PRI_LOW);
+  mutex_enter(&xxx->event_mutex);
+  xxx->card_state |= XX_REGISTRATION_COMPLETE;
+  mutex_exit(&xxx->event_mutex);
+  rval = CS_SUCCESS;
+  break;
+  case CS_EVENT_CARD_READY:
+  ASSERT(priority & CS_EVENT_PRI_LOW);
+  rval = xx_card_ready(xxx);
+  mutex_exit(&xxx->event_mutex);
+  break;
+  case CS_EVENT_CARD_INSERTION:
+  ASSERT(priority & CS_EVENT_PRI_LOW);
+  mutex_enter(&xxx->event_mutex);
+  rval = xx_card_insertion(xxx);
+  mutex_exit(&xxx->event_mutex);
+  break;
+  case CS_EVENT_CARD_REMOVAL:
+  if (priority & CS_EVENT_PRI_HIGH) {
+  mutex_enter(&xxx->hi_event_mutex);
+  xxx->card_state &= ~XX_CARD_PRESENT;
+  mutex_exit(&xxx->hi_event_mutex);
+  } else {
+  mutex_enter(&xxx->event_mutex);
+  rval = xx_card_removal(xxx);
+  mutex_exit(&xxx->event_mutex);
+  }
+  break;
+<beginning of page>
+  case CS_EVENT_CLIENT_INFO:
+  ASSERT(priority & CS_EVENT_PRI_LOW);
+  if (GET_CLIENT_INFO_SUBSVC_CS(info->Attributes) ==
+  CS_CLIENT_INFO_SUBSVC_CS) {
+  info->Attributes |= CS_CLIENT_INFO_VALID;
+  info->Revision = 4;
+  info->CSLevel = CS_VERSION;
+  info->RevDate = CS_CLIENT_INFO_MAKE_DATE(4, 7, 17);
+  (void)strncpy(info->ClientName,
+  "WhizBang Ultra Zowie PC card driver",
+  CS_CLIENT_INFO_MAX_NAME_LEN)
+  "ACME PC card drivers, Inc.",
+  CS_CLIENT_INFO_MAX_NAME_LEN);
+  rval = CS_SUCCESS;
+  } else {
+  rval = CS_UNSUPPORTED_EVENT;
+  }
+  break;
+  case CS_EVENT_WRITE_PROTECT:
+  ASSERT(priority & CS_EVENT_PRI_LOW);
+  mutex_enter(&xxx->event_mutex);
+  if (args->info == CS_EVENT_WRITE_PROTECT_WPOFF) {
+  xxx->card_state &= ~XX_WRITE_PROTECTED;
+  } else {
+  xxx->card_state |= XX_WRITE_PROTECTED;
+  }
+  mutex_exit(&xxx->event_mutex);
+  rval = CS_SUCCESS;
+  break;
+  default:
+  rval = CS_UNSUPPORTED_EVENT;
+  break;
+  }
+  return (rval);
+ }
+csx_Event2Text(9F), csx_RegisterClient(9F), csx_RequestSocketMask(9F)
+PC Card 95 Standard, PCMCIA/JEIDA

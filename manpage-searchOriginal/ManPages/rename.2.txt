@@ -1,0 +1,86 @@
+<beginning of page>
+rename, renameat <-> change the name of a file
+#include <stdio.h>
+int rename(const char *old, const char *new);
+#include <unistd.h>
+int renameat(int fromfd, const char *old, int tofd,
+ const char *new);
+#include <unistd.h>
+int rename(const char *old, const char *new);
+The rename() function changes the name of a file. The old argument points to the pathname of the file to be re<hy>
+named. The new argument points to the new path name of the file.
+The renameat() function renames an entry in a directory, possibly moving the entry into a different directory. See
+fsattr(5). If the old argument is an absolute path, the fromfd is ignored. Otherwise it is resolved relative to the
+fromfd argument rather than the current working directory. Similarly, if the new argument is not absolute, it is re<hy>
+solved relative to the tofd argument. If either fromfd or tofd have the value AT_FDCWD, defined in <fcntl.h>, and
+their respective paths are relative, the path is resolved relative to the current working directory.
+Current implementation restrictions will cause the renameat() function to return an error if an attempt is made to re<hy>
+name an extended attribute file to a regular (non-attribute) file, or to rename a regular file to an extended attribute
+file.
+If old and new both refer to the same existing file, the rename() and renameat() functions return successfully and
+performs no other action.
+If old points to the pathname of a file that is not a directory, new must not point to the pathname of a directory. If the
+link named by new exists, it will be removed and old will be renamed to new. In this case, a link named new must re<hy>
+main visible to other processes throughout the renaming operation and will refer to either the file referred to by new
+or the file referred to as old before the operation began.
+If old points to the pathname of a directory, new must not point to the pathname of a file that is not a directory. If the
+directory named by new exists, it will be removed and old will be renamed to new. In this case, a link named new
+will exist throughout the renaming operation and will refer to either the file referred to by new or the file referred to
+as old before the operation began. Thus, if new names an existing directory, it must be an empty directory.
+The new pathname must not contain a path prefix that names old. Write access permission is required for both the di<hy>
+rectory containing old and the directory containing new. If old points to the pathname of a directory, write access
+permission is required for the directory named by old, and, if it exists, the directory named by new.
+If the directory containing old has the sticky bit set, at least one of the following conditions listed below must be
+true: <bu> the user must own old <bu> the user must own the directory containing old <bu> old must be writable by the user <bu> the
+user must be a privileged user
+If new exists, and the directory containing new is writable and has the sticky bit set, at least one of the following
+conditions must be true: <bu> the user must own new <bu> the user must own the directory containing new <bu> new must be
+writable by the user <bu> the user must be a privileged user
+If the link named by new exists, the file's link count becomes zero when it is removed, and no process has the file
+open, then the space occupied by the file will be freed and the file will no longer be accessible. If one or more pro<hy>
+cesses have the file open when the last link is removed, the link will be removed before rename() or renameat() re<hy>
+turns, but the removal of the file contents will be postponed until all references to the file have been closed.
+Upon successful completion, the rename() and renameat() functions will mark for update the st_ctime and
+st_mtime fields of the parent directory of each file.
+Upon successful completion, 0 is returned. Otherwise, <mi>1 is returned and errno is set to indicate an error.
+The rename() function will fail if:
+<beginning of page>
+EACCES A component of either path prefix denies search permission; one of the directories containing old and new
+denies write permissions; or write permission is denied by a directory pointed to by old or new.
+EBUSY The new argument is a directory and the mount point for a mounted file system.
+EDQUOT The directory where the new name entry is being placed cannot be extended because the user's quota of
+disk blocks on that file system has been exhausted.
+EEXIST The link named by new is a directory containing entries other than `.' (the directory itself) and `..' (the par<hy>
+ent directory).
+EFAULT Either old or new references an invalid address.
+EILSEQ The path argument includes non-UTF8 characters and the file system accepts only file names where all
+characters are part of the UTF-8 character codeset.
+EINVAL The new argument directory pathname contains a path prefix that names the old directory, or an attempt
+was made to rename a regular file to an extended attribute or from an extended attribute to a regular file.
+EIO An I/O error occurred while making or updating a directory entry.
+EISDIR The new argument points to a directory but old points to a file that is not a directory.
+ELOOP Too many symbolic links were encountered in translating the pathname.
+ENAMETOOLONG The length of old or new exceeds PATH_MAX, or a pathname component is longer than
+NAME_MAX while _POSIX_NO_TRUNC is in effect.
+EMLINK The file named by old is a directory, and the link count of the parent directory of new would exceed
+LINK_MAX.
+ENOENT The link named by old does not name an existing file, a component of the path prefix of new does not ex<hy>
+ist, or either old or new points to an empty string.
+ENOSPC The directory that would contain new cannot be extended.
+ENOTDIR A component of either path prefix is not a directory, or old names a directory and new names a file that
+is not a directory, or tofd and dirfd in renameat() do not reference a directory.
+EROFS The requested operation requires writing in a directory on a read-only file system.
+EXDEV The links named by old and new are on different file systems.
+The renameat() functions will fail if:
+ENOTSUP An attempt was made to rename a regular file as an attribute file or to rename an attribute file as a regu<hy>
+lar file.
+<beginning of page>
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed _ MT-LevelAsync-Signal-Safe _ StandardFor rename(), see standards(5).
+chmod(2), link(2), unlink(2), attributes(5), fsattr(5), standards(5)
+The system can deadlock if there is a loop in the file system graph. Such a loop can occur if there is an entry in di<hy>
+rectory a, a/name1, that is a hard link to directory b, and an entry in directory b, b/name2, that is a hard link to di<hy>
+rectory a. When such a loop exists and two separate processes attempt to rename a/name1 to b/name2 and b/name2
+to a/name1, the system may deadlock attempting to lock both directories for modification. Use symbolic links in<hy>
+stead of hard links for directories.

@@ -1,0 +1,57 @@
+<beginning of page>
+efi_alloc_and_init, efi_alloc_and_read, efi_free, efi_write, efi_use_whole_disk <-> manipulate a disk's EFI Partition
+Table
+cc [ flag ... ] file... -lefi [ library ... ]
+#include <sys/vtoc.h>
+#include <sys/efi_partition.h>
+int efi_alloc_and_init(int fd, uint32_t nparts, dk_gpt_t **vtoc);
+int efi_alloc_and_read(int fd, dk_gpt_t **vtoc);
+void efi_free(dk_gpt_t *vtoc);
+int efi_write(int fd, dk_gpt_t *vtoc);
+int efi_use_whole_disk(int fd);
+The efi_alloc_and_init() function initializes the dk_gpt_t structure specified by vtoc in preparation for a call to
+efi_write(). It calculates and initializes the efi_version, efi_lbasize, efi_nparts, efi_first_u_lba, efi_last_lba, and
+efi_last_u_lba members of this sturcture. The caller can then set the efi_nparts member.
+The efi_alloc_and_read() function allocates memory and returns the partition table.
+The efi_free() function frees the memory allocated by efi_alloc_and_init() and efi_alloc_and_read().
+The efi_write() function writes the EFI partition table.
+The efi_use_whole_disk() function takes any space that is not contained in the disk label and adds it to the last phys<hy>
+ically non-zero area before the reserved slice (from slice 0 to slice 6 or unallocated space).
+The fd argument refers to any slice on a raw disk, opened with O_NDELAY. See open(2).
+The nparts argument specifies the number of desired partitions.
+The vtoc argument is a dk_gpt_t structure that describes an EFI partition table and contains at least the following
+members:
+ uint_t efi_version; /* set to EFI_VERSION_CURRENT */
+ uint_t efi_nparts; /* number of partitions in efi_parts */
+ uint_t efi_lbasize; /* size of block in bytes */
+ diskaddr_t efi_last_lba; /* last block on the disk */
+ diskaddr_t efi_first_u_lba; /* first block after labels */
+ diskaddr_t efi_last_u_lba; /* last block before backup labels */
+ struct dk_part efi_parts[]; /* array of partitions */
+Upon successful completion, efi_alloc_and_init() returns 0. Otherwise it returns VT_EIO if an I/O operation to the
+disk fails.
+Upon successful completion, efi_alloc_and_read() returns a positive integer indicating the slice index associated
+with the open file descriptor. Otherwise, it returns a negative integer to indicate one of the following:
+VT_EIO An I/O error occurred.
+VT_ERROR An unknown error occurred.
+VT_EINVAL An EFI label was not found.
+Upon successful completion, efi_write() returns 0. Otherwise, it returns a negative integer to indicate one of the fol<hy>
+lowing:
+VT_EIO An I/O error occurred.
+<beginning of page>
+VT_ERROR An unknown error occurred.
+VT_EINVAL The label contains incorrect data.
+Upon successfully completion, efi_use_whole_disk() returns 0. Otherwise, it returns a negative integer to indicate
+one of the following:
+VT_EIO An I/O error occurred.
+VT_ERROR An unknown error occurred.
+VT_EINVAL The label contains incorrect data.
+VT_ENOSPC Space out of label was not found.
+The EFI label is used on disks with more than 1^32-1 blocks. For compatibility reasons, the read_vtoc(3EXT) and
+write_vtoc() functions should be used on smaller disks. The application should attempt the read_vtoc() or
+write_vtoc() call, check for an error of VT_ENOTSUP, then call the analogous EFI function.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed _ MT-LevelUnsafe
+fmthard(1M), format(1M), prtvtoc(1M), ioctl(2), open(2), libefi(3LIB), read_vtoc(3EXT), attributes(5),
+dkio(7I)

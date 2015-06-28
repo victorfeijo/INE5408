@@ -1,0 +1,66 @@
+<beginning of page>
+dhcp_network <-> DHCP network tables
+The Dynamic Host Configuration Protocol (DHCP) network tables are used to map the client identifiers of DHCP
+clients to IP addresses and the associated configuration parameters of that address. One DHCP network table exists
+for each network served by the DHCP server, and each table is named using the network's IP address. There is no
+table or file with the name dhcp_network.
+The DHCP network tables can exist as ASCII text files, binary text files, or NIS+ tables, depending on the data
+store used. Since the format of the file could change, the preferred method of managing the DHCP network tables is
+through the use of dhcpmgr(1M) or the pntadm(1M) command.
+The dhcp_network file is used as a policy mechanism for whether in.dhcpd(1M) leases addresses on a given net<hy>
+work. If the DHCP server is not serving leases or information to a network, there should be no dhcp_network file
+for that network. To set the DHCP server in informational mode, where it responds to INFORM messages but does
+not lease addresses on that network, create an empty dhcp_network file for that network. For normal operations,
+where the DHCP server both leases addresses and responds to INFORM packets, create a dhcp_network file using
+dhcpmgr(1M) or pntadm(1M) and populate it with leasable addresses.
+The format of the records in a DHCP network table depends on the data store used to maintain the table. However,
+an entry in a DHCP network table must contain the following fields:
+Client_ID The client identifier field, Client_ID, is an ASCII hexadecimal representation of the unique octet string
+value of the DHCP Client Identifier Option (code 61) which identifies a DHCP client. In the absence of the DHCP
+Client Identifier Option, the DHCP client is identified using the form given below for BOOTP clients. The number
+of characters in this field must be an even number, with a maximum length of 64 characters. Valid characters are 0 -
+9 and A-F. Entries with values of 00 are freely available for dynamic allocation to requesting clients. BOOTP
+clients are identified by the concatenation of the network's hardware type (as defined by RFC 1340, titled "Assigned
+Numbers") and the client's hardware address. For example, the following BOOTP client has a hardware type of '01'
+(10mb ethernet) and a hardware address of 8:0:20:11:12:b7, so its client identifier would be: 010800201112B7
+Flags The Flags field is a decimal value, the bit fields of which can have a combination of the following values:
+1 (PERMANENT) Evaluation of the Lease field is turned off (lease is permanent). If this bit is not set, Evaluation
+of the Lease field is enabled and the Lease is DYNAMIC.
+2 (MANUAL) This entry has a manual client ID binding (cannot be reclaimed by DHCP server). Client will not be
+allocated another address.
+4 (UNUSABLE) When set, this value means that either through ICMP echo or client DECLINE, this address has
+been found to be unusable. Can also be used by the network administrator to prevent a certain client from booting, if
+used in conjunction with the MANUAL flag.
+8 (BOOTP) This entry is reserved for allocation to BOOTP clients only.
+Client_IP The Client_IP field holds the IP address for this entry. This value must be unique in the database.
+Server_IP This field holds the IP address of the DHCP server which owns this client IP address, and thus is respon<hy>
+sible for initial allocation to a requesting client. On a multi-homed DHCP server, this IP address must be the first ad<hy>
+dress returned by gethostbyname(3NSL).
+Lease This numeric field holds the entry's absolute lease expiration time, and is in seconds since January 1, 1970. It
+can be decimal, or hexadecimal (if 0x prefixes number). The special value -1 is used to denote a permanent lease.
+Macro This ASCII text field contains the dhcptab macro name used to look up this entry's configuration parame<hy>
+ters in the dhcptab(4) database.
+<beginning of page>
+Comment This ASCII text field contains an optional comment.
+This section describes how the DHCP/BOOTP server calculates a client's configuration lease using information
+contained in the dhcptab(4) and DHCP network tables. The server consults the LeaseTim and LeaseNeg symbols
+in the dhcptab, and the Flags and Lease fields of the chosen IP address record in the DHCP network table.
+The server first examines the Flags field for the identified DHCP network table record. If the PERMANENT flag is
+on, then the client's lease is considered permanent.
+If the PERMANENT flag is not on, the server checks if the client's lease as represented by the Lease field in the
+network table record has expired. If the lease is not expired, the server checks if the client has requested a new lease.
+If the LeaseNeg symbol has not been included in the client's dhcptab parameters, then the client's requested lease
+extension is ignored, and the lease is set to be the time remaining as shown by the Lease field. If the LeaseNeg sym<hy>
+bol has been included, then the server will extend the client's lease to the value it requested if this requested lease is
+less than or equal to the current time plus the value of the client's LeaseTim dhcptab parameter.
+If the client's requested lease is greater than policy allows (value of LeaseTim), then the client is given a lease equal
+to the current time plus the value of LeaseTim. If LeaseTim is not set, then the default LeaseTim value is one hour.
+For more information about the dhcptab symbols, see dhcptab(4).
+See attributes(5) for a description of the following attribute:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wdhcsu _ Interface StabilityEvolving
+dhcpconfig(1M), dhcpmgr(1M), dhtadm(1M), in.dhcpd(1M), pntadm(1M), dhcptab(4), dhcp(5), dhcp_mod<hy>
+ules(5), attributes(5)
+Solaris DHCP Service Developer's Guide
+System Administration Guide: IP Services
+Reynolds, J. and J. Postel, Assigned Numbers, STD 2, RFC 1340, USC/Information Sciences Institute, July 1992.

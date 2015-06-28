@@ -1,0 +1,62 @@
+<beginning of page>
+cpc_strtoevent, cpc_eventtostr <-> translate strings to and from events
+cc [ flag... ] file... <mi>lcpc [ library... ]
+#include <libcpc.h>
+int cpc_strtoevent(int cpuver, const char *spec, cpc_event_t *event);
+char *cpc_eventtostr(cpc_event_t *event);
+The cpc_strtoevent() function translates an event specification to the appropriate collection of control bits in a
+cpc_event_t structure pointed to by the event argument. The event specification is a getsubopt(3C)-style string that
+describes the event and any attributes that the processor can apply to the event or events. If successful, the funciton
+returns 0, the ce_cpuver field and the ISA-dependent control registers of event are initialized appropriately, and the
+rest of the cpc_event_t structure is initialized to 0.
+The cpc_eventtostr() function takes an event and constructs a compact canonical string representation for that event.
+Upon successful completion, cpc_strtoevent() returns 0. If the string cannot be decoded, a non-zero value is re<hy>
+turned and a message is printed using the library's error-reporting mechanism (see cpc_seterrfn(3CPC)).
+Upon successful completion, cpc_eventtostr() returns a pointer to a string. The string returned must be freed by the
+caller using free(3C). If cpc_eventtostr() fails, a null pointer is returned.
+The event selection syntax used is processor architecture-dependent. The supported processor families allow varia<hy>
+tions on how events are counted as well as what events can be counted. This information is available in compact
+form from the cpc_getusage() function (see cpc_getcpuver(3CPC)), but is explained in further detail below.
+On UltraSPARC processors, the syntax for setting options is as follows:
+ pic0=<eventspec>,pic1=<eventspec> [,sys] [,nouser]
+This syntax, which reflects the simplicity of the options available using the %pcr register, forces both counter events
+to be selected. By default only user events are counted; however, the sys keyword allows system (kernel) events to
+be counted as well. User event counting can be disabled by specifying the nouser keyword.
+The keywords pic0 and pic1 may be omitted; they can be used to resolve ambiguities if they exist.
+On Pentium processors, the syntax for setting counter options is as follows:
+ pic0=<eventspec>,pic1=<eventspec> [,sys[[0|1]]] [,nouser[[0|1]]]
+ [,noedge[[0|1]]] [,pc[[0|1]]]
+The syntax and semantics are the same as UltraSPARC, except that is possible to specify whether a particular
+counter counts user or system events. If unspecified, the specification is presumed to apply to both counters.
+There are some additional keywords. The noedge keyword specifies that the counter should count clocks (duration)
+instead of events. The pc keyword allows the external pin control pins to be set high (defaults to low). When the pin
+control register is set high, the external pin will be asserted when the associated register overflows. When the pin
+control register is set low, the external pin will be asserted when the counter has been incremented. The electrical
+effect of driving the pin is dependent uptoon how the motherboard manufacturer has chosen to connect it, if it is con<hy>
+nected at all.
+For Pentium II processors, the syntax is substantially more complex, reflecting the complex configuration options
+available:
+ pic0=<eventspec>,pic1=<eventspec> [,sys[[0|1]]]
+ [,nouser[[0|1]]] [,noedge[[0|1]]] [,pc[[0|1]]] [,inv[[0|1]]] [,int[[0|1]]]
+ [,cmask[0|1]=<maskspec>] [,umask[0|1]=<maskspec>]
+This syntax is a straightforward extension of the earlier syntax. The additional inv, int, cmask0, cmask1, umask0,
+<beginning of page>
+and umask1 keywords allow extended counting semantics. The mask specification is a number between 0 and 255,
+expressed in hexadecimal, octal or decimal notation. Example 1 SPARC Example.
+ cpc_event_t event;
+ char *setting = "pic0=EC_ref,pic1=EC_hit"; /* UltraSPARC-specific */
+ if (cpc_strtoevent(cpuver, setting, &event) != 0)
+  /* can't measure 'setting' on this processor */
+ else
+  setting = cpc_eventtostr(&event);
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Obsolete _ MT-LevelMT-Safe
+cpc(3CPC), cpc_getcpuver(3CPC), cpc_set_add_request(3CPC), cpc_seterrfn(3CPC), free(3C), getsubopt(3C),
+libcpc(3LIB), attributes(5)
+The cpc_strtoevent() and cpc_eventtostr() functions exist for binary compatibility only. Source containing these
+functions will not compile. These functions are obsolete and might be removed in a future release. Applications
+should use cpc_set_add_request(3CPC) instead.
+These functions are provided as a convenience only. As new processors are usually released asynchronously with
+software, the library allows the pic0 and pic1 keywords to interpret numeric values specified directly in hexadeci<hy>
+mal, octal, or decimal.

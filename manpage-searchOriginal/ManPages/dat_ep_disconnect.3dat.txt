@@ -1,0 +1,56 @@
+<beginning of page>
+dat_ep_disconnect <-> terminate a connection or a connection establishment
+cc [ flag... ] file... -ldat [ library... ]
+#include <dat/udat.h>
+DAT_RETURN
+ dat_ep_disconnect (
+ IN DAT_EP_HANDLE ep_handle,
+ IN DAT_CLOSE_FLAGS disconnect_flags
+ )
+ep_handle Handle for an instance of Endpoint.
+disconnect_flags Flags for disconnect. Flag values are as follows:
+DAT_CLOSE_ABRUPT_FLAG Abrupt close. This is the default value.
+DAT_CLOSE_GRACEFUL_FLAG Graceful close.
+The dat_ep_disconnect() function requests a termination of a connection or connection establishment. This opera<hy>
+tion is used by the active/client or a passive/server side Consumer of the connection model.
+The disconnect_flags parameter allows Consumers to specify whether they want graceful or abrupt disconnect. Upon
+disconnect, all outstanding and in-progress DTOs and RMR Binds must be completed.
+For abrupt disconnect, all outstanding DTOs and RMR Binds are completed unsuccessfully, and in-progress DTOs
+and RMR Binds can be completed successfully or unsuccessfully. If an in-progress DTO is completed unsuccessful<hy>
+ly, all follow on in-progress DTOs in the same direction also must be completed unsuccessfully. This order is pre<hy>
+sented to the Consumer through a DTO completion Event Stream of the recv_evd_handle and and request_evd_han<hy>
+dle of the Endpoint.
+For graceful disconnect, all outstanding and in-progress request DTOs and RMR Binds must try to be completed
+successfully first, before disconnect proceeds. During that time, the local Endpoint is in a DAT_EP_DISCON<hy>
+NECT_PENDING state.
+The Consumer can call abrupt dat_ep_disconnect() when the local Endpoint is in the DAT_EP_DISCON<hy>
+NECT_PENDING state. This causes the Endpoint to transition into DAT_EP_STATE_DISCONNECTED with<hy>
+out waiting for outstanding and in-progress request DTOs and RMR Binds to successfully complete. The graceful
+dat_ep_disconnect() call when the local Endpoint is in the DAT_EP_DISCONNECT_PENDING state has no ef<hy>
+fect.
+If the Endpoint is not in DAT_EP_STATE_CONNECTED, the semantic of the operation is the same for graceful
+or abrupt disconnect_flags value.
+No new Send, RDMA Read, and RDMA Write DTOs, or RMR Binds can be posted to the Endpoint when the local
+Endpoint is in the DAT_EP_DISCONNECT_PENDING state.
+The successful completion of the disconnect is reported to the Consumer through a DAT_CONNEC<hy>
+TION_EVENT_DISCONNECTED event on connect_evd_handle of the Endpoint. The Endpoint is automatically
+transitioned into a DAT_EP_STATE_DISCONNECTED state upon successful asynchronous completion. If the
+same EVD is used for connect_evd_handle and any recv_evd_handle and request_evd_handle, all successful Com<hy>
+pletion events of in-progress DTOs precede the Disconnect Completion event.
+Disconnecting an unconnected Disconnected Endpoint is no-op. Disconnecting an Endpoint in
+DAT_EP_STATE_UNCONNECTED, DAT_EP_STATE_RESERVED, DAT_EP_STATE_PASSIVE_CON<hy>
+NECTION_PENDING, and DAT_EP_STATE_TENTATIVE_CONNECTION_PENDING is disallowed.
+Both abrupt and graceful disconnect of the Endpoint during connection establishment, DAT_EP_STATE_AC<hy>
+TIVE_CONNECTION_PENDING and DAT_EP_STATE_COMPLETION_PENDING, "aborts" the connection
+establishment and transitions the local Endpoint into DAT_EP_STATE_DISCONNECTED. That causes preposted
+Recv DTOs to be flushed to recv_evd_handle.
+<beginning of page>
+DAT_SUCCESS The operation was successful.
+DAT_INVALID_HANDLE The ep_handle parameter is invalid.
+DAT_INSUFFICIENT_RESOURCES The operation failed due to resource limitations.
+DAT_INVALID_PARAMETER The disconnect_flags parameter is invalid.
+DAT_INVALID_STATE A parameter is in an invalid state. Endpoint is not in the valid state for disconnect.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Standard: uDAPL, 1.1, 1.2 _ MT-Level Unsafe
+libdat(3LIB), attributes(5)

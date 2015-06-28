@@ -1,0 +1,365 @@
+<beginning of page>
+idmap <-> configure and manage the Native Identity Mapping service
+idmap
+idmap -f command-file
+idmap add [-d] name1 name2
+idmap dump [-n] [-v]
+idmap export [-f file] format
+idmap get-namemap name
+idmap help
+idmap import [-F] [-f file] format
+idmap list
+idmap remove [-t|-f] name
+idmap remove -a
+idmap remove [-d] name1 name2
+idmap set-namemap [-a authenticationMethod] [-D bindDN]
+ [-j passwdfile] name1 name2
+idmap show [-c] [-v] identity [target-type]
+idmap unset-namemap [-a authenticationMethod] [-D bindDN]
+ [-j passwdfile] name [target-type]
+The idmap utility is used to configure and manage the Native Identity Mapping service.
+The Native Identity Mapping service supports the following types of mappings between Windows security identities
+(SIDs) and POSIX user IDs and group IDs (UIDs and GIDs): <bu> Name-based mapping. An administrator maps Win<hy>
+dows and UNIX users and groups by name. <bu> Ephemeral ID mapping. A UID or GID is dynamically allocated for
+every SID that is not already mapped by name. <bu> Local-SID mapping. A non-ephemeral UID or GID is mapped to
+an algorithmically generated local SID.
+The idmap utility can be used to create and manage the name-based mappings and to monitor the mappings in ef<hy>
+fect.
+If the idmap utility is invoked without a subcommand or option, it reads the subcommands from standard input.
+When standard input is a TTY, the idmap command prints the usage message and exits.
+The idmapd(1M) daemon maps Windows user and group SIDs to UNIX UIDs and GIDs as follows: 1. SIDs are
+mapped by name.
+This mapping uses the name-based mappings that are manually set up by the system administrator. 2. If no name-
+based mapping is found, the SID is mapped to a dynamically allocated ephemeral ID.
+This allocation uses the next available UID or GID from 2^31 to 2^32 - 2.
+Local SID mappings are used to map from UNIX to Windows.
+To prevent aliasing problems, all file systems, archive and backup formats, and protocols must store SIDs or map all
+UIDs and GIDs in the 2^31 to 2^32 - 2 range to the nobody user and group.
+It is possible to create also diagonal mappings. They are the mappings between Windows groups and Solaris users
+and between Solaris groups and Windows users. They are needed when Windows uses a group identity as a file own<hy>
+er or vice versa.
+Name-based mappings establish name equivalence between Windows users and groups and their counterparts in the
+<beginning of page>
+UNIX name service. These mappings persist across reboots. For example, the following command maps Windows
+users to UNIX users with the same name:
+ # idmap add "winuser:*@mywindomain.com" "unixuser:*"
+If configured to use a directory service, idmapd(1M) will first try to use the mapping information that is stored in
+user or group objects in the Active Directory (AD) and/or the native LDAP directory service. For example, an AD
+object for a given Windows user or group can be augmented to include the corresponding Solaris user or group name
+or numeric id. Similarly, the native LDAP object for a given Solaris user or group can be augmented to include the
+corresponding Windows user or group name.
+idmapd(1M) can be configured to use AD and/or native LDAP directory-based name mappings by setting the ap<hy>
+propriate service management facility (SMF) properties of the idmap service. See "Service Properties," below, for
+more details.
+If directory-based name mapping is not configured or if configured but not found, then idmapd(1M) will process lo<hy>
+cally stored name-based mapping rules.
+idmap supports the mapping of Windows well-known names. A few of these are listed below:
+ Administrator
+ Guest
+ KRBTGT
+ Domain Admins
+ Domain Users
+ Domain Guest
+ Domain Computers
+ Domain Controllers
+When idmap rules are added, these well-known names will be expanded to canonical form. That is, either the de<hy>
+fault domain name will be added (for names that are not well-known) or an appropriate built-in domain name will be
+added. Depending on the particular well-known name, this domain name might be null, BUILTIN, or the local host
+name.
+The following sequence of idmap commands illustrate the treatment of the non-well-known name fred and the well-
+known names administrator and guest.
+ # idmap add winname:fred unixuser:fredf
+ add winname:fred unixuser:fredf
+ # idmap add winname:administrator unixuser:root
+ add winname:administrator unixuser:root
+ # idmap add winname:guest unixuser:nobody
+ add winname:guest unixuser:nobody
+ # idmap add wingroup:administrators sysadmin
+ add wingroup:administrators unixgroup:sysadmin
+ # idmap list
+ add winname:Administrator@examplehost unixuser:root
+ add winname:Guest@examplehost unixuser:nobody
+ add wingroup:Administrators@BUILTIN unixgroup:sysadmin
+ add winname:fred@example.com unixuser:fredf
+The idmapd daemon attempts to preserve ephemeral ID mappings across daemon restarts. However, when IDs can<hy>
+not be preserved, the daemon maps each previously mapped SID to a new ephemeral UID or GID value. The dae<hy>
+mon will never re-use ephemeral UIDs or GIDs. If the idmapd daemon runs out of ephemeral UIDs and GIDs, it re<hy>
+turns an error as well as a default UID or GID for SIDs that cannot be mapped by name.
+<beginning of page>
+The dynamic ID mappings are not retained across reboots. So, any SIDs that are dynamically mapped to UNIX
+UIDs or GIDs are most likely mapped to different IDs after rebooting the system.
+If no name-based mapping is found, a non-ephemeral UID or GID is mapped to an algorithmically generated local
+SID. The mapping is generated as follows:
+ local SID for UID = <machine SID> - <1000 + UID>
+ local SID for GID = <machine SID> - <2^31 + GID>
+<machine SID> is a unique SID generated by the idmap service for the host on which it runs.
+When mapping a Windows name to a UNIX name, lookup for name-based mapping rules is performed in the fol<hy>
+lowing order: 1. windows-name@domain to "" 2. windows-name@domain to unix-name 3. windows-name@* to
+"" 4. windows-name@* to unix-name 5. *@domain to * 6. *@domain to "" 7. *@domain to unix-name 8. *@*
+to * 9. *@* to "" 10. *@* to unix-name
+When mapping a UNIX name to a Windows name, lookup for name-based mapping rules is performed in the fol<hy>
+lowing order: 1. unix-name to "" 2. unix-name to windows-name@domain 3. * to *@domain 4. * to "" 5. * to
+windows-name@domain
+The service properties determine the behavior of the idmapd(1M) daemon. These properties are stored in the SMF
+repository (see smf(5)) under property group config. They can be accessed and modified using svccfg(1M), which
+requires solaris.smf.value.idmap authorization. The service properties for the idmap service are:
+config/ad_unixuser_attr
+Specify the name of the AD attribute that contains the UNIX user name. There is no default.
+config/ad_unixgroup_attr
+Specify the name of the AD attribute that contains the UNIX group name. There is no default.
+config/nldap_winname_attr
+Specify the name of the Native LDAP attribute that contains the Windows user/group name. There is no default.
+config/directory_based_mapping
+Controls support for identity mapping using data stored in a directory service.
+none disables directory-based mapping.
+name enables name-based mapping using the properties described above.
+idmu enables mapping using Microsoft's Identity Management for UNIX (IDMU). This Windows component al<hy>
+lows the administrator to specify a UNIX user ID for each Windows user, mapping the Windows identity to the cor<hy>
+responding UNIX identity. Only IDMU data from the domain the Solaris system is a member of is used.
+Changes to service properties do not affect a running idmap service. The service must be refreshed (with sv<hy>
+cadm(1M)) for the changes to take effect.
+The idmap command uses the following operands:
+format
+Specifies the format in which user name mappings are described for the export and import subcommands. The Ne<hy>
+tapp usermap.cfg and Samba smbusers external formats are supported. These external formats are only for users,
+not groups. <bu> The usermap.cfg rule-mapping format is as follows:
+ windows-username [direction] unix-username
+<beginning of page>
+windows-username is a Windows user name in either the domain\username or username@domain format.
+unix-username is a UNIX user name.
+direction is one of the following: <bu> == means a bidirectional mapping, which is the default. <bu> => or <= means a uni<hy>
+directional mapping. The IP qualifier is not supported. <bu> The smbusers rule-mapping format is as follows:
+ unixname = winname1 winname2 ...
+If winname includes whitespace, escape the whitespace by enclosing the value in double quotes. For example, the
+following file shows how to specify whitespace in a valid format for the idmap command:
+ $ cat myusermap
+ terry="Terry Maddox"
+ pat="Pat Flynn"
+ cal=cbrown
+The mappings are imported as unidirectional mappings from Windows names to UNIX names.
+The format is based on the "username map" entry of the smb.conf man page, which is available on the samba.org
+web site. The use of an asterisk (*) for windows-name is supported. However, the @group directive and the chaining
+of mappings are not supported.
+By default, if no mapping entries are in the smbusers file, Samba maps a windows-name to the equivalent unix-
+name, if any. If you want to set up the same mapping as Samba does, use the following idmap command:
+ idmap add -d "winuser:*@*" "unixuser:*"
+identity
+Specifies a user name, user ID, group name, or group ID. identity is specified as type:value. type is one of the follow<hy>
+ing:
+usid Windows user SID in text format
+gsid Windows group SID in text format
+sid Windows group SID in text format that can belong either to a user or to a group
+uid Numeric POSIX UID
+gid Numeric POSIX GID
+unixuser UNIX user name
+unixgroup UNIX group name
+winuser Windows user name
+wingroup Windows group name
+<beginning of page>
+winname Windows user or group name
+value is a number or string that is appropriate to the specified type. For instance, unixgroup:staff specifies the
+UNIX group name, staff. The identity gid:10 represents GID 10, which corresponds to the UNIX group staff.
+name
+Specifies a UNIX name (unixuser, unixgroup) or a Windows name (winuser, wingroup) that can be used for
+name-based mapping rules.
+A Windows security entity name can be specified in one of these ways: <bu> domain\name <bu> name@domain <bu> name,
+which uses the default mapping domain If name is the empty string (""), mapping is inhibited. Note that a name of
+"" should not be used to preclude logins by unmapped Windows users.
+If name uses the wildcard (*), it matches all names that are not matched by other mappings. Similarly, if name is the
+wildcard Windows name (*@*), it matches all names in all domains that are not matched by other mappings.
+If name uses the wildcard on both sides of the mapping rule, the name is the same for both Windows and Solaris
+users. For example, if the rule is "*@domain" == "*", the jp@domain Windows user name matches this rule and
+maps to the jp Solaris user name.
+Specifying the type of name is optional if the type can be deduced from other arguments or types specified on the
+command line.
+target-type
+Used with the show and unset-namemap subcommands. For show, specifies the mapping type that should be
+shown. For example, if target-type is sid, idmap show returns the SID mapped to the identity specified on the com<hy>
+mand line. For unset-namemap, identifies an attribute within the object specified by the name operand.
+The idmap command supports one option and a set of subcommands. The subcommands also have options.
+-f command-file
+Reads and executes idmap subcommands from command-file. The idmap -f - command reads from standard input.
+This option is not used by any subcommands.
+The following subcommands are supported:
+add [-d] name1 name2
+Adds a name-based mapping rule. By default, the name mapping is bidirectional. If the -d option is used, a unidirec<hy>
+tional mapping is created from name1 to name2.
+Either name1 or name2 must be a Windows name, and the other must be a UNIX name. For the Windows name, the
+winname identity type must not be used. Instead, specify one of the winuser or wingroup types. See "Operands"
+for information about the name operand.
+Note that two unidirectional mappings between the same two names in two opposite directions are equivalent to one
+bidirectional mapping.
+This subcommand requires the solaris.admin.idmap.rules authorization.
+dump [-n] [-v]
+Dumps all the mappings cached since the last system boot. The -n option shows the names, as well. By default, only
+sids, uids, and gids are shown. The -v option shows how the mappings were generated.
+export [-f file] format
+Exports name-based mapping rules to standard output in the specified format. The -f file option writes the rules to
+the specified output file.
+<beginning of page>
+get-namemap name
+Get the directory-based name mapping information from the AD or native LDAP user or group object represented
+by the specified name.
+help
+Displays the usage message.
+import [-F] [-f file] format
+Imports name-based mapping rules from standard input by using the specified format. The -f file option reads the
+rules from the specified file. The -F option flushes existing name-based mapping rules before adding new ones.
+Regardless of the external format used, the imported rules are processed by using the semantics and order described
+in the section "Rule Lookup Order," above.
+This subcommand requires the solaris.admin.idmap.rules authorization.
+list
+Lists all name-based mapping rules. Each rule appears in its idmap add form.
+remove [-t|-f] name
+Removes any name-based mapping rule that involves the specified name. name can be either a UNIX or Windows
+user name or group name.
+The -f option removes rules that use name as the source. The -t option removes rules that use name as the destina<hy>
+tion. These options are mutually exclusive.
+This subcommand requires the solaris.admin.idmap.rules authorization.
+remove -a
+Removes all name-based mapping rules.
+This subcommand requires the solaris.admin.idmap.rules authorization.
+remove [-d] name1 name2
+Removes name-based mapping rules between name1 and name2. If the -d option is specified, rules from name1 to
+name2 are removed.
+Either name1 or name2 must be a Windows name, and the other must be a UNIX name.
+This subcommand requires the solaris.admin.idmap.rules authorization.
+set-namemap [-a authenticationMethod] [-D bindDN] [-j passwdfile] name1 name2
+Sets name mapping information in the AD or native LDAP user or group object. Either name1 or name2 must be a
+Windows name, and the other must be a UNIX name.
+If name1 is a Windows name, then the UNIX name name2 is added to the AD object represented by name1. Similar<hy>
+ly, if name1 is a UNIX name then the Windows name name2 is added to the native LDAP entry represented by
+name1.
+The following options are supported:
+-a authenticationMethod
+Specify authentication method when modifying native LDAP entry. See ldapaddent(1M) for details. Default value
+<beginning of page>
+is sasl/GSSAPI.
+-D bindDN
+Uses the distinguished name bindDN to bind to the directory.
+-j passwdfile
+Specify a file containing the password for authentication to the directory.
+show [-c] [-v] name [target-type]
+Shows the identity of type, target-type, that the specified name maps to. If the optional target-type is omitted, the
+non-diagonal mapping is shown.
+By default, this subcommand shows only mappings that have been established already. The -c option forces the eval<hy>
+uation of name-based mapping configurations or the dynamic allocation of IDs.
+The -v option shows how the mapping was generated and also whether the mapping was just generated or was re<hy>
+trieved from the cache.
+unset-namemap [-a authenticationMethod] [-D bindDN] [-j passwdfile] name [target-type]
+Unsets directory-based name mapping information from the AD or native LDAP user or group object represented by
+the specified name and optional target type.
+See the set-namemap subcommand for options.
+Example 1 Using a Wildcard on Both Sides of a Name-Based Mapping Rule
+The following command maps all Windows user names in the xyz.com domain to the UNIX users with the same
+names provided that one exists and is not otherwise mapped. If such a rule is matched but the UNIX user name does
+not exist, an ephemeral ID mapping is used.
+ # idmap add "winuser:*@xyz.com" "unixuser:*"
+Example 2 Using a Wildcard on One Side of a Name-Based Mapping Rule
+The following command maps all unmapped Windows users in the xyz.com domain to the guest UNIX user. The -d
+option specifies a unidirectional mapping from *@xyz.com users to the guest user.
+ # idmap add -d "winuser:*@xyz.com" unixuser:guest
+Example 3 Adding a Bidirectional Name-Based Mapping Rule
+The following command maps Windows user, foobar@example.com, to UNIX user, foo, and conversely:
+ # idmap add winuser:foobar@example.com unixuser:foo
+This command shows how to remove the mapping added by the previous command:
+ # idmap remove winuser:foobar@example.com unixuser:foo
+Example 4 Showing a UID-to-SID Mapping <bu> The following command shows the SID that the specified UID,
+<beginning of page>
+uid:50000, maps to:
+ # idmap show uid:50000 sid
+ uid:50000 -> usid:S-1-5-21-3223191800-2000
+<bu> The following command shows the UNIX user name that the specified Windows user name, joe@example.com,
+maps to:
+ # idmap show joe@example.com unixuser
+ winuser:joe@example.com -> unixuser:joes
+Example 5 Listing the Cached SID-to-UID Mappings
+The following command shows all of the SID-to-UID mappings that are in the cache:
+ # idmap dump | grep "uid:"
+ usid:S-1-5-21-3223191800-2000 == uid:50000
+ usid:S-1-5-21-3223191800-2001 == uid:50001
+ usid:S-1-5-21-3223191800-2006 == uid:50010
+ usid:S-1-5-21-3223191900-3000 == uid:2147491840
+ usid:S-1-5-21-3223191700-4000 => uid:60001
+Example 6 Batching idmap Requests
+The following commands show how to batch idmap requests. This particular command sequence does the follow<hy>
+ing:
+<bu> Removes any previous rules for foobar@example.com. <bu> Maps Windows user foobar@example.com to UNIX
+user bar and vice-versa. <bu> Maps Windows group members to UNIX group staff and vice-versa.
+ # idmap <<EOF
+  remove winuser:foobar@example.com
+  add winuser:foobar@example.com unixuser:bar
+  add wingroup:members unixgroup:staff
+ EOF
+Example 7 Listing Name-Based Mapping Rules
+The following command shows how to list the name-based mapping rules:
+ # idmap list
+ add winuser:foobar@example.com unixuser:bar
+ add wingroup:members unixgroup:staff
+Example 8 Importing Name-Based Mapping Rules From the usermap.cfg File
+The usermap.cfg file can be used to configure name-based mapping rules. The following usermap.cfg file shows
+mapping rules that map Windows user foo@example.com to UNIX user foo, and that map foobar@example.com
+to the UNIX user foo.
+ # cat usermap.cfg
+ foo@example.com == foo
+ foobar@example.com => foo
+The following idmap command imports usermap.cfg information to the idmapd database:
+<beginning of page>
+ # cat usermap.cfg | idmap import usermap.cfg
+This command does the same as the previous command:
+ # idmap import -f usermap.cfg usermap.cfg
+The following commands are equivalent to the previous idmap import commands:
+ # idmap <<EOF
+  add winuser:foo@example.com unixuser:foo
+  add -d winuser:foobar@example.com unixuser:foo
+ EOF
+Example 9 Using Name-Based and Ephemeral ID Mapping With Identity Function Mapping and Exceptions
+The following commands map all users in the example.com Windows domain to UNIX user accounts of the same
+name. The command also specifies mappings for the following Windows users: joe@example.com, jane.doe@ex<hy>
+ample.com, administrator@example.com. The administrator from all domains is mapped to nobody. Any Win<hy>
+dows users without corresponding UNIX accounts are mapped dynamically to available ephemeral UIDs.
+ # idmap import usermap.cfg <<EOF
+  joe@example.com == joes
+  jane.doe@example.com == janed
+  administrator@* => nobody
+  *@example.com == *
+  *@example.com => nobody
+ EOF
+Example 10 Adding Directory-based Name Mapping to AD User Object
+The following command maps Windows user joe@example.com to UNIX user joe by adding the UNIX name to
+AD object for joe@example.com.
+ # idmap set-namemap winuser:joe@example.com joes
+Example 11 Adding Directory-based Name Mapping to Native LDAP User Object
+The following command maps UNIX user foo to Windows user foobar@example.com by adding the Windows
+name to native LDAP object for foo.
+ # idmap set-namemap unixuser:foo foobar@example.com
+Example 12 Removing Directory-based Name Mapping from AD User Object
+The following command removes the UNIX username unixuser from the AD object representing joe@exam<hy>
+ple.com.
+ # idmap unset-namemap winuser:joe@example.com unixuser
+<beginning of page>
+0 Successful completion.
+>0 An error occurred. A diagnostic message is written to standard error.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu _ Interface StabilityUncommitted
+svcs(1), idmapd(1M), ldapaddent(1M), svcadm(1M), svccfg(1M), attributes(5), smf(5)
+The idmapd service is managed by the service management facility, smf(5). The service identifier for the idmapd
+service is svc:/system/idmap.
+Use the svcadm command to perform administrative actions on this service, such as enabling, disabling, or restart<hy>
+ing the service. These actions require the solaris.smf.manage.idmap authorization. Use the svcs command to query
+the service's status.
+Windows user names are case-insensitive, while UNIX user names are case-sensitive. The case of Windows names
+as they appear in idmap name-rules and idmap show command lines is irrelevant.
+Because common practice in UNIX environments is to use all-lowercase user names, wildcard name-rules map Win<hy>
+dows names to UNIX user/group names as follows: first, the canonical Windows name (that is, in the case as it ap<hy>
+pears in the directory) is used as a UNIX user or group name. If there is no such UNIX entity, then the Windows
+name's case is folded to lowercase and the result is used as the UNIX user or group name.
+As a result of this differing treatment of case, user names that appear to be alike might not be recognized as matches.
+You must create rules to handle such pairings of strings that differ only in case. For example, to map the Windows
+user sam@example to the Solaris user Sam, you must create the following rules:
+ # idmap add "winuser:*@example" "unixuser:*"
+ # idmap add winuser:sam@example unixuser:Sam
+For guidance on modifying an Active Directory schema, consult the Microsoft document, Step-by-Step Guide to Us<hy>
+ing Active Directory Schema and Display Specifiers, which you can find at their technet web site, http://technet.mi<hy>
+crosoft.com/.

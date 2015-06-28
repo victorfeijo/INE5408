@@ -1,0 +1,270 @@
+<beginning of page>
+wscons <-> workstation console
+#include <sys/strredir.h>
+ioctl(fd, SRIOCSREDIR, target);
+ioctl(fd, SRIOCISREDIR, target);
+The wscons workstation console consists of a workstation keyboard and frame buffer that act together to emulate an
+ASCII terminal. It includes a redirection facility that allows I/O issued to the workstation console to be diverted to a
+STREAMS device, enabling window systems to redirect output that would otherwise appear directly on the frame
+buffer in corrupted form.
+The wscons redirection facility maintains a list of devices that are designated as redirection targets through the SRI<hy>
+OCSREDIR ioctl described below. Only the current entry is active; when the active entry is closed, the most recent
+remaining entry becomes active. The active entry acts as a proxy for the device being redirected and handles all
+read(2), write(2), ioctl(2), and poll(2) calls issued against the redirectee.
+The ioctls described below control the redirection facility. In both cases, fd is a descriptor for the device being redi<hy>
+rected (or workstation console) and target is a descriptor for a STREAMS device.
+SRIOCSREDIR Designates target as the source and destination of I/O ostensibly directed to the device denoted by
+fd.
+SRIOCISREDIR Returns 1 if target names the device currently acting as proxy for the device denoted by fd, and 0
+if it is not.
+The Solaris kernel terminal emulator provides ANSI X3.64 emulation both on SPARC and x86 systems.
+On SPARC systems, the PROM monitor is used to emulate an ANSI X3.64 terminal if the kernel terminal emulator
+is not available for emulation. See visual_io(7I) for more details.
+Note: The VT100 adheres the ANSI X3.64 standard. However, because the VT100 features nonstandard extensions
+to ANSI X3.64, it is incompatible with Sun terminal emulators.
+The SPARC console displays 34 lines of 80 ASCII characters per line. The x86 console displays 25 lines of 80
+ASCII characters per line. Devices with smaller text capacities may display less. On SPARC systems, the
+screen-#rows screen-#columns should be set to 34 or 80 respectively or text capacities will vary from those de<hy>
+scribed above. On SPARC systems, the screen-#rows and screen-#columns fields are stored in NVRAM/EEP<hy>
+ROM. See eeprom(1M) for more information. Both SPARC and x86 consoles offer scrolling, (x, y) cursor address<hy>
+ing ability and a number of other control functions.
+The console cursor marks the current line and character position on the screen. ASCII characters between 0x20
+(space) and 0x7E (tilde) inclusive are printing characters. When a print character is written to the console (and is not
+part of an escape sequence), it is displayed at the current cursor position and the cursor moves one position to the
+right on the current line.
+On SPARC based systems, later PROM revisions have the full 8-bit ISO Latin-1 (ISO 8859-1) character set. Earli<hy>
+er PROM revisions display characters in the range 0xA0 through 0xFE as spaces.
+When the cursor is at the right edge of the screen, it moves to the first character position on the next line. When the
+cursor is at the screen's right-bottom edge, the line-feed function is performed (see CTRL-J below). The line-feed
+function scrolls the screen up by one or more lines before moving the cursor to the first character position on the
+next line.
+The wscons console defines a number of control sequences that may occur during input. When a control sequence is
+written to the console, it affects one of the control functions described below. Control sequences are not displayed on
+screen.
+A number of control sequences (or control character functions) are of the form:
+CTRL-x
+ where x represents a singe character., such as CNTRL-J for a line feed.
+<beginning of page>
+Other ANSI control sequences are of the form:
+ ESC [ params char
+Note -
+Spaces are included only for readability; these characters must occur in the given sequence without the intervening
+spaces.
+ESC ASCII escape character (ESC, CTRL-[, 0x1B).
+[ Left square bracket `[' (0x5B).
+params Sequence of zero or more decimal numbers made up of digits between 0 and 9, separated by semicolons. Pa<hy>
+rameters are represented by n in the syntax descriptions for escape sequence functions.
+char Function character, which is different for each control sequence and it represented by x in the syntax descrip<hy>
+tions for control character functions.
+In the following examples of syntactically valid escape sequences, ESC represent the single ASCII character, Es<hy>
+cape:
+ESC[m Select graphic rendition with default parameter
+ESC[7m Select graphic rendition with reverse image
+ESC[33;54H Set cursor position
+ESC[123;456;0;;3;B Move cursor down
+Syntactically valid control characters and ANSI escape sequences that are not currently interpreted by the console
+are ignored.
+Each control function requires a specified number of parameters. If fewer parameters are supplied, the remaining pa<hy>
+rameters (with certain exceptions noted below) default to 1. If more parameters are supplied, the first n parameters
+are used by kernel terminal emulator. In contrast, only the last n parameters are used by PROM based emulator,
+where n is the number required by that particular command character.
+Parameters which are omitted or set to 0 are reset to the default value of 1 (with certain exceptions). For example,
+the command character M requires one parameter. ESC[;M, ESC[0M, ESC[M and ESC[23;15;32;1M are all
+equivalent to ESC[1M and provide a parameter value of 1. Note that ESC[;5M (interpreted as `ESC[5M') is not
+equivalent to ESC[5;M (interpreted as `ESC[5;1M') which is ultimately interpreted as `ESC[1M').
+The following paragraphs specify the ANSI control functions implemented by the console. Each description pro<hy>
+vides: <bu> Control sequence syntax <bu> Hexadecimal equivalent of control characters where applicable <bu> Control function
+name and ANSI or Sun abbreviation (if any). <bu> Description of parameters required, if any <bu> Description of the con<hy>
+trol function <bu> Initial setting of the mode for functions that set a mode. To restore the initial settings, use the SUN<hy>
+RESET escape sequence.
+The wscons control character functions are:
+Bell (BEL),
+CTRL-G
+0x7 Used for consoles that are not equipped with an audible bell. Current Sun workstation models also flash the
+screen if the keyboard is not the console input device.
+Backspace (BS),
+CTRL-H,
+<beginning of page>
+0x8 The cursor moves one position to the left on the current line. If it is already at the left edge of the screen, no
+change takes place.
+Tab (TAB),
+CTRL-I,
+0x9 The cursor moves right on the current line to the next tab stop. The tab stops are fixed at every multiple of eight
+columns. If the cursor is already at the right edge of the screen, nothing change takes place. Otherwise, the cursor
+moves right a minimum of one and a maximum of eight character positions.
+Line-feed (LF),
+CTRL-J,
+0xA The cursor, while remaining at the same character position on the line, moves down one line. If the cursor is at
+the bottom line, the screen either scrolls up or wraps around depending on the setting of an internal variable n (ini<hy>
+tially 1) . The internal variable can be changed using the ESC[r control sequence. If n is greater than zero, the entire
+screen (including the cursor) is scrolled up by n lines before executing the line-feed. The top n lines scroll off the
+screen and are lost. New blank lines n scroll onto the bottom of the screen. After scrolling, move the cursor down
+one line to execute the line feed.
+If n is zero, wrap-around mode is entered. The ESC [ 1 r exits back to scroll mode. If a line-feed occurs on the bot<hy>
+tom line in wrap mode, the cursor goes to the same character position in the top line of the screen. During line-
+feeds, the line that the cursor moves to is cleared and no scrolling occurs. Wrap-around mode is not implemented in
+the window system.
+On SPARC based systems, the speed at which the screen scrolls is dependent on the amount of data waiting to be
+printed. Whenever a scroll occurs and the console is in normal scroll mode (ESC [ 1 r), it scans the rest of the data
+awaiting printing to see how many line-feeds occur in it. This scan stops when the console finds a control character
+from the set {VT, FF, SO, SI, DLE, DC1, DC2, DC3, DC4, NAK, SYN, ETB, CAN, EM, SUB, ESC, FS, GS,
+RS, US} . At that point, the screen is scrolled by n lines (n <>=> 1) and processing continues. The scanned text is pro<hy>
+cessed normally and fills in the newly created lines. As long as escape codes or other control characters are not inter<hy>
+mixed with the text, this results in faster scrolling
+Reverse Line-feed,
+CTRL-K,
+0xB With kernel terminal emulator (while remaining at the same character position on the line), the cursor moves
+down one line. However, with PROM based emulator (while remaining at the same character position on the line),
+the cursor moves up one line. If the cursor is already at the top line, no change takes place.
+Form-feed (FF)
+CTRL-L,
+0xC The cursor is positioned to the home position (upper-left corner) and the entire screen is cleared.
+Return (CR),
+CTRL-M,
+0xD The cursor moves to the leftmost character position on the current line.
+The wscons escape sequence functions are:
+Escape (ESC),
+CTRL-[,
+0x1B
+The escape character. Escape initiates a multi-character control sequence.
+Insert Character (ICH)
+ESC[#@
+Takes one parameter, n (default 1). Inserts n spaces at the current cursor position. The current line, starting at the
+current cursor position inclusive, is shifted to the right by n character positions to make room for the spaces. The
+rightmost n character positions shift off the line and are lost. The position of the cursor is unchanged.
+Cursor Up (CUU),
+ESC[#A
+Takes one parameter, n (default 1). Moves the cursor up n lines. If the cursor is fewer than n lines from the top of
+the screen, moves the cursor to the topmost line on the screen. The character position of the cursor on the line is un<hy>
+changed.
+<beginning of page>
+Cursor Down (CUD),
+ESC[#B
+Takes one parameter, (default 1). Moves the cursor down n lines. If the cursor is fewer than n lines from the bot<hy>
+tom of the screen, move the cursor to the last line on the screen. The character position of the cursor on the line is
+unchanged.
+Cursor Forward (CUF),
+ESC[#C
+Takes one parameter, n (default 1). Moves the cursor to the right by n character positions on the current line. If the
+cursor is fewer than n positions from the right edge of the screen, moves the cursor to the rightmost position on the
+current line.
+Cursor Backward (CUB),
+ESC[#D
+Takes one parameter, n (default 1). Moves the cursor to the left by n character positions on the current line. If the
+cursor is fewer than n positions from the left edge of the screen, moves the cursor to the leftmost position on the
+current line.
+Cursor Next Line (CNL),
+ESC[#E
+Takes one parameter, n (default 1). Positions the cursor at the leftmost character position on the n-th line below the
+current line. If the current line is less than n lines from the bottom of the screen, positions the cursor at the leftmost
+character position on the bottom line.
+Horizontal and Vertical Position (HVP),
+ESC[#1;#2f
+or
+Cursor Position (CUP),
+ESC[#1;#2H
+Takes two parameters, n1 and n2 (default 1, 1). Moves the cursor to the n2-th character position on the n1-th line.
+Character positions are numbered from 1 at the left edge of the screen; line positions are numbered from 1 at the top
+of the screen. Hence, if both parameters are omitted, the default action moves the cursor to the home position (upper
+left corner). If only one parameter is supplied, the cursor moves to column 1 of the specified line.
+Erase in Display (ED),
+ESC[J
+Takes no parameters. Erases from the current cursor position inclusive to the end of the screen, that is, to the end of
+the current line and all lines below the current line. The cursor position is unchanged.
+Erase in Line (EL),
+ESC[K
+Takes no parameters. Erases from the current cursor position inclusive to the end of the current line. The cursor po<hy>
+sition is unchanged.
+Insert Line (IL),
+ESC[#L
+Takes one parameter, n (default 1). Makes room for n new lines starting at the current line by scrolling down by n
+lines the portion of the screen from the current line inclusive to the bottom. The n new lines at the cursor are filled
+with spaces; the bottom n lines shift off the bottom of the screen and are lost. The position of the cursor on the
+screen is unchanged.
+<beginning of page>
+Delete Line (DL),
+ESC[#M
+Takes one parameter, n (default 1). Deletes n lines beginning with the current line. The portion of the screen from
+the current line inclusive to the bottom is scrolled upward by n lines. The n new lines scrolling onto the bottom of
+the screen are filled with spaces; the n old lines beginning at the cursor line are deleted. The position of the cursor
+on the screen is unchanged.
+Delete Character (DCH),
+ESC[#P
+Takes one parameter, n (default 1). Deletes n characters starting with the current cursor position. Shifts the tail of
+the current line to the left by n character positions from the current cursor position, inclusive, to the end of the line.
+Blanks are shifted into the rightmost n character positions. The position of the cursor on the screen is unchanged.
+Select Graphic Rendition (SGR),
+ESC[#m
+Takes one parameter, n (default 0). Note that unlike most escape sequences, the parameter defaults to zero if omit<hy>
+ted. Invokes the graphic rendition specified by the parameter. All following printing characters in the data stream
+are rendered according to the parameter until the next occurrence of this escape sequence in the data stream. With
+PROM-based emulator, only two graphic renditions are defined:
+0 Normal rendition
+7 Negative (reverse) image
+Negative image displays characters as white-on-black if the screen mode is currently black-on white, and vice-versa.
+Any non-zero value of n is currently equivalent to 7 and selects the negative image rendition.
+In addition to the two renditions mentioned above, the following ISO 6429-1983 graphic rendition values support
+color text with kernel terminal emulator:
+30 black foreground
+31 red foreground
+32 green foreground
+33 brown foreground
+34 blue foreground
+35 magenta foreground
+36 cyan foreground
+37 white foreground
+40 black background
+41 red background
+<beginning of page>
+42 green background
+43 brown background
+44 blue background
+45 magenta background
+46 cyan background
+47 white background
+Black On White (SUNBOW),
+ESC[p
+Takes no parameters. On SPARC, sets the screen mode to black-on-white. If the screen mode is already black-on-
+white, has no effect. In this mode, spaces display as solid white, other characters as black-on-white. The cursor is a
+solid black block. Characters displayed in negative image rendition (see `Select Graphic Rendition' above) are
+white-on-black. This comprises the initial setting of the screen mode on reset. On x86 systems, use ESC[q to set
+black-on-white.
+White On Black (SUNWOB),
+ESC[q
+Takes no parameters. On SPARC, sets the screen mode to white-on-black. If the screen mode is already white-on-
+black, has no effect. In this mode spaces display as solid black, other characters as white-on-black. The cursor is a
+solid white block. Characters displayed in negative image rendition (see `Select Graphic Rendition' above) are
+black-on-white. Initial setting of the screen mode on reset is black on white. On x86 systems, use ESC[p to set
+white-on-black.
+ESC[#r
+Set Scrolling (SUNSCRL)
+Takes one parameter, n (default 0). Sets to n an internal register which determines how many lines the screen
+scrolls up when a line-feed function is performed with the cursor on the bottom line. A parameter of 2 or 3 intro<hy>
+duces a small amount of jump when a scroll occurs. A parameter of 34 clears the screen rather than scrolling. The
+initial setting is 1 on reset.
+A parameter of zero initiates wrap mode instead of scrolling. If a linefeed occurs on the bottom line during wrap
+mode, the cursor goes to the same character position in the top line of the screen. When a line feed occurs, the line
+that the cursor moves to is cleared and no scrolling occurs. ESC [ 1 r exits back to scroll mode.
+For more information, see the description of the Line-feed (CTRL-J) control function above.
+ESC[s
+Reset terminal emulator (SUNRESET)
+Takes no parameters. Resets all modes to default, restores current font from PROM. Screen and cursor position are
+unchanged.
+When there are no errors, the redirection ioctls have return values as described above. Otherwise, they return <mi>1 and
+set errno to indicate the error. If the target stream is in an error state, errno is set accordingly.
+If the target stream is in an error state, errno is set accordingly.
+<beginning of page>
+EBADF target does not denote an open file.
+ENOSTR target does not denote a STREAMS device.
+/dev/wscons Workstation console, accessed via the redirection facility
+/dev/systty Devices that must be opened for the SRIOCSREDIR and SRIOCISREDIR ioctls.
+/dev/syscon Access system console
+/dev/console Access system console
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stabili<hy>
+tyStable
+cvcd(1M), eeprom(1M), ioctl(2), poll(2), read(2), write(2), cvc(7D), console(7D), visual_io(7I)
+The redirection ioctls block while there is I/O outstanding on the device instance being redirected. If you try to redi<hy>
+rect the workstation console while there is a outstanding read, the workstation console will hang until the read com<hy>
+pletes.
+The cvc facility supersedes the SunOS wscons facility and should not be used with wscons.

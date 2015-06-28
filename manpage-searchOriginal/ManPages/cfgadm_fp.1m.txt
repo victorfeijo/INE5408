@@ -1,0 +1,259 @@
+<beginning of page>
+cfgadm_fp <-> driver specific commands for cfgadm
+/usr/sbin/cfgadm [-f] [-n | -y] [-v] [-o hardware_options]
+ -c function ap_id [ap_id]
+/usr/sbin/cfgadm [-v] [-a] [-s listing_options]
+ [-o hardware_options] [-l [ap_id]]
+/usr/sbin/cfgadm [-v] [-o hardware_options] -h [ap_id]
+The fp port driver plug-in /usr/lib/cfgadm/fp.so.1 provides the functionality for Fibre Channel Fabric device node
+management through cfgadm(1M). cfgadm operates on attachment points. Attachment points are locations in the
+system where hardware resources can be dynamically reconfigured. Refer to cfgadm(1M) for additional details on
+attachment points.
+For Fibre Channel Fabric device node management, each fp port node is represented by an attachment point in the
+device tree. In addition, each Fibre Channel device is represented by a dynamic attachment point. Attachment points
+are named through ap_ids. Two types of ap_ids are defined: logical and physical. The physical ap_id is based on
+the physical pathname. The logical ap_id is a shorter, more user-friendly name. For fp port nodes, the logical ap_id
+is the corresponding disk controller number. For example, c0 is a typical logical ap_id.
+Fibre Channel devices are named with a port World Wide Name (WWN). If a disk device is connected to controller
+c0, its ap_id can be:
+ c0::50020f2300006077
+where 50020f2300006077 identifies the port WWN of a specific Fibre Channel device.
+Each device on the Fibre Channel private loop port, Fabric port or public loop port is probed and made available to
+Solaris by default. Devices connected to the Fibre Channel Fabric port or public loop port can be made unavailable
+to Solaris by initiating an application or an end user operation. The operation is similar to the hot unplugging of de<hy>
+vices by way of management user interfaces. Applications or users can use the /usr/lib/cfgadm/fp.so.1 library to en<hy>
+able libcfgadm to provide interfaces to accomplish this task.
+The list of currently connected Fabric devices is generated in the form of the attachment point.
+A simple listing of attachment points in the system includes attachment points at fp port nodes but not Fibre Channel
+devices. The following example uses the -a flag to the list option (-l) to list Fibre Channel devices:
+ # cfgadm -l
+  Ap_Id Type Receptacle Occupant Condition
+  c0 fc-fabric connected configured unknown
+  c1 fc-private connected configured unknown
+  c2 fc-pt_to_pt connected configured unknown
+  c3 fc connected unconfigured unknown
+  sysctrl0:slot0 cpu/mem connected configured ok
+  sysctrl0:slot1 sbus-upa connected configured ok
+The following example lists Fibre Channel devices connected to fp ports.
+ # cfgadm -al
+  Ap_Id Type Receptacle Occupant Condition
+  c0 fc-fabric connected configured unknown
+  c0::50020f2300006077 disk connected configured unknown
+  c0::50020f23000063a9 disk connected configured unknown
+  c0::50020f2300005f24 disk connected configured unknown
+  c0::50020f2300006107 disk connected configured unknown
+  c1 fc-private connected configured unknown
+  c1::220000203708b69c disk connected configured unknown
+  c1::220000203708ba7d disk connected configured unknown
+  c1::220000203708b8d4 disk connected configured unknown
+  c1::220000203708b9b2 disk connected configured unknown
+<beginning of page>
+  c2 fc-pt_to_pt connected configured unknown
+  c2::500104f000937528 tape connected configured unknown
+  c3 fc connected unconfigured unknown
+  sysctrl0:slot0 cpu/mem connected configured ok
+  sysctrl0:slot1 sbus-upa connected configured ok
+In this example, the fc-fabric type of ap_id c0 indicates that the fp port is connected to Fabric. For an fp port with a
+Fabric-related type such as fc-fabric and fc-public, device node creation happens by default at the boot time and can
+be managed by the cfgadm configure and unconfigure operations. The fc-private type of ap_id c1 indicates that
+fp port is connected to private-loop and device node creation happens by default as well. The fc-pt_to_pt type of
+ap_id c2 indicates that the fp port is directly connected to another N_port and device node creation also happens by
+default. The fc type of ap_id c3 indicates that nothing is attached to fp port c2. The Type field of a Fibre Channel
+device ap_id shows the SCSI device type of LUN 0 in the device.
+A Fibre Channel device with multiple FCP SCSI LUNs is configured into Solaris and each FCP SCSI LUN is avail<hy>
+able as a Solaris device. Suppose that ap_ids c0::50020f2300006077 and c0::50020f23000063a9 represent Fibre
+Channel devices with multiple FCP SCSI LUNs.
+The following example shows how to list ap_ids with FCP SCSI LUN information:
+ # cfgadm -al -o show_SCSI_LUN
+  Ap_Id Type Receptacle Occupant Condition
+  c0 fc-fabric connected configured unknown
+  c0::50020f2300006077,0 disk connected configured unknown
+  c0::50020f2300006077,1 disk connected configured unknown
+  c0::50020f2300006077,2 disk connected configured unknown
+  c0::50020f2300006077,3 disk connected configured unknown
+  c0::50020f23000063a9,0 disk connected configured unknown
+  c0::50020f23000063a9,1 disk connected configured unknown
+  c0::50020f23000063a9,2 disk connected configured unknown
+  c0::50020f23000063a9,3 disk connected configured unknown
+  c0::50020f2300005f24,0 disk connected unconfigured unknown
+  c0::50020f2300005f24,1 disk connected unconfigured unknown
+  c0::50020f2300006107,0 disk connected unconfigured unknown
+  c0::50020f2300006107,1 disk connected unconfigured unknown
+  c1 fc-private connected configured unknown
+  c1::220000203708b69c,0 disk connected configured unknown
+  c1::220000203708ba7d,0 disk connected configured unknown
+  c1::220000203708b8d4,0 disk connected configured unknown
+  c1::220000203708b9b2,0 disk connected configured unknown
+  c2 fc-pt_to_pt connected configured unknown
+  c2::500104f000937528,0 tape connected configured unknown
+  c3 fc connected unconfigured unknown
+In this example, the ap_id c0::50020f2300006077,0 identifies the FCP SCSI LUN 0 of the Fibre Channel device
+which is represented by port WWN 50020f2300006077. The Fibre Channel device is reported to have 4 FCP SCSI
+LUNs and they are all configured. 4 FCP SCSI LUN level ap_ids associated with port WWN 50020f2300006077
+are listed. The listing also displays FCP SCSI LUNs for unconfigured Fibre Channel devices. The Fibre Channel
+device represented by c0::50020f2300005f24 is reported to have two FCP SCSI LUNs. The configure operation on
+c0::50020f2300005f24 creates two Solaris devices. The Type field of FCP SCSI LUN level ap_ids show the SCSI
+device type of each LUN. When a Fibre Channel device has different device type LUNs, the Type field reflects that.
+The receptacle and occupant state for attachment points at the fp port have the following meanings:
+configured
+One or more devices configured on the fp port
+connected
+fp port active
+<beginning of page>
+disconnected
+fp port quiesced (IO activity is suspended)
+empty
+Not applicable
+unconfigured
+No devices configured on the fp port
+The state for individual Fibre Channel devices on an fp port:
+configured
+Device is configured into Solaris and is available for use
+connected
+fp port to which the device is connected to is active
+disconnected
+fp port to which the device is attached is quiesced
+unconfigured
+Device is available to be configured
+The condition field for attachment points at the fp port has the following meanings:
+failed
+An error condition has prevented the fp port from being able to detect the presence or type of a Fibre Channel con<hy>
+nection.
+The condition field for individual Fibre Channel devices on an fp port has the following meanings:
+failed
+An error is encountered while probing a device on Fabric.
+failing
+A device was configured on a host and its state as seen by Solaris appears to be normal (i.e., online) but it is either
+not currently present or visible in the fabric or its presence could not be verified due to an error condition on the lo<hy>
+cal port through which the device was configured.
+unusable
+A device has been configured on the host, but is currently offline or failed.
+The unknown condition indicates that probing a device on Fabric completed without an error and the device state
+within Solaris host is normal if the device was configured previously. The internal condition of the device cannot be
+guaranteed.
+cfgadm defines several types of operations in addition to listing (-l). These operations include invoking configura<hy>
+tion state changes and obtaining configuration administration help messages (-h).
+<beginning of page>
+The following options are supported:
+-c function
+The following generic commands are defined for the fp-transport-specific library:
+For Fibre Channel device attachment points on the fc-fabric type fp port attachment point, the following configura<hy>
+tion state change operations are supported:
+configure
+Configure a connected Fibre Channel Fabric device to a host. When a Fibre Channel device is listed as an unknown
+type in the output of the list operation the device might not be configurable. No attempt is made to configure devices
+with unknown types. The force option (-f) can be used to force the fp port driver plug-in to make an attempt to con<hy>
+figure any devices. Any errors in the process are reported. By default, each FCP SCSI LUN that is discovered on a
+Fibre channel Fabric device is configured. However, FCP SCSI LUNs that are specified in the "pwwn-lun-blacklist"
+property in the fp.conf file will remain unconfigured. The FCP SCSI LUN level listing reflects the state of such FCP
+SCSI LUNs. They stay in the "unconfigured" state after reboot or Solaris Dynamic Reconfiguration on the controller
+that they are connected through. Refer to fp(7D) for additional details on the "pwwn-lun-blacklist" property.
+unconfigure
+Unconfigure a Fibre Channel Fabric device from a host. This device stays unconfigured until the next reboot or So<hy>
+laris Dynamic Reconfiguration on the controller that the device is connected, at which time all fabric devices are au<hy>
+tomatically enumerated. The default behavior may be changed through the use of the "manual_configuration_only"
+property in the fp.conf file. If the property is set, the device remains unconfigured after reboot. Refer to fp(7D) for
+additional details on the "manual_configuration_only" property.
+For Fibre Channel private loop devices and N_Port point-to-point devices, the configure command returns success
+without doing any operation. The unconfigure command is not supported on the private loop devices and N_Port
+point-to-point devices. The private loop devices and N_Port point-to-point devices are configured by Solaris Fibre
+Channel drivers by default and are not managed through end user- or application-initiated operations. The pwwn-
+lun-blacklist property in the fp.conf file is applied to the private loop device and N_Port point-to-point device in
+the same way it is applied to a Fabric device.
+-f
+Force the configure change state operation to occur irrespective of the condition or type. Refer to the above de<hy>
+scription of the configure change state operation.
+-h ap_id
+Obtain fp<em>transport-specific help. Specify any fp attachment point.
+-o hardware_options
+The following hardware options are supported.
+show_SCSI_LUN
+Lists ap_ids associated with each FCP SCSI LUN for discovered Fibre Channel devices when specified with the list
+option -al. Refer to the previously mentioned description and example of FCP SCSI LUN level listing. Device node
+creation is not supported on the FCP SCSI LUN level. See NOTES.
+All Fibre Channel devices are available to Solaris by default. Enabling only a subset of Fabric devices available to
+Solaris by default can be accomplished by setting the property "manual_configuration_only" in /kernel/drv/fp.conf
+file. When "manual_configuration_only" in fp.conf is set, all Fabric devices are not available to Solaris unless an ap<hy>
+plication or an end user had previously requested the device be configured into Solaris. The configure state-change
+command makes the device available to Solaris. After a successful configure operation on a Fabric device, the asso<hy>
+ciated links are added to the /dev namespace. The unconfigure state-change command makes a device unavailable
+to Solaris.
+When a Fibre Channel Fabric device is configured successfully to a host using the -c configure operation, its physi<hy>
+cal ap_id is stored in a repository. When a Fibre Channel Fabric device is unconfigured using the -c unconfigure
+<beginning of page>
+operation, its physical ap_id is deleted from the same repository. All fabric devices are automatically enumerated by
+default and the repository is used only if the fp.conf "manual_configuration_only" property is set. Refer to fp(7D)
+for additional details on the "manual_configuration_only" property.
+You can specify the following commands with the -c option to control the update behavior of the repository:
+force_update
+For configure, the attachment point is unconditionally added to the repository; for unconfigure, the attachment
+point is unconditionally deleted.
+no_update
+No update is made to the repository regardless of the operation.
+These options should not be used for normal configure and unconfigure operations. See WARNINGS.
+When a Fibre Channel device has multiple FCP SCSI LUNs configured and any Solaris device associated with its
+FCP SCSI LUN is in the unusable condition, the whole Fibre Channel device is reported as unusable. The following
+option with the -c unconfigure command removes only Solaris devices with the unusable condition for a Fibre Chan<hy>
+nel device.
+unusable_SCSI_LUN
+For unconfigure operation, any offlined device nodes for a target device is removed.
+-s listing_options
+Refer to cfgadm(1M) for usage information.
+-t ap_id
+No test commands are available at present.
+-x hardware_function
+No hardware specific functions are available at present.
+All other options have the same meaning as defined in the cfgadm(1M) man page. Example 1 Unconfiguring a
+Disk
+The following command unconfigures a disk:
+ # cfgadm -c unconfigure c0::210000203708b606
+Example 2 Unconfigure all the Configured Disks under Single Attachment Point
+The following command unconfigures all configured disks under the attachment point c0.
+ # cfgadm -c unconfigure c0
+Example 3 Configuring a Disk
+The following command configures a disk:
+ # cfgadm -c configure c0::210000203708b606
+<beginning of page>
+Example 4 Configure all the Unconfigured Disks under Single Attachment Point
+The following command configures all unconfigured disks under the attachment point c0.
+ # cfgadm -c configure c0
+Example 5 Removing the Fibre Channel Fabric Device Attachment Point from Repository
+The following command unconditionally removes the fibre channel fabric device attachment point from the Fabric
+device repository.
+ # cfgadm -c unconfigure -o force_update c0::210000203708b606
+Example 6 Removing Offlined Solaris Device Nodes for a Target Device
+The following command removes offlined Solaris device nodes for a target device:
+ # cfgadm -c unconfigure -o unusable_SCSI_LUN c0::210000203708b606
+/usr/lib/cfgadm/fp.so.1
+Hardware-specific library for Fibre Channel Fabric device node management.
+/etc/cfg/fp/fabric_WWN_map
+Repository of physical ap_ids of Fabric devices currently configured. It is used only to reconfigure those Fabric de<hy>
+vices at boot time. This repository is only used when the "manual_configuration_only" /kernel/drv/fp.conf file is
+set.
+/etc/rcS.d/fdevattach
+Reconfigures Fabric device(s) of which physical ap_id is listed in /etc/cfg/fp/fabric_WWN_map on boot time.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcfpl, SUNWcfplx
+svcs(1), cfgadm(1M), svcadm(1M), config_admin(3CFGADM), libcfgadm(3LIB), attributes(5), smf(5), fp(7D)
+Do not use hardware-specific options for the repository update under normal configure/unconfigure operations. The
+hardware-specific options are expected to be used when the node creation of a Fabric device fails at boot time and
+the error condition is considered to be permanent. The unconfigure command with force_update hardware-specific
+option unconditionally removes the attachment point of a failing Fabric device from the repository.
+For devices with unknown or no SCSI device type (for example, a Fibre Channel Host Bus Adapter), the configure
+operation might not be applicable.
+The configure and unconfigure commands operate on the Fibre Channel device level which is represented by port
+WWN ap_id. If a Fibre Channel device has multiple FCP SCSI LUNs configured, the configure command on the as<hy>
+sociated port WWN ap_id results in creating a Solaris device for each FCP SCSI LUN unless it is specified in the
+"pwwn-lun-blacklist" property in the fp.conf file. The unconfigure command removes all Solaris devices associated
+with the port WWN ap_id. The FCP SCSI LUN level ap_id is not valid for the configure and unconfigure com<hy>
+mands.
+<beginning of page>
+The deprecated show_FCP_dev option has been replaced by the new show_SCSI_LUN option, and the deprecated
+unusable_FCP_dev option has been replaced by the new unusable_SCSI_LUN option.
+The cfgadm_fp service is managed by the service management facility, smf(5), under the service identifier:
+ svc:/system/device/fc-fabric:default
+Administrative actions on this service, such as enabling, disabling, or requesting restart, can be performed using sv<hy>
+cadm(1M). The service's status can be queried using the svcs(1) command.
+No administrative actions on this service are required for Fabric device configuration once this service is started on
+boot time.

@@ -1,0 +1,187 @@
+<beginning of page>
+in.routed, routed <-> network routing daemon
+/usr/sbin/in.routed [-AdghmnqsStVz] [-T tracefile [-v]]
+ [-F net[/mask ][,metric]] [-P params]
+The daemon in.routed, often referred to as routed, is invoked at boot time to manage the network routing tables. It
+uses Routing Information Protocol, RIPv1 (RFC 1058), RIPv2 (RFC 2453), and Internet Router Discovery Protocol
+(RFC 1256) to maintain the kernel routing table. The RIPv1 protocol is based on the reference 4.3BSD daemon.
+in.routed is managed by means of the service management facility (SMF), using the fault management resource
+identifier (FMRI):
+ svc:/network/routing/route:default
+The daemon listens on a udp socket for the route service (see services(4)) for Routing Information Protocol pack<hy>
+ets. It also sends and receives multicast Router Discovery ICMP messages. If the host is a router, in.routed periodi<hy>
+cally supplies copies of its routing tables to any directly connected hosts and networks. It also advertises or solicits
+default routes using Router Discovery ICMP messages.
+When started (or when a network interface is later turned on), in.routed uses an AF_ROUTE address family facility
+to find those directly connected interfaces configured into the system and marked "up". It adds necessary routes for
+the interfaces to the kernel routing table. Soon after being first started, and provided there is at least one interface on
+which RIP has not been disabled, in.routed deletes all pre-existing non-static routes in the kernel table. Static routes
+in the kernel table are preserved and included in RIP responses if they have a valid RIP metric (see route(1M)).
+If more than one interface is present (not counting the loopback interface), it is assumed that the host should forward
+packets among the connected networks. After transmitting a RIP request and Router Discovery Advertisements or
+Solicitations on a new interface, the daemon enters a loop, listening for RIP request and response and Router Dis<hy>
+covery packets from other hosts.
+When a request packet is received, in.routed formulates a reply based on the information maintained in its internal
+tables. The response packet generated contains a list of known routes, each marked with a "hop count" metric (a
+count of 16 or greater is considered "infinite"). Advertised metrics reflect the metric associated with an interface (see
+ifconfig(1M)), so setting the metric on an interface is an effective way to steer traffic.
+Responses do not include routes with a first hop on the requesting network, to implement in part split-horizon. Re<hy>
+quests from query programs such as rtquery(1M) are answered with the complete table.
+The routing table maintained by the daemon includes space for several gateways for each destination to speed recov<hy>
+ery from a failing router. RIP response packets received are used to update the routing tables, provided they are from
+one of the several currently recognized gateways or advertise a better metric than at least one of the existing gate<hy>
+ways.
+When an update is applied, in.routed records the change in its own tables and updates the kernel routing table if the
+best route to the destination changes. The change in the kernel routing table is reflected in the next batch of response
+packets sent. If the next response is not scheduled for a while, a flash update response containing only recently
+changed routes is sent.
+In addition to processing incoming packets, in.routed also periodically checks the routing table entries. If an entry
+has not been updated for 3 minutes, the entry's metric is set to infinity and marked for deletion. Deletions are de<hy>
+layed until the route has been advertised with an infnite metric to insure the invalidation is propagated throughout
+the local internet. This is a form of poison reverse.
+Routes in the kernel table that are added or changed as a result of ICMP Redirect messages are deleted after a while
+to minimize black-holes. When a TCP connection suffers a timeout, the kernel tells in.routed, which deletes all
+redirected routes through the gateway involved, advances the age of all RIP routes through the gateway to allow an
+alternate to be chosen, and advances of the age of any relevant Router Discovery Protocol default routes.
+Hosts acting as internetwork routers gratuitously supply their routing tables every 30 seconds to all directly connect<hy>
+ed hosts and networks. These RIP responses are sent to the broadcast address on nets that support broadcasting, to
+the destination address on point-to-point links, and to the router's own address on other networks. If RIPv2 is en<hy>
+abled, multicast packets are sent on interfaces that support multicasting.
+If no response is received on a remote interface, if there are errors while sending responses, or if there are more er<hy>
+<beginning of page>
+rors than input or output (see netstat(1M)), then the cable or some other part of the interface is assumed to be dis<hy>
+connected or broken, and routes are adjusted appropriately.
+The Internet Router Discovery Protocol is handled similarly. When the daemon is supplying RIP routes, it also lis<hy>
+tens for Router Discovery Solicitations and sends Advertisements. When it is quiet and listening to other RIP
+routers, it sends Solicitations and listens for Advertisements. If it receives a good Advertisement and it is not multi-
+homed, it stops listening for broadcast or multicast RIP responses. It tracks several advertising routers to speed re<hy>
+covery when the currently chosen router dies. If all discovered routers disappear, the daemon resumes listening to
+RIP responses. It continues listening to RIP while using Router Discovery if multi-homed to ensure all interfaces are
+used.
+The Router Discovery standard requires that advertisements have a default "lifetime" of 30 minutes. That means
+should something happen, a client can be without a good route for 30 minutes. It is a good idea to reduce the default
+to 45 seconds using -P rdisc_interval=45 on the command line or rdisc_interval=45 in the /etc/gateways file. See
+gateways(4).
+While using Router Discovery (which happens by default when the system has a single network interface and a
+Router Discover Advertisement is received), there is a single default route and a variable number of redirected host
+routes in the kernel table. On a host with more than one network interface, this default route will be via only one of
+the interfaces. Thus, multi-homed hosts running with -q might need the no_rdisc argument described below.
+To support "legacy" systems that can handle neither RIPv2 nor Router Discovery, you can use the pm_rdisc parame<hy>
+ter in the /etc/gateways. See gateways(4).
+By default, neither Router Discovery advertisements nor solicitations are sent over point-to-point links (for example,
+PPP). The Solaris OE uses a netmask of all ones (255.255.255.255) on point-to-point links.
+in.routed supports the notion of "distant" passive or active gateways. When the daemon is started, it reads the file
+/etc/gateways to find such distant gateways that cannot be located using only information from a routing socket, to
+discover if some of the local gateways are passive, and to obtain other parameters. Gateways specified in this manner
+should be marked passive if they are not expected to exchange routing information, while gateways marked active
+should be willing to exchange RIP packets. Routes through passive gateways are installed in the kernel's routing ta<hy>
+bles once upon startup and are not included in transmitted RIP responses.
+Distant active gateways are treated like network interfaces. RIP responses are sent to the distant active gateway. If no
+responses are received, the associated route is deleted from the kernel table and RIP responses are advertised via oth<hy>
+er interfaces. If the distant gateway resumes sending RIP responses, the associated route is restored.
+Distant active gateways can be useful on media that do not support broadcasts or multicasts but otherwise act like
+classic shared media, such as some ATM networks. One can list all RIP routers reachable on the HIPPI or ATM net<hy>
+work in /etc/gateways with a series of "host" lines. Note that it is usually desirable to use RIPv2 in such situations to
+avoid generating lists of inferred host routes.
+Gateways marked external are also passive, but are not placed in the kernel routing table, nor are they included in
+routing updates. The function of external entries is to indicate that another routing process will install such a route if
+necessary, and that other routes to that destination should not be installed by in.routed. Such entries are required on<hy>
+ly when both routers might learn of routes to the same destination.
+Listed below are available options. Any other argument supplied is interpreted as the name of a file in which the ac<hy>
+tions of in.routed should be logged. It is better to use -T (described below) instead of appending the name of the
+trace file to the command. Associated SMF properties for these options are described, and can be set by means of a
+command of the form:
+ # routeadm -m route:default name=value
+-A
+Do not ignore RIPv2 authentication if we do not care about RIPv2 authentication. This option is required for confor<hy>
+mance with RFC 2453. However, it makes no sense and breaks using RIP as a discovery protocol to ignore all RIPv2
+packets that carry authentication when this machine does not care about authentication. This option is equivalent to
+setting the ignore_auth property value to false.
+<beginning of page>
+-d
+Do not run in the background. This option is meant for interactive use and is not usable under the SMF.
+-F net[/mask][,metric]
+Minimize routes in transmissions via interfaces with addresses that match net (network number)/mask (netmask),
+and synthesizes a default route to this machine with the metric. The intent is to reduce RIP traffic on slow, point-to-
+point links, such as PPP links, by replacing many large UDP packets of RIP information with a single, small packet
+containing a "fake" default route. If metric is absent, a value of 14 is assumed to limit the spread of the "fake" de<hy>
+fault route. This is a dangerous feature that, when used carelessly, can cause routing loops. Notice also that more
+than one interface can match the specified network number and mask. See also -g. Use of this option is equivalent to
+setting the minimize_routes property.
+-g
+Used on internetwork routers to offer a route to the "default" destination. It is equivalent to -F 0/0,1 and is present
+mostly for historical reasons. A better choice is -P pm_rdisc on the command line or pm_rdisc in the /etc/gateways
+file. A larger metric will be used with the latter alternatives, reducing the spread of the potentially dangerous default
+route. The -g (or -P) option is typically used on a gateway to the Internet, or on a gateway that uses another routing
+protocol whose routes are not reported to other local routers. Note that because a metric of 1 is used, this feature is
+dangerous. Its use more often creates chaos with a routing loop than solves problems. Use of this option is equiv<hy>
+alent to setting the offer_default_route property to true.
+-h
+Causes host or point-to-point routes not to be advertised, provided there is a network route going the same direction.
+That is a limited kind of aggregation. This option is useful on gateways to LANs that have other gateway machines
+connected with point-to-point links such as SLIP. Use of this option is equivalent to setting the adver<hy>
+tise_host_routes property to false.
+-m
+Cause the machine to advertise a host or point-to-point route to its primary interface. It is useful on multi-homed
+machines such as NFS servers. This option should not be used except when the cost of the host routes it generates is
+justified by the popularity of the server. It is effective only when the machine is supplying routing information, be<hy>
+cause there is more than one interface. The -m option overrides the -q option to the limited extent of advertising the
+host route. Use of this option is equivalent to setting the advertise_host_routes_primary property to true.
+-n
+Do not install routes in kernel. By default, routes are installed in the kernel. Use of this option is equivalent to setting
+the install_routes property to false.
+-P params
+Equivalent to adding the parameter line params to the /etc/gateways file. Can also be set by means of the parame<hy>
+ters property.
+-q
+Opposite of the -s option. This is the default when only one interface is present. With this explicit option, the dae<hy>
+mon is always in "quiet mode" for RIP and does not supply routing information to other computers. Use of this op<hy>
+tion is equivalent to setting the quiet_mode property to true.
+-s
+Force in.routed to supply routing information. This is the default if multiple network interfaces are present on which
+RIP or Router Discovery have not been disabled, and if the /dev/ip ndd variable ip_forwarding is set to 1. Use of
+this option is equivalent to setting the supply_routes property to true.
+<beginning of page>
+-S
+If in.routed is not acting as an internetwork router, instead of entering the whole routing table in the kernel, it enters
+only a default route for each internetwork router. This reduces the memory requirements without losing any routing
+reliability. This option is provided for compatibility with the previous, RIPv1-only in.routed. Use of this option is
+generally discouraged. Use of this option is equivalent to setting the default_routes_only property to true.
+-t
+Runs in the foreground (as with -d) and logs the contents of the packets received (as with -zz). This is for compati<hy>
+bility with prior versions of Solaris and has no SMF equivalent.
+-T tracefile
+Increases the debugging level to at least 1 and causes debugging information to be appended to the trace file. Be<hy>
+cause of security concerns, do not to run in.routed routinely with tracing directed to a file. Use of this option is
+equivalent to setting the log_file property to trace file path.
+-v
+Enables debug. Similar to -z, except, where -z increments trace_level, -v sets trace_level to 1. Also, -v requires the
+-T option. Use of this option is equivalent to setting the debug property to true.
+-V
+Displays the version of the daemon.
+-z
+Increase the debugging level, which causes more information to be logged on the tracefile specified with -T or std<hy>
+out. The debugging level can be increased or decreased with the SIGUSR1 or SIGUSR2 signals or with the rt<hy>
+query(1M) command.
+/etc/defaultrouter If this file is present and contains the address of a default router, the system startup script does
+not run in.routed. See defaultrouter(4).
+/etc/gateways List of distant gateways and general configuration options for in.routed. See gateways(4).
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wroute
+route(1M), routeadm(1M), rtquery(1M), svcadm(1M), ioctl(2), inet(3SOCKET), defaultrouter(4), gateways(4),
+attributes(5), icmp(7P), inet(7P), udp(7P)
+Internet Transport Protocols, XSIS 028112, Xerox System Integration Standard
+Routing Information Protocol, v2 (RFC 2453, STD 0056, November 1998)
+RIP-v2 MD5 Authentication (RFC 2082, January 1997)
+Routing Information Protocol, v1 (RFC 1058, June 1988)
+ICMP Router Discovery Messages (RFC 1256, September 1991)
+In keeping with its intended design, this daemon deviates from RFC 2453 in two notable ways: <bu> By default, in.rout<hy>
+ed does not discard authenticated RIPv2 messages when RIP authentication is not configured. There is little to gain
+<beginning of page>
+from dropping authenticated packets when RIPv1 listeners will gladly process them. Using the -A option causes
+in.routed to conform to the RFC in this case. <bu> Unauthenticated RIP requests are never discarded, even when RIP
+authentication is configured. Forwarding tables are not secret and can be inferred through other means such as test
+traffic. RIP is also the most common router-discovery protocol, and hosts need to send queries that will be answered.
+in.routed does not always detect unidirectional failures in network interfaces, for example, when the output side
+fails.

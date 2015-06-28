@@ -1,0 +1,46 @@
+<beginning of page>
+ddi_umem_lock, ddi_umem_unlock <-> lock and unlock memory pages
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+int ddi_umem_lock(caddr_t addr, size_t len, int flags,
+ ddi_umem_cookie_t *cookiep);
+void ddi_umem_unlock(ddi_umem_cookie_t cookie);
+Solaris DDI specific (Solaris DDI)
+addr Virtual address of memory object
+len Length of memory object in bytes
+flags Valid flags include:
+DDI_UMEMLOCK_READ Memory pages are locked to be read from. (Disk write or a network send.)
+DDI_UMEMLOCK_WRITE Memory pages are locked to be written to. (Disk read or a network receive.)
+cookiep Pointer to a kernel memory cookie.
+cookie Kernel memory cookie allocated by ddi_umem_lock().
+The ddi_umem_lock() function locks down the physical pages (including I/O pages) that correspond to the current
+process' virtual address range [addr, addr + size) and fills in a cookie representing the locked pages. This cookie can
+be used to create a buf(9S) structure that can be used to perform I/O (see ddi_umem_iosetup(9F) and
+ddi_dma_buf_bind_handle(9F), or it can be used with devmap_umem_setup(9F) to export the memory to an ap<hy>
+plication.
+The virtual address and length specified must be at a page boundary and the mapping performed in terms of the sys<hy>
+tem page size. See pagesize(1).
+The flags argument indicates the intended use of the locked memory. Set flags to DDI_UMEMLOCK_READ if the
+memory pages will be read (for example, in a disk write or a network send.) Set flags to DDI_UMEM<hy>
+LOCK_WRITE if the memory pages will be written (for example, in a disk read or a network receive). You must
+choose one (and only one) of these values.
+To unlock the locked pages, the drivers call ddi_umem_unlock(9F) with the cookie obtained from
+ddi_umem_lock().
+The process is not allowed to exec(2) or fork(2) while its physical pages are locked down by the device driver.
+The device driver must ensure that the physical pages have been unlocked after the application has called close(2).
+On success, a 0 is returned. Otherwise, one of the following errno values is returned.
+EFAULT User process has no mapping at that address range or does not support locking
+EACCES User process does not have the required permission.
+ENOMEM The system does not have sufficient resources to lock memory, or locking len memory would exceed a
+limit or resource control on locked memory.
+<beginning of page>
+EAGAIN Could not allocate system resources required to lock the pages. The ddi_umem_lock() could succeed at a
+later time.
+EINVAL Requested memory is not aligned on a system page boundary.
+The ddi_umem_lock() function can only be called from user context; ddi_umem_unlock() from user, kernel, and
+interrupt contexts.
+ddi_umem_iosetup(9F), ddi_dma_buf_bind_handle(9F), devmap_umem_setup(9F), ddi_umem_alloc(9F)
+The ddi_umem_unlock() function consumes physical memory. The driver is responsible for a speedy unlock to free
+up the resources.
+The ddi_umem_unlock() function can defer unlocking of the pages to a later time depending on the implementa<hy>
+tion.

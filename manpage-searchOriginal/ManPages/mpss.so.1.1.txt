@@ -1,0 +1,79 @@
+<beginning of page>
+mpss.so.1 <-> shared object for setting preferred page size
+mpss.so.1
+The mpss.so.1 shared object provides a means by which the preferred stack and/or heap page size can be selectively
+configured for launched processes and their descendants. To enable mpss.so.1, the following string needs to be
+present in the environment (see ld.so.1(1)) along with one or more MPSS (Multiple Page Size Support) environment
+variables:
+ LD_PRELOAD=$LD_PRELOAD:mpss.so.1
+Once preloaded, the mpss.so.1 shared object reads the following environment variables to determine any preferred
+page size requirements and any processes these may be specific to.
+MPSSHEAP=size
+MPSSSTACK=size MPSSHEAP and MPSSSTACK specify the preferred page sizes for the heap and stack, re<hy>
+spectively. The specified page size(s) are applied to all created processes.
+size must be a supported page size (see pagesize(1)) or 0, in which case the system will select an appropriate page
+size (see memcntl(2)).
+size can be qualified with K, M, G, or T to specify Kilobytes, Megabytes, Gigabytes, or Terabytes respectively.
+MPSSCFGFILE=config-file config-file is a text file which contains one or more mpss configuration entries of the
+form:
+ exec-name exec-args:heap-size:stack-size
+exec-name specifies the name of an application or executable. The corresponding preferred page size(s) are set for
+newly created processes (see getexecname(3C)) that match the first exec-name found in the file.
+exec-name can be a full pathname, a base name or a pattern string. See File Name Generation in sh(1) for a discus<hy>
+sion of pattern matching.
+exec-args is an optionally specified pattern string to match against arguments. Preferred page size(s) are set only if
+exec-args is not specified or occurs within the arguments to exec-name.
+If heap-size and/or stack-size are not specified, the corresponding preferred page size(s) will not be set.
+MPSSCFGFILE takes precedence over MPSSHEAP and MPSSSTACK. When MPSSCFGFILE is not set, pre<hy>
+ferred page size settings are taken from file /etc/mpss.conf if it exists.
+MPSSERRFILE=pathname By default, error messages are logged via syslog(3C) using level LOG_ERR and facil<hy>
+ity LOG_USER. If MPSSERRFILE contains a valid pathname (such as /dev/stderr), error messages will be
+logged there instead.
+Example 1 Configuring preferred page sizes using MPSSCFGFILE
+The following Bourne shell commands (see sh(1)) configure the preferred page sizes to a select set of applications
+with exec names that begin with foo, using the MPSSCFGFILE environment variable. The MPSS configuration
+file, mpsscfg, is assumed to have been previously created via a text editor like vi(1). The cat(1) command is only
+dumping out the contents.
+ example$ LD_PRELOAD=$LD_PRELOAD:mpss.so.1
+ example$ MPSSCFGFILE=mpsscfg
+ example$ export LD_PRELOAD MPSSCFGFILE
+ example$ cat $MPSSCFGFILE
+ foo*:512K:64K
+<beginning of page>
+Once the application has been started, pmap (see proc(1)) can be used to view the actual page sizes configured:
+ example$ foobar &
+ example$ pmap -s `pgrep foobar`
+If the desired page size is not configured (shown in the pmap output), it may be due to errors in the MPSS configu<hy>
+ration file or environment variables. Check the error log (by default: /var/adm/messages) for errors.
+If no errors can be found, resource or alignment constraints may be responsible. See the NOTES section.
+Example 2 Configuring preferred page sizes using MPSSHEAP and MPSSSTACK
+The following Bourne shell commands configure 512K heap and 64K stack preferred page sizes for all applications
+using the MPSSHEAP and MPSSSTACK environment variables.
+ example$ LD_PRELOAD=$LD_PRELOAD:mpss.so.1
+ example$ MPSSHEAP=512K
+ example$ MPSSSTACK=64K
+ example$ export LD_PRELOAD MPSSHEAP MPSSSTACK
+Example 3 Precedence rules (continuation from Example 2)
+The preferred page size configuration in MPSSCFGFILE overrides MPSSHEAP and MPSSTACK. Appending the
+following commands to those in Example 2 would mean that all applications will be configured with 512K heap and
+64K stack preferred page sizes with the exception of those applications, the ls command, and all applications begin<hy>
+ning with ora that have ora1 as an argument, in the configuration file.
+ example$ MPSSCFGFILE=mpsscfg2
+ example$ export MPSSCFGFILE
+ example$ cat $MPSSCFGFILE
+ ls::
+ ora* ora1:4m:4m
+/usr/lib/ld/map.bssalign A template link-editor mapfile for aligning bss (see NOTES).
+/etc/mpss.conf Configuration file
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wesu (32-bit) _ SUNWesxu (64-bit) _ Interface StabilityEvolving
+cat(1), ld(1), ld.so.1(1), pagesize(1), ppgsz(1), proc(1), sh(1), vi(1), exec(2), fork(2), memcntl(2), getexec<hy>
+name(3C), getpagesize(3C), syslog(3C), proc(4), attributes(5)
+The heap and stack preferred page sizes are inherited. A child process has the same preferred page sizes as its par<hy>
+ent. On exec(2), the preferred page sizes are set back to the default system page size unless a preferred page size has
+been configured via the mpss shared object.
+ppgsz(1), a proc tool, can also be used to set the preferred stack and/or heap page sizes. It cannot selectively config<hy>
+ure the page size for descendents based on name matches.
+<beginning of page>
+See also NOTES under ppgsz(1).

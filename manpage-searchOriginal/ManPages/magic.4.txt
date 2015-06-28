@@ -1,0 +1,76 @@
+<beginning of page>
+magic <-> file command's magic number file
+/etc/magic
+The file(1) command identifies the type of a file using, among other tests, a test for whether the file begins with a
+certain magic number. The /etc/magic file, or a file specified as an option-argument to the -m or -M options of
+file(1), specifies what magic numbers are to be tested for, what message to print if a particular magic number is
+found, and additional information to extract from the file.
+Each line of the file specifies a position-sensitive test to perform. A test compares the data starting at a particular off<hy>
+set in the file with a 1-byte, 2-byte, 4-byte, or 8-byte numeric value or string. If the test succeeds, a message is print<hy>
+ed. The line consists of the following fields (separated by tabs): offset type value message
+offset A number specifying the offset, in bytes, into the file of the data which is to be tested.
+type The type of the data to be tested. The possible values are:
+byte, d1, dC A one-byte signed value.
+short, d2, dS A 2-byte signed value.
+long, d4, dI, dL, d A 4-byte signed value.
+llong, d8 An 8-byte signed value
+ubyte, u1, uC A one-byte unsigned value.
+ushort, u2, uS A 2-byte unsigned value.
+ulong, u4, uI, uL, u A 4-byte unsigned value.
+ullong, u8 An 8-byte unsigned value.
+string, s A string of bytes.
+All type specifiers, except for string and s, may be followed by a mask specifier of the form &number. If a mask
+specifier is given, the value is AND'ed with the number before any comparisons are done. The number is specified
+in C form. For instance, 13 is decimal, 013 is octal, and 0x13 is hexadecimal.
+value The value to be compared with the value from the file. If the type is numeric, this value is specified in C form.
+If it is a string, it is specified as a C string with the usual escapes permitted (for instance, \n for NEWLINE).
+Numeric values may be preceded by a character indicating the operation to be performed, as follows:
+= The value from the file must equal the specified value.
+< The value from the file must be less than the specified value.
+> The value from the file must be greater than the specified value.
+& All the bits in the specified value must be set in the value from the file.
+<beginning of page>
+^ At least one of the bits in the specified value must not be set in the value from the file.
+x Any value will match.
+If the character is omitted, it is assumed to be "=".
+For comparison of numeric values, the sign and size of both the value in the file and the value from the value field of
+the magic entry will match that of the corresponding type field. If there is a non-zero mask (&) in the type field, the
+comparison will be unsigned.
+For string values, the byte string from the file must match the specified byte string. The byte string from the file
+which is matched is the same length as the specified byte string. If the value is a string, it can contain the following
+sequences:
+\character The backslash-escape sequences \\, \a, \b, \f, \n, \r, \t, \v.
+\octal Octal sequences that can be used to represent characters with specific coded values. An octal sequence con<hy>
+sists of a backslash followed by the longest sequence of one, two, or three octal-digit characters (01234567).
+message The message to be printed if the comparison succeeds. If the string contains a printf(3C) format specifica<hy>
+tion, the value from the file (with any specified masking performed) is printed using the message as the format
+string.
+Some file formats contain additional information which is to be printed along with the file type. A line which begins
+with the character ">" indicates additional tests and messages to be printed. If the test on the line preceding the first
+line with a ">" succeeds, the tests specified in all the subsequent lines beginning with ">" are performed, and the
+messages are printed if the tests succeed. The next line which does not begin with a ">" terminates this.
+/etc/magic
+file(1), file(1B), printf(3C)
+In Solaris 9 and prior releases, the file utility may have performed unsigned comparisons for types byte, short, and
+long. Old user-defined magic files, which were specified with the -m option, will need modification of byte, short,
+and long entries to their corresponding unsigned types (ubyte, ushort, or ulong) for those entries for which all of
+the following are true: <bu> The entry uses the "<" or the ">" operator. <bu> The type field does not contain a non-zero
+mask. <bu> The intention of the entry is to test unsigned values.
+For example, if the following entry is expected to match any non-zero, one-byte value from the file, including values
+for which the sign bit is on:
+ #offset type value message
+ 0 byte >0 this matches any non-zero value
+then that entry should be changed to:
+ 0 ubyte >0 this matches any non-zero value
+In Solaris 7 through Solaris 9, when applying tests for magic file entries whose type field is the numeric type "short"
+or "long", the file utility in the x86 environment would switch the byte order of the numeric values read. Starting in
+Solaris 10, the byte order will not be switched on x86. A test for a numeric value whose byte order is identical in
+both little- and big-endian architectures may require two magic file entries, to ensure that the test correctly identifies
+files in both environments. For example, a magic file entry that will match on a big-endian system may look like
+this:
+<beginning of page>
+ 0 long 0xf00000ff extended accounting file
+Its corresponding magic file entry that will match the same value on a little-endian system would look like this:
+ 0 long 0xff0000f0 extended accounting file
+There should be more than one level of subtests, with the level indicated by the number of `>' at the beginning of the
+line.

@@ -1,0 +1,100 @@
+<beginning of page>
+devmap_access <-> device mapping access entry point
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+int prefixdevmap_access(devmap_cookie_t dhp, void *pvtp,
+ offset_t off, size_t len, uint_t type, uint_t rw);
+Solaris DDI specific (Solaris DDI).
+dhp An opaque mapping handle that the system uses to describe the mapping.
+pvtp Driver private mapping data.
+off User offset within the logical device memory at which the access begins.
+len Length (in bytes) of the memory being accessed.
+type Type of access operation. Possible values are:
+DEVMAP_ACCESS Memory access.
+DEVMAP_LOCK Lock the memory being accessed.
+DEVMAP_UNLOCK Unlock the memory being accessed.
+rw Direction of access. Possible values are:
+DEVMAP_READ Read access attempted.
+DEVMAP_WRITE Write access attempted.
+DEVMAP_EXEC Execution access attempted.
+The devmap_access() entry point is an optional routine. It notifies drivers whenever an access is made to a mapping
+described by dhp that has not been validated or does not have sufficient protection for the access. The system ex<hy>
+pects devmap_access() to call either devmap_do_ctxmgt(9F) or devmap_default_access(9F) to load the memory
+address translations before it returns. For mappings that support context switching, device drivers should call de<hy>
+vmap_do_ctxmgt(9F). For mappings that do not support context switching, the drivers should call devmap_de<hy>
+fault_access(9F).
+In devmap_access(), drivers perform memory access related operations such as context switching, checking the
+availability of the memory object, and locking and unlocking the memory object being accessed. The devmap_ac<hy>
+cess() entry point is set to NULL if no operations need to be performed.
+pvtp is a pointer to the driver's private mapping data that was allocated and initialized in the devmap_map(9E) entry
+point.
+off and len define the range to be affected by the operations in devmap_access(). type defines the type of operation
+that device drivers should perform on the memory object. If type is either DEVMAP_LOCK or DEVMAP_UN<hy>
+LOCK, the length passed to either devmap_do_ctxmgt(9F) or devmap_default_access(9F) must be same as len.
+rw specifies the direction of access on the memory object.
+<beginning of page>
+A non-zero return value from devmap_access() may result in a SIGSEGV or SIGBUS signal being delivered to the
+process.
+devmap_access() returns the following values:
+0 Successful completion.
+Non-zero An error occurred. The return value from devmap_do_ctxmgt(9F) or devmap_default_access(9F)
+should be returned.
+Example 1 devmap_access() entry point
+The following is an example of the devmap_access() entry point. If the mapping supports context switching, de<hy>
+vmap_access() calls devmap_do_ctxmgt(9F). Otherwise, devmap_access() calls devmap_default_access(9F).
+ ...
+ #define OFF_DO_CTXMGT 0x40000000
+ #define OFF_NORMAL 0x40100000
+ #define CTXMGT_SIZE 0x100000
+ #define NORMAL_SIZE 0x100000
+ /*
+  * Driver devmap_contextmgt(9E) callback function.
+  */
+ static int
+ xx_context_mgt(devmap_cookie_t dhp, void *pvtp, offset_t offset,
+  size_t length, uint_t type, uint_t rw)
+ {
+  ......
+  /*
+  * see devmap_contextmgt(9E) for an example
+  */
+ }
+ /*
+  * Driver devmap_access(9E) entry point
+  */
+ static int
+ xxdevmap_access(devmap_cookie_t dhp, void *pvtp, offset_t off,
+  size_t len, uint_t type, uint_t rw)
+ {
+  offset_t diff;
+  int err;
+  /*
+  * check if off is within the range that supports
+  * context management.
+  */
+  if ((diff = off - OFF_DO_CTXMG) >= 0 && diff < CTXMGT_SIZE) {
+  /*
+  * calculates the length for context switching
+  */
+  if ((len + off) > (OFF_DO_CTXMGT + CTXMGT_SIZE))
+  return (-1);
+  /*
+  * perform context switching
+  */
+  err = devmap_do_ctxmgt(dhp, pvtp, off, len, type,
+  rw, xx_context_mgt);
+  /*
+  * check if off is within the range that does normal
+  * memory mapping.
+  */
+<beginning of page>
+  } else if ((diff = off - OFF_NORMAL) >= 0 && diff < NORMAL_SIZE) {
+  if ((len + off) > (OFF_NORMAL + NORMAL_SIZE))
+  return (-1);
+  err = devmap_default_access(dhp, pvtp, off, len, type, rw);
+  } else
+  return (-1);
+  return (err);
+ }
+devmap_map(9E), devmap_default_access(9F), devmap_do_ctxmgt(9F), devmap_callback_ctl(9S)
+Writing Device Drivers

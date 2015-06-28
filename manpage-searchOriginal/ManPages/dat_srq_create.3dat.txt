@@ -1,0 +1,65 @@
+<beginning of page>
+dat_srq_create <-> create an instance of a shared receive queue
+cc [ flag... ] file... -ldat [ library... ]
+#include <dat/udat.h>
+DAT_RETURN
+ dat_srq_create (
+ IN DAT_IA_HANDLE ia_handle,
+ IN DAT_PZ_HANDLE pz_handle,
+ IN DAT_SRQ_ATTR *srq_attr,
+ OUT DAT_SRQ_HANDLE *srq_handle
+ )
+ia_handle A handle for an open instance of the IA to which the created SRQ belongs.
+pz_handle A handle for an instance of the Protection Zone.
+srq_attr A pointer to a structure that contains Consumer-requested SRQ attributes.
+srq_handle A handle for the created instance of a Shared Receive Queue.
+The dat_srq_create() function creates an instance of a Shared Receive Queue (SRQ) that is provided to the Con<hy>
+sumer as srq_handle. If the value of DAT_RETURN is not DAT_SUCCESS, the value of srq_handle is not defined.
+The created SRQ is unattached to any Endpoints.
+The Protection Zone pz_handle allows Consumers to control what local memory can be used for the Recv DTO buf<hy>
+fers posted to the SRQ. Only memory referred to by LMRs of the posted Recv buffers that match the SRQ Protec<hy>
+tion Zone can be accessed by the SRQ.
+The srq_attributes argument specifies the initial attributes of the created SRQ. If the operation is successful, the cre<hy>
+ated SRQ will have the queue size at least max_recv_dtos and the number of entries on the posted Recv scatter list of
+at lease max_recv_iov. The created SRQ can have the queue size and support number of entries on post Recv buffers
+larger than requested. Consumer can query SRQ to find out the actual supported queue size and maximum Recv
+IOV.
+The Consumer must set low_watermark to DAT_SRQ_LW_DEFAULT to ensure that an asynchronous event will
+not be generated immediately, since there are no buffers in the created SRQ. The Consumer should set the Maximum
+Receive DTO attribute and the Maximum number of elements in IOV for posted buffers as needed.
+When an associated EP tries to get a buffer from SRQ and there are no buffers available, the behavior of the EP is
+the same as when there are no buffers on the EP Recv Work Queue.
+DAT_SUCCESS The operation was successful.
+DAT_INSUFFICIENT_RESOURCES The operation failed due to resource limitations.
+DAT_INVALID_HANDLE Either ia_handle or pz_handle is an invalid DAT handle.
+DAT_INVALID_PARAMETER One of the parameters is invalid. Either one of the requested SRQ attributes was
+invalid or a combination of attributes is invalid.
+DAT_MODEL_NOT_SUPPORTED The requested Model was not supported by the Provider.
+SRQ is created by the Consumer prior to creation of the EPs that will be using it. Some Providers might restrict
+whether multiple EPs that share a SRQ can have different Protection Zones. Check the srq_ep_pz_difference_sup<hy>
+port Provider attribute. The EPs that use SRQ might or might not use the same recv_evd.
+<beginning of page>
+Since a Recv buffer of SRQ can be used by any EP that is using SRQ, the Consumer should ensure that the posted
+Recv buffers are large enough to receive an incoming message on any of the EPs.
+If Consumers do not want to receive an asynchronous event when the number of buffers in SRQ falls below the Low
+Watermark, they should leave its value as DAT_SRQ_LW_DEFAULT. If Consumers do want to receive a notifica<hy>
+tion, they can set the value to the desired one by calling dat_srq_set_lw(3DAT).
+SRQ allows the Consumer to use fewer Recv buffers then posting the maximum number of buffers for each connec<hy>
+tion. If the Consumer can upper bound the number of incoming messages over all connections whose local EP is us<hy>
+ing SRQ, then instead of posting this maximum for each connection the Consumer can post them for all connections
+on SRQ. For example, the maximum utilized link bandwidth divided over the message size can be used for an upper
+bound.
+Depending on the underlying Transport, one or more messages can arrive simultaneously on an EP that is using
+SRQ. Thus, the same EP can have multiple Recv buffers in its possession without these buffers being on SRQ or
+recv_evd.
+Since Recv buffers can be used by multiple connections of the local EPs that are using SRQ, the completion order of
+the Recv buffers is no longer guaranteed even when they use of the same recv_evd. For each connection the Recv
+buffers completion order is guaranteed to be in the order of the posted matching Sends to the other end of the con<hy>
+nection. There is no ordering guarantee that Receive buffers will be returned in the order they were posted even if
+there is only a single connection (Endpoint) associated with the SRQ. There is no ordering guarantee between differ<hy>
+ent connections or between different recv_evds.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Standard: uDAPL, 1.2 _ MT-LevelSafe
+dat_srq_free(3DAT), dat_srq_post_recv(3DAT), dat_srq_query(3DAT), dat_srq_resize(3DAT),
+dat_srq_set_lw(3DAT), libdat(3LIB), attributes(5)

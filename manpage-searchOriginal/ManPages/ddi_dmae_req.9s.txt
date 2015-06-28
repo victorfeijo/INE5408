@@ -1,0 +1,85 @@
+<beginning of page>
+ddi_dmae_req <-> DMA engine request structure
+#include <sys/dma_engine.h>
+Solaris x86 DDI specific (Solaris x86 DDI).
+A device driver uses the ddi_dmae_req structure to describe the parameters for a DMA channel. This structure con<hy>
+tains all the information necessary to set up the channel, except for the DMA memory address and transfer count.
+The defaults, as specified below, support most standard devices. Other modes might be desirable for some devices,
+or to increase performance. The DMA engine request structure is passed to ddi_dmae_prog(9F).
+The ddi_dmae_req structure contains several members, each of which controls some aspect of DMA engine opera<hy>
+tion. The structure members associated with supported DMA engine options are described here.
+ uchar_tder_command; /* Read / Write *
+ /uchar_tder_bufprocess; /* Standard / Chain */
+ uchar_tder_path; /* 8 / 16 / 32 */
+ uchar_tder_cycles; /* Compat / Type A / Type B / Burst */
+ uchar_tder_trans; /* Single / Demand / Block */
+ ddi_dma_cookie_t*(*proc)(); /* address of nextcookie routine */
+ void*procparms; /* parameter for nextcookie call */
+der_command Specifies what DMA operation is to be performed. The value DMAE_CMD_WRITE signifies that
+data is to be transferred from memory to the I/O device. The value DMAE_CMD_READ signifies that data is to be
+transferred from the I/O device to memory. This field must be set by the driver before calling ddi_dmae_prog().
+der_bufprocess On some bus types, a driver can set der_bufprocess to the value DMAE_BUF_CHAIN to specify
+that multiple DMA cookies will be given to the DMA engine for a single I/O transfer. This action causes a scat<hy>
+ter/gather operation. In this mode of operation, the driver calls ddi_dmae_prog() to give the DMA engine the DMA
+engine request structure and a pointer to the first cookie. The proc structure member must be set to the address of a
+driver nextcookie routine. This routine takes one argument, specified by the procparms structure member, and re<hy>
+turns a pointer to a structure of type ddi_dma_cookie_t that specifies the next cookie for the I/O transfer. When the
+DMA engine is ready to receive an additional cookie, the bus nexus driver controlling that DMA engine calls the
+routine specified by the proc structure member to obtain the next cookie from the driver. The driver's nextcookie
+routine must then return the address of the next cookie (in static storage) to the bus nexus routine that called it. If
+there are no more segments in the current DMA window, then (*proc)() must return the NULL pointer.
+A driver can specify the DMAE_BUF_CHAIN flag only if the particular bus architecture supports the use of multi<hy>
+ple DMA cookies in a single I/O transfer. A bus DMA engine can support this feature either with a fixed-length
+scatter/gather list, or by an interrupt chaining feature. A driver must determine whether its parent bus nexus supports
+this feature by examining the scatter/gather list size returned in the dlim_sgllen member of the DMA limit structure
+returned by the driver's call to ddi_dmae_getlim(). (See ddi_dma_lim_x86(9S).) If the size of the scatter/gather list
+is 1, then no chaining is available. The driver must not specify the DMAE_BUF_CHAIN flag in the ddi_dmae_req
+structure it passes to ddi_dmae_prog(), and the driver need not provide a nextcookie routine.
+If the size of the scatter/gather list is greater than 1, then DMA chaining is available, and the driver has two options.
+Under the first option, the driver chooses not to use the chaining feature. In this case (a) the driver must set the size
+of the scatter/gather list to 1 before passing it to the DMA setup routine, and (b) the driver must not set the
+DMAE_BUF_CHAIN flag.
+Under the second option, the driver chooses to use the chaining feature, in which case, (a) it should leave the size of
+the scatter/gather list alone, and (b) it must set the DMAE_BUF_CHAIN flag in the ddi_dmae_req structure. Be<hy>
+fore calling ddi_dmae_prog(), the driver must prefetch cookies by repeatedly calling ddi_dma_nextseg(9F) and
+ddi_dma_segtocookie(9F) until either (1) the end of the DMA window is reached (ddi_dma_nextseg(9F) returns
+NULL), or (2) the size of the scatter/gather list is reached, whichever occurs first. These cookies must be saved by
+the driver until they are requested by the nexus driver calling the driver's nextcookie routine. The driver's nextcook<hy>
+ie routine must return the prefetched cookies in order, one cookie for each call to the nextcookie routine, until the
+list of prefetched cookies is exhausted. After the end of the list of cookies is reached, the nextcookie routine must
+return the NULL pointer.
+The size of the scatter/gather list determines how many discontiguous segments of physical memory can participate
+in a single DMA transfer. ISA bus DMA engines have no scatter/gather capability, so their scatter/gather list sizes
+are 1. Other finite scatter/gather list sizes would also be possible. For performance reasons, drivers should use the
+chaining capability if it is available on their parent bus.
+<beginning of page>
+As described above, a driver making use of DMA chaining must prefetch DMA cookies before calling
+ddi_dmae_prog(). The reasons for this are: <bu> First, the driver must have some way to know the total I/O count with
+which to program the I/O device. This I/O count must match the total size of all the DMA segments that will be
+chained together into one DMA operation. Depending on the size of the scatter/gather list and the memory position
+and alignment of the DMA object, all or just part of the current DMA window might be able to participate in a sin<hy>
+gle I/O operation. The driver must compute the I/O count by adding up the sizes of the prefetched DMA cookies.
+The number of cookies whose sizes are to be summed is the lesser of (a) the size of the scatter/gather list, or (b) the
+number of segments remaining in the window. <bu> Second, on some bus architectures, the driver's nextcookie routine
+can be called from a high-level interrupt routine. If the cookies were not prefetched, the nextcookie routine would
+have to call ddi_dma_nextseg() and ddi_dma_segtocookie() from a high-level interrupt routine, which is not rec<hy>
+ommended. When breaking a DMA window into segments, the system arranges for the end of every segment whose
+number is an integral multiple of the scatter/gather list size to fall on a device-granularity boundary, as specified in
+the dlim_granular field in the ddi_dma_lim_x86(9S) structure.
+If the scatter/gather list size is 1 (either because no chaining is available or because the driver does not want to use
+the chaining feature), then the total I/O count for a single DMA operation is the size of DMA segment denoted by
+the single DMA cookie that is passed in the call to ddi_dmae_prog(). In this case, the system arranges for each
+DMA segment to be a multiple of the device-granularity size.
+der_path Specifies the DMA transfer size. The default of zero (DMAE_PATH_DEF) specifies ISA compatibility
+mode. In that mode, channels 0, 1, 2, and 3 are programmed in 8-bit mode (DMAE_PATH_8), and channels 5, 6,
+and 7 are programmed in 16-bit, count-by-word mode (DMAE_PATH_16).
+der_cycles Specifies the timing mode to be used during DMA data transfers. The default of zero (DMAE_CY<hy>
+CLES_1) specifies ISA compatible timing. Drivers using this mode must also specify DMAE_TRANS_SNGL in
+the der_trans structure member.
+der_trans Specifies the bus transfer mode that the DMA engine should expect from the device. The default value of
+zero (DMAE_TRANS_SNGL) specifies that the device performs one transfer for each bus arbitration cycle. De<hy>
+vices that use ISA compatible timing (specified by a value of zero, which is the default, in the der_cycles structure
+member) should use the DMAE_TRANS_SNGL mode.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Architecturex86
+isa(4), attributes(5), ddi_dma_segtocookie(9F), ddi_dmae(9F), ddi_dma_lim_x86(9S), ddi_dma_req(9S)

@@ -1,0 +1,66 @@
+<beginning of page>
+mlib_ImageColorDitherInit <-> initialization for image dithering
+cc [ flag... ] file... -lmlib [ library... ]
+#include <mlib.h>
+mlib_status mlib_ImageColorDitherInit(void **colormap, const mlib_s32 *dimensions,
+ mlib_type intype, mlib_type outtype, mlib_s32 channels, mlib_s32 entries,
+ mlib_s32 offset, void **lut);
+The mlib_ImageColorDitherInit() function creates an internal data structure, colormap, which can be used by one
+of the following functions for image dithering:
+ mlib_ImageColorErrorDiffusion3x3
+ mlib_ImageColorErrorDiffusionMxN
+ mlib_ImageColorOrderedDither8x8
+ mlib_ImageColorOrderedDitherMxN
+The lut might have either 1 or 3 channels. The type of the lut can be one of the following:
+ MLIB_BYTE in, MLIB_BYTE out (i.e., BYTE-to-BYTE)
+ MLIB_BIT in, MLIB_BYTE out (i.e., BIT-to-BYTE)
+If dimensions == NULL, then no colorcube will be created. In this case, the user-provided lookup table, lut, will be
+used for dithering.
+If dimensions != NULL, then a colorcube is created from scratch in a way shown in the following example.
+To dither an RGB image of type MLIB_BYTE to a color-indexed image of type MLIB_BYTE, we can use the fol<hy>
+lowing parameters:
+ mlib_s32 dimensions[] = {2, 3, 4};
+ mlib_type intype = MLIB_BYTE;
+ mlib_type outtype = MLIB_BYTE;
+ mlib_s32 channels = 3;
+ mlib_s32 offset = 6;
+These values would lead to the creation of a colorcube that would dither red values in the source image to one of 2
+red levels, green values to one of 3 green levels, and blue values to one of 4 blue levels. You could picture this col<hy>
+orcube as a cube with dimensions of 2, 3, and 4. The index values assigned to the elements in that cube can be de<hy>
+scribed by the following lookup table:
+tab(); cw(1.38i) |cw(1.38i) |cw(1.38i) |cw(1.38i) lw(1.38i) |lw(1.38i) |lw(1.38i) |lw(1.38i) IndexesRed ValuesGreen
+ValuesBlue Values _ 0 _ ... _ 5 _ 6000 _ 725500 _ 801280 _ 92551280 _ 1002550 _ 112552550 _ 120085 _
+13255085 _ 14012885 _ 1525512885 _ 16025585 _ 1725525585 _ 1800170 _ 192550170 _ 200128170 _
+21255128170 _ 220255170 _ 23255255170 _ 2400255 _ 252550255 _ 260128255 _ 27255128255 _ 280255255 _
+29255255255 _ ...
+The distance between level changes in each channel of the lookup table is determined by the following formulas:
+ multipliers[0] = signof(dimensions[0])*1;
+ multipliers[i] = signof(dimensions[i])*
+  abs(multipliers[i-1]*dimension[i-1]);
+A negative dimensions[i], so as to a negative multipliers[i], indicates that the values in a color ramp for channel i
+should appear in decreasing as opposed to increasing order.
+For each channel i, the values of the levels are determined by the following formulas:
+ double delta = (dataMax - dataMin)/(abs(dimensions[i]) - 1);
+<beginning of page>
+ int levels[j] = (int)(j*delta + 0.5);
+where dataMax and dataMin are the maximum and minimum values, respectively, for data type intype.
+Whenever a colorcube is created, if lut != NULL, the lookup table will be filled according to the colorcube and sup<hy>
+plied parameters like offset. For the example shown above, the lookup table will start from line 6. In this case, it is
+the user's responsibility to allocate memory for the lookup table.
+The function takes the following arguments:
+colormap Internal data structure for image dithering.
+dimensions
+ Dimensions of the colorcube in the colormap structure.
+intype Data type of the source image and the lookup table.
+outtype Data type of the destination indexed image.
+channels Number of channels of the lookup table and source image.
+entries Number of entries of the lookup table.
+offset Index offset of the lookup table.
+lut Lookup table.
+The function returns MLIB_SUCCESS if successful. Otherwise it returns MLIB_FAILURE.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed _ MT-LevelMT-Safe
+mlib_ImageColorDitherFree(3MLIB), mlib_ImageColorErrorDiffusion3x3(3MLIB), mlib_ImageColor<hy>
+ErrorDiffusionMxN(3MLIB), mlib_ImageColorOrderedDither8x8(3MLIB), mlib_ImageColorOrderedDither<hy>
+MxN(3MLIB), attributes(5)

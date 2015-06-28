@@ -1,0 +1,104 @@
+<beginning of page>
+scsi_ifgetcap, scsi_ifsetcap <-> get/set SCSI transport capability
+#include <sys/scsi/scsi.h>
+int scsi_ifgetcap(struct scsi_address *ap, char *cap, int whom);
+int scsi_ifsetcap(struct scsi_address *ap, char *cap, int value,
+ int whom);
+Solaris DDI specific (Solaris DDI).
+ap Pointer to the scsi_address structure.
+cap Pointer to the string capability identifier.
+value Defines the new state of the capability.
+whom Determines if all targets or only the specified target is affected.
+The scsi_ifsetcap() function is used by target drivers to set the capabilities of the host adapter driver. The cap pointer
+is a name-value pair identified by a null-terminated character string and the integer value of the cap. The current val<hy>
+ue of the capability can be retrieved with the scsi_ifgetcap() function. If the whom value is 0, all target drivers are
+affected. Otherwise, the scsi_address structure pointed to by ap is the only target that is affected.
+The driver should confirm that scsi_ifsetcap() and scsi_ifsetcap() functions are called with a cap that points to a ca<hy>
+pability which is supported by the device.
+The following capabilities have been defined:
+dma-max Maximum dma transfer size that is supported by the host adapter.
+dma-max-arch Maximum dma transfer size that is supported by system. Takes the host adapter and system archi<hy>
+tecture into account. This is useful for target drivers which do not support partial DMAs on systems which do not
+have an IOMMU. In this case, the DMA can also be limited by the host adapters "scatter/gather" list constraints.
+The "dma-max-arch" capability can not be set. It is implemented with this command and does not rely on a
+tran_getcap(9E) response from the HBA.
+msg-out Message out capability that is supported by the host adapter: 0 disables, 1 enables.
+disconnect Disconnect capability that is supported by the host adapter: 0 disables, 1 enables.
+synchronous Synchronous data transfer capability that is supported by the host adapter: 0 disables, 1 enables.
+wide-xfer Wide transfer capability that is supported by the host adapter: 0 disables, 1 enables.
+parity Parity checking capability that is supported by host adapter: 0 disables, 1 enables.
+initiator-id Host bus address that is returned.
+untagged-qing Host adapter capability that supports internal queueing of commands without tagged queueing: 0
+disables, 1 enables.
+<beginning of page>
+tagged-qing Host adapter capability that supports queuing: 0 disables, 1 enables.
+auto-rqsense Host adapter capability that supports auto request sense on check conditions: 0 disables, 1 enables.
+sector-size Capability that is set by the target driver to inform the HBA of the granularity, in bytes, of the DMA
+breakup. The HBA DMA limit structure is set to reflect the byte total of this setting. See ddi_dma_lim_sparc(9S)
+or ddi_dma_lim_x86(9S). The sector-size should be set to the size of the physical disk sector. The capability de<hy>
+faults to 512 bytes.
+total-sectors Capability that is set by the target driver to inform the HBA of the total number of sectors on the de<hy>
+vice returned by the SCSI get capacity command. This capability must be set before the target driver ``gets'' the ge<hy>
+ometry capability.
+geometry Capability that returns the HBA geometry of a target disk. The target driver sets the total-sectors capabil<hy>
+ity before ``getting'' the geometry capability. The geometry is returned as a 32-bit value. The upper 16 bits represent
+the number of heads per cylinder. The lower 16 bits represent the number of sectors per track. The geometry capabil<hy>
+ity cannot be ``set''.
+If geometry is not relevant or appropriate for the target disk, scsi_ifgetcap() can return -1 to indicate that the geome<hy>
+try is not defined. For example, if the HBA BIOS supports Logical Block Addressing for the target disk, scsi_ifget<hy>
+cap() returns -1. Attempts to retreive the "virtual geometry" from the target driver, such as the DKIOCG_VIRTGE<hy>
+OM ioctl, will fail. See dkio(7I) for more information about DKIOCG_VIRTGEOM.
+reset-notification Host adapter capability that supports bus reset notification: 0 disables, 1 enables. See scsi_re<hy>
+set_notify(9F).
+linked-cmds Host adapter capability that supports linked commands: 0 disables, 1 enables.
+qfull-retries Capability that enables or disables QUEUE FULL handling. If 0, the HBA will not retry a command
+when a QUEUE FULL status is returned. If the value is greater than 0, the HBA driver retries the command a speci<hy>
+fied number of times at an interval determined by the qfull-retry-interval. The range for qfull-retries is 0-255.
+qfull-retry-interval Capability that sets the retry interval in milliseconds (ms) for commands completed with a
+QUEUE FULL status. The range for qfull-retry-intervals is 0-1000 ms.
+lun-reset Capability that is created with a value of zero by HBA drivers that support the RESET_LUN flag in the
+tran_reset(9E) function. If it exists, the lun-reset value can be set to 1 by target drivers to allow the use of LOGI<hy>
+CAL UNIT RESET on a specific target instance. If lun-reset does not exist or has a value of zero, scsi_reset(9F) is
+prevented from passing the RESET_LUN flag to tran_reset() function of the HBA driver. If lun-reset exists and
+has a value of 1, the tran_reset() function of the HBA driver can be called with the RESET_LUN flag.
+interconnect-type Capability held in the tran_interconnect_type element of struct scsi_hba_tran that indicates the
+HBA transport interconnect type . The integer value of the interconnect type of the transport is defined in the ser<hy>
+vices.h header file.
+max-cdb-length Host adapter capability of the maximum supported CDB (Command Descriptor Block) length. The
+target driver asks for the capability at attach time. If the HBA driver supports the capability, the maximum length of
+the CDB is returned in bytes. The target driver can then use that value to determine which CDB is used for the
+HBA.
+If the HBA driver does not support the max-cdb-length capability, the default value of the target driver is used for
+the CDB determination.
+<beginning of page>
+The scsi_ifsetcap() function returns:
+1 If the capability was successfully set to the new value.
+0 If the capability is not variable.
+<mi>1 If the capability was not defined, or setting the capability to a new value failed.
+The scsi_ifgetcap() function returns the current value of a capability, or:
+<mi>1 If the capability was not defined.
+Example 1 Using scsi_ifgetcap()
+ if (scsi_ifgetcap(&sd->sd_address, "auto-rqsense", 1) == 1) {
+  un->un_arq_enabled = 1;
+ } else {
+  un->un_arq_enabled =
+  ((scsi_ifsetcap(&sd->sd_address, "auto-rqsense", 1, 1) == 1) ?
+  1 : 0);
+ }
+ if (scsi_ifsetcap(&devp->sd_address, "tagged-qing", 1, 1) == 1) {
+   un->un_dp->options |= SD_QUEUEING;
+   un->un_throttle = MAX_THROTTLE;
+ } else if (scsi_ifgetcap(&devp->sd_address, "untagged-qing", 0) == 1) {
+   un->un_dp->options |= SD_QUEUEING;
+   un->un_throttle = 3;
+ } else {
+   un->un_dp->options &= ~SD_QUEUEING;
+   un->un_throttle = 1;
+ }
+These functions can be called from user, interrupt, or kernel context.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed
+tran_reset(9E), scsi_hba_lookup_capstr(9F), scsi_reset(9F), scsi_reset_notify(9F), ddi_dma_lim_sparc(9S),
+ddi_dma_lim_x86(9S), scsi_address(9S), scsi_arq_status(9S)
+Writing Device Drivers

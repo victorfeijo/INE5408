@@ -1,0 +1,474 @@
+<beginning of page>
+st <-> driver for SCSI tape devices
+st@target,lun:l,m,h,c,ubn
+The st device driver provides a standard interface to various SCSI tape devices. See mtio(7I) for details.
+To determine if the st device driver supports your tape device, SPARC users should enter the following on a com<hy>
+mand line:
+ % strings /kernel/drv/sparcv9/st | grep -i <tape device name>
+x86 users can do the following to determine if the st device driver supports a particular tape device:
+ % strings /kernel/drv/st | grep -i <tape device name>
+The driver can be opened with either rewind on close or no rewind on close options. It can also be opened with the
+O_NDELAY (see open(2)) option when there is no tape inserted in the drive. A maximum of four tape formats per
+device are supported (see FILES below). The tape format is specified using the device name. (Tape format is also
+referred to as tape density).
+Following are a list of SCSI commands that can be executed while another host reserves the tape drive. The com<hy>
+mands are:
+ SCMD_TEST_UNIT_READY
+ SCMD_REQUEST_SENSE
+ SCMD_READ_BLKLIM
+ SCMD_INQUIRY
+ SCMD_RESERVE
+ SCMD_RELEASE
+ SCMD_DOORLOCK
+ SCMD_REPORT_DENSITIES
+ SCMD_LOG_SENSE_G1
+ SCMD_PERSISTENT_RESERVE_IN
+ SCMD_PERSISTENT_RESERVE_OUT
+ SCMD_REPORT_LUNS
+In multi-initiator environments, the driver will not reserve the tape drive if above commands are issued. For other
+SCSI commands, the driver reserves the tape drive and releases the drive at close if it has been reserved. Refer to the
+MTIOCRESERVE and MTIOCRELEASE ioctls in mtio(7I) for information about how to allow a tape drive to re<hy>
+main reserved upon close. See the flag options below for information about disabling this feature.
+If a SCSI-3 persistent reservation is done through the driver, the driver disables all existing SCSI-2 reservations.
+If the tape drive is opened in O_NDELAY mode, no reservation occurs during the open, as per the POSIX standard
+(see standards(5)). However, if a command not found in the above list is used, a reservation will occur to provide
+reserve/release functionality before the command is issued.
+The st driver now supports persistent errors (see mtio(7I) and asynchronous tape operations (see mtio(7I), aiore<hy>
+ad(3C), and aiowrite(3C)).
+If the driver is opened for reading in a different format than the tape is written in, the driver overrides the user-select<hy>
+ed format. For example, if a 1/4" cartridge tape is written in QIC-24 format and opened for reading in QIC-150, the
+driver detects a read failure on the first read and automatically switches to QIC-24 to read the data.
+Note that if the low density format is used, no indication is given that the driver has overridden the format you se<hy>
+lected. Other formats issue a warning message to inform you of an overridden format selection. Some devices auto<hy>
+matically perform this function and do not require driver support (1/2" reel tape drive, for example).
+Writing from the beginning of tape is performed in the user-specified format. The original tape format is used for ap<hy>
+pending onto previously written tapes.
+The st driver has a built-in configuration table for most Sun-supported tape drives. For those tape drives that are not
+in the table, the st driver tries to read the configuration from the tape drive through optional SCSI-3 commands. To
+<beginning of page>
+support the addition of third party tape devices which are not in the built-in configuration table or not able to report
+their configuration, device information can be supplied in st.conf as global properties that apply to each node, or as
+properties that are applicable to one node only. By supplying the information in st.conf, the built-in configuration is
+overridden and the st driver will not query the configuration from tape drives. The st driver looks for the property
+called tape-config-list. The value of this property is a list of triplets, where each triplet consists of three strings.
+The formal syntax is:
+ tape-config-list = <triplet> [, <triplet> *];
+where  
+ <triplet> := <vid+pid>, <pretty print>, <data-property-name>
+and  
+ <data-property-name> = <version>, <type>, <bsize>,
+  <options>, <number of densities>,
+  <density> [, <density>*], <default-density>;
+or
+ <data-property-name> = <version 2>, <type>, <bsize>,
+   <options>, <number of densities>,
+   <density> [, <density>*], <default-density>,
+   <non-motion time-out>, <I/O time-out>,
+   <rewind time-out>, <space time-out>,
+   <load time-out>, <unload time-out>,
+   <erase time-out>;   
+A semicolon (;) is used to terminate a prototype devinfo node specification. Individual elements listed within the
+specification should not be separated by a semicolon. (Refer to driver.conf(4) for more information.)
+<vid+pid> is the string that is returned by the tape device on a SCSI inquiry command. This string may contain any
+character in the range 0x20-0x7e. Characters such as " " " (double quote) or " ' " (single quote), which are not per<hy>
+mitted in property value strings, are represented by their octal equivalent (for example,  42 and  47). Trailing spaces
+may be truncated.
+<pretty print> is used to report the device on the console. This string may have zero length, in which case the
+<vid+pid> will be used to report the device.
+<data-property-name> is the name of the property which contains all the tape configuration values (such as
+<type>, <bsize>, etc.) corresponding for the tape drive for the specified <vid+pid>.
+<version> is a version number and should be 1 or 2. In the future, higher version numbers may be used to allow for
+changes in the syntax of the <data-property-name> value list.
+<type> is a type field. Valid types are defined in /usr/include/sys/mtio.h. For third party tape configuration, the fol<hy>
+lowing generic types are recommended:
+tab(); lw(2.75i) lw(2.75i) lw(2.75i) lw(2.75i) MT_ISQIC0x32 MT_ISREEL0x33 MT_ISDAT0x34
+MT_IS8MM0x35 MT_ISOTHER0x36 MT_ISTAND25G0x37 MT_ISDLT0x38 MT_ISSTK98400x39 MT_IS<hy>
+BMDLT10x3A MT_LTO0x3B
+<beginning of page>
+<bsize> is the preferred block size of the tape device. The value should be 0 for variable block size devices.
+<options> is a bit pattern representing the devices, as defined in /usr/include/sys/scsi/targets/stdef.h. Valid flags for
+tape configuration are shown in the following table. Note that this table does not list flags that are non-configurable
+in st.conf (including ST_KNOWS_MEDIA which uses the media type reported from the mode select data to select
+the correct density code).
+tab(); lw(2.75i) lw(2.75i) lw(2.75i) lw(2.75i) ST_VARIABLE0x0001 ST_QIC0x0002 ST_REEL0x0004
+ST_BSF0x0008 ST_BSR0x0010 ST_LONG_ERASE0x0020 ST_AUTODEN_OVERRIDE0x0040
+ST_NOBUF0x0080 ST_KNOWS_EOD0x0200 ST_UNLOADABLE0x0400 ST_SOFT_ERROR_REPORT<hy>
+ING0x0800 ST_LONG_TIMEOUTS0x1000 ST_NO_RECSIZE_LIMIT0x8000
+ST_MODE_SEL_COMP0x10000 ST_NO_RESERVE_RELEASE0x20000 ST_READ_IGNORE_ILI0x40000
+ST_READ_IGNORE_EOFS0x80000 ST_SHORT_FILEMARKS0x100000 ST_EJECT_TAPE_ON_CHANG<hy>
+ER_FAILURE0x200000 ST_RETRY_ON_RECOVERED_DEFERRED_ERROR0x400000
+ST_WORMABLE0x1000000
+ST_VARIABLE
+The flag indicates the tape device supports variable length record sizes.
+ST_QIC
+The flag indicates a Quarter Inch Cartridge (QIC) tape device.
+ST_REEL
+The flag indicates a 1/2<mi>inch reel tape device.
+ST_BSF
+If flag is set, the device supports backspace over EOF marks (bsf - see mt(1)).
+ST_BSR
+If flag is set, the tape device supports the backspace record operation (bsr - see mt(1)). If the device does not support
+bsr, the st driver emulates the action by rewinding the tape and using the forward space record (fsf) operation to for<hy>
+ward the tape to the correct file. The driver then uses forward space record (fsr - see mt(1)) to forward the tape to the
+correct record.
+ST_LONG_ERASE
+The flag indicates the tape device needs a longer time than normal to erase.
+ST_AUTODEN_OVERRIDE
+The auto-density override flag. The device is capable of determining the tape density automatically without issuing a
+"mode-select"/"mode-sense command."
+ST_NOBUF
+The flag disables the device's ability to perform buffered writes. A buffered write occurs when the device acknowl<hy>
+edges the completion of a write request after the data has been written to the device's buffer, but before all of the da<hy>
+ta has been written to the tape.
+ST_KNOWS_EOD
+If flag is set, the device can determine when EOD (End of Data) has been reached. When this flag is set, the st driver
+<beginning of page>
+uses fast file skipping. Otherwise, file skipping happens one file at a time.
+ST_UNLOADABLE
+The flag indicates the device will not complain if the st driver is unloaded and loaded again (see modload(1M) and
+modunload(1M)). That is, the driver will return the correct inquiry string.
+ST_SOFT_ERROR_REPORTING
+The flag indicates the tape device will perform a "request sense" or "log sense" command when the device is closed.
+Currently, only Exabyte and DAT drives support this feature.
+ST_LONG_TIMEOUTS
+The flag indicates the tape device requires timeouts that are five times longer than usual for normal operation.
+ST_NO_RECSIZE_LIMIT
+The flag applies to variable-length tape devices. If this flag is set, the record size is not limited to a 64 Kbyte record
+size. The record size is only limited by the smaller of either the record size supported by the device or the maximum
+DMA transfer size of the system. (Refer to Large Record Sizes and WARNINGS.) The maximum block size that
+will not be broken into smaller blocks can be determined from the mt_bf returned from the MTIOCGET ioctl(). This
+number is the lesser of the upper block limit returned by the drive from READ BLOCK LIMITS command and the
+dma-max property set by the Host Bus Adapter (HBA) to which the drive is attached.
+ST_MODE_SEL_COMP
+If the ST_MODE_SEL_COMP flag is set, the driver determines which of the two mode pages the device supports
+for selecting or deselecting compression. It first tries the Data Compression mode page (0x0F); if this fails, it tries
+the Device Configuration mode page (0x10). Some devices, however, may need a specific density code for selecting
+or deselecting compression. Please refer to the device specific SCSI manual. When the flag is set, compression is en<hy>
+abled only if the "c" or "u" device is used. Note that when the lower 2 densities of a drive are identically configured
+and the upper 2 densities are identically configured, but the lower and upper differ from each other and
+ST_MODE_SEL_COMP is set, the "m" node sets compression on for the lower density code (for example, 0x42)
+and the "c" and "u" nodes set compression on for the higher density (for example, 0x43). For any other device densi<hy>
+ties, compression is disabled.
+ST_NO_RESERVE_RELEASE
+The ST_NO_RESERVE_RELEASE flag disables the use of reserve on open and release on close. If an attempt to
+use a ioctl of MTRESERVE or MTRELEASE on a drive with this flag set, it will return an error of ENOTTY (in<hy>
+appropriate ioctl for device).
+ST_READ_IGNORE_ILI
+The ST_READ_IGNORE_ILI flag is applicable only to variable block devices which support the SILI bit option.
+The ST_READ_IGNORE_ILI flag indicates that SILI (supress incorrect length indicator) bit will be set during
+reads. When this flag is set, short reads (requested read size is less than the record size on the tape) will be success<hy>
+ful and the number of bytes transferred will be equal to the record size on the tape. The tape will be positioned at the
+start of the next record skipping over the extra data (the remaining data has been has been lost). Long reads (request<hy>
+ed read size is more than the record size on the tape) will see a large performance gain when this flag is set, due to
+overhead reduction. When this flag is not set, short reads will return an error of ENOMEM.
+ST_READ_IGNORE_EOFS
+The ST_READ_IGNORE_EOFS flag is applicable only to 1/2" Reel Tape drives and when performing consecutive
+reads only. It should not be used for any other tape command. Usually End-of-recorded-media (EOM) is indicated
+by two EOF marks on 1/2" tape and application cannot read past EOM. When this flag is set, two EOF marks no
+longer indicate EOM allowing applications to read past two EOF marks. In this case it is the responsibility of the ap<hy>
+plication to detect end-of-recorded-media (EOM). When this flag is set, tape operations (like MTEOM) which posi<hy>
+tions the tape at end-of-recorded-media will fail since detection of end-of-recorded-media (EOM) is to be handled
+by the application. This flag should be used when backup applications have embedded double filemarks between
+<beginning of page>
+files.
+ST_SHORT_FILEMARKS
+The ST_SHORT_FILEMARKS flag is applicable only to EXABYTE 8mm tape drives which supports short file<hy>
+marks. When this flag is set, short filemarks is used for writing filemarks. Short filemarks could lead to tape incom<hy>
+patible with some otherwise compatible device. By default long filemarks will be used for writing filemarks.
+ST_EJECT_TAPE_ON_CHANGER_FAILURE
+If ST_EJECT_TAPE_ON_CHANGER_FAILURE flag is set, the tape is ejected automatically if the tape car<hy>
+tridge is trapped in the medium due to positioning problems of the medium changer.
+The following ASC/ASCQ keys are defined to the reasons for causing tape ejection if
+ST_EJECT_TAPE_ON_CHANGER_FAILURE option is set to 0x200000:
+Sense ASC/ASCQ Description
+Key
+4 15/01 Mechanical Failure
+4 44/00 Internal Target Failure
+2 53/00 Media Load or Eject Failed
+4 53/00 Media Load or Eject Failed
+4 53/01 Unload Tape Failure
+ST_RETRY_ON_RECOVERED_DEFERRED_ERROR
+If ST_RETRY_ON_RECOVERED_DEFERRED_ERROR flag is set, the st driver will retry the last write if this
+cmd caused a check condition with error code 0x71 and sense code 0x01. Some tape drives, notably the IBM 3090,
+require this option.
+ST_WORMABLE
+When ST_WORMABLE is set, st attempts to detect the presence of WORM media in the device.
+<number of densities> is the number of densities specified. Each tape drive can support up to four densities. The
+value entered should therefore be between 1 and 4; if less than 4, the remaining densities will be assigned a value of
+0x0.
+<density> is a single-byte hexadecimal number. It can either be found in the device specification manual or be ob<hy>
+tained from the device vendor.
+<default-density> has a value between 0 and (<number of densities> - 1).
+<non-motion time-out> Time in seconds that the drive should be able to perform any SCSI command that doesn't
+require tape to be moved. This includes mode sense, mode select, reserve, release, read block limits, and test unit
+ready.
+<I/O time-out> Time in seconds to perform data transfer I/O to or from tape including worst case error recovery.
+<rewind time-out> Time in seconds to rewind from anywhere on tape to BOT including worst case recovery forc<hy>
+ing buffered write data to tape.
+<space time-out> Time in seconds to space to any file, block or end of data on tape. Including worst case when any
+form of cataloging is invalid.
+<load time-out> Time in seconds to load tape and be ready to transfer first block. This should include worst case re<hy>
+covery reading tape catalog or drive specific operations done at load.
+<beginning of page>
+<unload time-out> Time in seconds to unload tape. Should include worst case time to write to catalog, unthread,
+and tape cartridge unloading. Also should include worst case time for any drive specific operations that are pre<hy>
+formed at unload. Should not include rewind time as the driver rewinds tape before issuing the unload.
+<erase time-out> Time in seconds to preform a full (BOT to EOT) erase of longest medium with worst case error
+recovery.
+Each device maintains I/O statistics both for the device and for each partition allocated on that device. For each de<hy>
+vice/partition, the driver accumulates reads, writes, bytes read, and bytes written. The driver also takes hi-resolution
+time stamps at queue entry and exit points, which facilitates monitoring the residence time and cumulative resi<hy>
+dence-length product for each queue.
+Each device also has error statistics associated with it. These must include counters for hard errors, soft errors and
+transport errors. Other data may be implemented as required.
+The behavior of SCSI tape positioning ioctls is the same across all devices which support them. (Refer to mtio(7I).)
+However, not all devices support all ioctls. The driver returns an ENOTTY error on unsupported ioctls.
+The retension ioctl only applies to 1/4" cartridge tape devices. It is used to restore tape tension, thus improving the
+tape's soft error rate after extensive start-stop operations or long-term storage.
+In order to increase performance of variable-length tape devices (particularly when they are used to read/write small
+record sizes), two operations in the MTIOCTOP ioctl, MTSRSZ and MTGRSZ, can be used to set and get fixed
+record lengths. The ioctl also works with fixed-length tape drives which allow multiple record sizes. The min/max
+limits of record size allowed on a driver are found by using a SCSI-2 READ BLOCK LIMITS command to the de<hy>
+vice. If this command fails, the default min/max record sizes allowed are 1 byte and 63k bytes. An application that
+needs to use a different record size opens the device, sets the size with the MTSRSZ ioctl, and then continues with
+I/O. The scope of the change in record size remains until the device is closed. The next open to the device resets the
+record size to the default record size (retrieved from st.conf).
+Note that the error status is reset by the MTIOCGET get status ioctl call or by the next read, write, or other ioctl op<hy>
+eration. If no error has occurred (sense key is 0), the current file and record position is returned.
+EACCES The driver is opened for write access and the tape is write-protected or the tape unit is reserved by another
+host.
+EBUSY The tape drive is in use by another process. Only one process can use the tape drive at a time. The driver
+will allow a grace period for the other process to finish before reporting this error.
+EINVAL The number of bytes read or written is not a multiple of the physical record size (fixed-length tape devices
+only).
+EIO During opening, the tape device is not ready because either no tape is in the drive, or the drive is not on-line.
+Once open, this error is returned if the requested I/O transfer could not be completed.
+ENOTTY This indicates that the tape device does not support the requested ioctl function.
+ENXIO During opening, the tape device does not exist.
+ENOMEM This indicates that the record size on the tape drive is more than the requested size during read opera<hy>
+tion.
+Example 1 Global tape-config list property
+The following is an example of a global tape-config-list property:
+ tape-config-list =
+ "Magic DAT", "Magic 4mm Helical Scan", "magic-data",
+<beginning of page>
+ "Major Appliance", "Major Appliance Tape", "major-tape";
+ magic-data = 1,0x34,1024,0x1639,4,0,0x8c,0x8c,0x8c,3;
+ major-tape = 2,0x3c,0,0x18619,4,0x0,0x0,0x0,0x0,
+  3,0,0,30,120,0,0,36000;
+ name="st" class="scsi"
+  target=0 lun=0;
+ name="st" class="scsi"
+  target=1 lun=0;
+ name="st" class="scsi"
+  target=2 lun=0;
+  .
+  .
+  .
+ name="st" class="scsi"
+  target=6 lun=0;
+Example 2 Tape-config-list property applicable to target 2 only
+The following is an example of a tape-config-list property applicable to target 2 only:
+ name="st" class="scsi"
+  target=0 lun=0;
+ name="st" class="scsi"
+  target=1 lun=0;
+ name="st" class="scsi"
+  target=2 lun=0
+  tape-config-list =
+  "Magic DAT", "Magic 4mm Helical Scan", "magic-data"
+  magic-data = 1,0x34,1024,0x1639,4,0,0x8c,0x8c,0x8c,3;
+ name="st" class="scsi"
+  target=3 lun=0;
+  .
+  .
+  .
+ name="st" class="scsi"
+  target=6 lun=0;
+To support applications such as seismic programs that require large record sizes, the flag ST_NO_RECSIZE_LIM<hy>
+IT must be set in drive option in the configuration entry. A SCSI tape drive that needs to transfer large records
+should OR this flag with other flags in the 'options' field in st.conf. (Refer to Tape Configuration.) By default, this
+flag is set for the built-in config entries of Archive DAT and Exabyte drives.
+If this flag is set, the st driver issues a SCSI-2 READ BLOCK LIMITS command to the device to determine the
+maximum record size allowed by it. If the command fails, st continues to use the maximum record sizes mentioned
+in the mtio(7I) man page.
+If the command succeeds, st restricts the maximum transfer size of a variable-length device to the minimum of that
+record size and the maximum DMA size that the host adapter can handle. Fixed-length devices are bound by the
+maximum DMA size allocated by the machine. Note that tapes created with a large record size may not be readable
+by earlier releases or on other platforms.
+(Refer to the WARNINGS section for more information.)
+The Emulex drives have only a physical end of tape (PEOT); thus it is not possible to write past EOT. All other
+drives have a logical end of tape (LEOT) before PEOT to guarantee flushing the data onto the tape. The amount of
+storage between LEOT and PEOT varies from less than 1 Mbyte to about 20 Mbyte, depending on the tape drive.
+If EOT is encountered while writing an Emulex, no error is reported but the number of bytes transferred is 0 and no
+further writing is allowed. On all other drives, the first write that encounters EOT will return a short count or 0. If a
+short count is returned, then the next write will return 0. After a zero count is returned, the next write returns a full
+count or short count. A following write returns 0 again. It is important that the number and size of trailer records be
+<beginning of page>
+kept as small as possible to prevent data loss. Therefore, writing after EOT is not recommended.
+Reading past EOT is transparent to the user. Reading is stopped only by reading EOF's. For 1/2" reel devices, it is
+possible to read off the end of the reel if one reads past the two file marks which mark the end of recorded media.
+/kernel/drv/st.conf
+driver configuration file
+/usr/include/sys/mtio.h
+structures and definitions for mag tape io control commands
+/usr/include/sys/scsi/targets/stdef.h
+definitions for SCSI tape drives
+/dev/rmt/[0<mi> 127][l,m,h,u,c][b][n]
+where l,m,h,u,c specifies the density (low, medium, high, ultra/compressed), b the optional BSD behavior (see
+mtio(7I)), and n the optional no rewind behavior. For example, /dev/rmt/0lbn specifies unit 0, low density, BSD be<hy>
+havior, and no rewind.
+For 1/2" reel tape devices (HP-88780), the densities are:
+tab(); lw(2.75i) lw(2.75i) lw(2.75i) lw(2.75i) l800 BPI density m1600 BPI density h6250 BPI density cdata com<hy>
+pression
+ (not supported on all modules)
+For 8mm tape devices (Exabyte 8200/8500/8505):
+tab(); lw(2.75i) lw(2.75i) lw(2.75i) lw(2.75i) lStandard 2 Gbyte format m5 Gbyte format (8500, 8505 only) h,c5
+Gbyte compressed format (8505 only)
+For 4mm DAT tape devices (Archive Python):
+tab(); lw(2.75i) lw(2.75i) lw(2.75i) lw(2.75i) lStandard format m,h,cdata compression
+For all QIC (other than QIC-24) tape devices:
+tab(); lw(2.75i) lw(2.75i) lw(2.75i) lw(2.75i) l,m,h,cdensity of the tape cartridge type (not all devices can read and
+write all formats)
+For QIC-24 tape devices (Emulex MT<mi>02):
+tab(); lw(2.75i) lw(2.75i) lw(2.75i) lw(2.75i) lQIC-11 Format m,h,cQIC-24 Format
+mt(1), modload(1M), modunload(1M), open(2), read(2), write(2), aioread(3C), aiowrite(3C), kstat(3KSTAT),
+driver.conf(4), scsi(4), standards(5), esp(7D), isp(7D), mtio(7I), ioctl(9E)
+The st driver diagnostics may be printed to the console or messages file.
+Each diagnostic is dependent on the value of the system variable st_error_level. st_error_level may be set in the
+<beginning of page>
+/etc/system file. The default setting for st_error_level is 4 (SCSI_ERR_RETRYABLE) which is suitable for most
+configurations since only actual fault diagnostics are printed. Settings range from values 0 (SCSI_ERR_ALL) which
+is most verbose, to 6 (SCSI_ERR_NONE) which is least verbose. See stdef.h for the full list of error-levels. SC<hy>
+SI_ERR_ALL level the amount of diagnostic information is likely to be excessive and unnecessary.
+The st driver diagnostics are described below:
+ Error for Command: <scsi_cmd_name()> Error Level:<error_class>
+ Requested Block: <blkno> Error Block: <err_blkno>
+ Vendor: <name>: Serial Number: <inq_serial>
+ Sense Key: <es_key> ASC: 0x<es_add_code> (scsi_asc_ascq_name()>), ASCQ:
+ 0x<es_qual_code>, FRU: 0x<ex_fru_code>
+where <error_class> may be any one of the following: "All," "Unknown," "Informational," "Recovered,"
+"Retryable," "Fatal"
+The command indicated by <scsi_cmd_name> failed. Requested Block represents the block where the transfer start<hy>
+ed. Error Block represents the block that caused the error. Sense Key, ASC, ASCQ and FRU information is returned
+by the target in response to a request sense command. See SCSI protocol documentation for description of Sense
+Key, ASC, ASCQ, FRU.
+The st driver attempts to validate entries in the st.conf file. Each field in the entry is checked for upper and lower
+limits and invalid bits set. The fields are named as follows in config string order:
+  conf version
+  drive type
+  block size
+  options
+  number of densities
+  density code
+  default density
+  non motion timeout
+  I/O timeout
+  space timeout
+  load timeout
+  unload timeout
+  erase timeout
+The st.conf diagnostics are described below:
+ <con-name> <field-in-err> <problem-with-field>
+where <con-name> is the name of the config string. Where <field-in-err> is the field containing invalid entries and
+where <problem-with-field> describes the nature of the invalid entry.
+ Write/read: not modulo <n> block size
+The request size for fixed record size devices must be a multiple of the specified block size.
+ Recovery by resets failed
+After a transport error, the driver attempted to recover by issuing a device reset and then a bus reset if device reset
+ failed. These recoveries failed.
+ Periodic head cleaning required
+The driver reported that periodic head cleaning is now required. This diagnostic is generated either due to a thresh<hy>
+<beginning of page>
+old number of retries, or due to the device communicating to the driver that head cleaning is required.
+ Soft error rate (<n>%) during writing/reading was too high
+The soft error rate has exceeded the threshold specified by the vendor.
+ SCSI transport failed: reason 'xxxx': {retrying|giving up}
+The Host Bus Adapter (HBA) has failed to transport a command to the target for the reason stated. The driver will
+either retry the command or, ultimately, give up.
+ Tape not inserted in drive
+A media access command was attempted while there was no tape inserted into the specified drive. In this case, the
+drive returns sense key of DRIVE NOT READY.
+ Transport rejected
+The Host Bus Adapter (HBA) driver is not accepting commands after failing to successfully transport a scsi packet
+to the target. The actual status received by the st driver from the underlying HBA driver was either TRAN_FA<hy>
+TAL_ERROR or TRAN_BADPKT.
+ Retrying command
+The st driver failed to complete a command. However the command is retryable and will be retried.
+ Giving up
+The st driver has exhausted retries or otherwise is unable to retry the command and so is giving up.
+ No target struct for st%d
+The st driver failed to obtain state information because the requested state structure was not allocated. The specified
+device was probably not attached.
+ File mark detected
+The operation detected an end of file mark. (File marks signify the end of a file on the tape media).
+ End-of-media detected
+The operation reached the end of the tape media.
+ Exabyte soft error reporting failed. DAT soft error reporting failed
+The st driver was unable to determine if the soft error threshold had been exceeded because it did not successfully
+<beginning of page>
+read the data it requires or did not obtain enough data. This data is retrieved using the log sense command.
+ Log sense parameter code does not make sense
+The log sense command retrieves hardware statistics that are stored on the drive (for example, soft error counts and
+retries.) If the data retrieved from the drive is invalid, this message is printed and the data is not used.
+ Restoring tape position at fileno=%x, blkno=%lx....
+The st driver is positioning to the specified file and block. This occurs on an open.
+ Failed to restore the last <file/block> position:
+ In this state, tape will be loaded at BOT during next open
+The st driver could not position to the specified location and will revert to the beginning of the tape when the next
+open is attempted.
+ Device does not support compression
+The compression facility of the device was requested. However the device does not have a hardware compression ca<hy>
+pability.
+ DAT soft error reset failed
+After DAT soft error reporting, the counters within the device that accumulate this sense data need to be re-set.  
+This operation failed.
+ Errors after pkt alloc (b_flags=0x%x, b_error=0x%x)
+Memory allocation for a scsi packet failed.
+ Incorrect length indicator set
+The drive reported the length of data requested in a READ operation, was incorrect. Incorrect Length Indicator (ILI)
+is a very commonly used facility in SCSI tape protocol and should not be seen as an error per-se. Applications typi<hy>
+cally probe a new tape with a read of any length, using the returned length to the read system call for future reads.
+Along with this operation, an underlying ILI error is received. ILI errors are therefore informational only and are
+masked at the default st_error_level.
+ Data property (%s) has no value
+ Data property (%s) incomplete
+ Version # for data property (%s) greater than 1
+These diagnostics indicate problems in retrieving the values of the various property settings. The st driver is in the
+process of setting the property/parameter values for the tape drive using information from either the built-in table
+within the driver or from uncommented entries in the st.conf file. The effect on the system may be that the tape drive
+may be set with default or generic driver settings which may not be appropriate for the actual type of tape drive be<hy>
+ing used.
+ st_attach-RESUME: tape failure tape position will be lost
+<beginning of page>
+On a resume after a power management suspend, the previously known tape position is no longer valid. This can oc<hy>
+cur if the tape was changed while the system was in power management suspend. The operation will not be retried.
+ Write Data Buffering has been deprecated. Your applications should
+ continue to work normally. However, they should be ported to use
+ Asynchronous I/O.
+Indicates that buffering has been removed from Solaris.
+ Cannot detach: fileno=%x, blkno=%lx
+The st driver cannot unload because the tape is not positioned at BOT (beginning of tape). May indicate hardware
+problems with the tape drive.
+ Variable record length I/O
+ Fixed record length (%d byte blocks) I/O
+Tape-drives can use either Fixed or Variable record length. If the drive uses Fixed length records, then the built in
+property table or the st.conf file will contain a non-zero record-length property. Most DAT, Exabyte and DLT drives
+support Variable record lengths. Many QIC format tape drives have historically been of Fixed record length.
+ Command will be retried
+  un_ncmds: %d can't retry cmd
+These diagnostics are only seen with tape drives with the ST_RETRY_ON_RECOVERED_DEFERRED_ERROR
+bit set. See stdef.h for explanation of the specific usage of this setting.
+Effective with Solaris 2.4, the ST_NO_RECSIZE_LIMIT flag is set for the built-in config entries of the Archive
+DAT and Exabyte drivers by default. (Refer to Large Record Sizes.) Tapes written with large block sizes prior to
+Solaris 2.4 may cause some applications to fail if the number of bytes returned by a read request is less than the re<hy>
+quested block size (for example, asking for 128 Kbytes and receiving less than 64 Kbytes).
+The ST_NO_RECSIZE_LIMIT flag can be disabled in the config entry for the device as a work-around. (Refer to
+Tape Configuration.) This action disables the ability to read and write with large block sizes and allows the reading
+of tapes written prior to Solaris 2.4 with large block sizes.
+(Refer to mtio(7I) for a description of maximum record sizes.)
+Tape devices that do not return a BUSY status during tape loading prevent user commands from being held until the
+device is ready. The user must delay issuing any tape operations until the tape device is ready. This is not a problem
+for tape devices supplied by Sun Microsystems.
+Tape devices that do not report a blank check error at the end of recorded media may cause file positioning opera<hy>
+tions to fail. Some tape drives, for example, mistakenly report media error instead of blank check error.

@@ -1,0 +1,517 @@
+<beginning of page>
+boot <-> start the system kernel or a standalone program
+boot [OBP names] [file] [-aLV] [-F object] [-D default-file]
+ [-Z dataset] [boot-flags] [<mi><mi>] [client-program-args]
+kernel$ /platform/i86pc/kernel/$ISADIR/unix [boot-args]
+ [-B prop=val [,val...]]
+Bootstrapping is the process of loading and executing a standalone program. For the purpose of this discussion,
+bootstrapping means the process of loading and executing the bootable operating system. Typically, the standalone
+program is the operating system kernel (see kernel(1M)), but any standalone program can be booted instead. On a
+SPARC-based system, the diagnostic monitor for a machine is a good example of a standalone program other than
+the operating system that can be booted.
+If the standalone is identified as a dynamically-linked executable, boot will load the interpreter (linker/loader) as in<hy>
+dicated by the executable format and then transfer control to the interpreter. If the standalone is statically-linked, it
+will jump directly to the standalone.
+Once the kernel is loaded, it starts the UNIX system, mounts the necessary file systems (see vfstab(4)), and runs
+/sbin/init to bring the system to the "initdefault" state specified in /etc/inittab. See inittab(4).
+On SPARC based systems, the bootstrap procedure on most machines consists of the following basic phases.
+After the machine is turned on, the system firmware (in PROM) executes power-on self-test (POST). The form and
+scope of these tests depends on the version of the firmware in your system.
+After the tests have been completed successfully, the firmware attempts to autoboot if the appropriate flag has been
+set in the non-volatile storage area used by the firmware. The name of the file to load, and the device to load it from
+can also be manipulated.
+These flags and names can be set using the eeprom(1M) command from the shell, or by using PROM commands
+from the ok prompt after the system has been halted.
+The second level program is either a fileystem-specific boot block (when booting from a disk), or inetboot or wan<hy>
+boot (when booting across the network).
+Network Booting
+Network booting occurs in two steps: the client first obtains an IP address and any other parameters necessary to per<hy>
+mit it to load the second-stage booter. The second-stage booter in turn loads the boot archive from the boot device.
+An IP address can be obtained in one of three ways: RARP, DHCP, or manual configuration, depending on the func<hy>
+tions available in and configuration of the PROM. Machines of the sun4u and sun4v kernel architectures have
+DHCP-capable PROMs.
+The boot command syntax for specifying the two methods of network booting are:
+ boot net:rarp
+ boot net:dhcp
+The command:
+ boot net
+without a rarp or dhcp specifier, invokes the default method for network booting over the network interface for
+which net is an alias.
+The sequence of events for network booting using RARP/bootparams is described in the following paragraphs. The
+sequence for DHCP follows the RARP/bootparams description.
+When booting over the network using RARP/bootparams, the PROM begins by broadcasting a reverse ARP request
+until it receives a reply. When a reply is received, the PROM then broadcasts a TFTP request to fetch the first block
+<beginning of page>
+of inetboot. Subsequent requests will be sent to the server that initially answered the first block request. After load<hy>
+ing, inetboot will also use reverse ARP to fetch its IP address, then broadcast bootparams RPC calls (see boot<hy>
+params(4)) to locate configuration information and its root file system. inetboot then loads the boot archive by
+means of NFS and transfers control to that archive.
+When booting over the network using DHCP, the PROM broadcasts the hardware address and kernel architecture
+and requests an IP address, boot parameters, and network configuration information. After a DHCP server responds
+and is selected (from among potentially multiple servers), that server sends to the client an IP address and all other
+information needed to boot the client. After receipt of this information, the client PROM examines the name of the
+file to be loaded, and will behave in one of two ways, depending on whether the file's name appears to be an HTTP
+URL. If it does not, the PROM downloads inetboot, loads that file into memory, and executes it. inetboot loads the
+boot archive, which takes over the machine and releases inetboot. Startup scripts then initiate the DHCP agent (see
+dhcpagent(1M)), which implements further DHCP activities.
+If the file to be loaded is an HTTP URL, the PROM will use HTTP to load the referenced file. If the client has been
+configured with an HMAC SHA-1 key, it will check the integrity of the loaded file before proceeding to execute it.
+The file is expected to be the wanboot binary. The WAN boot process can be configured to use either DHCP or
+NVRAM properties to discover the install server and router and the proxies needed to connect to it. When wanboot
+begins executing, it determines whether sufficient information is available to it to allow it to proceed. If any neces<hy>
+sary information is missing, it will either exit with an appropriate error or bring up a command interpreter and
+prompt for further configuration information. Once wanboot has obtained the necessary information, it loads the
+boot loader into memory by means of HTTP. If an encryption key has been installed on the client, wanboot will ver<hy>
+ify the boot loader's signature and its accompanying hash. Presence of an encryption key but no hashing key is an er<hy>
+ror.
+The wanboot boot loader can communicate with the client using either HTTP or secure HTTP. If the former, and if
+the client has been configured with an HMAC SHA-1 key, the boot loader will perform an integrity check of the root
+file system. Once the root file system has been loaded into memory (and possibly had an integrity check performed),
+the boot archive is transferred from the server. If provided with a boot_logger URL by means of the wan<hy>
+boot.conf(4) file, wanboot will periodically log its progress.
+Not all PROMs are capable of consuming URLs. You can determine whether a client is so capable using the list-se<hy>
+curity-keys OBP command (see monitor(1M)).
+WAN booting is not currently available on the x86 platform.
+The wanboot Command Line
+When the client program is wanboot, it accepts client-program-args of the form:
+ boot ... -o opt1[,opt2[,...]]
+where each option may be an action:
+dhcp
+Require wanboot to obtain configuration parameters by means of DHCP.
+prompt
+Cause wanboot to enter its command interpreter.
+<cmd>
+One of the interpreter commands listed below.
+...or an assignment, using the interpreter's parameter names listed below.
+The wanboot Command Interpreter
+The wanboot command interpreter is invoked by supplying a client-program-args of "-o prompt" when booting.
+Input consists of single commands or assignments, or a comma-separated list of commands or assignments. The
+configuration parameters are:
+<beginning of page>
+host-ip
+IP address of the client (in dotted-decimal notation)
+router-ip
+IP address of the default router (in dotted-decimal notation)
+subnet-mask
+subnet mask (in dotted-decimal notation)
+client-id
+DHCP client identifier (a quoted ASCII string or hex ASCII)
+hostname
+hostname to request in DHCP transactions (ASCII)
+http-proxy
+HTTP proxy server specification (IPADDR[:PORT])
+The key names are:
+3des
+the triple DES encryption key (48 hex ASCII characters)
+aes
+the AES encryption key (32 hex ASCII characters)
+sha1
+the HMAC SHA-1 signature key (40 hex ASCII characters)
+Finally, the URL or the WAN boot CGI is referred to by means of:
+bootserver
+URL of WAN boot's CGI (the equivalent of OBP's file parameter)
+The interpreter accepts the following commands:
+help
+Print a brief description of the available commands
+var=val
+Assign val to var, where var is one of the configuration parameter names, the key names, or bootserver.
+var=
+Unset parameter var.
+<beginning of page>
+list
+List all parameters and their values (key values retrieved by means of OBP are never shown).
+prompt
+Prompt for values for unset parameters. The name of each parameter and its current value (if any) is printed, and the
+user can accept this value (press Return) or enter a new value.
+go
+Once the user is satisfied that all values have been entered, leave the interpreter and continue booting.
+exit
+Quit the boot interpreter and return to OBP's ok prompt.
+Any of these assignments or commands can be passed on the command line as part of the -o options, subject to the
+OBP limit of 128 bytes for boot arguments. For example, -o list,go would simply list current (default) values of the
+parameters and then continue booting.
+iSCSI boot is currently supported only on x86. The host being booted must be equipped with NIC(s) capable of
+iBFT (iSCSI Boot Firmware Table) or have the mainboard's BIOS be iBFT-capable. iBFT, defined in the Advanced
+Configuration and Power Interface (ACPI) 3.0b specification, specifies a block of information that contains various
+parameters that are useful to the iSCSI Boot process.
+Firmware implementing iBFT presents an iSCSI disk in the BIOS during startup as a bootable device by establishing
+the connection to the iSCSI target. The rest of the process of iSCSI booting is the same as booting from a local disk.
+To configure the iBFT properly, users need to refer to the documentation from their hardware vendors.
+When booting from disk, the OpenBoot PROM firmware reads the boot blocks from blocks 1 to 15 of the partition
+specified as the boot device. This standalone booter usually contains a file system-specific reader capable of reading
+the boot archive.
+If the pathname to the standalone is relative (does not begin with a slash), the second level boot will look for the
+standalone in a platform-dependent search path. This path is guaranteed to contain /platform/platform-name. Many
+SPARC platforms next search the platform-specific path entry /platform/hardware-class-name. See filesystem(5). If
+the pathname is absolute, boot will use the specified path. The boot program then loads the standalone at the appro<hy>
+priate address, and then transfers control.
+Once the boot archive has been transferred from the boot device, Solaris can initialize and take over control of the
+machine. This process is further described in the "Boot Archive Phase," below, and is identical on all platforms.
+If the filename is not given on the command line or otherwise specified, for example, by the boot-file NVRAM vari<hy>
+able, boot chooses an appropriate default file to load based on what software is installed on the system and the capa<hy>
+bilities of the hardware and firmware.
+The path to the kernel must not contain any whitespace.
+Booting from ZFS differs from booting from UFS in that, with ZFS, a device specifier identifies a storage pool, not a
+single root file system. A storage pool can contain multiple bootable datasets (that is, root file systems). Therefore,
+when booting from ZFS, it is not sufficient to specify a boot device. One must also identify a root file system within
+the pool that was identified by the boot device. By default, the dataset selected for booting is the one identified by
+the pool's bootfs property. This default selection can be overridden by specifying an alternate bootable dataset with
+the -Z option.
+The boot archive contains a file system image that is mounted using an in-memory disk. The image is self-describ<hy>
+ing, specifically containing a file system reader in the boot block. This file system reader mounts and opens the
+RAM disk image, then reads and executes the kernel contained within it. By default, this kernel is in:
+ /platform/`uname -i`/kernel/unix
+<beginning of page>
+If booting from ZFS, the pathnames of both the archive and the kernel file are resolved in the root file system (that
+is, dataset) selected for booting as described in the previous section.
+The initialization of the kernel continues by loading necessary drivers and modules from the in-memory filesystem
+until I/O can be turned on and the root filesystem mounted. Once the root filesystem is mounted, the in-memory
+filesystem is no longer needed and is discarded.
+The OpenBoot boot command takes arguments of the following form:
+ ok boot [device-specifier] [arguments]
+The default boot command has no arguments:
+ ok boot
+If no device-specifier is given on the boot command line, OpenBoot typically uses the boot-device or diag-device
+NVRAM variable. If no optional arguments are given on the command line, OpenBoot typically uses the boot-file or
+diag-file NVRAM variable as default boot arguments. (If the system is in diagnostics mode, diag-device and diag-
+file are used instead of boot-device and boot-file).
+arguments may include more than one string. All argument strings are passed to the secondary booter; they are not
+interpreted by OpenBoot.
+If any arguments are specified on the boot command line, then neither the boot-file nor the diag-file NVRAM vari<hy>
+able is used. The contents of the NVRAM variables are not merged with command line arguments. For example, the
+command:
+ ok boot -s
+ignores the settings in both boot-file and diag-file; it interprets the string "-s" as arguments. boot will not use the
+contents of boot-file or diag-file.
+With older PROMs, the command:
+ ok boot net
+took no arguments, using instead the settings in boot-file or diag-file (if set) as the default file name and arguments to
+pass to boot. In most cases, it is best to allow the boot command to choose an appropriate default based upon the
+system type, system hardware and firmware, and upon what is installed on the root file system. Changing boot-file or
+diag-file can generate unexpected results in certain circumstances.
+This behavior is found on most OpenBoot 2.x and 3.x based systems. Note that differences may occur on some plat<hy>
+forms.
+The command:
+ok boot cdrom
+...also normally takes no arguments. Accordingly, if boot-file is set to the 64-bit kernel filename and you attempt to
+boot the installation CD or DVD with boot cdrom, boot will fail if the installation media contains only a 32-bit ker<hy>
+nel.
+Because the contents of boot-file or diag-file can be ignored depending on the form of the boot command used, re<hy>
+liance upon boot-file should be discouraged for most production systems.
+When executing a WAN boot from a local (CD or DVD) copy of wanboot, one must use:
+<beginning of page>
+ok boot cdrom -F wanboot - install
+Modern PROMs have enhanced the network boot support package to support the following syntax for arguments to
+be processed by the package:
+[protocol,] [key=value,]*
+All arguments are optional and can appear in any order. Commas are required unless the argument is at the end of
+the list. If specified, an argument takes precedence over any default values, or, if booting using DHCP, over configu<hy>
+ration information provided by a DHCP server for those parameters.
+protocol, above, specifies the address discovery protocol to be used.
+Configuration parameters, listed below, are specified as key=value attribute pairs.
+tftp-server
+IP address of the TFTP server
+file
+file to download using TFTP or URL for WAN boot
+host-ip
+IP address of the client (in dotted-decimal notation)
+router-ip
+IP address of the default router
+subnet-mask
+subnet mask (in dotted-decimal notation)
+client-id
+DHCP client identifier
+hostname
+hostname to use in DHCP transactions
+http-proxy
+HTTP proxy server specification (IPADDR[:PORT])
+tftp-retries
+maximum number of TFTP retries
+dhcp-retries
+maximum number of DHCP retries
+The list of arguments to be processed by the network boot support package is specified in one of two ways: <bu> As ar<hy>
+guments passed to the package's open method, or <bu> arguments listed in the NVRAM variable network-boot-argu<hy>
+ments.
+Arguments specified in network-boot-arguments will be processed only if there are no arguments passed to the
+<beginning of page>
+package's open method.
+Argument Values
+protocol specifies the address discovery protocol to be used. If present, the possible values are rarp or dhcp.
+If other configuration parameters are specified in the new syntax and style specified by this document, absence of the
+protocol parameter implies manual configuration.
+If no other configuration parameters are specified, or if those arguments are specified in the positional parameter
+syntax currently supported, the absence of the protocol parameter causes the network boot support package to use
+the platform-specific default address discovery protocol.
+Manual configuration requires that the client be provided its IP address, the name of the boot file, and the address of
+the server providing the boot file image. Depending on the network configuration, it might be required that subnet-
+mask and router-ip also be specified.
+If the protocol argument is not specified, the network boot support package uses the platform-specific default ad<hy>
+dress discovery protocol.
+tftp-server is the IP address (in standard IPv4 dotted-decimal notation) of the TFTP server that provides the file to
+download if using TFTP.
+When using DHCP, the value, if specified, overrides the value of the TFTP server specified in the DHCP response.
+The TFTP RRQ is unicast to the server if one is specified as an argument or in the DHCP response. Otherwise, the
+TFTP RRQ is broadcast.
+file specifies the file to be loaded by TFTP from the TFTP server, or the URL if using HTTP. The use of HTTP is
+triggered if the file name is a URL, that is, the file name starts with http: (case-insensitive).
+When using RARP and TFTP, the default file name is the ASCII hexadecimal representation of the IP address of the
+client, as documented in a preceding section of this document.
+When using DHCP, this argument, if specified, overrides the name of the boot file specified in the DHCP response.
+When using DHCP and TFTP, the default file name is constructed from the root node's name property, with commas
+(,) replaced by periods (.).
+When specified on the command line, the filename must not contain slashes (/).
+The format of URLs is described in RFC 2396. The HTTP server must be specified as an IP address (in standard
+IPv4 dotted-decimal notation). The optional port number is specified in decimal. If a port is not specified, port 80
+(decimal) is implied.
+The URL presented must be "safe-encoded", that is, the package does not apply escape encodings to the URL pre<hy>
+sented. URLs containing commas must be presented as a quoted string. Quoting URLs is optional otherwise.
+host-ip specifies the IP address (in standard IPv4 dotted-decimal notation) of the client, the system being booted. If
+using RARP as the address discovery protocol, specifying this argument makes use of RARP unnecessary.
+If DHCP is used, specifying the host-ip argument causes the client to follow the steps required of a client with an
+"Externally Configured Network Address", as specified in RFC 2131.
+router-ip is the IP address (in standard IPv4 dotted-decimal notation) of a router on a directly connected network.
+The router will be used as the first hop for communications spanning networks. If this argument is supplied, the
+router specified here takes precedence over the preferred router specified in the DHCP response.
+subnet-mask (specified in standard IPv4 dotted-decimal notation) is the subnet mask on the client's network. If the
+subnet mask is not provided (either by means of this argument or in the DHCP response), the default mask appropri<hy>
+ate to the network class (Class A, B, or C) of the address assigned to the booting client will be assumed.
+client-id specifies the unique identifier for the client. The DHCP client identifier is derived from this value. Client
+identifiers can be specified as: <bu> The ASCII hexadecimal representation of the identifier, or <bu> a quoted string
+Thus, client-id="openboot" and client-id=6f70656e626f6f74 both represent a DHCP client identifier of
+<beginning of page>
+6F70656E626F6F74.
+Identifiers specified on the command line must must not include slash (/) or spaces.
+The maximum length of the DHCP client identifier is 32 bytes, or 64 characters representing 32 bytes if using the
+ASCII hexadecimal form. If the latter form is used, the number of characters in the identifier must be an even num<hy>
+ber. Valid characters are 0-9, a-f, and A-F.
+For correct identification of clients, the client identifier must be unique among the client identifiers used on the sub<hy>
+net to which the client is attached. System administrators are responsible for choosing identifiers that meet this re<hy>
+quirement.
+Specifying a client identifier on a command line takes precedence over any other DHCP mechanism of specifying
+identifiers.
+hostname (specified as a string) specifies the hostname to be used in DHCP transactions. The name might or might
+not be qualified with the local domain name. The maximum length of the hostname is 255 characters. Note -
+The hostname parameter can be used in service environments that require that the client provide the desired host<hy>
+name to the DHCP server. Clients provide the desired hostname to the DHCP server, which can then register the
+hostname and IP address assigned to the client with DNS.
+http-proxy is specified in the following standard notation for a host:
+ host [":"" port]
+...where host is specified as an IP ddress (in standard IPv4 dotted-decimal notation) and the optional port is specified
+in decimal. If a port is not specified, port 8080 (decimal) is implied.
+tftp-retries is the maximum number of retries (specified in decimal) attempted before the TFTP process is deter<hy>
+mined to have failed. Defaults to using infinite retries.
+dhcp-retries is the maximum number of retries (specified in decimal) attempted before the DHCP process is deter<hy>
+mined to have failed. Defaults to of using infinite retries.
+On x86 based systems, the bootstrapping process consists of two conceptually distinct phases, kernel loading and
+kernel initialization. Kernel loading is implemented in GRUB (GRand Unified Bootloader) using the BIOS ROM on
+the system board, and BIOS extensions in ROMs on peripheral boards. The BIOS loads GRUB, starting with the
+first physical sector from a hard disk, DVD, or CD. If supported by the ROM on the network adapter, the BIOS can
+also download the pxegrub binary from a network boot server. Once GRUB is located, it executes a command in a
+menu to load the unix kernel and a pre-constructed boot archive containing kernel modules and data.
+If the device identified by GRUB as the boot device contains a ZFS storage pool, the menu.lst file used to create the
+GRUB menu will be found in the dataset at the root of the pool's dataset hierarchy. This is the dataset with the same
+name as the pool itself. There is always exactly one such dataset in a pool, and so this dataset is well-suited for pool-
+wide data such as the menu.lst file. After the system is booted, this dataset is mounted at /poolname in the root file
+system.
+There can be multiple bootable datasets (that is, root file systems) within a pool. By default, the file system in which
+file name entries in a menu.lst file are resolved is the one identified by the pool's bootfs property (see zpool(1M)).
+However, a menu.lst entry can contain a bootfs command, which specifies an alternate dataset in the pool. In this
+way, the menu.lst file can contain entries for multiple root file systems within the pool.
+Kernel initialization starts when GRUB finishes loading the boot archive and hands control over to the unix binary.
+At this point, GRUB becomes inactive and no more I/O occurs with the boot device. The Unix operating system ini<hy>
+tializes, links in the necessary modules from the boot archive and mounts the root file system on the real root device.
+At this point, the kernel regains storage I/O, mounts additional file systems (see vfstab(4)), and starts various operat<hy>
+ing system services (see smf(5)).
+A requirement of booting from a root filesystem image built into a boot archive then remounting root onto the actual
+root device is that the contents of the boot archive and the root filesystem must be consistent. Otherwise, the proper
+operation and integrity of the machine cannot be guaranteed.
+The term "consistent" means that all files and modules in the root filesystem are also present in the boot archive and
+<beginning of page>
+have identical contents. Since the boot strategy requires first reading and mounting the boot archive as the first-stage
+root image, all unloadable kernel modules and initialization derived from the contents of the boot archive are re<hy>
+quired to match the real root filesystem. Without such consistency, it is possible that the system could be running
+with a kernel module or parameter setting applied to the root device before reboot, but not yet updated in the root ar<hy>
+chive. This inconsistency could result in system instability or data loss.
+Once the root filesystem is mounted, and before relinquishing the in-memory filesystem, Solaris performs a consis<hy>
+tency verification against the two file systems. If an inconsistency is detected, Solaris suspends the normal boot se<hy>
+quence and falls back to failsafe mode. Correcting this state requires the administrator take one of two steps. The
+recommended procedure is to reboot to the failsafe archive and rebuild the boot archive. This ensures that a known
+kernel is booted and functioning for the archive rebuild process. Alternatively, the administrator can elect to clear the
+inconsistent boot archive service state and continue system bring-up if the inconsistency is such that correct system
+operation will not be impaired. See svcadm(1M).
+If the boot archive service is cleared and system bring-up is continued (the second alternative above), the system
+may be running with unloadable kernel drivers or other modules that are out-of-date with respect to the root filesys<hy>
+tem. As such, correct system operation may be compromised.
+To ensure that the boot archive is consistent, the normal system shutdown process, as initiated by reboot(1M) and
+shutdown(1M), checks for and applies updates to the boot archive at the conclusion of the umountall(1M) mile<hy>
+stone.
+An update to any kernel file, driver, module or driver configuration file that needs to be included in the boot archive
+after the umountall service is complete will result in a failed boot archive consistency check during the next boot.
+To avoid this, it is recommended to always shut down a machine cleanly.
+If an update is required to the kernel after completion of the umountall service, the administrator may elect to re<hy>
+build the archive by invoking:
+ # bootadm update-archive
+The failsafe archive can be used to boot the machine at any time for maintenance or troubleshooting. The failsafe
+boot archive is installed on the machine, sourced from the miniroot archive. Booting the failsafe archive causes the
+machine to boot using the in-memory filesystem as the root device.
+The SPARC failsafe archive is:
+ /platform/`uname -i`/failsafe
+...and can be booted as follows:
+ ok boot [device-specifier] -F failsafe
+If a user wishes to boot a failsafe archive from a particular ZFS bootable dataset, this can be done as follows:
+ ok boot [device-specifier] -Z dataset -F failsafe
+The x86 failsafe archive is:
+ /boot/x86.miniroot-safe
+...and can be booted by selecting the Solaris failsafe item from the GRUB menu.
+The following SPARC options are supported:
+<beginning of page>
+-a
+The boot program interprets this flag to mean ask me, and so it prompts for the name of the standalone. The '-a' flag
+is then passed to the standalone program.
+-D default-file
+Explicitly specify the default-file. On some systems, boot chooses a dynamic default file, used when none is other<hy>
+wise specified. This option allows the default-file to be explicitly set and can be useful when booting kmdb(1) since,
+by default, kmdb loads the default-file as exported by the boot program.
+-F object
+Boot using the named object. The object must be either an ELF executable or bootable object containing a boot
+block. The primary use is to boot the failsafe or wanboot boot archive.
+-L
+List the bootable datasets within a ZFS pool. You can select one of the bootable datasets in the list, after which de<hy>
+tailed instructions for booting that dataset are displayed. Boot the selected dataset by following the instructions. This
+option is supported only when the boot device contains a ZFS storage pool.
+-V
+Display verbose debugging information.
+boot-flags
+The boot program passes all boot-flags to file. They are not interpreted by boot. See the kernel(1M) and kmdb(1)
+manual pages for information about the options available with the default standalone program.
+client-program-args
+The boot program passes all client-program-args to file. They are not interpreted by boot.
+file
+Name of a standalone program to boot. If a filename is not explicitly specified, either on the boot command line or
+in the boot-file NVRAM variable, boot chooses an appropriate default filename.
+OBP names
+Specify the open boot prom designations. For example, on Desktop SPARC based systems, the designation
+/sbus/esp@0,800000/sd@3,0:a indicates a SCSI disk (sd) at target 3, lun0 on the SCSI bus, with the esp host
+adapter plugged into slot 0.
+-Z dataset
+Boot from the root file system in the specified ZFS dataset.
+The following x86 options are supported:
+-B prop=val...
+One or more property-value pairs to be passed to the kernel. Multiple property-value pairs must be separated by a
+comma. Use of this option is the equivalent of the command: eeprom prop=val. See eeprom(1M) for available prop<hy>
+erties and valid values.
+If the root file system corresponding to this menu entry is a ZFS dataset, the menu entry needs the following option
+added:
+<beginning of page>
+ -B $ZFS-BOOTFS
+boot-args
+The boot program passes all boot-args to file. They are not interpreted by boot. See kernel(1M) and kmdb(1) for in<hy>
+formation about the options available with the kernel.
+/platform/i86pc/kernel/$ISADIR/unix
+Name of the kernel to boot. When using the kernel$ token, $ISADIR expands to amd64 on 64-bit machines, and a
+null string on other machines. As a result of this dereferencing, this path expands to the proper kernel for the ma<hy>
+chine.
+After a PC-compatible machine is turned on, the system firmware in the BIOS ROM executes a power-on self test
+(POST), runs BIOS extensions in peripheral board ROMs, and invokes software interrupt INT 19h, Bootstrap. The
+INT 19h handler typically performs the standard PC-compatible boot, which consists of trying to read the first physi<hy>
+cal sector from the first diskette drive, or, if that fails, from the first hard disk. The processor then jumps to the first
+byte of the sector image in memory.
+The first sector on a floppy disk contains the master boot block (GRUB stage1). The stage 1 is responsible for load<hy>
+ing GRUB stage2. Now GRUB is fully functional. It reads and executes the menu file /boot/grub/menu.lst. A simi<hy>
+lar sequence occurs for DVD or CD boot, but the master boot block location and contents are dictated by the El Tori<hy>
+to specification. The El Torito boot also leads to strap.com, which in turn loads boot.bin.
+The first sector on a hard disk contains the master boot block, which contains the master boot program and the
+FDISK table, named for the PC program that maintains it. The master boot finds the active partition in the FDISK
+table, loads its first sector (GRUB stage1), and jumps to its first byte in memory. This completes the standard PC-
+compatible hard disk boot sequence. If GRUB stage1 is installed on the master boot block (see the -m option of in<hy>
+stallgrub(1M)), then stage2 is loaded directly from the Solaris FDISK partition regardless of the active partition.
+An x86 FDISK partition for the Solaris software begins with a one-cylinder boot slice, which contains GRUB
+stage1 in the first sector, the standard Solaris disk label and volume table of contents (VTOC) in the second and
+third sectors, and GRUB stage2 in the fiftieth and subsequent sectors. The area from sector 4 to 49 might contain
+boot blocks for older versions of Solaris. This makes it possible for multiple Solaris releases on the same FDISK to
+coexist. When the FDISK partition for the Solaris software is the active partition, the master boot program (mboot)
+reads the partition boot program in the first sector into memory and jumps to it. It in turn reads GRUB stage2 pro<hy>
+gram into memory and jumps to it. Once the GRUB menu is displayed, the user can choose to boot an operating sys<hy>
+tem on a different partition, a different disk, or possibly from the network.
+For network booting, the supported method is Intel's Preboot eXecution Environment (PXE) standard. When boot<hy>
+ing from the network using PXE, the system or network adapter BIOS uses DHCP to locate a network bootstrap pro<hy>
+gram (pxegrub) on a boot server and reads it using Trivial File Transfer Protocol (TFTP). The BIOS executes the
+pxegrub by jumping to its first byte in memory. The pxegrub program downloads a menu file and presents the en<hy>
+tries to user.
+The kernel startup process is independent of the kernel loading process. During kernel startup, console I/O goes to
+the device specified by the console property.
+When booting from UFS, the root device is specified by the bootpath property, and the root file system type is spec<hy>
+ified by the fstype property. These properties should be setup by the Solaris Install/Upgrade process in /boot/so<hy>
+laris/bootenv.rc and can be overridden with the -B option, described above (see the eeprom(1M) man page).
+When booting from ZFS, the root device is specified by a boot parameter specified by the -B $ZFS-BOOTFS pa<hy>
+rameter on either the kernel or module line in the GRUB menu entry. This value (as with all parameters specified by
+the -B option) is passed by GRUB to the kernel.
+If the console properties are not present, console I/O defaults to screen and keyboard. The root device defaults to
+ramdisk and the file system defaults to ufs. Example 1 To Boot the Default Kernel In Single-User Interactive
+Mode
+To boot the default kernel in single-user interactive mode, respond to the ok prompt with one of the following:
+<beginning of page>
+ boot -as
+ boot disk3 -as
+Example 2 Network Booting with WAN Boot-Capable PROMs
+To illustrate some of the subtle repercussions of various boot command line invocations, assume that the network-
+boot-arguments are set and that net is devaliased as shown in the commands below.
+In the following command, device arguments in the device alias are processed by the device driver. The network
+boot support package processes arguments in network-boot-arguments.
+ boot net
+The command below results in no device arguments. The network boot support package processes arguments in net<hy>
+work-boot-arguments.
+ boot net:
+The command below results in no device arguments. rarp is the only network boot support package argument. net<hy>
+work-boot-arguments is ignored.
+ boot net:rarp
+In the command below, the specified device arguments are honored. The network boot support package processes ar<hy>
+guments in network-boot-arguments.
+ boot net:speed=100,duplex=full
+Example 3 Using wanboot with Older PROMs
+The command below results in the wanboot binary being loaded from DVD or CD, at which time wanboot will per<hy>
+form DHCP and then drop into its command interpreter to allow the user to enter keys and any other necessary con<hy>
+figuration.
+ boot cdrom -F wanboot -o dhcp,prompt
+Example 4 To Boot the Default Kernel In 32-bit Single-User Interactive Mode
+To boot the default kernel in single-user interactive mode, edit the GRUB kernel command line to read:
+ kernel /platform/i86pc/kernel/unix -as
+Example 5 To Boot the Default Kernel In 64-bit Single-User Interactive Mode
+To boot the default kernel in single-user interactive mode, edit the GRUB kernel command line to read:
+<beginning of page>
+ kernel /platform/i86pc/kernel/amd64/unix -as
+Example 6 Switching Between 32-bit and 64-bit Kernels on 64-bit x86 Platform
+To be able to boot both 32-bit and 64-bit kernels, add entries for both kernels to /boot/grub/menu.lst, and use the
+set-menu subcommand of bootadm(1M) to switch. See bootadm(1M) for an example of the bootadm set-menu.
+/platform/platform-name/ufsboot
+Second-level program to boot from a disk, DVD, or CD
+/etc/inittab
+Table in which the initdefault state is specified
+/sbin/init
+Program that brings the system to the initdefault state
+/platform/platform-name/kernel/sparcv9/unix
+Default program to boot system.
+/boot
+Directory containing boot-related files.
+/boot/grub/menu.lst
+Menu of bootable operating systems displayed by GRUB.
+/platform/i86pc/kernel/unix
+32-bit kernel.
+/platform/i86pc/kernel/amd64/unix
+64-bit kernel.
+kmdb(1), uname(1), bootadm(1M), eeprom(1M), init(1M), installboot(1M), kernel(1M), monitor(1M), shut<hy>
+down(1M), svcadm(1M), umountall(1M), zpool(1M), uadmin(2), bootparams(4), inittab(4), vfstab(4), wan<hy>
+boot.conf(4), filesystem(5)
+RFC 903, A Reverse Address Resolution Protocol, http://www.ietf.org/rfc/rfc903.txt
+RFC 2131, Dynamic Host Configuration Protocol, http://www.ietf.org/rfc/rfc2131.txt
+RFC 2132, DHCP Options and BOOTP Vendor Extensions, http://www.ietf.org/rfc/rfc2132.txt
+RFC 2396, Uniform Resource Identifiers (URI): Generic Syntax, http://www.ietf.org/rfc/rfc2396.txt
+
+Sun Hardware Platform Guide
+OpenBoot Command Reference Manual
+The boot utility is unable to determine which files can be used as bootable programs. If the booting of a file that is
+not bootable is requested, the boot utility loads it and branches to it. What happens after that is unpredictable.
+<beginning of page>
+platform-name can be found using the -i option of uname(1). hardware-class-name can be found using the -m op<hy>
+tion of uname(1).
+The current release of the Solaris operating system does not support machines running an UltraSPARC-I CPU.

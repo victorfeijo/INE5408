@@ -1,0 +1,50 @@
+<beginning of page>
+t_sync <-> synchronize transport library
+#include <xti.h>
+int t_sync(int fd);
+This routine is part of the XTI interfaces which evolved from the TLI interfaces. XTI represents the future evolution
+of these interfaces. However, TLI interfaces are supported for compatibility. When using a TLI routine that has the
+same name as an XTI routine, the tiuser.h header file must be used. Refer to the TLI COMPATIBILITY section
+for a description of differences between the two interfaces.
+For the transport endpoint specified by fd, t_sync() synchronizes the data structures managed by the transport library
+with information from the underlying transport provider. In doing so, it can convert an uninitialized file descriptor
+(obtained by means of a open(2), dup(2) or as a result of a fork(2) and exec(2)) to an initialized transport endpoint,
+assuming that the file descriptor referenced a transport endpoint, by updating and allocating the necessary library
+data structures. This function also allows two cooperating processes to synchronize their interaction with a transport
+provider.
+For example, if a process forks a new process and issues an exec(2), the new process must issue a t_sync() to build
+the private library data structure associated with a transport endpoint and to synchronize the data structure with the
+relevant provider information.
+It is important to remember that the transport provider treats all users of a transport endpoint as a single user. If mul<hy>
+tiple processes are using the same endpoint, they should coordinate their activities so as not to violate the state of the
+transport endpoint. The function t_sync() returns the current state of the transport endpoint to the user, thereby en<hy>
+abling the user to verify the state before taking further action. This coordination is only valid among cooperating
+processes; it is possible that a process or an incoming event could change the endpoint's state after a t_sync() is is<hy>
+sued.
+If the transport endpoint is undergoing a state transition when t_sync() is called, the function will fail.
+On successful completion, the state of the transport endpoint is returned. Otherwise, a value of -1 is returned and
+t_errno is set to indicate an error. The state returned is one of the following:
+T_UNBND Unbound.
+T_IDLE Idle.
+T_OUTCON Outgoing connection pending.
+T_INCON Incoming connection pending.
+T_DATAXFER Data transfer.
+T_OUTREL Outgoing orderly release (waiting for an orderly release indication).
+T_INREL Incoming orderly release (waiting for an orderly release request).
+On failure, t_errno is set to one of the following:
+TBADF The specified file descriptor does not refer to a transport endpoint. This error may be returned when the fd
+has been previously closed or an erroneous number may have been passed to the call.
+TPROTO This error indicates that a communication problem has been detected between XTI and the transport
+provider for which there is no other suitable XTI error (t_errno).
+<beginning of page>
+TSTATECHNG The transport endpoint is undergoing a state change.
+TSYSERR A system error has occurred during execution of this function.
+The XTI and TLI interface definitions have common names but use different header files. This, and other semantic
+differences between the two interfaces are described in the subsections below.
+The XTI interfaces use the header file, xti.h. TLI interfaces should not use this header. They should use the header:
+ #include <tiuser.h>
+The t_errno value that can be set by the XTI interface and cannot be set by the TLI interface is:
+ TPROTO
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT LevelSafe
+dup(2), exec(2), fork(2), open(2), attributes(5)

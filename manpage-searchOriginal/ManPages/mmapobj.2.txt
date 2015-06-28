@@ -1,0 +1,93 @@
+<beginning of page>
+mmapobj <-> map a file object in the appropriate manner
+#include <sys/mman.h>
+int mmapobj(int fd, uint_t flags, mmapobj_result_t *storage,
+ uint_t *elements, void *arg);
+fd The open file descriptor for the file to be mapped.
+flags Indicates that the default behavior of mmapobj() should be modified accordingly. Available flags are:
+MMOBJ_INTERPRET
+Interpret the contents of the file descriptor instead of just mapping it as a single image. This flag can be used only
+with ELF and AOUT files.
+MMOBJ_PADDING
+When mapping in the file descriptor, add an additional mapping before the lowest mapping and after the highest
+mapping. The size of this padding is at least as large as the amount pointed to by arg. These mappings will be pri<hy>
+vate to the process, will not reserve any swap space and will have no protections. To use this address space, the pro<hy>
+tections for it will need to be changed. This padding request will be ignored for the AOUT format.
+storage A pointer to the mmapobj_result_t array where the mapping data will be copied out after a successful map<hy>
+ping of fd.
+elements A pointer to the number of mmapobj_result_t elements pointed to by storage. On return, elements con<hy>
+tains the number of mappings required to fully map the requested object. If the original value of elements is too
+small, E2BIG is returned and elements is modified to contain the number of mappings necessary.
+arg A pointer to additional information that might be associated with the specific request. Only the MMOBJ_PAD<hy>
+DING request uses this argument. If MMOBJ_PADDING is not specified, arg must be NULL.
+The mmapobj() function establishes a set of mappings between a process's address space and a file. By default,
+mmapobj() maps the whole file as a single, private, read-only mapping. The MMOBJ_INTERPRET flag instructs
+mmapobj() to attempt to interpret the file and map the file according to the rules for that file format. The following
+ELF and AOUT formats are supported:
+ET_EXEC and AOUT executables
+This format results in one or more mappings whose size, alignment and protections are as described by the file's pro<hy>
+gram header information. The address of each mapping is explicitly defined by the file's program headers.
+ET_DYN and AOUT shared objects
+This format results in one or more mappings whose size, alignment and protections are as described by the file's pro<hy>
+gram header information. The base address of the initial mapping is chosen by mmapobj(). The addresses of adja<hy>
+cent mappings are based off of this base address as defined by the file's program headers.
+ET_REL and ET_CORE
+This format results in a single, read-only mapping that covers the whole file. The base address of this mapping is
+chosen by mmapobj().
+The mmapobj() function will not map over any currently used mappings within the process, except for the case of
+an ELF ET_EXEC file for which a previous reservation has been made via /dev/null. The most common way to
+make such a reservation would be with an mmap() of /dev/null.
+<beginning of page>
+Mappings created with mmapobj() can be processed individually by other system calls such as munmap(2).
+The mmapobj_result structure contains the following members:
+ typedef struct mmapobj_result {
+  caddr_t mr_addr; /* mapping address */
+  size_t mr_msize; /* mapping size */
+  size_t mr_fsize; /* file size */
+  size_t mr_offset; /* offset into file */
+  uint_t mr_prot; /* the protections provided */
+  uint_t mr_flags; /* info on the mapping */
+ } mmapobj_result_t;
+The macro MR_GET_TYPE(mr_flags) must be used when looking for the above flags in the value of mr_flags.
+Values for mr_flags include:
+ MR_PADDING 0x1 /* this mapping represents requested padding */
+ MR_HDR_ELF 0x2 /* the ELF header is mapped at mr_addr */
+ MR_HDR_AOU 0x3 /* the AOUT header is mapped at mr_addr */
+When MR_PADDING is set, mr_fsize and mr_offset will both be 0.
+The mr_fsize member represents the amount of the file that is mapped into memory with this mapping.
+The mr_offset member is the offset into the mapping where valid data begins.
+The mr_msize member represents the size of the memory mapping starting at mr_addr. This size may include un<hy>
+used data prior to mr_offset that exists to satisfy the alignment requirements of this segment. This size may also in<hy>
+clude any non-file data that are required to provide NOBITS data (typically .bss). The system reserves the right to
+map more than mr_msize bytes of memory but only mr_msize bytes will be available to the caller of mmapobj().
+Upon successful completion, 0 is returned and elements contains the number of program headers that are mapped for
+fd. The data describing these elements are copied to storage such that the first elements members of the storage array
+contain valid mapping data.
+On failure, -1 is returned and errno is set to indicate the error. No data is copied to storage.
+The mmapobj() function will fail if:
+E2BIG The elements argument was not large enough to hold the number of loadable segments in fd. The elements
+argument will be modified to contain the number of segments required.
+EACCES The file system containing the fd to be mapped does not allow execute access, or the file descriptor point<hy>
+ed to by fd is not open for reading.
+EADDRINUSE The mapping requirements overlap an object that is already used by the process.
+EAGAIN There is insufficient room to reserve swap space for the mapping.
+The file to be mapped is already locked using advisory or mandatory record locking. See fcntl(2).
+EBADF The fd argument is not a valid open file descriptor.
+EFAULT The storage, arg, or elements argument points to an invalid address.
+EINVAL The flags argument contains an invalid flag.
+<beginning of page>
+MMOBJ_PADDING was not specified in flagsand arg was non-null.
+ENODEV The fd argument refers to an object for which mmapobj() is meaningless, such as a terminal.
+ENOMEM Insufficient memory is available to hold the program headers.
+Insufficient memory is available in the address space to create the mapping.
+ENOTSUP The current user data model does not match the fd to be interpreted; thus, a 32-bit process that tried to
+use mmapobj() to interpret a 64-bit object would return ENOTSUP.
+The fd argument is a file whose type can not be interpreted and MMOBJ_INTERPRET was specified in flags.
+The ELF header contains an unaligned e_phentsize value.
+ENOSYS An unsupported filesystem operation was attempted while trying to map in the object.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stabili<hy>
+tyPrivate _ MT-LevelAsync-Signal-Safe
+ld.so.1(1), fcntl(2), memcntl(2), mmap(2), mprotect(2), munmap(2), elf(3ELF), madvise(3C), mlockall(3C),
+msync(3C), a.out(4), attributes(5)
+Linker and Libraries Guide

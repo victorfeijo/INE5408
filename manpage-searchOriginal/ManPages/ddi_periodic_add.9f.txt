@@ -1,0 +1,80 @@
+<beginning of page>
+ddi_periodic_add <-> issue nanosecond periodic timeout requests
+#include <sys/dditypes.h>
+#include <sys/sunddi.h>
+ddi_periodic_t ddi_periodic_add(void (*func)(void *), void arg,
+ hrtime_t interval, int level);
+Solaris DDI specific (Solaris DDI)
+func The callback function is invoked periodically in the specified interval. If the argument level is zero, the function
+is invoked in kernel context. Otherwise, it's invoked in interrupt context at the specified level.
+arg The argument passed to the callback function.
+interval Interval time in nanoseconds.
+level Callback interrupt level. If the value is zero, the callback function is invoked in kernel context. If the value is
+more than zero, but less than or equal to ten, the callback function is invoked in interrupt context at the specified in<hy>
+terrupt level, which may be used for real time applications.
+This value must be in range of 0-10, which can be either a numeric number, a pre-defined macro (DDI_IPL_0, ... ,
+DDI_IPL_10), or the DDI_INTR_PRI macro with the interrupt priority.
+The ddi_periodic_add() function schedules the specified function to be periodically invoked in the nanosecond in<hy>
+terval time.
+As with timeout(9F), the exact time interval over which the function takes effect cannot be guaranteed, but the value
+given is a close approximation.
+ddi_periodic_add()returns the non-zero opaque value (ddi_periodic_t), which might be used for ddi_period<hy>
+ic_delete(9F) to specify the request.
+The ddi_periodic_add() function may be called from user or kernel context. Example 1 Using ddi_period<hy>
+ic_add() for a periodic callback function
+In the following example, the device driver registers a periodic callback function invoked in kernel context.
+ static void
+ my_periodic_func(void *arg)
+ {
+  /*
+  * This handler is invoked periodically.
+  */
+  struct my_state *statep = (struct my_state *)arg;
+  mutex_enter(&statep->lock);
+  if (load_unbalanced(statep)) {
+  balance_tasks(statep);
+  }
+  mutex_exit(&statep->lock);
+ }
+ static void
+ start_periodic_timer(struct my_state *statep)
+ {
+  hrtime_t interval = CHECK_INTERVAL;
+  mutex_init(&statep->lock, NULL, MUTEX_DRIVER,
+  (void *)DDI_IPL_0);
+<beginning of page>
+  /*
+  * Register my_callback which is invoked periodically
+  * in CHECK_INTERVAL in kernel context.
+  */
+  statep->periodic_id = ddi_periodic_add(my_periodic_func,
+  statep, interval, DDI_IPL_0);
+In the following example, the device driver registers a callback function invoked in interrupt context at level 7.
+ /*
+  * This handler is invoked periodically in interrupt context.
+  */
+  static void
+  my_periodic_int7_func(void *arg)
+  {
+  struct my_state *statep = (struct my_state *)arg;
+  mutex_enter(&statep->lock);
+  monitor_device(statep);
+  mutex_exit(&statep->lock);
+  }
+  static void
+  start_monitor_device(struct my_state *statep)
+  {
+  hrtime_t interval = MONITOR_INTERVAL;
+  mutex_init(&statep->lock, NULL, MUTEX_DRIVER,
+  (void *)DDI_IPL_7);
+  /*
+  * Register the callback function invoked periodically
+  * at interrupt level 7.
+  */
+  statep->periodic_id = ddi_periodic_add(my_periodic_int7_func,
+  statep, interval, DDI_IPL_7);
+  }
+cv_timedwait(9F), ddi_intr_get_pri(9F), ddi_periodic_delete(9F), ddi_intr_get_softint_pri(9F), delay(9F),
+drv_usectohz(9F), qtimeout(9F), quntimeout(9F), timeout(9F), untimeout(9F)
+A caller can only specify an interval in an integral multiple of 10ms. No other values are supported at this time. The
+interval specified is a lower bound on the interval on which the callback occurs.

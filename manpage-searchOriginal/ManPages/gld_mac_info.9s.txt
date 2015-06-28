@@ -1,0 +1,103 @@
+<beginning of page>
+gld_mac_info <-> Generic LAN Driver MAC info data structure
+#include <sys/gld.h>
+Solaris architecture specific (Solaris DDI).
+The Generic LAN Driver (GLD) Media Access Control (MAC) information (gld_mac_info) structure is the main
+data interface between the device-specific driver and GLD. It contains data required by GLD and a pointer to an op<hy>
+tional additional driver-specific information structure.
+The gld_mac_info structure should be allocated using gld_mac_alloc() and deallocated using gld_mac_free().
+Drivers can make no assumptions about the length of this structure, which might be different in different releases of
+Solaris and/or GLD. Structure members private to GLD, not documented here, should not be set or read by the de<hy>
+vice-specific driver.
+ caddr_t gldm_private; /* Driver private data */
+ int (*gldm_reset)(); /* Reset device */
+ int (*gldm_start)(); /* Start device */
+ int (*gldm_stop)(); /* Stop device */
+ int (*gldm_set_mac_addr)(); /* Set device phys addr */
+ int (*gldm_set_multicast)(); /* Set/delete */
+  /* multicast address */
+ int (*gldm_set_promiscuous)();
+  /* Set/reset promiscuous */
+  /* mode*/
+ int (*gldm_send)(); /* Transmit routine */
+ u_int (*gldm_intr)(); /* Interrupt handler */
+ int (*gldm_get_stats)(); /* Get device statistics */
+ int (*gldm_ioctl)(); /* Driver-specific ioctls */
+ char *gldm_ident; /* Driver identity string */
+ uint32_t gldm_type; /* Device type */
+ uint32_t gldm_minpkt; /* Minimum packet size */
+  /* accepted by driver */
+ uint32_t gldm_maxpkt; /* Maximum packet size */
+  /* accepted by driver */
+ uint32_t gldm_addrlen; /* Physical address */
+  /* length */
+ int32_t gldm_saplen; /* SAP length for */
+  /* DL_INFO_ACK */
+ unsigned char *gldm_broadcast_addr; /* Physical broadcast */
+  /* addr */
+ unsigned char *gldm_vendor_addr; /* Factory MAC address */
+ t_uscalar_t gldm_ppa; /* Physical Point of */
+  /* Attachment (PPA) number */
+ dev_info_t *gldm_devinfo; /* Pointer to device's */
+  /* dev_info node */
+ ddi_iblock_cookie_tgldm_cookie; /* Device's interrupt */
+  /* block cookie */
+ int gldm_margin /* accepted data beyond */
+  /*gldm_maxpkt */
+ uint32_t gldm_capabilities; /* Device capabilities */
+Below is a description of the members of the gld_mac_info structure that are visible to the device driver.
+gldm_private This structure member is private to the device-specific driver and is not used or modified by GLD.
+Conventionally, this is used as a pointer to private data, pointing to a driver-defined and driver-allocated per-instance
+data structure.
+The following group of structure members must be set by the driver before calling gld_register(), and should not
+thereafter be modified by the driver; gld_register() can use or cache the values of some of these structure members,
+so changes made by the driver after calling gld_register() might cause unpredicted results.
+<beginning of page>
+gldm_reset Pointer to driver entry point; see gld(9E).
+gldm_start Pointer to driver entry point; see gld(9E).
+gldm_stop Pointer to driver entry point; see gld(9E).
+gldm_set_mac_addr Pointer to driver entry point; see gld(9E).
+gldm_set_multicast Pointer to driver entry point; see gld(9E).
+gldm_set_promiscuous Pointer to driver entry point; see gld(9E).
+gldm_send Pointer to driver entry point; see gld(9E).
+gldm_intr Pointer to driver entry point; see gld(9E).
+gldm_get_stats Pointer to driver entry point; see gld(9E).
+gldm_ioctl Pointer to driver entry point; can be NULL; see gld(9E).
+gldm_ident Pointer to a string containing a short description of the device. It is used to identify the device in system
+messages.
+gldm_type The type of device the driver handles. The values currently supported by GLD are DL_ETHER (IEEE
+802.3 and Ethernet Bus), DL_TPR (IEEE 802.5 Token Passing Ring), and DL_FDDI (ISO 9314-2 Fibre Distributed
+Data Interface). This structure member must be correctly set for GLD to function properly.
+Support for the DL_TPR and DL_FDDI media types is obsolete and may be removed in a future release of Solaris.
+gldm_minpkt Minimum Service Data Unit size <em> the minimum packet size, not including the MAC header, that
+the device will transmit. This can be zero if the device-specific driver can handle any required padding.
+gldm_maxpkt Maximum Service Data Unit size <em> the maximum size of packet, not including the MAC header,
+that can be transmitted by the device. For Ethernet, this number is 1500.
+gldm_addrlen The length in bytes of physical addresses handled by the device. For Ethernet, Token Ring, and FD<hy>
+DI, the value of this structure member should be 6.
+gldm_saplen The length in bytes of the Service Access Point (SAP) address used by the driver. For GLD-based
+drivers, this should always be set to -2, to indicate that two-byte SAP values are supported and that the SAP appears
+after the physical address in a DLSAP address. See the description under ``Message DL_INFO_ACK'' in the DLPI
+specification for more details.
+gldm_broadcast_addr Pointer to an array of bytes of length gldm_addrlen containing the broadcast address to be
+used for transmit. The driver must allocate space to hold the broadcast address, fill it in with the appropriate value,
+and set gldm_broadcast_addr to point at it. For Ethernet, Token Ring, and FDDI, the broadcast address is normally
+0xFF-FF-FF-FF-FF-FF.
+<beginning of page>
+gldm_vendor_addr Pointer to an array of bytes of length gldm_addrlen containing the vendor-provided network
+physical address of the device. The driver must allocate space to hold the address, fill it in with information read
+from the device, and set gldm_vendor_addr to point at it.
+gldm_ppa The Physical Point of Attachment (PPA) number for this instance of the device. Normally this should be
+set to the instance number, returned from ddi_get_instance(9F).
+gldm_devinfo Pointer to the dev_info node for this device.
+gldm_cookie The interrupt block cookie returned by ddi_get_iblock_cookie(9F), ddi_add_intr(9F),
+ddi_get_soft_iblock_cookie(9F), or ddi_add_softintr(9F). This must correspond to the device's receive interrupt,
+from which gld_recv() is called.
+gldm_margin Drivers set this value to the amount of data in bytes that the device can transmit beyond gldm_maxp<hy>
+kt. For example, if an Ethernet device can handle packets whose payload section is no greater than 1522 bytes and
+the gldm_maxpkt is set to 1500 (as is typical for Ethernet), then gldm_margin is set to 22. The registered
+gldm_margin value is reported in acknowledgements of the DLIOCMARGININFO ioctl (see dlpi(7P)).
+gldm_capabilities Bit-field of device capabilities. If the device is capable of reporting media link state, the
+GLD_CAP_LINKSTATE bit should be set.
+gld(7D), dlpi(7P), attach(9E), gld(9E), ddi_add_intr(9F), gld(9F), gld_stats(9S)
+Writing Device Drivers

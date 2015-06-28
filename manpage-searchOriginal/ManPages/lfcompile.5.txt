@@ -1,0 +1,69 @@
+<beginning of page>
+lfcompile <-> large file compilation environment for 32-bit applications
+All 64-bit applications can manipulate large files by default. The methods described on this page allow 32-bit appli<hy>
+cations to manipulate large files.
+In the large file compilation environment, source interfaces are bound to appropriate 64-bit functions, structures, and
+types. Compiling in this environment allows 32-bit applications to access files whose size is greater than or equal to
+2 Gbyte ( 2^31 bytes).
+Each interface named xxx() that needs to access 64-bit entities to access large files maps to a xxx64() call in the re<hy>
+sulting binary. All relevant data types are defined to be of correct size (for example, off_t has a typedef definition for
+a 64-bit entity).
+An application compiled in this environment is able to use the xxx() source interfaces to access both large and small
+files, rather than having to explicitly utilize the transitional xxx64() interface calls to access large files. See the lf<hy>
+compile64(5) manual page for information regarding the transitional compilation environment.
+Applications can be compiled in the large file compilation environment by using the following methods: <bu> Use the
+getconf(1) utility with one or more of the arguments listed in the table below. This method is recommended for por<hy>
+table applications.
+tab() box; cw(1.68i) |cw(3.82i) lw(1.68i) |lw(3.82i) argumentpurpose _ LFS_CFLAGST{ obtain compilation flags
+necessary to enable the large file compilation environment T} LFS_LDFLAGSobtain link editor options LFS_LIB<hy>
+Sobtain link library names LFS_LINTFLAGSobtain lint options
+<bu> Set the compile-time flag _FILE_OFFSET_BITS to 64 before including any headers. Applications may combine
+objects produced in the large file compilation environment with objects produced in the transitional compilation en<hy>
+vironment, but must be careful with respect to interoperability between those objects. Applications should not de<hy>
+clare global variables of types whose sizes change between compilation environments.
+The fseek() and ftell() functions do not map to functions named fseek64() and ftell64(); rather, the large file addi<hy>
+tions fseeko() and ftello(), have functionality identical to fseek() and ftell() and do map to the 64-bit functions
+fseeko64() and ftello64(). Applications wishing to access large files should use fseeko() and ftello() in place of
+fseek() and ftell(). See the fseek(3C) and ftell(3C) manual pages for information about fseeko() and ftello().
+Applications wishing to access fseeko() and ftello() as well as the POSIX and X/Open specification-conforming in<hy>
+terfaces should define the macro _LARGEFILE_SOURCE to be 1 and set whichever feature test macros are appro<hy>
+priate to obtain the desired environment (see standards(5)).
+In the following examples, the large file compilation environment is accessed by invoking the getconf utility with
+one of the arguments listed in the table above. The additional large file interfaces are accessed by specifying
+-D_LARGEFILE_SOURCE.
+The examples that use the form of command substitution specifying the command within parentheses preceded by a
+dollar sign can be executed only in a POSIX-conforming shell such as the Korn Shell (see ksh(1)). In a shell that is
+not POSIX-conforming, such as the Bourne Shell (see sh(1)) and the C Shell (see csh(1)), the getconf calls must be
+enclosed within grave accent marks, as shown in the second example. Example 1 Compile a program with a "large"
+off_t that uses fseeko(), ftello(), and yacc.
+The following example compiles a program with a "large" off_t and uses fseeko(), ftello(), and yacc(1).
+ $ c89 -D_LARGEFILE_SOURCE \
+  -D_FILE_OFFSET_BITS=64 -o foo \
+  $(getconf LFS_CFLAGS) y.tab.c b.o \
+  $(getconf LFS_LDFLAGS) \
+  -ly $(getconf LFS_LIBS)
+Example 2 Compile a program with a "large" off_t that does not use fseeko() and ftello() and has no application
+specific libraries.
+ % c89 -D_FILE_OFFSET_BITS=64 \
+  <ga>getconf LFS_CFLAGS<ga> a.c \
+  <ga>getconf LFS_LDFLAGS<ga> \
+<beginning of page>
+  <ga>getconf LFS_LIBS<ga> \
+Example 3 Compile a program with a "default" off_t that uses fseeko() and ftello().
+ $ c89 -D_LARGEFILE_SOURCE a.c
+csh(1), getconf(1), ksh(1), yacc(1), sh(1), fseek(3C), ftell(3C), lf64(5), lfcompile64(5), standards(5)
+Certain system-specific or non-portable interfaces are not usable in the large file compilation environment. Known
+cases are: <bu> Kernel data structures read from /dev/kmem. <bu> Interfaces in the kernel virtual memory library, -lkvm. <bu>
+Interfaces in the ELF access library, -lelf. <bu> Interfaces to /proc defined in <procfs.h>. <bu> The ustat(2) system call.
+Programs that use these interfaces should not be compiled in the large file compilation environment. As a partial
+safeguard against making this mistake, including either of the <libelf.h> or <sys/procfs.h> header files will induce a
+compilation error when the large file compilation environment is enabled.
+In general, caution should be exercised when using any separately-compiled library whose interfaces include data
+items of type off_t or the other redefined types either directly or indirectly, such as with 'struct stat'. (The redefined
+types are off_t, rlim_t, ino_t, blkcnt_t, fsblkcnt_t, and fsfilcnt_t.) For the large file compilation environment to
+work correctly with such a library, the library interfaces must include the appropriate xxx64() binary entry points and
+must have them mapped to the corresponding primary functions when _FILE_OFFSET_BITS is set to 64.
+Care should be exercised using any of the printf() or scanf() routines on variables of the types mentioned above. In
+the large file compilation environment, these variables should be printed or scanned using long long formats.
+Symbolic formats analogous to those found in <sys/int_fmtio.h> do not exist for printing or scanning variables of
+the types that are redefined in the large file compilation environment.

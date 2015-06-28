@@ -1,0 +1,44 @@
+<beginning of page>
+listen <-> network listener daemon
+/usr/lib/saf/listen [-m devstem] net_spec
+The listen process ``listens'' to a network for service requests, accepts requests when they arrive, and invokes servers
+in response to those service requests. The network listener process may be used with any connection-oriented net<hy>
+work (more precisely, with any connection-oriented transport provider) that conforms to the Transport Layer Inter<hy>
+face (TLI) Specification.
+The listener internally generates a pathname for the minor device for each connection; it is this pathname that is used
+in the utmpx entry for a service, if one is created. By default, this pathname is the concatenation of the prefix
+/dev/netspec with the decimal representation of the minor device number. In either case, the representation of the
+minor device number will be at least two digits (for example, 05 or 27), or longer when it is necessary to accommo<hy>
+date minor device numbers larger than 99.
+When a connection indication is received, the listener creates a new transport endpoint and accepts the connection
+on that endpoint. Before giving the file descriptor for this new connection to the server, any designated STREAMS
+modules are pushed and the configuration script is executed, (if one exists). This file descriptor is appropriate for use
+with either TLI (see t_sync(3NSL) ) or the sockets interface library.
+By default, a new instance of the server is invoked for each connection. When the server is invoked, file descriptor 0
+refers to the transport endpoint, and is open for reading and writing. File descriptors 1 and 2 are copies of file de<hy>
+scriptor 0; no other file descriptors are open. The service is invoked with the user and group IDs of the user name un<hy>
+der which the service was registered with the listener, and with the current directory set to the HOME directory of
+that user.
+Alternatively, a service may be registered so that the listener will pass connections to a standing server process
+through a FIFO or a named stream, instead of invoking the server anew for each connection. In this case, the connec<hy>
+tion is passed in the form of a file descriptor that refers to the new transport endpoint. Before the file descriptor is
+sent to the server, the listener interprets any configuration script registered for that service using doconfig(3NSL), al<hy>
+though doconfig is invoked with both the NORUN and NOASSIGN flags. The server receives the file descriptor for
+the connection in a strrecvfd structure using an I_RECVFD ioctl(2).
+For more details about the listener and its administration, see nlsadmin(1M).
+-mdevstem The listener will use devstem as the prefix for the pathname.
+/etc/saf/pmtag/*
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu
+nlsadmin(1M), pmadm(1M), sac(1M), sacadm(1M), ioctl(2), doconfig(3NSL), nlsgetcall(3NSL), nl<hy>
+sprovider(3NSL), t_sync(3NSL), attributes(5), streamio(7I)
+
+When passing a connection to a standing server, the user and group IDs contained in the strrecvfd structure will be
+those for the listener (that is, they will both be 0); the user name under which the service was registered with the lis<hy>
+tener is not reflected in these IDs.
+When operating multiple instances of the listener on a single transport provider, there is a potential race condition in
+the binding of addresses during initialization of the listeners, if any of their services have dynamically assigned ad<hy>
+dresses. This condition would appear as an inability of the listener to bind a static-address service to its otherwise
+valid address, and would result from a dynamic-address service having been bound to that address by a different in<hy>
+stance of the listener.

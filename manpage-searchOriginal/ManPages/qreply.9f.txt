@@ -1,0 +1,41 @@
+<beginning of page>
+qreply <-> send a message on a stream in the reverse direction
+#include <sys/stream.h>
+void qreply(queue_t *q, mblk_t *mp);
+Architecture independent level 1 (DDI/DKI).
+q Pointer to the queue.
+mp Pointer to the message to be sent in the opposite direction.
+The qreply() function sends messages in the reverse direction of normal flow. That is, qreply(q, mp) is equivalent to
+putnext(OTHERQ(q), mp).
+The qreply() function can be called from user, interrupt, or kernel context. Example 1 Canonical Flushing Code for
+STREAMS Drivers.
+This example depicts the canonical flushing code for STREAMS drivers. Assume that the driver has service proce<hy>
+dures so that there may be messages on its queues. See srv(9E). Its write-side put procedure handles M_FLUSH
+messages by first checking the FLUSHW bit in the first byte of the message, then the write queue is flushed (line 8)
+and the FLUSHW bit is turned off (line 9). See put(9E). If the FLUSHR bit is on, then the read queue is flushed
+(line 12) and the message is sent back up the read side of the stream with the qreply() function (line 13). If the
+FLUSHR bit is off, then the message is freed (line 15). See the example for flushq(9F) for the canonical flushing
+code for modules.
+ 1 xxxwput(q, mp)
+  2 queue_t *q;
+  3 mblk_t *mp;
+  4 {
+  5  switch(mp->b_datap->db_type) {
+  6  case M_FLUSH:
+  7 if (*mp->b_rptr & FLUSHW) {
+  8 flushq(q, FLUSHALL);
+  9 *mp->b_rptr &= ~FLUSHW;
+ 10  }
+ 11 if (*mp->b_rptr & FLUSHR) {
+ 12 flushq(RD(q), FLUSHALL);
+ 13  qreply(q, mp);
+ 14 } else {
+ 15  freemsg(mp);
+ 16  }
+ 17 break;
+   . . .
+ 18 }
+ 19 }
+put(9E), srv(9E), flushq(9F), OTHERQ(9F), putnext(9F)
+Writing Device Drivers
+STREAMS Programming Guide

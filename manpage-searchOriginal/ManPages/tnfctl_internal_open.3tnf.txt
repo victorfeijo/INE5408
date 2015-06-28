@@ -1,0 +1,32 @@
+<beginning of page>
+tnfctl_internal_open <-> create handle for internal process probe control
+cc [ flag ... ] file ... -ltnfctl [ library ... ]
+#include <tnf/tnfctl.h>
+tnfctl_errcode_t tnfctl_internal_open(tnfctl_handle_t **ret_val);
+tnfctl_internal_open() returns in ret_val a pointer to an opaque handle that can be used to control probes in the
+same process as the caller (internal process probe control). The process must have libtnfprobe.so.1 loaded. Probes
+in libraries that are brought in by dlopen(3C) will be visible after the library has been opened. Probes in libraries
+closed by a dlclose(3C) will not be visible after the library has been disassociated. See the NOTES section for more
+details.
+tnfctl_internal_open() returns TNFCTL_ERR_NONE upon success.
+TNFCTL_ERR_ALLOCFAIL A memory allocation failure occurred.
+TNFCTL_ERR_BUSY Another client is already tracing this program (internally or externally).
+TNFCTL_ERR_NOLIBTNFPROBE libtnfprobe.so.1 is not linked in the target process.
+TNFCTL_ERR_INTERNAL An internal error occurred.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Availability<hy>
+SUNWtnfc _ MT LevelMT-Safe
+ld(1), prex(1), TNF_PROBE(3TNF), dlopen(3C), dlclose(3C), libtnfctl(3TNF), tracing(3TNF), attributes(5)
+Linker and Libraries Guide
+libtnfctl interposes on dlopen(3C) and dlclose(3C) in order to be notified of libraries being dynamically opened and
+closed. This interposition is necessary for internal process probe control to update its list of probes. In these interpo<hy>
+sition functions, a lock is acquired to synchronize on traversal of the library list maintained by the runtime linker. To
+avoid deadlocking on this lock, tnfctl_internal_open() should not be called from within the init section of a library
+that can be opened by dlopen(3C).
+Since interposition does not work as expected when a library is opened dynamically, tnfctl_internal_open() should
+not be used if the client opened libtnfctl through dlopen(3C). In this case, the client program should be built with a
+static dependency on libtnfctl. Also, if the client program is explicitly linking in -ldl, it should link -ltnfctl before
+-ldl.
+Probes in filtered libraries (see ld(1)) will not be seen because the filtee (backing library) is loaded lazily on the first
+symbol reference and not at process startup or dlopen(3C) time. A workaround is to call tnfctl_check_libs(3TNF)
+once the caller is sure that the filtee has been loaded.

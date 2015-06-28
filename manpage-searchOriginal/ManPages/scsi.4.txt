@@ -1,0 +1,113 @@
+<beginning of page>
+scsi <-> configuration files for SCSI target drivers
+The architecture of the Solaris SCSI subsystem distinguishes two types of device drivers: SCSI target drivers, and
+SCSI host adapter drivers. Target drivers like sd(7D) and st(7D) manage the device on the other end of the SCSI
+bus. Host adapter drivers manage the SCSI bus on behalf of all the devices that share it.
+Drivers for host adapters provide a common set of interfaces for target drivers. These interfaces comprise the Sun
+Common SCSI Architecture ( SCSA) which are documented as part of the Solaris DDI/DKI. See scsi_ifgetcap(9F),
+scsi_init_pkt(9F), and scsi_transport(9F) for further details of these, and associated routines.
+Depending on the interconnect (transport), SCSI target devices are either self-identifying or rely on driver.conf(4)
+entries to be recognized by the system. For self-identifying target devices the driver binding is chosen based on the
+IEEE-1275 like 'compatible' forms of the target devices. Currently the Fibre Channel interconnects, fcp(7D),
+ifp(7D), scsi_vhci(7D), sf(7D), and the SATA framework drivers (see sata(7D)) are self-identifying. You must spec<hy>
+ify other possible interconnects target devices by using the target driver driver.conf(4) configuration files.
+Host adapter drivers of class scsi-self-identifying that dynamically create self-identifying target device children es<hy>
+tablish a compatible property on each child. The compatible property is an ordered array of strings, each string is a
+compatible form. High precedence forms are defined first. For a particular device, the highest precedence form that
+has an established driver alias selects the driver for the device. Driver associations to compatible forms, called alias<hy>
+es, are administered by way of add_drv(1M), update_drv(1M), and rem_drv(1M) utilities.
+The forms for self-identifying SCSI target devices are derived from the SCSI target device's INQUIRY data. A di<hy>
+verse set of forms is defined, allowing for flexibility in binding.
+From the SCSI INQUIRY data, three types of information are extracted: scsi_dtype, flag bits, and SCSI_ASCII ven<hy>
+dor product revision.
+The scsi_dtype is the first component of most forms. It is represented as two hex digits. For nodes that represent em<hy>
+bedded secondary functions, such as an embedded enclosure service or media changer, additional forms are generat<hy>
+ed that contain the dtype of the secondary function followed by the dtype of the device in which the secondary func<hy>
+tion is embedded.
+For forms that use flag bits, all applicable flags are concatenated (in alphabetical order) into a single flags string. Re<hy>
+movable media is represented by a flag. For forms that use the SCSI_ASCII INQUIRY vendor, product, and revision
+fields, a one-way conversion algorithm translates SCSI_ASCII to a IEEE 1275 compatible string.
+It is possible that a device might change the INQUIRY data it returns over time as a result of a device initialization
+sequence or in response to out-of-band management. A device node's compatible property is based on the INQUIRY
+data when the device node was created.
+The following forms, in high to low precedence order, are defined for SCSI target device nodes.
+ scsiclass,DDEEFFF.vVVVVVVVV.pPPPPPPPPPPPPPPPP.rRRRR (1 *1&2)
+ scsiclass,DDEE.vVVVVVVVV.pPPPPPPPPPPPPPPPP.rRRRR (2 *1)
+ scsiclass,DDFFF.vVVVVVVVV.pPPPPPPPPPPPPPPPP.rRRRR (3 *2)
+ scsiclass,DD.vVVVVVVVV.pPPPPPPPPPPPPPPPP.rRRRR (4)
+ scsiclass,DDEEFFF.vVVVVVVVV.pPPPPPPPPPPPPPPPP (5 *1&2)
+ scsiclass,DDEE.vVVVVVVVV.pPPPPPPPPPPPPPPPP (6 *1)
+ scsiclass,DDFFF.vVVVVVVVV.pPPPPPPPPPPPPPPPP (7 *2)
+ scsiclass,DD.vVVVVVVVV.pPPPPPPPPPPPPPPPP (8)
+ scsiclass,DDEEFFF (9 *1&2)
+ scsiclass,DDEE (10 *1)
+ scsiclass,DDFFF (11 *2)
+ scsiclass,DD (12)
+ scsiclass (13)
+  *1 only produced on a secondary function node
+  *2 only produced on a node with flags
+where:
+v Is the letter v. Denotes the beginning of VVVVVVVV.
+<beginning of page>
+VVVVVVVV Translated scsi_vendor: SCSI standard INQUIRY data "Vendor identification" SCSI_ASCII field
+(bytes 8-15).
+p Is the letter p. Denotes the beginning of PPPPPPPPPPPPPPPP.
+PPPPPPPPPPPPPPPP Translated scsi_product: SCSI standard INQUIRY data "Product identification" SC<hy>
+SI_ASCII field (bytes 16-31).
+r Is the letter r. Denotes the beginning of RRRR.
+RRRR Translated scsi_revision: SCSI standard INQUIRY data "Product revision level" SCSI_ASCII field (bytes
+32-35).
+DD Is a two digit ASCII hexadecimal number. The value of the two digits is based one the SCSI "Peripheral device
+type" command set associated with the node. On a primary node this is the scsi_dtype of the primary command set;
+on a secondary node this is the scsi_dtype associated with the embedded function command set.
+EE Same encoding used for DD. This form is only generated on secondary function nodes. The DD function is em<hy>
+bedded in an EE device.
+FFF Concatenation, in alphabetical order, of the flag characters below. The following flag characters are defined:
+R Removable media: Used when scsi_rmb is set
+Forms using FFF are only be generated if there are applicable flag characters.
+Solaris might create additional compatible forms not described. These forms are for Solaris internal use only. Any
+additional use of these forms is discouraged. Future releases of Solaris might not produce these forms.
+Configuration files for SCSI target drivers should identify the host adapter driver implicitly using the class keyword
+to remove any dependency on the particular host adapter involved.
+All host adapter drivers of class scsi recognize the following properties:
+target Integer-valued SCSI target identifier that this driver claims.
+lun Integer-valued SCSI logical unit number ( LUN) that this driver claims.
+All SCSI target driver configuration file device definitions except stub device definitions for discovery of devid must
+provide target and lun properties. These properties are used to construct the address part of the device name under
+/devices. The stub device definitions for discovery of devid must be able to specify or imply the host adapter drivers
+that might have children that bind to the target driver. So all SCSI target driver configuration file stub device defini<hy>
+tions must be defined by property class or parent.
+The SCSI target driver configuration files shipped with Solaris have entries for LUN 0 only. For devices that support
+other LUNs, such as some CD changers, the system administrator can edit the driver configuration file to add entries
+for other LUNs. Example 1 An Example Configuration File for a SCSI Target Driver
+The following is an example configuration file for a SCSI target driver called toaster.conf.
+ #
+ # Copyright (c) 1992, by Sun Microsystems, Inc.
+ #
+ #ident "@(#)toaster.conf 1.2 92/05/12 SMI"
+ name="toaster" class="scsi" target=4 lun=0;
+<beginning of page>
+Add the following lines to sd.conf for a six- CD changer on target 3, with LUNs 0 to 5.
+ name="sd" class="scsi" target=3 lun=1;
+ name="sd" class="scsi" target=3 lun=2;
+ name="sd" class="scsi" target=3 lun=3;
+ name="sd" class="scsi" target=3 lun=4;
+ name="sd" class="scsi" target=3 lun=5;
+It is not necessary to add the line for LUN 0, as it already exists in the file shipped with Solaris.
+Example 2 A Stub Device Definition of sd.conf
+The following line is a stub device definition which implies the host adapter drivers of class scsi-self-identifying
+might have children that bind to the sd(7D) driver:
+ name="sd" class="scsi-self-identifying";
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wckr _ Interface StabilityCommitted
+add_drv(1M), rem_drv(1M), update_drv(1M), driver.conf(4), attributes(5), fcp(7D), ifp(7D), sata(7D), scsi_vh<hy>
+ci(7D), sd(7D), sf(7D), st(7D), scsi_ifgetcap(9F), scsi_init_pkt(9F), scsi_transport(9F)
+Writing Device Drivers
+ANS X3T9.2/82-2 SMALL COMPUTER SYSTEM INTERFACE (SCSI-1)
+ANS X3T9.2/375D Small Computer System Interface - 2 (SCSI-2)
+ANS X3T10/994D SCSI-3 Architecture Model (SAM)
+IEEE 1275 SCSI Target Device Binding
+With driver.conf(4) configuration, you need to ensure that the target and lun values claimed by your target driver
+do not conflict with existing target drivers on the system. For example, if the target is a direct access device, the stan<hy>
+dard sd.conf file usually makes sd claim it before any other driver has a chance to probe it.

@@ -1,0 +1,154 @@
+<beginning of page>
+svcadm <-> manipulate service instances
+/usr/sbin/svcadm [-v] enable [-rst] {FMRI | pattern}...
+/usr/sbin/svcadm [-v] disable [-st] {FMRI | pattern}...
+/usr/sbin/svcadm [-v] restart {FMRI | pattern}...
+/usr/sbin/svcadm [-v] refresh {FMRI | pattern}...
+/usr/sbin/svcadm [-v] clear {FMRI | pattern}...
+/usr/sbin/svcadm [-v] mark [-It] instance_state
+ {FMRI | pattern}...
+/usr/sbin/svcadm [-v] milestone [-d] milestone_FMRI
+svcadm issues requests for actions on services executing within the service management facility (see smf(5)). Ac<hy>
+tions for a service are carried out by its assigned service restarter agent. The default service restarter is svc.startd
+(see svc.startd(1M)).
+The following options are supported:
+-v Print actions verbosely to standard output.
+The subcommands listed below are used during the typical administration of a service instance.
+For subcommands taking one or more operands, if the operand specifies a service (instead of a service instance), and
+that service has only a single instance, svcadm operates on that instance. If an abbreviated FMRI (a fault manage<hy>
+ment resource identifier) or pattern matches more than one service, a warning message is displayed and that operand
+is ignored. See smf(5).
+In the case that the service has more than one instance, svcadm return a non-zero exit status.
+enable [-rst] {FMRI | pattern}. . .
+Enables the service instances specified by the operands. For each service instance, the assigned restarter will try to
+bring it to the online state. This action requires permission to modify the "general" property group of the service in<hy>
+stance (see smf_security(5)).
+If the -r option is specified, svcadm enables each service instance and recursively enables its dependencies.
+If the -s option is specified, svcadm enables each service instance and then waits for each service instance to enter
+the online or degraded state. svcadm will return early if it determines that the service cannot reach these states
+without administrator intervention.
+If the -t option is specified, svcadm temporarily enables each service instance. Temporary enable only lasts until re<hy>
+boot. This action requires permission to modify the "restarter_actions" property group of the service instance (see
+smf_security(5)). By default, enable is persistent across reboot.
+disable [-st] {FMRI | pattern}. . .
+Disables the service instance specified by the operands. For each service instance, the assigned restarter will try to
+bring it to the disabled state. This action requires permission to modify the "general" property group of the service
+instance (see smf_security(5)).
+If the -s option is specified, svcadm disables each service instance and then waits for each service instance to enter
+the disabled state. svcadm will return early if it determines that the service cannot reach this state without adminis<hy>
+trator intervention.
+If the -t option is specified, svcadm temporarily disables each service instance. Temporary disable only lasts until
+reboot. This action requires permission to modify the "restarter_actions" property group of the service instance (see
+smf_security(5)). By default, disable is persistent across reboot.
+<beginning of page>
+restart {FMRI | pattern}. . .
+Requests that the service instances specified by the operands be restarted. This action requires permission to modify
+the "restarter_actions" property group of the service instance (see smf_security(5)).
+This subcommand can restart only those services that are in the online or degraded states, as those states are defined
+in smf(5).
+refresh {FMRI | pattern}. . .
+For each service instance specified by the operands, requests that the assigned restarter update the service's running
+configuration snapshot with the values from the current configuration. Some of these values take effect immediately
+(for example, dependency changes). Other values do not take effect until the next service restart. See the restarter
+and service documentation for more information.
+If the service is managed by svc.startd(1M), the refresh method will be invoked if it exists to request the service
+reread its own configuration. For other restarters, see the restarter documentation.
+This action requires permission to modify the "restarter_actions" property group of the service instance (see smf_se<hy>
+curity(5)).
+clear {FMRI | pattern}. . .
+For each service instance specified by the operands, if the instance is in the maintenance state, signal to the as<hy>
+signed restarter that the service has been repaired. If the instance is in the degraded state, request that the assigned
+restarter take the service to the online state. This action requires permission to modify the "restarter_actions" proper<hy>
+ty group of the service instance (see smf_security(5)).
+The following subcommands are used for service development and temporary administrative manipulation.
+mark [-It] instance_state {FMRI | pattern}. . .
+If instance_state is "maintenance", then for each service specified by the operands, svcadm requests that the as<hy>
+signed restarter place the service in the maintenance state. See svc.startd(1M) and inetd(1M) for a detailed de<hy>
+scription of the actions taken for each restarter.
+If instance_state is "degraded", then for services specified by the operands in the online state, svcadm requests that
+the restarters assigned to the services move them into the degraded state.
+If the -I option is specified, the request is flagged as immediate.
+The -t option is only valid for maintenance requests. When this option is specified, the request is flagged as tempo<hy>
+rary, and its effect will only last until the next reboot.
+milestone [-d] milestone_FMRI
+If milestone_FMRI is the keyword "none", all services other than the master restarter, svc:/system/svc/restarter:de<hy>
+fault, will be temporarily disabled.
+If milestone_FMRI is the keyword "all", temporary enable and disable requests for all services will be nullified.
+If milestone_FMRI is one of the following:
+ svc:/milestone/single-user:default
+ svc:/milestone/multi-user:default
+ svc:/milestone/multi-user-server:default
+then temporary enable and disable requests for the indicated service and all services it depends on (directly or indi<hy>
+rectly) will be nullified. All other services will be temporarily disabled.
+Changing the system's current milestone with the "milestone" subcommand will not change the current run level of
+the system. To change the system's run level, invoke /sbin/init directly.
+<beginning of page>
+This action requires permission to modify the "options_ovr" property group of the svc:/system/svc/restarter:de<hy>
+fault service instance (see smf_security(5)).
+The -d option immediately changes the milestone to the requested milestone, as above. Additionally, it makes the
+specified milestone the default boot milestone, which persists across reboot. The default milestone is defined by the
+options/milestone property on the master restarter, svc:/system/svc/restarter:default. If this property is absent,
+"all" is the default. This action requires permission to modify the "options" property group of the svc:/sys<hy>
+tem/svc/restarter:default service instance (see smf_security(5)).
+The following operands are supported:
+FMRI An FMRI that specifies one or more instances. FMRIs can be abbreviated by specifying the instance name, or
+the trailing portion of the service name. For example, given the FMRI:
+ svc:/network/smtp:sendmail
+All the following are valid abbreviations:
+ sendmail
+ :sendmail
+ smtp
+ smtp:sendmail
+ network/smtp
+While the following are invalid:
+ mail
+ network
+ network/smt
+If the FMRI specifies a service, then the command applies to all instances of that service. Abbreviated forms of FM<hy>
+RIs are unstable, and should not be used in scripts or other permanent tools.
+pattern A pattern that is matched against the FMRIs of service instances according to the "globbing" rules described
+by fnmatch(5). If the pattern does not begin with "svc:", then "svc:/" is prepended.
+If an abbreviated FMRI or pattern matches more than one service, a warning message is displayed and that operand
+is ignored. Example 1 Restarting a Service Instance
+The following command restarts the NFS server. The full FMRI for the default service instance is: svc:/net<hy>
+work/nfs/server:default
+However, you can abbreviate the full FMRI as follows:
+ # svcadm restart nfs/server
+Example 2 Disabling the Standard HTTP Server
+The following command disables the standard HTTP server, using an abbreviated FMRI:
+ $ svcadm disable http
+Example 3 Enabling an Instance and Its Dependent Instances
+The following command enables the foo:bar instance, and all instances on which it depends:
+<beginning of page>
+ $ svcadm enable -r foo:bar
+Example 4 Synchronously enabling an instance
+The following command enables the foo:bar instance. The command will not return until the instance comes online
+or svcadm determines it is not possible for the service to come online.
+ $ svcadm enable -s foo:bar
+Example 5 Restricting and Restoring the Running Services
+The following command restricts the running services to single user mode:
+ # svcadm milestone milestone/single-user
+The following command restores the running services:
+ # svcadm milestone all
+The following exit values are returned:
+0 Successful completion.
+1 A fatal error occurred. One or more error messages are displayed on standard error.
+2 Invalid command line options were specified.
+3 svcadm determined that a service instance that it was waiting for could not reach the desired state without admin<hy>
+istrator intervention due to a problem with the service instance itself.
+4 svcadm determined that a service instance that it was waiting for could not reach the desired state without admin<hy>
+istrator intervention due to a problem with the service's dependencies.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu _ Interface StabilitySee below.
+The interactive output is Uncommitted. The invocation and non-interactive output are Committed.
+svcprop(1), svcs(1), inetd(1M), init(1M), svccfg(1M), svc.startd(1M), libscf(3LIB), contract(4), attributes(5),
+smf(5), smf_security(5)
+The amount of time svcadm will spend waiting for services and their dependencies to change state is implicitly lim<hy>
+ited by their method timeouts. For example, a service using the default restarter whose start method hangs will be
+transitioned to the maintenance state when its timeout expires. svcadm will then consider it impossible for this ser<hy>
+vice to come online without administrator intervention.
+<beginning of page>
+Attempts to synchronously enable a service which depends (directly or indirectly) on a file may fail with an exit sta<hy>
+tus indicating that dependencies are unsatisfied if the caller does not have the privileges necessary to search the di<hy>
+rectory containing the file. This limitation may be removed in a future Solaris release.

@@ -1,0 +1,107 @@
+<beginning of page>
+ddi_devid_compare, ddi_devid_free, ddi_devid_init, ddi_devid_register, ddi_devid_sizeof, ddi_devid_str_decode,
+ddi_devid_str_encode, ddi_devid_str_free, ddi_devid_get, ddi_devid_unregister, ddi_devid_valid <-> kernel interfaces
+for device ids
+int ddi_devid_compare(ddi_devid_t devid1, ddi_devid_t devid2);
+size_t ddi_devid_sizeof(ddi_devid_t devid);
+int ddi_devid_init(dev_info_t *dip, ushort_t devid_type,
+ ushort_t nbytes, void *id, ddi_devid_t *retdevid);
+void ddi_devid_free(ddi_devid_t devid);
+int ddi_devid_register(dev_info_t *dip, ddi_devid_t devid);
+int ddi_devid_str_decode(char *devidstr, ddi_devid_t *retdevid,
+ char **retminor_name);
+int ddi_devid_str_encode(ddi_devid_t devid, char *minor_name);
+int ddi_devid_str_free(char *devidstr);
+int ddi_devid_get(dev_info_t *dip, ddi_devid_t *retdevid);
+void ddi_devid_unregister(dev_info_t *dip);
+int ddi_devid_valid(ddi_devid_t devid);
+devid The device id address.
+devidstr The devid and minor_name represented as a string.
+devid1 The first of two device id addresses to be compared calling ddi_devid_compare().
+devid2 The second of two device id addresses to be compared calling ddi_devid_compare().
+dip A dev_info pointer, which identifies the device.
+devid_type The following device id types may be accepted by the ddi_devid_init() function:
+DEVID_SCSI3_WWN World Wide Name associated with SCSI-3 devices.
+DEVID_SCSI_SERIAL Vendor IDand serial number associated with a SCSI device. Note: This may only be used
+if known to be unique; otherwise a fabricated device id must be used.
+DEVID_ENCAP Device ID of another device. This is for layered device driver usage.
+DEVID_FAB Fabricated device ID.
+minor_name The minor name to be encoded.
+nbytes The length in bytes of device ID.
+<beginning of page>
+retdevid The return address of the device ID.
+retminor_name The return address of a minor name. Free string with ddi_devid_str_free().
+Solaris DDI specific (Solaris DDI).
+The following routines are used to provide unique identifiers, device IDs, for devices. Specifically, kernel modules
+use these interfaces to identify and locate devices, independent of the device's physical connection or its logical de<hy>
+vice name or number.
+ddi_devid_compare() compares two device IDs byte-by-byte and determines both equality and sort order.
+ddi_devid_sizeof() returns the number of bytes allocated for the passed in device ID (devid).
+ddi_devid_init() allocates memory and initializes the opaque device ID structure. This function does not store the
+devid. If the device id is not derived from the device's firmware, it is the driver's responsibility to store the devid on
+some reliable store. When a devid_type of either DEVID_SCSI3_WWN, DEVID_SCSI_SERIAL, or DEV<hy>
+ID_ENCAP is accepted, an array of bytes (id) must be passed in (nbytes).
+When the devid_type DEVID_FAB is used, the array of bytes (id) must be NULL and the length (nbytes) must be
+zero. The fabricated device ids, DEVID_FAB will be initialized with the machine's host id and a timestamp.
+Drivers must free the memory allocated by this function, using the ddi_devid_free() function.
+ddi_devid_free() frees the memory allocated for the returned devid by the ddi_devid_init() and devid_str_de<hy>
+code() functions.
+ddi_devid_register() registers the device ID address (devid) with the DDI framework, associating it with the
+dev_info passed in (dip). The drivers must register device IDs at attach time. See attach(9E).
+ddi_devid_unregister() removes the device ID address from the dev_info passed in (dip). Drivers must use this
+function to unregister the device ID when devices are being detached. This function does not free the space allocated
+for the device ID. The driver must free the space allocated for the device ID, using the ddi_devid_free() function.
+See detach(9E).
+ddi_devid_valid() validates the device ID (devid) passed in. The driver must use this function to validate any fabri<hy>
+cated device ID that has been stored on a device.
+The ddi_devid_get() function returns a pointer to the device ID structure through retdevid if there is already a regis<hy>
+tered device ID associated with the dev_info node. A driver can use this interface to check and get the device ID as<hy>
+sociated with the dev_info node. It returns DDI_FAILURE if no device ID is registered for the node.
+The ddi_devid_get() function allocates memory for the opaque device ID structure and initializes it with the associ<hy>
+ated device ID and returns the pointer to it. The driver must free the memory allocated by this function using the
+ddi_devid_free() function.
+The ddi_devid_str_encode() function encodes a devid and minor_name into a null-terminated ASCII string, return<hy>
+ing a pointer to that string. If both a devid and a minor_name are non-null, then a slash (/) is used to separate the dev<hy>
+id from the minor_name in the encoded string. If minor_name is null, then only the devid is encoded. If the devid is
+null, then the special string id0 is returned. Note that you cannot compare the returned string against another string
+with strcmp() to determine devid equality. The returned string must be freed by calling devid_str_free().
+The ddi_devid_str_decode() function takes a string previously produced by the devid_str_encode(3DEVID) or
+ddi_devid_str_encode() function and decodes the contained device ID and minor_name, allocating and returning
+pointers to the extracted parts through the retdevid and retminor_name arguments. If the special devidstr id0 was
+specified then the returned device ID and minor name will both be null. A non-null returned devid must be freed by
+the caller through the ddi_devid_free() function. A non-null returned minor name must be freed by calling ddi_dev<hy>
+id_str_free().
+The ddi_devid_str_free() function is used to free all strings returned by the ddi_devid functions (the ddi_dev<hy>
+id_str_encode() function return value and the returned retminor_name argument).
+ddi_devid_init() returns the following values:
+<beginning of page>
+DDI_SUCCESS Success.
+DDI_FAILURE Out of memory. An invalid devid_type was passed in.
+ddi_devid_valid() returns the following values:
+DDI_SUCCESS Valid device ID.
+DDI_FAILURE Invalid device ID.
+ddi_devid_register() returns the following values:
+DDI_SUCCESS Success.
+DDI_FAILURE Failure. The device ID is already registered or the device ID is invalid.
+ddi_devid_valid() returns the following values:
+DDI_SUCCESS Valid device ID.
+DDI_FAILURE Invalid device ID.
+ddi_devid_get() returns the following values:
+DDI_SUCCESS Device ID is present and a pointer to it is returned in retdevid.
+DDI_FAILURE No device ID is defined for this dev_info node.
+ddi_devid_compare() returns the following values:
+<mi>1 The first device ID is less than the second device ID.
+0 The first device ID is equal to the second device ID.
+1 The first device ID is greater than the second device ID.
+ddi_devid_sizeof() returns the size of the devid in bytes. If called with a null, then the number of bytes that must be
+allocated and initialized to determine the size of a complete device ID is returned.
+ddi_devid_str_encode() returns a value of null to indicate failure. Failure can be caused by attempting to encode an
+invalid devid. If the return value is non-null then the caller must free the returned string by using the dev<hy>
+<beginning of page>
+id_str_free() function.
+ddi_devid_str_decode() returns the following values:
+DDI_SUCCESS Success.
+DDI_FAILURE Failure; the devidstr string was not valid.
+These functions can be called from a user or kernel context.
+devid_get(3DEVID), , libdevid(3LIB), attributes(5), attach(9E), detach(9E), kmem_free(9F)
+Writing Device Drivers

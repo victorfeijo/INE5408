@@ -1,0 +1,111 @@
+<beginning of page>
+syslogd <-> log system messages
+/usr/sbin/syslogd [-d] [-f configfile] [-m markinterval]
+ [-p path] [-t | -T]
+syslogd reads and forwards system messages to the appropriate log files or users, depending upon the priority of a
+message and the system facility from which it originates. The configuration file /etc/syslog.conf (see syslog.conf(4))
+controls where messages are forwarded. syslogd logs a mark (timestamp) message every markinterval minutes (de<hy>
+fault 20) at priority LOG_INFO to the facility whose name is given as mark in the syslog.conf file.
+A system message consists of a single line of text, which may be prefixed with a priority code number enclosed in
+angle-brackets (<>); priorities are defined in <sys/syslog.h>.
+syslogd reads from the STREAMS log driver, /dev/log, and from any transport provider specified in /etc/netconfig,
+/etc/net/transport/hosts, and /etc/net/transport/services.
+syslogd reads the configuration file when it starts up, and again whenever it receives a HUP signal (see sig<hy>
+nal.h(3HEAD), at which time it also closes all files it has open, re-reads its configuration file, and then opens only
+the log files that are listed in that file. syslogd exits when it receives a TERM signal.
+As it starts up, syslogd creates the file /var/run/syslog.pid, if possible, containing its process identifier (PID).
+If message ID generation is enabled (see log(7D)), each message will be preceded by an identifier in the following
+format: [ID msgid facility.priority]. msgid is the message's numeric identifier described in msgid(1M). facility and
+priority are described in syslog.conf(4). [ID 123456 kern.notice] is an example of an identifier when message ID
+generation is enabled.
+If the message originated in a loadable kernel module or driver, the kernel module's name (for example, ufs) will be
+displayed instead of unix. See EXAMPLES for sample output from syslogd with and without message ID genera<hy>
+tion enabled.
+In an effort to reduce visual clutter, message IDs are not displayed when writing to the console; message IDs are on<hy>
+ly written to the log file. See .
+The /etc/default/syslogd file contains the following default parameter settings, which are in effect if neither the -t
+nor -T option is selected. See FILES.
+The recommended way to allow or disallow message logging is through the use of the service management facility
+(smf(5)) property:
+ svc:/system/system-log/config/log_from_remote
+This property specifies whether remote messages are logged. log_from_remote=true is equivalent to the -t com<hy>
+mand-line option and false is equivalent to the -T command-line option. The default value for -log_from_remote is
+false. See NOTES, below.
+LOG_FROM_REMOTE
+Specifies whether remote messages are logged. LOG_FROM_REMOTE=NO is equivalent to the -t command-line
+option. The default value for LOG_FROM_REMOTE is YES.
+The following options are supported:
+-d
+Turn on debugging. This option should only be used interactively in a root shell once the system is in multi-user
+mode. It should not be used in the system start-up scripts, as this will cause the system to hang at the point where
+syslogd is started.
+-f configfile
+Specify an alternate configuration file.
+<beginning of page>
+-m markinterval
+Specify an interval, in minutes, between mark messages.
+-p path
+Specify an alternative log device name. The default is /dev/log.
+-T
+Enable the syslogd UDP port to turn on logging of remote messages. This is the default behavior. See .
+-t
+Disable the syslogd UDP port to turn off logging of remote messages. See .
+Example 1 syslogd Output Without Message ID Generation Enabled
+The following example shows the output from syslogd when message ID generation is not enabled:
+ Sep 29 21:41:18 cathy unix: alloc /: file system full
+Example 2 syslogd Output with ID generation Enabled
+The following example shows the output from syslogd when message ID generation is enabled. The message ID is
+displayed when writing to log file/var/adm/messages.
+ Sep 29 21:41:18 cathy ufs: [ID 845546 kern.notice]
+  alloc /: file system full
+Example 3 syslogd Output with ID Generation Enabled
+The following example shows the output from syslogd when message ID generation is enabled when writing to the
+console. Even though message ID is enabled, the message ID is not displayed at the console.
+ Sep 29 21:41:18 cathy ufs: alloc /: file system full
+Example 4 Enabling Acceptance of UDP Messages from Remote Systems
+The following commands enable syslogd to accept entries from remote systems.
+ # svccfg -s svc:/system/system-log setprop config/log_from_remote = true
+ # svcadm restart svc:/system/system-log
+/etc/syslog.conf
+Configuration file
+/var/run/syslog.pid
+Process ID
+/etc/default/syslogd
+Contains default settings. You can override some of the settings by command-line options.
+<beginning of page>
+/dev/log
+STREAMS log driver
+/etc/netconfig
+Transport providers available on the system
+/etc/net/transport/hosts
+Network hosts for each transport
+/etc/net/transport/services
+Network services for each transport
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu
+logger(1), svcs(1), msgid(1M), svcadm(1M), svccfg(1M), syslog(3C), syslog.conf(4), attributes(5), sig<hy>
+nal.h(3HEAD), smf(5), log(7D)
+The mark message is a system time stamp, and so it is only defined for the system on which syslogd is running. It
+can not be forwarded to other systems.
+When syslogd receives a HUP signal, it attempts to complete outputting pending messages, and close all log files to
+which it is currently logging messages. If, for some reason, one (or more) of these files does not close within a gen<hy>
+erous grace period, syslogd discards the pending messages, forcibly closes these files, and starts reconfiguration. If
+this shutdown procedure is disturbed by an unexpected error and syslogd cannot complete reconfiguration, syslogd
+sends a mail message to the superuser on the current system stating that it has shut down, and exits.
+Care should be taken to ensure that each window displaying messages forwarded by syslogd (especially console
+windows) is run in the system default locale (which is syslogd's locale). If this advice is not followed, it is possible
+for a syslog message to alter the terminal settings for that window, possibly even allowing remote execution of arbi<hy>
+trary commands from that window.
+The syslogd service is managed by the service management facility, smf(5), under the service identifier:
+  svc:/system/system-log:default
+Administrative actions on this service, such as enabling, disabling, or requesting restart, can be performed using sv<hy>
+cadm(1M). The service's status can be queried using the svcs(1) command.
+When syslogd is started by means of svcadm(1M), if a value is specified for LOG_FROM_REMOTE in the
+/etc/defaults/syslogd file, the SMF property svc:/system/system-log/config/log_from_remote is set to correspond
+to the LOG_FROM_REMOTE value and the /etc/default/syslogd file is modified to replace the
+LOG_FROM_REMOTE specification with the following comment:
+ # LOG_FROM_REMOTE is now set using svccfg(1m), see syslogd(1m).
+If neither LOG_FROM_REMOTE nor svc:/system/system-log/config/log_from_remote are defined, the default
+is to log remote messages.
+On installation, the initial value of svc:/system/system-log/config/log_from_remote is false.

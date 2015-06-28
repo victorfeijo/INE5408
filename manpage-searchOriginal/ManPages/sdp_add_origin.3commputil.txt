@@ -1,0 +1,191 @@
+<beginning of page>
+sdp_add_origin, sdp_add_name, sdp_add_information, sdp_add_uri, sdp_add_email, sdp_add_phone, sdp_add_con<hy>
+nection, sdp_add_bandwidth, sdp_add_repeat, sdp_add_time, sdp_add_zone, sdp_add_key, sdp_add_attribute,
+sdp_add_media <-> add specific SDP fields to the SDP session structure
+cc [ flag...] file... -lcommputil [ library...]
+#include <sdp.h>
+int sdp_add_origin(sdp_session_t *session, const char *name,
+ uint64_t id, uint64_t ver, const char *nettype,
+ const char *addrtype, const char *address);
+int sdp_add_name(sdp_session_t *session, const char *name);
+int sdp_add_information(char **information, const char *value);
+int sdp_add_uri(sdp_session_t *session, const char *uri);
+int sdp_add_email(sdp_session_t *session, const char *email);
+int sdp_add_phone(sdp_session_t *session, const char *phone);
+int sdp_add_connection(sdp_conn_t **conn, const char *nettype,
+ const char *addrtype, const char *address, uint8_t ttl,
+ int addrcount);
+int sdp_add_bandwidth(sdp_bandwidth_t **bw, const char *type,
+ uint64_t value);
+int sdp_add_repeat(sdp_time_t *time, uint64_t interval,
+ uint64_t duration, const char *offset);
+int sdp_add_time(sdp_session_t *session, uint64_t starttime,
+ uint64_t stoptime, sdp_time_t **time);
+int sdp_add_zone(sdp_session_t *session, uint64_t time,
+ const char *offset);
+int sdp_add_key(sdp_key_t **key, const char *method,
+ const char *enckey);
+int sdp_add_attribute(sdp_attr_t **attr, const char *name,
+ const char *value);
+int sdp_add_media(sdp_session_t *session, const char *name,
+ uint_t port, int portcount, const char *protocol,
+ const char *format, sdp_media_t **media);
+The caller has to first call sdp_new_session(3COMMPUTIL) and get pointer to a session structure. Then that point<hy>
+er is used as argument in the following functions and the session structure is constructed. Once the structure is built
+the caller converts it to a string representation using sdp_session_to_str(3COMMPUTIL).
+The sdp_add_origin() function adds ORIGIN (o=) SDP field to the session structure (sdp_session_t) using name,
+id, ver, nettype, addrtype, and address.
+The sdp_add_name() function adds NAME (s=) SDP field to the session structure (sdp_session_t) using name.
+The sdp_add_information() function adds INFO (i=) SDP field to the session structure (sdp_session_t) or media
+structure (sdp_media_t) using value. Since this field can be either in the media section or the session section of an
+SDP description the caller has to pass &session<->>s_info or &media<->>m_info as the first argument.
+The sdp_add_uri() function adds URI (u=) SDP field to the session structure (sdp_session_t) using uri.
+The sdp_add_email() function adds EMAIL (e=) SDP field to the session structure (sdp_session_t) using email.
+The sdp_add_phone() function adds PHONE (p=) SDP field to the session structure (sdp_session_t) using phone.
+<beginning of page>
+The sdp_add_connection() function adds CONNECTION (c=) SDP field to the session structure (sdp_session_t)
+or the media structure (sdp_media_t) using nettype, addrtype, address, ttl, and addrcount. While adding an IP4 or
+IP6 unicast address the ttl and addrcount should be set to 0. For multicast address the ttl should be set a reasonable
+value (0 - 255) and addrcount cannot be 0. Also since this field can be either in the media section or the session sec<hy>
+tion of an SDP description, the caller has to pass &session<->>s_conn or &media<->>m_conn as the first argument.
+The sdp_add_bandwidth() function adds BANDWIDTH (b=) SDP field to the session structure (sdp_session_t) or
+the media structure (sdp_media_t) using type and value. Since this field can be either in the media section or the
+session section of an SDP description, the caller has to pass &session<->>s_bw or &media<->>m_bw as the first argu<hy>
+ment.
+The sdp_add_time() function adds the TIME (t=) SDP field to the session structure using startime and stoptime.
+The pointer to the newly created time structure is returned in time. This pointer is then used in sdp_add_repeat()
+function.
+The sdp_add_repeat() function adds the REPEAT (r=) SDP field to the session structure using interval, duration
+and offset. Here, offset is a string holding one or more offset values, for example "60" or "60 1d 3h".
+The sdp_add_zone() function adds the ZONE (z=) SDP field to the session structure using time and offset. To add
+multiple time and offset values in a single zone field, call this function once for each pair. See the example below.
+The sdp_add_key() function adds the KEY (k=) SDP field to the session structure (sdp_session_t) or media struc<hy>
+ture (sdp_media_t) using method and enckey. Since this field can be either in the media section or the session sec<hy>
+tion of an SDP description, the caller has to pass &session<->>s_key or &media<->>m_key as the first argument.
+The sdp_add_attribute() function adds the ATTRIBUTE (a=) SDP field to the session structure (sdp_session_t) or
+media structure (sdp_media_t) using name and value. Since this field can be either in the media section or the ses<hy>
+sion section of an SDP description, the caller has to pass &session<->>s_attr or &media<->>m_attr as the first argu<hy>
+ment.
+The sdp_add_media() function adds the MEDIA (m=) SDP field to the session structure (sdp_session_t) using
+name, port, portcount, protocol, and format. Here, format is a string holding possibly more than one value, for ex<hy>
+ample, "0 31 32 97". The pointer to the newly created media structure is returned in media. This pointer is then used
+to add SDP fields specific to that media section.
+These functions return 0 on success and the appropriate error value on failure. The value of errno is not changed by
+these calls in the event of an error.
+These functions will fail if:
+EINVAL Mandatory parameters are not provided (they are null).
+ENOMEM The allocation of memory failed.
+Example 1 Build an SDP session structure
+In the following example we see how to build an SDP session structure using the functions described on this manual
+page. We first get a pointer to sdp_session_t structure by calling sdp_new_session(). Then to this newly created
+structure we add various SDP fields. Once the structure is built we obtain a string representation of the structure us<hy>
+ing sdp_session_to_str() function. Since its caller responsibility to free the session we call sdp_free_session() to<hy>
+wards the end.
+ /* SDP Message we will be building
+ "v=0\r\n\
+ o=Alice 2890844526 2890842807 IN IP4 10.47.16.5\r\n\
+ s=-\r\n\
+ i=A Seminar on the session description protocol\r\n\
+ u=http://www.example.com/seminars/sdp.pdf\r\n\
+ e=alice@example.com (Alice Smith)\r\n\
+ p=+1 911-345-1160\r\n\
+ c=IN IP4 10.47.16.5\r\n\
+ b=CT:1024\r\n\
+ t=2854678930 2854679000\r\n\
+ r=604800 3600 0 90000\r\n\
+<beginning of page>
+ z=2882844526 -1h 2898848070 0h\r\n\
+ a=recvonly\r\n\
+ m=audio 49170 RTP/AVP 0\r\n\
+ i=audio media\r\n\
+ b=CT:1000\r\n\
+ k=prompt\r\n\
+ m=video 51372 RTP/AVP 99 90\r\n\
+ i=video media\r\n\
+ a=rtpmap:99 h232-199/90000\r\n\
+ a=rtpmap:90 h263-1998/90000\r\n"
+ */
+ #include stdio.h>
+ #include string.h>
+ #include errno.h>
+ #include sdp.h>
+ int main ()
+ {
+  sdp_session_t *my_sess;
+  sdp_media_t *my_media;
+  sdp_time_t *my_time;
+  char *b_sdp;
+  my_sess = sdp_new_session();
+  if (my_sess == NULL) {
+  return (ENOMEM);
+  }
+  my_sess->version = 0;
+  if (sdp_add_name(my_sess, "-") != 0)
+  goto err_ret;
+  if (sdp_add_origin(my_sess, "Alice", 2890844526ULL, 2890842807ULL,
+  "IN", "IP4", "10.47.16.5") != 0)
+  goto err_ret;
+  if (sdp_add_information(&my_sess->s_info, "A Seminar on the session"
+  "description protocol") != 0)
+  goto err_ret;
+  if (sdp_add_uri (my_sess, "http://www.example.com/seminars/sdp.pdf")
+  != 0)
+  goto err_ret;
+  if (sdp_add_email(my_sess, "alice@example.com (Alice smith)") != 0)
+  goto err_ret;
+  if (sdp_add_phone(my_sess, "+1 911-345-1160") != 0)
+  goto err_ret;
+  if (sdp_add_connection(&my_sess->s_conn, "IN", "IP4", "10.47.16.5",
+  0, 0) != 0)
+  goto err_ret;
+  if (sdp_add_bandwidth(&my_sess->s_bw, "CT", 1024) != 0)
+  goto err_ret;
+  if (sdp_add_time(my_sess, 2854678930ULL, 2854679000ULL, &my_time)
+  != 0)
+  goto err_ret;
+  if (sdp_add_repeat(my_time, 604800ULL, 3600ULL, "0 90000") != 0)
+  goto err_ret;
+  if (sdp_add_zone(my_sess, 2882844526ULL, "-1h") != 0)
+  goto err_ret;
+  if (sdp_add_zone(my_sess, 2898848070ULL, "0h") != 0)
+  goto err_ret;
+  if (sdp_add_attribute(&my_sess->s_attr, "sendrecv", NULL) != 0)
+  goto err_ret;
+  if (sdp_add_media(my_sess, "audio", 49170, 1, "RTP/AVP",
+  "0", &my_media) != 0)
+  goto err_ret;
+  if (sdp_add_information(&my_media->m_info, "audio media") != 0)
+  goto err_ret;
+  if (sdp_add_bandwidth(&my_media->m_bw, "CT", 1000) != 0)
+<beginning of page>
+  goto err_ret;
+  if (sdp_add_key(&my_media->m_key, "prompt", NULL) != 0)
+  goto err_ret;
+  if (sdp_add_media(my_sess, "video", 51732, 1, "RTP/AVP",
+  "99 90", &my_media) != 0)
+  goto err_ret;
+  if (sdp_add_information(&my_media->m_info, "video media") != 0)
+  goto err_ret;
+  if (sdp_add_attribute(&my_media->m_attr, "rtpmap",
+  "99 h232-199/90000") != 0)
+  goto err_ret;
+  if (sdp_add_attribute(&my_media->m_attr, "rtpmap",
+  "90 h263-1998/90000") != 0)
+  goto err_ret;
+  b_sdp = sdp_session_to_str(my_sess, &error);
+  /*
+  * b_sdp is the string representation of my_sess structure
+  */
+  free(b_sdp);
+  sdp_free_session(my_sess);
+  return (0);
+ err_ret:
+  free(b_sdp);
+  sdp_free_session(my_sess);
+  return (1);
+ }
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed _ MT-LevelSafe
+libcommputil(3LIB), sdp_new_session(3COMMPUTIL), sdp_parse(3COMMPUTIL), sdp_ses<hy>
+sion_to_str(3COMMPUTIL), attributes(5)

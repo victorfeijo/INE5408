@@ -1,0 +1,47 @@
+<beginning of page>
+pci_report_pmcap <-> Report Power Management capability of a PCI device
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+int pci_report_pmcap(dev_info_t *dip, int cap, void *arg);
+Solaris DDI specific (Solaris DDI)
+dip Pointer to the device's dev_info structure
+cap Power management capability
+arg Argument for the capability
+Some PCI devices provide power management capabilities in addition to those provided by the PCI Power Manage<hy>
+ment Specification. The pci_report_pmcap() function reports those Power Management capabilities of the PCI de<hy>
+vice to the framework. Framework supports dynamic changing of the capability by allowing pci_report_pmcap() to
+be called multiple times. Following are the supported capabilities as indicated by the cap:
+PCI_PM_IDLESPEED <em> The PCI_PM_IDLESPEED value indicates the lowest PCI clock speed that a device
+can tolerate when idle, and is applicable only to 33 MHz PCI bus. arg represents the lowest possible idle speed in
+KHz (1 KHz is 1000 Hz). The integer value representing the speed should be cast to (void *)before passing as arg to
+pci_report_pmcap().
+The special values of arg are:
+PCI_PM_IDLESPEED_ANY The device can tolerate any idle clock speed.
+PCI_PM_IDLESPEED_NONE The device cannot tolerate slowing down of PCI clock even when idle.
+If the driver doesn't make this call, PCI_PM_IDLESPEED_NONE is assumed. In this case, one offending device
+can keep the entire bus from being power managed.
+The pci_report_pmcap() function returns:
+DDI_SUCCESS Successful reporting of the capability
+DDI_FAILURE Failure to report capability because of invalid argument(s)
+The pci_report_pmcap() function can be called from user, kernel and interrupt context.
+1. A device driver knows that the device it controls works with any clock between DC and 33 MHz as specified in
+Section 4.2.3.1: Clock Specification of the PCI Bus Specification Revision 2.1. The device driver makes the follow<hy>
+ing call from its attach(9E):
+ if (pci_report_pmcap(dip, PCI_PM_IDLESPEED, PCI_PM_IDLESPEED_ANY) !=
+  DDI_SUCCESS)
+  cmn_err(CE_WARN, "%s%d: pci_report_pmcap failed\n",
+  ddi_driver_name(dip), ddi_get_instance(dip));
+2. A device driver controls a 10/100 Mb Ethernet device which runs the device state machine on the chip from the
+PCI clock. For the device state machine to receive packets at 100 Mb, the PCI clock cannot drop below 4 MHz. The
+driver makes the following call whenever it negotiates a 100 Mb Ethernet connection:
+ if (pci_report_pmcap(dip, PCI_PM_IDLESPEED, (void *)4000) !=
+<beginning of page>
+  DDI_SUCCESS)
+  cmn_err(CE_WARN, "%s%d: pci_report_pmcap failed\n",
+  ddi_driver_name(dip), ddi_get_instance(dip));
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed
+Writing Device Drivers
+PCI Bus Power Management Interface Specification Version 1.1
+PCI Bus Specification Revision 2.1

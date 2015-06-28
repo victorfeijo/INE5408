@@ -1,0 +1,43 @@
+<beginning of page>
+uio <-> scatter/gather I/O request structure
+#include <sys/uio.h>
+Architecture independent level 1 (DDI/DKI)
+A uio structure describes an I/O request that can be broken up into different data storage areas (scatter/gather I/O).
+A request is a list of iovec structures (base-length pairs) indicating where in user space or kernel space the I/O data
+is to be read or written.
+The contents of uio structures passed to the driver through the entry points should not be written by the driver. The
+uiomove(9F) function takes care of all overhead related to maintaining the state of the uio structure.
+uio structures allocated by the driver should be initialized to zero before use, by bzero(9F), kmem_zalloc(9F), or an
+equivalent.
+ iovec_t *uio_iov; /* pointer to start of iovec */
+  /* list for uio struc. */
+ int uio_iovcnt; /* number of iovecs in list */
+ off_t uio_offset; /* 32-bit offset into file where
+  /* data is xferred. See NOTES. */
+ offset_t uio_loffset; /* 64-bit offset into file where */
+  /* data is xferred. See NOTES. */
+ uio_seg_t uio_segflg; /* ID's type of I/O transfer: */
+  /* UIO_SYSSPACE: kernel <-> kernel */
+  /* UIO_USERSPACE: kernel <-> user */
+ uint16_t uio_fmode; /* file mode flags (not driver setable) */
+ daddr_t uio_limit; /* 32-bit ulimit for file (max. block */
+  /* offset). not driver setable. */
+  /* See NOTES. */
+ diskaddr_t uio_llimit; /* 64-bit ulimit for file (max. block */
+  /* offset). not driver setable. */
+  /* See NOTES */
+ ssize_t uio_resid; /* residual count */
+The uio_iov member is a pointer to the beginning of the iovec(9S) list for the uio. When the uio structure is passed
+to the driver through an entry point, the driver should not set uio_iov. When the uio structure is created by the driv<hy>
+er, uio_iov should be initialized by the driver and not written to afterward.
+aread(9E), awrite(9E), read(9E), write(9E), bzero(9F), kmem_zalloc(9F), uiomove(9F), cb_ops(9S), iovec(9S)
+Writing Device Drivers
+Only one structure, uio_offset or uio_loffset, should be interpreted by the driver. Which field the driver interprets is
+dependent upon the settings in the cb_ops(9S) structure.
+Only one structure, uio_limit or uio_llimit, should be interpreted by the driver. Which field the driver interprets is
+dependent upon the settings in the cb_ops(9S) structure.
+When performing I/O on a seekable device, the driver should not modify either the uio_offset or the uio_loffset
+field of the uio structure. I/O to such a device is constrained by the maximum offset value. When performing I/O on
+a device on which the concept of position has no relevance, the driver may preserve the uio_offset or uio_loffset,
+perform the I/O operation, then restore the uio_offset or uio_loffset to the field's initial value. I/O performed to a
+device in this manner is not constrained.

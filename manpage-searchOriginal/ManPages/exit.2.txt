@@ -1,0 +1,62 @@
+<beginning of page>
+exit, _Exit, _exit <-> terminate process
+#include <stdlib.h>
+void exit(int status);
+void _Exit(int status);
+#include <unistd.h>
+void _exit(int status);
+The exit() function first calls all functions registered by atexit(3C), in the reverse order of their registration, except
+that a function is called after any previously registered functions that had already been called at the time it was regis<hy>
+tered. Each function is called as many times as it was registered. If, during the call to any such function, a call to the
+longjmp(3C) function is made that would terminate the call to the registered function, the behavior is undefined.
+If a function registered by a call to atexit(3C) fails to return, the remaining registered functions are not called and
+the rest of the exit() processing is not completed. If exit() is called more than once, the effects are undefined.
+The exit() function then flushes all open streams with unwritten buffered data, closes all open streams, and removes
+all files created by tmpfile(3C).
+The _Exit() and _exit() functions are functionally equivalent. They do not call functions registered with atexit(), do
+not call any registered signal handlers, and do not flush open streams.
+The _exit(), _Exit(), and exit() functions terminate the calling process with the following consequences: <bu> All of the
+file descriptors, directory streams, conversion descriptors and message catalogue descriptors open in the calling
+process are closed. <bu> If the parent process of the calling process is executing a wait(3C), wait3(3C), waitid(2), or
+waitpid(3C), and has neither set its SA_NOCLDWAIT flag nor set SIGCHLD to SIG_IGN, it is notified of the
+calling process's termination and the low-order eight bits (that is, bits 0377) of status are made available to it. If the
+parent is not waiting, the child's status will be made available to it when the parent subsequently executes wait(),
+wait3(), waitid(), or waitpid(). <bu> If the parent process of the calling process is not executing a wait(), wait3(), wait<hy>
+id(), or waitpid(), and has not set its SA_NOCLDWAIT flag, or set SIGCHLD to SIG_IGN, the calling process is
+transformed into a zombie process. A zombie process is an inactive process and it will be deleted at some later time
+when its parent process executes wait(), wait3(), waitid(), or waitpid(). A zombie process only occupies a slot in
+the process table; it has no other space allocated either in user or kernel space. The process table slot that it occupies
+is partially overlaid with time accounting information (see <sys/proc.h>) to be used by the times(2) function. <bu> Ter<hy>
+mination of a process does not directly terminate its children. The sending of a SIGHUP signal as described below
+indirectly terminates children in some circumstances. <bu> A SIGCHLD will be sent to the parent process. <bu> The par<hy>
+ent process ID of all of the calling process's existing child processes and zombie processes is set to 1. That is, these
+processes are inherited by the initialization process (see Intro(2)). <bu> Each mapped memory object is unmapped. <bu>
+Each attached shared-memory segment is detached and the value of shm_nattch (see shmget(2)) in the data struc<hy>
+ture associated with its shared memory ID is decremented by 1. <bu> For each semaphore for which the calling process
+has set a semadj value (see semop(2)), that value is added to the semval of the specified semaphore. <bu> If the process
+is a controlling process, the SIGHUP signal will be sent to each process in the foreground process group of the con<hy>
+trolling terminal belonging to the calling process. <bu> If the process is a controlling process, the controlling terminal
+associated with the session is disassociated from the session, allowing it to be acquired by a new controlling process.
+<bu> If the exit of the process causes a process group to become orphaned, and if any member of the newly-orphaned
+process group is stopped, then a SIGHUP signal followed by a SIGCONT signal will be sent to each process in the
+newly-orphaned process group. <bu> If the parent process has set its SA_NOCLDWAIT flag, or set SIGCHLD to
+SIG_IGN, the status will be discarded, and the lifetime of the calling process will end immediately. <bu> If the process
+has process, text or data locks, an UNLOCK is performed (see plock(3C) and memcntl(2)). <bu> All open named sem<hy>
+aphores in the process are closed as if by appropriate calls to sem_close(3C). All open message queues in the
+process are closed as if by appropriate calls to mq_close(3C). Any outstanding asynchronous I/O operations may be
+cancelled. <bu> An accounting record is written on the accounting file if the system's accounting routine is enabled (see
+acct(2)). <bu> An extended accounting record is written to the extended process accounting file if the system's extended
+process accounting facility is enabled (see acctadm(1M)). <bu> If the current process is the last process within its task
+and if the system's extended task accounting facility is enabled (see acctadm(1M)), an extended accounting record
+is written to the extended task accounting file.
+These functions do not return.
+No errors are defined.
+Normally applications should use exit() rather than _exit().
+<beginning of page>
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed _ MT-LevelSee below. _ StandardSee standards(5).
+The _exit() and _Exit() functions are Async-Signal-Safe.
+acctadm(1M), Intro(2), acct(2), close(2), memcntl(2), semop(2), shmget(2), sigaction(2), times(2), waitid(2),
+atexit(3C), fclose(3C), mq_close(3C), plock(3C), signal.h(3HEAD), tmpfile(3C), wait(3C), wait3(3C), wait<hy>
+pid(3C), attributes(5), standards(5)

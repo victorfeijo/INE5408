@@ -1,0 +1,132 @@
+<beginning of page>
+nsmbrc <-> configuration file for Solaris CIFS client requests
+$HOME/.nsmbrc
+Global behavior of the Solaris CIFS client is defined by property values that are stored in the Service Management
+Facility (SMF). The .nsmbrc file can be used to customize the behavior of the Solaris CIFS client on a per-user ba<hy>
+sis. Settings in the $HOME/.nsmbrc file are used unless they have security implications.
+An authorized user can use the sharectl command to set global values for these properties in SMF. See
+sharectl(1M).
+A regular user can change the global values when granted the "SMBFS Management" rights profile in the /user_attr
+file. See user_attr(4) and rbac(5).
+The SMBFS library first reads from SMF and then the $HOME/.nsmbrc file when determining which policy to ap<hy>
+ply to a particular server, user, or share. $HOME/.nsmbrc entries take precedence with the exception of the
+minauth property value. For minauth, the strongest authentication level specified is used. Sections are applied so
+that more specific sections override less specific sections. Not all keywords are valid in all sections.
+The configuration file is comprised of these four section types. Each section can include zero or more properties and
+associated values. The sections also have a hierarchical relationship with each other, as shown by the order of the
+following list: <bu> Default section. Specifies the default property values to be used by all other sections unless specifi<hy>
+cally overridden.
+The section name appears in the .nsmbrc file as [default]. <bu> Server section. Specifies the property values to be used
+by sections that are related to the named server. These property values can be specifically overridden by a related us<hy>
+er section or share section.
+The section name appears in the .nsmbrc file as [server-name]. server-name must use uppercase characters to
+match. <bu> User section. Specifies the property values to be used by sections that are related to the named server and
+user. These property values can be specifically overridden by a related share section.
+The section name appears in the .nsmbrc as [server-name:username]. Both server-name and username must use up<hy>
+percase characters to match. <bu> Share section. Specifies the property values to be used by sections that are related to
+the named server, user, and share.
+The section name appears in the .nsmbrc as [server-name:username:share-name]. Both server-name and username
+must use uppercase characters to match.
+The end of each section is marked either by the start of a new section or by an end of file (EOF).
+The following list describes the properties and states in which sections they can be set:
+addr
+Specifies the DNS name or IP address of the CIFS server. This property can only be set in a server section. If this
+property is specified, it must specify a value as there is no default.
+domain
+Specifies the Windows domain name to use when authenticating with a server. The default value is WORKGROUP.
+This property can only be set in the default and server sections.
+minauth
+Is the minimum authentication level required, which can be one of kerberos, ntlmv2, ntlm, lm, or none. If
+minauth is set globally and in a user's .nsmbrc file, the stronger authentication setting are used whether set by the
+user or globally. This property can only be set in the default and server sections. The default value is ntlm.
+nbns
+Specifies the DNS name or IP address of the NetBIOS/WINS name server. This property can only be set by an ad<hy>
+ministrator by using the sharectl command. This property can only be set in the default section. The default value is
+empty, nbns="".
+<beginning of page>
+nbns_broadcast
+Specifies whether to perform NetBIOS/WINS broadcast lookups. Broadcast lookups are less secure than unicast
+lookups. To prevent broadcast lookups, set the value to no. This property has no effect if the nbns_enable property
+is set to no or false. This property can only be set by an administrator by using the sharectl command. This property
+can only be set in the default section. Valid values are yes, true, no, and false. The default value is yes.
+nbns_enable
+Specifies whether to perform NetBIOS/WINS name lookups. To force all lookups to be done through the name ser<hy>
+vice switch (see nsswitch.conf(4)), set the value to no. This property can only be set by an administrator by using
+the sharectl command. This property can only be set in the default section. Valid values are yes, true, no, and false.
+The default value is yes.
+password
+Specifies the password to use when authenticating a server. The password property value is used as long as the
+.nsmbrc file can only be read and written by the owner. This property can be set in the default, server, user, and
+share sections.
+If you assign the hashed password from the smbutil crypt command to the password property, be sure to escape the
+special characters in the password.
+signing
+Specifies whether communications are digitally signed by SMB security signatures for the Solaris CIFS client. This
+property can only be set in the default and server sections. Valid values are disabled, enabled, and required. The
+default value is disabled.
+When set to disabled, the client permits the use of SMB security signatures only if the server requires signing. In
+such an instance, the Solaris CIFS client ignores local property values.
+When set to enabled, the client permits, but does not require, the use of SMB security signatures.
+When set to required, the client requires the use of SMB security signatures. So, if SMB security signatures are dis<hy>
+abled on a CIFS server and a client has signing required, the client cannot connect to that server.
+timeout
+Specifies the CIFS request timeout. By default, the timeout is 15 seconds. This property can only be set in the de<hy>
+fault, server, and share sections.
+user
+Specifies the user name to use when authenticating a server. The default value is the Solaris account name of the us<hy>
+er performing the authentication. This property can only be set in the default and server sections.
+workgroup
+Is supported for compatibility purposes and is a synonym for the domain property. Use the domain property in<hy>
+stead.
+The examples in this section show how to use the .nsmbrc file and the smbutil command to configure the ex.com
+environment.
+The ex.com environment is described by means of these sections and settings: <bu> The default section describes the
+default domain, which is called MYDOMAIN, and sets a default user of MYUSER. These default settings are in<hy>
+herited by other sections unless property values are overridden. <bu> FSERVER is a server section that defines a server
+called fserv.ex.com. It is part of the SALES domain. <bu> RSERVER is a server section that defines a server called
+rserv.ex.com that belongs to a new domain called REMGROUP. Example 1 Using the $HOME/.nsmbrc Config<hy>
+uration File
+<beginning of page>
+The following example shows how a user can configure the ex.com environment by creating the .nsmbrc file.
+All lines that begin with the # character are comments and are not parsed.
+ # Configuration file for ex.com
+ # Specify the Windows account name to use everywhere.
+ [default]
+ domain=MYDOMAIN
+ user=MYUSER
+ # The 'FSERVER' is server in our domain.
+ [FSERVER]
+ addr=fserv.ex.com
+ # The 'RSERVER' is a server in another domain.
+ [RSERVER]
+ domain=REMGROUP
+ addr=rserv.ex.com
+Example 2 Using the sharectl Command
+The following example shows how an authorized user can use sharectl commands to configure global settings for
+the ex.com environment in SMF.
+ # sharectl set -p section=default -p domain=MYDOMAIN \
+ -p user=MYUSER smbfs
+ # sharectl set -p section=FSERVER -p addr=fserv.ex.com smbfs
+ # sharectl set -p section=RSERVER -p domain=REMGROUP \
+ -p addr=rserv.ex.com smbfs
+Example 3 Using the sharectl Command to Show Current Settings
+The following example shows how an authorized user can use the sharectl get command to view the global settings
+for smbfs in SMF. The values shown are those set by the previous example.
+ # sharectl get smbfs
+ [default]
+  domain=MYDOMAIN
+  user=MYUSER
+ [FSERVER]
+  addr=fserv.ex.com
+ [RSERVER]
+  domain=REMGROUP
+  addr=rserv.ex.com
+$HOME/.nsmbrc
+User-settable mount point configuration file to store the description for each connection.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wsmbfscu _ Interface StabilityCommitted
+smbutil(1), mount_smbfs(1M), sharectl(1M), nsswitch.conf(4), user_attr(4), attributes(5), rbac(5), smbfs(7FS)
+<beginning of page>
+By default, passwords stored in the .nsmbrc file are ignored unless only the file owner has read and write permis<hy>
+sion.

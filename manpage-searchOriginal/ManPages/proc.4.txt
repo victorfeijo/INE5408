@@ -1,0 +1,1116 @@
+<beginning of page>
+proc <-> /proc, the process file system
+/proc is a file system that provides access to the state of each process and light-weight process (lwp) in the system.
+The name of each entry in the /proc directory is a decimal number corresponding to a process-ID. These entries are
+themselves subdirectories. Access to process state is provided by additional files contained within each subdirectory;
+the hierarchy is described more completely below. In this document, ``/proc file'' refers to a non-directory file within
+the hierarchy rooted at /proc. The owner of each /proc file and subdirectory is determined by the user-ID of the
+process.
+/proc can be mounted on any mount point, in addition to the standard /proc mount point, and can be mounted sever<hy>
+al places at once. Such additional mounts are allowed in order to facilitate the confinement of processes to subtrees
+of the file system via chroot(1M) and yet allow such processes access to commands like ps(1).
+Standard system calls are used to access /proc files: open(2), close(2), read(2), and write(2) (including readv(2),
+writev(2), pread(2), and pwrite(2)). Most files describe process state and can only be opened for reading. ctl and
+lwpctl (control) files permit manipulation of process state and can only be opened for writing. as (address space)
+files contain the image of the running process and can be opened for both reading and writing. An open for writing
+allows process control; a read-only open allows inspection but not control. In this document, we refer to the process
+as open for reading or writing if any of its associated /proc files is open for reading or writing.
+In general, more than one process can open the same /proc file at the same time. Exclusive open is an advisory
+mechanism provided to allow controlling processes to avoid collisions with each other. A process can obtain exclu<hy>
+sive control of a target process, with respect to other cooperating processes, if it successfully opens any /proc file in
+the target process for writing (the as or ctl files, or the lwpctl file of any lwp) while specifying O_EXCL in the
+open(2). Such an open will fail if the target process is already open for writing (that is, if an as, ctl, or lwpctl file is
+already open for writing). There can be any number of concurrent read-only opens; O_EXCL is ignored on opens
+for reading. It is recommended that the first open for writing by a controlling process use the O_EXCL flag; multi<hy>
+ple controlling processes usually result in chaos.
+If a process opens one of its own /proc files for writing, the open succeeds regardless of O_EXCL and regardless of
+whether some other process has the process open for writing. Self-opens do not count when another process attempts
+an exclusive open. (A process cannot exclude a debugger by opening itself for writing and the application of a de<hy>
+bugger cannot prevent a process from opening itself.) All self-opens for writing are forced to be close-on-exec (see
+the F_SETFD operation of fcntl(2)).
+Data may be transferred from or to any locations in the address space of the traced process by applying lseek(2) to
+position the as file at the virtual address of interest followed by read(2) or write(2) (or by using pread(2) or
+pwrite(2) for the combined operation). The address-map files /proc/pid/map and /proc/pid/xmap can be read to de<hy>
+termine the accessible areas (mappings) of the address space. I/O transfers may span contiguous mappings. An I/O
+request extending into an unmapped area is truncated at the boundary. A write request beginning at an unmapped
+virtual address fails with EIO; a read request beginning at an unmapped virtual address returns zero (an end-of-file
+indication).
+Information and control operations are provided through additional files. <procfs.h> contains definitions of data
+structures and message formats used with these files. Some of these definitions involve the use of sets of flags. The
+set types sigset_t, fltset_t, and sysset_t correspond, respectively, to signal, fault, and system call enumerations de<hy>
+fined in <sys/signal.h>, <sys/fault.h>, and <sys/syscall.h>. Each set type is large enough to hold flags for its own
+enumeration. Although they are of different sizes, they have a common structure and can be manipulated by these
+macros:
+ prfillset(&set); /* turn on all flags in set */
+ premptyset(&set); /* turn off all flags in set */
+ praddset(&set, flag); /* turn on the specified flag */
+ prdelset(&set, flag); /* turn off the specified flag */
+ r = prismember(&set, flag); /* != 0 iff flag is turned on */
+One of prfillset() or premptyset() must be used to initialize set before it is used in any other operation. flag must be
+a member of the enumeration corresponding to set.
+Every process contains at least one light-weight process, or lwp. Each lwp represents a flow of execution that is inde<hy>
+pendently scheduled by the operating system. All lwps in a process share its address space as well as many other at<hy>
+tributes. Through the use of lwpctl and ctl files as described below, it is possible to affect individual lwps in a
+process or to affect all of them at once, depending on the operation.
+When the process has more than one lwp, a representative lwp is chosen by the system for certain process status files
+<beginning of page>
+and control operations. The representative lwp is a stopped lwp only if all of the process's lwps are stopped; is
+stopped on an event of interest only if all of the lwps are so stopped (excluding PR_SUSPENDED lwps); is in a
+PR_REQUESTED stop only if there are no other events of interest to be found; or, failing everything else, is in a
+PR_SUSPENDED stop (implying that the process is deadlocked). See the description of the status file for defini<hy>
+tions of stopped states. See the PCSTOP control operation for the definition of ``event of interest''.
+The representative lwp remains fixed (it will be chosen again on the next operation) as long as all of the lwps are
+stopped on events of interest or are in a PR_SUSPENDED stop and the PCRUN control operation is not applied to
+any of them.
+When applied to the process control file, every /proc control operation that must act on an lwp uses the same algo<hy>
+rithm to choose which lwp to act upon. Together with synchronous stopping (see PCSET), this enables a debugger
+to control a multiple-lwp process using only the process-level status and control files if it so chooses. More fine-
+grained control can be achieved using the lwp-specific files.
+The system supports two process data models, the traditional 32-bit data model in which ints, longs and pointers are
+all 32 bits wide (the ILP32 data model), and on some platforms the 64-bit data model in which longs and pointers,
+but not ints, are 64 bits in width (the LP64 data model). In the LP64 data model some system data types, notably
+size_t, off_t, time_t and dev_t, grow from 32 bits to 64 bits as well.
+The /proc interfaces described here are available to both 32-bit and 64-bit controlling processes. However, many op<hy>
+erations attempted by a 32-bit controlling process on a 64-bit target process will fail with EOVERFLOW because
+the address space range of a 32-bit process cannot encompass a 64-bit process or because the data in some 64-bit
+system data type cannot be compressed to fit into the corresponding 32-bit type without loss of information. Opera<hy>
+tions that fail in this circumstance include reading and writing the address space, reading the address-map files, and
+setting the target process's registers. There is no restriction on operations applied by a 64-bit process to either a
+32-bit or a 64-bit target processes.
+The format of the contents of any /proc file depends on the data model of the observer (the controlling process), not
+on the data model of the target process. A 64-bit debugger does not have to translate the information it reads from a
+/proc file for a 32-bit process from 32-bit format to 64-bit format. However, it usually has to be aware of the data
+model of the target process. The pr_dmodel field of the status files indicates the target process's data model.
+To help deal with system data structures that are read from 32-bit processes, a 64-bit controlling program can be
+compiled with the C preprocessor symbol _SYSCALL32 defined before system header files are included. This
+makes explicit 32-bit fixed-width data structures (like cstruct stat32) visible to the 64-bit program. See
+types32.h(3HEAD).
+At the top level, the directory /proc contains entries each of which names an existing process in the system. These
+entries are themselves directories. Except where otherwise noted, the files described below can be opened for read<hy>
+ing only. In addition, if a process becomes a zombie (one that has exited but whose parent has not yet performed a
+wait(3C) upon it), most of its associated /proc files disappear from the hierarchy; subsequent attempts to open them,
+or to read or write files opened before the process exited, will elicit the error ENOENT.
+Although process state and consequently the contents of /proc files can change from instant to instant, a single
+read(2) of a /proc file is guaranteed to return a sane representation of state; that is, the read will be atomic with re<hy>
+spect to the state of the process. No such guarantee applies to successive reads applied to a /proc file for a running
+process. In addition, atomicity is not guaranteed for I/O applied to the as (address-space) file for a running process
+or for a process whose address space contains memory shared by another running process.
+A number of structure definitions are used to describe the files. These structures may grow by the addition of ele<hy>
+ments at the end in future releases of the system and it is not legitimate for a program to assume that they will not.
+A given directory /proc/pid contains the following entries. A process can use the invisible alias /proc/self if it wish<hy>
+es to open one of its own /proc files (invisible in the sense that the name ``self'' does not appear in a directory listing
+of /proc obtained from ls(1), getdents(2), or readdir(3C)).
+A directory containing references to the contracts held by the process. Each entry is a symlink to the contract's di<hy>
+rectory under /system/contract. See contract(4).
+Contains the address-space image of the process; it can be opened for both reading and writing. lseek(2) is used to
+position the file at the virtual address of interest and then the address space can be examined or changed through
+read(2) or write(2) (or by using pread(2) or pwrite(2) for the combined operation).
+A write-only file to which structured messages are written directing the system to change some aspect of the
+process's state or control its behavior in some way. The seek offset is not relevant when writing to this file. Individu<hy>
+<beginning of page>
+al lwps also have associated lwpctl files in the lwp subdirectories. A control message may be written either to the
+process's ctl file or to a specific lwpctl file with operation-specific effects. The effect of a control message is imme<hy>
+diately reflected in the state of the process visible through appropriate status and information files. The types of con<hy>
+trol messages are described in detail later. See CONTROL MESSAGES.
+Contains state information about the process and the representative lwp. The file contains a pstatus structure which
+contains an embedded lwpstatus structure for the representative lwp, as follows:
+ typedef struct pstatus {
+  int pr_flags; /* flags (see below) */
+  int pr_nlwp; /* number of active lwps in the process */
+  int pr_nzomb; /* number of zombie lwps in the process */
+  pid_tpr_pid; /* process id */
+  pid_tpr_ppid; /* parent process id */
+  pid_tpr_pgid; /* process group id */
+  pid_tpr_sid; /* session id */
+  id_t pr_aslwpid; /* obsolete */
+  id_t pr_agentid; /* lwp-id of the agent lwp, if any */
+  sigset_t pr_sigpend; /* set of process pending signals */
+  uintptr_t pr_brkbase; /* virtual address of the process heap */
+  size_t pr_brksize; /* size of the process heap, in bytes */
+  uintptr_t pr_stkbase; /* virtual address of the process stack */
+  size_tpr_stksize; /* size of the process stack, in bytes */
+  timestruc_t pr_utime; /* process user cpu time */
+  timestruc_t pr_stime; /* process system cpu time */
+  timestruc_t pr_cutime; /* sum of children's user times */
+  timestruc_t pr_cstime; /* sum of children's system times */
+  sigset_t pr_sigtrace; /* set of traced signals */
+  fltset_t pr_flttrace; /* set of traced faults */
+  sysset_t pr_sysentry; /* set of system calls traced on entry */
+  sysset_t pr_sysexit; /* set of system calls traced on exit */
+  char pr_dmodel; /* data model of the process */
+  taskid_t pr_taskid; /* task id */
+  projid_t pr_projid; /* project id */
+  zoneid_t pr_zoneid; /* zone id */
+  lwpstatus_t pr_lwp; /* status of the representative lwp */
+ } pstatus_t;
+pr_flags is a bit-mask holding the following process flags. For convenience, it also contains the lwp flags for the rep<hy>
+resentative lwp, described later.
+PR_ISSYS process is a system process (see PCSTOP).
+PR_VFORKP process is the parent of a vforked child (see PCWATCH).
+PR_FORK process has its inherit-on-fork mode set (see PCSET).
+PR_RLC process has its run-on-last-close mode set (see PCSET).
+PR_KLC process has its kill-on-last-close mode set (see PCSET).
+PR_ASYNC process has its asynchronous-stop mode set (see PCSET).
+PR_MSACCT Set by default in all processes to indicate that microstate accounting is enabled. However, this flag
+has been deprecated and no longer has any effect. Microstate accounting may not be disabled; however, it is still
+possible to toggle the flag.
+<beginning of page>
+PR_MSFORK Set by default in all processes to indicate that microstate accounting will be enabled for processes
+that this parent forks(). However, this flag has been deprecated and no longer has any effect. It is possible to toggle
+this flag; however, it is not possible to disable microstate accounting.
+PR_BPTADJ process has its breakpoint adjustment mode set (see PCSET).
+PR_PTRACE process has its ptrace-compatibility mode set (see PCSET).
+pr_nlwp is the total number of active lwps in the process. pr_nzomb is the total number of zombie lwps in the
+process. A zombie lwp is a non-detached lwp that has terminated but has not been reaped with thr_join(3C) or
+pthread_join(3C).
+pr_pid, pr_ppid, pr_pgid, and pr_sid are, respectively, the process ID, the ID of the process's parent, the process's
+process group ID, and the process's session ID.
+pr_aslwpid is obsolete and is always zero.
+pr_agentid is the lwp-ID for the /proc agent lwp (see the PCAGENT control operation). It is zero if there is no
+agent lwp in the process.
+pr_sigpend identifies asynchronous signals pending for the process.
+pr_brkbase is the virtual address of the process heap and pr_brksize is its size in bytes. The address formed by the
+sum of these values is the process break (see brk(2)). pr_stkbase and pr_stksize are, respectively, the virtual ad<hy>
+dress of the process stack and its size in bytes. (Each lwp runs on a separate stack; the distinguishing characteristic
+of the process stack is that the operating system will grow it when necessary.)
+pr_utime, pr_stime, pr_cutime, and pr_cstime are, respectively, the user CPU and system CPU time consumed by
+the process, and the cumulative user CPU and system CPU time consumed by the process's children, in seconds and
+nanoseconds.
+pr_sigtrace and pr_flttrace contain, respectively, the set of signals and the set of hardware faults that are being
+traced (see PCSTRACE and PCSFAULT).
+pr_sysentry and pr_sysexit contain, respectively, the sets of system calls being traced on entry and exit (see PC<hy>
+SENTRY and PCSEXIT).
+pr_dmodel indicates the data model of the process. Possible values are:
+PR_MODEL_ILP32 process data model is ILP32.
+PR_MODEL_LP64 process data model is LP64.
+PR_MODEL_NATIVE process data model is native.
+The pr_taskid, pr_projid, and pr_zoneid fields contain respectively, the numeric IDs of the task, project, and zone
+in which the process was running.
+The constant PR_MODEL_NATIVE reflects the data model of the controlling process, that is, its value is
+PR_MODEL_ILP32 or PR_MODEL_LP64 according to whether the controlling process has been compiled as a
+32-bit program or a 64-bit program, respectively.
+pr_lwp contains the status information for the representative lwp:
+ typedef struct lwpstatus {
+  int pr_flags; /* flags (see below) */
+  id_t pr_lwpid; /* specific lwp identifier */
+  short pr_why; /* reason for lwp stop, if stopped */
+  short pr_what; /* more detailed reason */
+  short pr_cursig; /* current signal, if any */
+<beginning of page>
+  siginfo_t pr_info; /* info associated with signal or fault */
+  sigset_t pr_lwppend; /* set of signals pending to the lwp */
+  sigset_t pr_lwphold; /* set of signals blocked by the lwp */
+  struct sigaction pr_action;/* signal action for current signal */
+  stack_t pr_altstack; /* alternate signal stack info */
+  uintptr_t pr_oldcontext; /* address of previous ucontext */
+  short pr_syscall; /* system call number (if in syscall) */
+  short pr_nsysarg; /* number of arguments to this syscall */
+  int pr_errno; /* errno for failed syscall */
+  long pr_sysarg[PRSYSARGS]; /* arguments to this syscall */
+  long pr_rval1; /* primary syscall return value */
+  long pr_rval2; /* second syscall return value, if any */
+  char pr_clname[PRCLSZ]; /* scheduling class name */
+  timestruc_t pr_tstamp; /* real-time time stamp of stop */
+  timestruc_t pr_utime; /* lwp user cpu time */
+  timestruc_t pr_stime; /* lwp system cpu time */
+  uintptr_t pr_ustack; /* stack boundary data (stack_t) address */
+  ulong_t pr_instr; /* current instruction */
+  prgregset_t pr_reg; /* general registers */
+  prfpregset_t pr_fpreg; /* floating-point registers */
+ } lwpstatus_t;
+pr_flags is a bit-mask holding the following lwp flags. For convenience, it also contains the process flags, described
+previously.
+PR_STOPPED The lwp is stopped.
+PR_ISTOP The lwp is stopped on an event of interest (see PCSTOP).
+PR_DSTOP The lwp has a stop directive in effect (see PCSTOP).
+PR_STEP The lwp has a single-step directive in effect (see PCRUN).
+PR_ASLEEP The lwp is in an interruptible sleep within a system call.
+PR_PCINVAL The lwp's current instruction (pr_instr) is undefined.
+PR_DETACH This is a detached lwp (see pthread_create(3C) and pthread_join(3C)).
+PR_DAEMON This is a daemon lwp (see pthread_create(3C)).
+PR_ASLWP This flag is obsolete and is never set.
+PR_AGENT This is the /proc agent lwp for the process.
+pr_lwpid names the specific lwp.
+pr_why and pr_what together describe, for a stopped lwp, the reason for the stop. Possible values of pr_why and
+the associated pr_what are:
+PR_REQUESTED indicates that the stop occurred in response to a stop directive, normally because PCSTOP was
+applied or because another lwp stopped on an event of interest and the asynchronous-stop flag (see PCSET) was not
+set for the process. pr_what is unused in this case.
+<beginning of page>
+PR_SIGNALLED indicates that the lwp stopped on receipt of a signal (see PCSTRACE); pr_what holds the sig<hy>
+nal number that caused the stop (for a newly-stopped lwp, the same value is in pr_cursig).
+PR_FAULTED indicates that the lwp stopped on incurring a hardware fault (see PCSFAULT); pr_what holds the
+fault number that caused the stop.
+PR_SYSENTRY
+PR_SYSEXIT indicate a stop on entry to or exit from a system call (see PCSENTRY and PCSEXIT); pr_what
+holds the system call number.
+PR_JOBCONTROL indicates that the lwp stopped due to the default action of a job control stop signal (see sigac<hy>
+tion(2)); pr_what holds the stopping signal number.
+PR_SUSPENDED indicates that the lwp stopped due to internal synchronization of lwps within the process.
+pr_what is unused in this case.
+pr_cursig names the current signal, that is, the next signal to be delivered to the lwp, if any. pr_info, when the lwp
+is in a PR_SIGNALLED or PR_FAULTED stop, contains additional information pertinent to the particular signal
+or fault (see <sys/siginfo.h>).
+pr_lwppend identifies any synchronous or directed signals pending for the lwp. pr_lwphold identifies those signals
+whose delivery is being blocked by the lwp (the signal mask).
+pr_action contains the signal action information pertaining to the current signal (see sigaction(2)); it is undefined if
+pr_cursig is zero. pr_altstack contains the alternate signal stack information for the lwp (see sigaltstack(2)).
+pr_oldcontext, if not zero, contains the address on the lwp stack of a ucontext structure describing the previous
+user-level context (see ucontext.h(3HEAD)). It is non-zero only if the lwp is executing in the context of a signal
+handler.
+pr_syscall is the number of the system call, if any, being executed by the lwp; it is non-zero if and only if the lwp is
+stopped on PR_SYSENTRY or PR_SYSEXIT, or is asleep within a system call ( PR_ASLEEP is set). If
+pr_syscall is non-zero, pr_nsysarg is the number of arguments to the system call and pr_sysarg contains the actual
+arguments.
+pr_rval1, pr_rval2, and pr_errno are defined only if the lwp is stopped on PR_SYSEXIT or if the PR_VFORKP
+flag is set. If pr_errno is zero, pr_rval1 and pr_rval2 contain the return values from the system call. Otherwise,
+pr_errno contains the error number for the failing system call (see <sys/errno.h>).
+pr_clname contains the name of the lwp's scheduling class.
+pr_tstamp, if the lwp is stopped, contains a time stamp marking when the lwp stopped, in real time seconds and
+nanoseconds since an arbitrary time in the past.
+pr_utime is the amount of user level CPU time used by this LWP.
+pr_stime is the amount of system level CPU time used by this LWP.
+pr_ustack is the virtual address of the stack_t that contains the stack boundaries for this LWP. See getustack(2) and
+_stack_grow(3C).
+pr_instr contains the machine instruction to which the lwp's program counter refers. The amount of data retrieved
+from the process is machine-dependent. On SPARC based machines, it is a 32-bit word. On x86-based machines, it
+is a single byte. In general, the size is that of the machine's smallest instruction. If PR_PCINVAL is set, pr_instr is
+undefined; this occurs whenever the lwp is not stopped or when the program counter refers to an invalid virtual ad<hy>
+dress.
+pr_reg is an array holding the contents of a stopped lwp's general registers.
+SPARC On SPARC-based machines, the predefined constants R_G0 ... R_G7, R_O0 ... R_O7, R_L0 ... R_L7,
+R_I0 ... R_I7, R_PC, R_nPC, and R_Y can be used as indices to refer to the corresponding registers; previous reg<hy>
+ister windows can be read from their overflow locations on the stack (however, see the gwindows file in the
+<beginning of page>
+/proc/pid/lwp/lwpid subdirectory).
+SPARC V8 (32-bit) For SPARC V8 (32-bit) controlling processes, the predefined constants R_PSR, R_WIM, and
+R_TBR can be used as indices to refer to the corresponding special registers. For SPARC V9 (64-bit) controlling
+processes, the predefined constants R_CCR, R_ASI, and R_FPRS can be used as indices to refer to the correspond<hy>
+ing special registers.
+x86 (32-bit) For 32-bit x86 processes, the predefined constants listed belowcan be used as indices to refer to the cor<hy>
+responding registers.
+ SS
+ UESP
+ EFL
+ CS
+ EIP
+ ERR
+ TRAPNO
+ EAX
+ ECX
+ EDX
+ EBX
+ ESP
+ EBP
+ ESI
+ EDI
+ DS
+ ES
+ GS
+The preceding constants are listed in <sys/regset.h>.
+Note that a 32-bit process can run on an x86 64-bit system, using the constants listed above.
+x86 (64-bit) To read the registers of a 32- or a 64-bit process, a 64-bit x86 process should use the predefined con<hy>
+stants listed below.
+ REG_GSBASE
+ REG_FSBASE
+ REG_DS
+ REG_ES
+ REG_GS
+ REG_FS
+ REG_SS
+ REG_RSP
+ REG_RFL
+ REG_CS
+ REG_RIP
+ REG_ERR
+ REG_TRAPNO
+ REG_RAX
+ REG_RCX
+ REG_RDX
+ REG_RBX
+ REG_RBP
+ REG_RSI
+ REG_RDI
+ REG_R8
+ REG_R9
+ REG_R10
+ REG_R11
+ REG_R12
+ REG_R13
+ REG_R14
+<beginning of page>
+ REG_R15
+The preceding constants are listed in <sys/regset.h>.
+pr_fpreg is a structure holding the contents of the floating-point registers.
+SPARC registers, both general and floating-point, as seen by a 64-bit controlling process are the V9 versions of the
+registers, even if the target process is a 32-bit (V8) process. V8 registers are a subset of the V9 registers.
+If the lwp is not stopped, all register values are undefined.
+Contains miscellaneous information about the process and the representative lwp needed by the ps(1) command.
+psinfo remains accessible after a process becomes a zombie. The file contains a psinfo structure which contains an
+embedded lwpsinfo structure for the representative lwp, as follows:
+ typedef struct psinfo {
+  int pr_flag; /* process flags (DEPRECATED: see below) */
+  int pr_nlwp; /* number of active lwps in the process */
+  int pr_nzomb; /* number of zombie lwps in the process */
+  pid_t pr_pid; /* process id */
+  pid_t pr_ppid; /* process id of parent */
+  pid_t pr_pgid; /* process id of process group leader */
+  pid_t pr_sid; /* session id */
+  uid_t pr_uid; /* real user id */
+  uid_t pr_euid; /* effective user id */
+  gid_t pr_gid; /* real group id */
+  gid_t pr_egid; /* effective group id */
+  uintptr_t pr_addr; /* address of process */
+  size_t pr_size; /* size of process image in Kbytes */
+  size_t pr_rssize; /* resident set size in Kbytes */
+  dev_t pr_ttydev; /* controlling tty device (or PRNODEV) */
+  ushort_t pr_pctcpu; /* % of recent cpu time used by all lwps */
+  ushort_t pr_pctmem; /* % of system memory used by process */
+  timestruc_t pr_start; /* process start time, from the epoch */
+  timestruc_t pr_time; /* cpu time for this process */
+  timestruc_t pr_ctime; /* cpu time for reaped children */
+  char pr_fname[PRFNSZ]; /* name of exec'ed file */
+  char pr_psargs[PRARGSZ]; /* initial characters of arg list */
+  int pr_wstat; /* if zombie, the wait() status */
+  int pr_argc; /* initial argument count */
+  uintptr_t pr_argv; /* address of initial argument vector */
+  uintptr_t pr_envp; /* address of initial environment vector */
+  char pr_dmodel; /* data model of the process */
+  lwpsinfo_t pr_lwp; /* information for representative lwp */
+  taskid_t pr_taskid; /* task id */
+  projid_t pr_projid; /* project id */
+  poolid_t pr_poolid; /* pool id */
+  zoneid_t pr_zoneid; /* zone id */
+  ctid_t pr_contract; /* process contract id */
+ } psinfo_t;
+Some of the entries in psinfo, such as pr_addr, refer to internal kernel data structures and should not be expected to
+retain their meanings across different versions of the operating system.
+psinfo_t.pr_flag is a deprecated interface that should no longer be used. Applications currently relying on the SSYS
+bit in pr_flag should migrate to checking PR_ISSYS in the pstatus structure's pr_flags field.
+pr_pctcpu and pr_pctmem are 16-bit binary fractions in the range 0.0 to 1.0 with the binary point to the right of the
+high-order bit (1.0 == 0x8000). pr_pctcpu is the summation over all lwps in the process.
+pr_lwp contains the ps(1) information for the representative lwp. If the process is a zombie, pr_nlwp, pr_nzomb,
+and pr_lwp.pr_lwpid are zero and the other fields of pr_lwp are undefined:
+ typedef struct lwpsinfo {
+<beginning of page>
+  int pr_flag; /* lwp flags (DEPRECATED: see below) */
+  id_t pr_lwpid; /* lwp id */
+  uintptr_t pr_addr; /* internal address of lwp */
+  uintptr_t pr_wchan; /* wait addr for sleeping lwp */
+  char pr_stype; /* synchronization event type */
+  char pr_state; /* numeric lwp state */
+  char pr_sname; /* printable character for pr_state */
+  char pr_nice; /* nice for cpu usage */
+  short pr_syscall; /* system call number (if in syscall) */
+  char pr_oldpri; /* pre-SVR4, low value is high priority */
+  char pr_cpu; /* pre-SVR4, cpu usage for scheduling */
+  int pr_pri; /* priority, high value = high priority */
+  ushort_t pr_pctcpu; /* % of recent cpu time used by this lwp */
+  timestruc_t pr_start; /* lwp start time, from the epoch */
+  timestruc_t pr_time; /* cpu time for this lwp */
+  char pr_clname[PRCLSZ]; /* scheduling class name */
+  char pr_name[PRFNSZ]; /* name of system lwp */
+  processorid_t pr_onpro; /* processor which last ran this lwp */
+  processorid_t pr_bindpro;/* processor to which lwp is bound */
+  psetid_t pr_bindpset; /* processor set to which lwp is bound */
+  lgrp_id_t pr_lgrp  /* home lgroup */
+ } lwpsinfo_t;
+Some of the entries in lwpsinfo, such as pr_addr, pr_wchan, pr_stype, pr_state, and pr_name, refer to internal
+kernel data structures and should not be expected to retain their meanings across different versions of the operating
+system.
+lwpsinfo_t.pr_flag is a deprecated interface that should no longer be used.
+pr_pctcpu is a 16-bit binary fraction, as described above. It represents the CPU time used by the specific lwp. On a
+multi-processor machine, the maximum value is 1/N, where N is the number of CPUs.
+pr_contract is the id of the process contract of which the process is a member. See contract(4) and process(4).
+Contains a description of the credentials associated with the process:
+ typedef struct prcred {
+  uid_t pr_euid; /* effective user id */
+  uid_t pr_ruid; /* real user id */
+  uid_t pr_suid; /* saved user id (from exec) */
+  gid_t pr_egid; /* effective group id */
+  gid_t pr_rgid; /* real group id */
+  gid_t pr_sgid; /* saved group id (from exec) */
+  int pr_ngroups; /* number of supplementary groups */
+  gid_t pr_groups[1]; /* array of supplementary groups */
+ } prcred_t;
+The array of associated supplementary groups in pr_groups is of variable length; the cred file contains all of the
+supplementary groups. pr_ngroups indicates the number of supplementary groups. (See also the PCSCRED and
+PCSCREDX control operations.)
+Contains a description of the privileges associated with the process:
+ typedef struct prpriv {
+  uint32_t pr_nsets; /* number of privilege set */
+  uint32_t pr_setsize; /* size of privilege set */
+  uint32_t pr_infosize; /* size of supplementary data */
+  priv_chunk_t pr_sets[1]; /* array of sets */
+ } prpriv_t;
+The actual dimension of the pr_sets[] field is
+<beginning of page>
+ pr_sets[pr_nsets][pr_setsize]
+which is followed by additional information about the process state pr_infosize bytes in size.
+The full size of the structure can be computed using PRIV_PRPRIV_SIZE(prpriv_t *).
+Contains an array of sigaction structures describing the current dispositions of all signals associated with the traced
+process (see sigaction(2)). Signal numbers are displaced by 1 from array indices, so that the action for signal num<hy>
+ber n appears in position n-1 of the array.
+Contains the initial values of the process's aux vector in an array of auxv_t structures (see <sys/auxv.h>). The val<hy>
+ues are those that were passed by the operating system as startup information to the dynamic linker.
+This file exists only on x86-based machines. It is non-empty only if the process has established a local descriptor ta<hy>
+ble (LDT). If non-empty, the file contains the array of currently active LDT entries in an array of elements of type
+struct ssd, defined in <sys/sysi86.h>, one element for each active LDT entry.
+Contain information about the virtual address map of the process. The map file contains an array of prmap struc<hy>
+tures while the xmap file contains an array of prxmap structures. Each structure describes a contiguous virtual ad<hy>
+dress region in the address space of the traced process:
+ typedef struct prmap {
+  uintptr_tpr_vaddr; /* virtual address of mapping */
+  size_t pr_size; /* size of mapping in bytes */
+  char pr_mapname[PRMAPSZ]; /* name in /proc/pid/object */
+  offset_t pr_offset; /* offset into mapped object, if any */
+  int pr_mflags; /* protection and attribute flags */
+  int pr_pagesize; /* pagesize for this mapping in bytes */
+  int pr_shmid; /* SysV shared memory identifier */
+ } prmap_t;
+ typedef struct prxmap {
+  uintptr_t pr_vaddr; /* virtual address of mapping */
+  size_t pr_size; /* size of mapping in bytes */
+  char pr_mapname[PRMAPSZ]; /* name in /proc/pid/object */
+  offset_t pr_offset; /* offset into mapped object, if any */
+  int pr_mflags; /* protection and attribute flags */
+  int pr_pagesize; /* pagesize for this mapping in bytes */
+  int pr_shmid; /* SysV shared memory identifier */
+  dev_t pr_dev; /* device of mapped object, if any */
+  uint64_t pr_ino; /* inode of mapped object, if any */
+  size_t pr_rss; /* pages of resident memory */
+  size_t pr_anon; /* pages of resident anonymous memory */
+  size_t pr_locked; /* pages of locked memory */
+  uint64_t pr_hatpagesize; /* pagesize of mapping */
+ } prxmap_t;
+pr_vaddr is the virtual address of the mapping within the traced process and pr_size is its size in bytes. pr_map<hy>
+name, if it does not contain a null string, contains the name of a file in the object directory (see below) that can be
+opened read-only to obtain a file descriptor for the mapped file associated with the mapping. This enables a debug<hy>
+ger to find object file symbol tables without having to know the real path names of the executable file and shared li<hy>
+braries of the process. pr_offset is the 64-bit offset within the mapped file (if any) to which the virtual address is
+mapped.
+pr_mflags is a bit-mask of protection and attribute flags:
+MA_READ mapping is readable by the traced process.
+MA_WRITE mapping is writable by the traced process.
+<beginning of page>
+MA_EXEC mapping is executable by the traced process.
+MA_SHARED mapping changes are shared by the mapped object.
+MA_ISM mapping is intimate shared memory (shared MMU resources)
+MAP_NORESERVE mapping does not have swap space reserved (mapped with MAP_NORESERVE)
+MA_SHM mapping System V shared memory
+A contiguous area of the address space having the same underlying mapped object may appear as multiple mappings
+due to varying read, write, and execute attributes. The underlying mapped object does not change over the range of a
+single mapping. An I/O operation to a mapping marked MA_SHARED fails if applied at a virtual address not cor<hy>
+responding to a valid page in the underlying mapped object. A write to a MA_SHARED mapping that is not marked
+MA_WRITE fails. Reads and writes to private mappings always succeed. Reads and writes to unmapped addresses
+fail.
+pr_pagesize is the page size for the mapping, currently always the system pagesize.
+pr_shmid is the shared memory identifier, if any, for the mapping. Its value is <mi>1 if the mapping is not System V
+shared memory. See shmget(2).
+pr_dev is the device of the mapped object, if any, for the mapping. Its value is PRNODEV (-1) if the mapping does
+not have a device.
+pr_ino is the inode of the mapped object, if any, for the mapping. Its contents are only valid if pr_dev is not PRN<hy>
+ODEV.
+pr_rss is the number of resident pages of memory for the mapping. The number of resident bytes for the mapping
+may be determined by multiplying pr_rss by the page size given by pr_pagesize.
+pr_anon is the number of resident anonymous memory pages (pages which are private to this process) for the map<hy>
+ping.
+pr_locked is the number of locked pages for the mapping. Pages which are locked are always resident in memory.
+pr_hatpagesize is the size, in bytes, of the HAT (MMU) translation for the mapping. pr_hatpagesize may be dif<hy>
+ferent than pr_pagesize. The possible values are hardware architecture specific, and may change over a mapping's
+lifetime.
+Contains information about the reserved address ranges of the process. The file contains an array of prmap struc<hy>
+tures, as defined above for the map file. Each structure describes a contiguous virtual address region in the address
+space of the traced process that is reserved by the system in the sense that an mmap(2) system call that does not
+specify MAP_FIXED will not use any part of it for the new mapping. Examples of such reservations include the ad<hy>
+dress ranges reserved for the process stack and the individual thread stacks of a multi-threaded process.
+A symbolic link to the process's current working directory. See chdir(2). A readlink(2) of /proc/pid/cwd yields a
+null string. However, it can be opened, listed, and searched as a directory, and can be the target of chdir(2).
+A symbolic link to the process's root directory. /proc/pid/root can differ from the system root directory if the
+process or one of its ancestors executed chroot(2) as super user. It has the same semantics as /proc/pid/cwd.
+A directory containing references to the open files of the process. Each entry is a decimal number corresponding to
+an open file descriptor in the process.
+If an entry refers to a regular file, it can be opened with normal file system semantics but, to ensure that the control<hy>
+ling process cannot gain greater access than the controlled process, with no file access modes other than its
+read/write open modes in the controlled process. If an entry refers to a directory, it can be accessed with the same se<hy>
+mantics as /proc/pid/cwd. An attempt to open any other type of entry fails with EACCES.
+<beginning of page>
+A directory containing read-only files with names corresponding to the pr_mapname entries in the map and page<hy>
+data files. Opening such a file yields a file descriptor for the underlying mapped file associated with an address-
+space mapping in the process. The file name a.out appears in the directory as an alias for the process's executable
+file.
+The object directory makes it possible for a controlling process to gain access to the object file and any shared li<hy>
+braries (and consequently the symbol tables) without having to know the actual path names of the executable files.
+A directory containing symbolic links to files opened by the process. The directory includes one entry for cwd and
+root. The directory also contains a numerical entry for each file descriptor in the fd directory, and entries matching
+those in the object directory. If this information is not available, any attempt to read the contents of the symbolic
+link will fail. This is most common for files that do not exist in the filesystem namespace (such as FIFOs and sock<hy>
+ets), but can also happen for regular files. For the file descriptor entries, the path may be different from the one used
+by the process to open the file.
+Opening the page data file enables tracking of address space references and modifications on a per-page basis.
+A read(2) of the page data file descriptor returns structured page data and atomically clears the page data maintained
+for the file by the system. That is to say, each read returns data collected since the last read; the first read returns data
+collected since the file was opened. When the call completes, the read buffer contains the following structure as its
+header and thereafter contains a number of section header structures and associated byte arrays that must be ac<hy>
+cessed by walking linearly through the buffer.
+ typedef struct prpageheader {
+  timestruc_t pr_tstamp; /* real time stamp, time of read() */
+  ulong_t pr_nmap; /* number of address space mappings */
+  ulong_t pr_npage; /* total number of pages */
+ } prpageheader_t;
+The header is followed by pr_nmap prasmap structures and associated data arrays. The prasmap structure con<hy>
+tains the following elements:
+ typedef struct prasmap {
+  uintptr_t pr_vaddr; /* virtual address of mapping */
+  ulong_t pr_npage; /* number of pages in mapping */
+  char pr_mapname[PRMAPSZ]; /* name in /proc/pid/object */
+  offset_t pr_offset; /* offset into mapped object, if any */
+  int pr_mflags; /* protection and attribute flags */
+  int pr_pagesize; /* pagesize for this mapping in bytes */
+  int pr_shmid; /* SysV shared memory identifier */
+ } prasmap_t;
+Each section header is followed by pr_npage bytes, one byte for each page in the mapping, plus 0-7 null bytes at the
+end so that the next prasmap structure begins on an eight-byte aligned boundary. Each data byte may contain these
+flags:
+PG_REFERENCED page has been referenced.
+PG_MODIFIED page has been modified.
+If the read buffer is not large enough to contain all of the page data, the read fails with E2BIG and the page data is
+not cleared. The required size of the read buffer can be determined through fstat(2). Application of lseek(2) to the
+page data file descriptor is ineffective; every read starts from the beginning of the file. Closing the page data file de<hy>
+scriptor terminates the system overhead associated with collecting the data.
+More than one page data file descriptor for the same process can be opened, up to a system-imposed limit per traced
+process. A read of one does not affect the data being collected by the system for the others. An open of the page data
+file will fail with ENOMEM if the system-imposed limit would be exceeded.
+Contains an array of prwatch structures, one for each watched area established by the PCWATCH control opera<hy>
+tion. See PCWATCH for details.
+<beginning of page>
+Contains process usage information described by a prusage structure which contains at least the following fields:
+ typedef struct prusage {
+  id_t pr_lwpid; /* lwp id. 0: process or defunct */
+  int pr_count; /* number of contributing lwps */
+  timestruc_t pr_tstamp; /* real time stamp, time of read() */
+  timestruc_t pr_create; /* process/lwp creation time stamp */
+  timestruc_t pr_term; /* process/lwp termination time stamp */
+  timestruc_t pr_rtime; /* total lwp real (elapsed) time */
+  timestruc_t pr_utime; /* user level CPU time */
+  timestruc_t pr_stime; /* system call CPU time */
+  timestruc_t pr_ttime; /* other system trap CPU time */
+  timestruc_t pr_tftime; /* text page fault sleep time */
+  timestruc_t pr_dftime; /* data page fault sleep time */
+  timestruc_t pr_kftime; /* kernel page fault sleep time */
+  timestruc_t pr_ltime; /* user lock wait sleep time */
+  timestruc_t pr_slptime; /* all other sleep time */
+  timestruc_t pr_wtime; /* wait-cpu (latency) time */
+  timestruc_t pr_stoptime; /* stopped time */
+  ulong_t pr_minf; /* minor page faults */
+  ulong_t pr_majf; /* major page faults */
+  ulong_t pr_nswap; /* swaps */
+  ulong_t pr_inblk; /* input blocks */
+  ulong_t pr_oublk; /* output blocks */
+  ulong_t pr_msnd; /* messages sent */
+  ulong_t pr_mrcv; /* messages received */
+  ulong_t pr_sigs; /* signals received */
+  ulong_t pr_vctx; /* voluntary context switches */
+  ulong_t pr_ictx; /* involuntary context switches */
+  ulong_t pr_sysc; /* system calls */
+  ulong_t pr_ioch; /* chars read and written */
+ } prusage_t;
+Microstate accounting is now continuously enabled. While this information was previously an estimate, if microstate
+accounting were not enabled, the current information is now never an estimate represents time the process has spent
+in various states.
+Contains a prheader structure followed by an array of lwpstatus structures, one for each active lwp in the process
+(see also /proc/pid/lwp/lwpid/lwpstatus, below). The prheader structure describes the number and size of the array
+entries that follow.
+ typedef struct prheader {
+  long pr_nent; /* number of entries */
+  size_t pr_entsize; /* size of each entry, in bytes */
+ } prheader_t;
+The lwpstatus structure may grow by the addition of elements at the end in future releases of the system. Programs
+must use pr_entsize in the file header to index through the array. These comments apply to all /proc files that in<hy>
+clude a prheader structure (lpsinfo and lusage, below).
+Contains a prheader structure followed by an array of lwpsinfo structures, one for eachactive and zombie lwp in the
+process. See also /proc/pid/lwp/lwpid/lwpsinfo, below.
+Contains a prheader structure followed by an array of prusage structures, one for each active lwp in the process,
+plus an additional element at the beginning that contains the summation over all defunct lwps (lwps that once existed
+but no longer exist in the process). Excluding the pr_lwpid, pr_tstamp, pr_create, and pr_term entries, the entry-
+by-entry summation over all these structures is the definition of the process usage information obtained from the us<hy>
+age file. (See also /proc/pid/lwp/lwpid/lwpusage, below.)
+A directory containing entries each of which names an active or zombie lwp within the process. These entries are
+themselves directories containing additional files as described below. Only the lwpsinfo file exists in the directory of
+a zombie lwp.
+A given directory /proc/pid/lwp/lwpid contains the following entries:
+<beginning of page>
+Write-only control file. The messages written to this file affect the specific lwp rather than the representative lwp, as
+is the case for the process's ctl file.
+lwp-specific state information. This file contains the lwpstatus structure for the specific lwp as described above for
+the representative lwp in the process's status file.
+lwp-specific ps(1) information. This file contains the lwpsinfo structure for the specific lwp as described above for
+the representative lwp in the process's psinfo file. The lwpsinfo file remains accessible after an lwp becomes a zom<hy>
+bie.
+This file contains the prusage structure for the specific lwp as described above for the process's usage file.
+This file exists only on SPARC based machines. If it is non-empty, it contains a gwindows_t structure, defined in
+<sys/regset.h>, with the values of those SPARC register windows that could not be stored on the stack when the lwp
+stopped. Conditions under which register windows are not stored on the stack are: the stack pointer refers to nonex<hy>
+istent process memory or the stack pointer is improperly aligned. If the lwp is not stopped or if there are no register
+windows that could not be stored on the stack, the file is empty (the usual case).
+Extra state registers. The extra state register set is architecture dependent; this file is empty if the system does not
+support extra state registers. If the file is non-empty, it contains an architecture dependent structure of type
+prxregset_t, defined in <procfs.h>, with the values of the lwp's extra state registers. If the lwp is not stopped, all
+register values are undefined. See also the PCSXREG control operation, below.
+This file exists only for 64-bit SPARC V9 processes. It contains an asrset_t structure, defined in <sys/regset.h>,
+containing the values of the lwp's platform-dependent ancillary state registers. If the lwp is not stopped, all register
+values are undefined. See also the PCSASRS control operation, below.
+A directory which contains references to the active templates for the lwp, named by the contract type. Changes made
+to an active template descriptor do not affect the original template which was activated, though they do affect the ac<hy>
+tive template. It is not possible to activate an active template descriptor. See contract(4).
+Process state changes are effected through messages written to a process's ctl file or to an individual lwp's lwpctl
+file. All control messages consist of a long that names the specific operation followed by additional data containing
+the operand, if any.
+Multiple control messages may be combined in a single write(2) (or writev(2)) to a control file, but no partial writes
+are permitted. That is, each control message, operation code plus operand, if any, must be presented in its entirety to
+the write(2) and not in pieces over several system calls. If a control operation fails, no subsequent operations con<hy>
+tained in the same write(2) are attempted.
+Descriptions of the allowable control messages follow. In all cases, writing a message to a control file for a process
+or lwp that has terminated elicits the error ENOENT.
+When applied to the process control file, PCSTOP directs all lwps to stop and waits for them to stop, PCDSTOP di<hy>
+rects all lwps to stop without waiting for them to stop, and PCWSTOP simply waits for all lwps to stop. When ap<hy>
+plied to an lwp control file, PCSTOP directs the specific lwp to stop and waits until it has stopped, PCDSTOP di<hy>
+rects the specific lwp to stop without waiting for it to stop, and PCWSTOP simply waits for the specific lwp to stop.
+When applied to an lwp control file, PCSTOP and PCWSTOP complete when the lwp stops on an event of interest,
+immediately if already so stopped; when applied to the process control file, they complete when every lwp has
+stopped either on an event of interest or on a PR_SUSPENDED stop.
+PCTWSTOP is identical to PCWSTOP except that it enables the operation to time out, to avoid waiting forever for
+a process or lwp that may never stop on an event of interest. PCTWSTOP takes a long operand specifying a number
+of milliseconds; the wait will terminate successfully after the specified number of milliseconds even if the process or
+lwp has not stopped; a timeout value of zero makes the operation identical to PCWSTOP.
+An ``event of interest'' is either a PR_REQUESTED stop or a stop that has been specified in the process's tracing
+flags (set by PCSTRACE, PCSFAULT, PCSENTRY, and PCSEXIT). PR_JOBCONTROL and PR_SUSPEND<hy>
+ED stops are specifically not events of interest. (An lwp may stop twice due to a stop signal, first showing PR_SIG<hy>
+NALLED if the signal is traced and again showing PR_JOBCONTROL if the lwp is set running without clearing
+the signal.) If PCSTOP or PCDSTOP is applied to an lwp that is stopped, but not on an event of interest, the stop
+directive takes effect when the lwp is restarted by the competing mechanism. At that time, the lwp enters a PR_RE<hy>
+QUESTED stop before executing any user-level code.
+A write of a control message that blocks is interruptible by a signal so that, for example, an alarm(2) can be set to
+<beginning of page>
+avoid waiting forever for a process or lwp that may never stop on an event of interest. If PCSTOP is interrupted, the
+lwp stop directives remain in effect even though the write(2) returns an error. (Use of PCTWSTOP with a non-zero
+timeout is recommended over PCWSTOP with an alarm(2).)
+A system process (indicated by the PR_ISSYS flag) never executes at user level, has no user-level address space vis<hy>
+ible through /proc, and cannot be stopped. Applying one of these operations to a system process or any of its lwps
+elicits the error EBUSY.
+Make an lwp runnable again after a stop. This operation takes a long operand containing zero or more of the follow<hy>
+ing flags:
+PRCSIG clears the current signal, if any (see PCCSIG).
+PRCFAULT clears the current fault, if any (see PCCFAULT).
+PRSTEP directs the lwp to execute a single machine instruction. On completion of the instruction, a trace trap oc<hy>
+curs. If FLTTRACE is being traced, the lwp stops; otherwise, it is sent SIGTRAP. If SIGTRAP is being traced
+and is not blocked, the lwp stops. When the lwp stops on an event of interest, the single-step directive is cancelled,
+even if the stop occurs before the instruction is executed. This operation requires hardware and operating system
+support and may not be implemented on all processors. It is implemented on SPARC and x86-based machines.
+PRSABORT is meaningful only if the lwp is in a PR_SYSENTRY stop or is marked PR_ASLEEP; it instructs the
+lwp to abort execution of the system call (see PCSENTRY and PCSEXIT).
+PRSTOP directs the lwp to stop again as soon as possible after resuming execution (see PCDSTOP). In particular,
+if the lwp is stopped on PR_SIGNALLED or PR_FAULTED, the next stop will show PR_REQUESTED, no other
+stop will have intervened, and the lwp will not have executed any user-level code.
+When applied to an lwp control file, PCRUN clears any outstanding directed-stop request and makes the specific
+lwp runnable. The operation fails with EBUSY if the specific lwp is not stopped on an event of interest or has not
+been directed to stop or if the agent lwp exists and this is not the agent lwp (see PCAGENT).
+When applied to the process control file, a representative lwp is chosen for the operation as described for
+/proc/pid/status. The operation fails with EBUSY if the representative lwp is not stopped on an event of interest or
+has not been directed to stop or if the agent lwp exists. If PRSTEP or PRSTOP was requested, the representative
+lwp is made runnable and its outstanding directed-stop request is cleared; otherwise all outstanding directed-stop re<hy>
+quests are cleared and, if it was stopped on an event of interest, the representative lwp is marked PR_REQUEST<hy>
+ED. If, as a consequence, all lwps are in the PR_REQUESTED or PR_SUSPENDED stop state, all lwps showing
+PR_REQUESTED are made runnable.
+Define a set of signals to be traced in the process. The receipt of one of these signals by an lwp causes the lwp to
+stop. The set of signals is defined using an operand sigset_t contained in the control message. Receipt of SIGKILL
+cannot be traced; if specified, it is silently ignored.
+If a signal that is included in an lwp's held signal set (the signal mask) is sent to the lwp, the signal is not received
+and does not cause a stop until it is removed from the held signal set, either by the lwp itself or by setting the held
+signal set with PCSHOLD.
+The current signal, if any, is cleared from the specific or representative lwp.
+The current signal and its associated signal information for the specific or representative lwp are set according to the
+contents of the operand siginfo structure (see <sys/siginfo.h>). If the specified signal number is zero, the current sig<hy>
+nal is cleared. The semantics of this operation are different from those of kill(2) in that the signal is delivered to the
+lwp immediately after execution is resumed (even if it is being blocked) and an additional PR_SIGNALLED stop
+does not intervene even if the signal is traced. Setting the current signal to SIGKILL terminates the process imme<hy>
+diately.
+If applied to the process control file, a signal is sent to the process with semantics identical to those of kill(2). If ap<hy>
+plied to an lwp control file, a directed signal is sent to the specific lwp. The signal is named in a long operand con<hy>
+tained in the message. Sending SIGKILL terminates the process immediately.
+<beginning of page>
+A signal is deleted, that is, it is removed from the set of pending signals. If applied to the process control file, the
+signal is deleted from the process's pending signals. If applied to an lwp control file, the signal is deleted from the
+lwp's pending signals. The current signal (if any) is unaffected. The signal is named in a long operand in the control
+message. It is an error (EINVAL) to attempt to delete SIGKILL.
+Set the set of held signals for the specific or representative lwp (signals whose delivery will be blocked if sent to the
+lwp). The set of signals is specified with a sigset_t operand. SIGKILL and SIGSTOP cannot be held; if specified,
+they are silently ignored.
+Define a set of hardware faults to be traced in the process. On incurring one of these faults, an lwp stops. The set is
+defined via the operand fltset_t structure. Fault names are defined in <sys/fault.h> and include the following. Some
+of these may not occur on all processors; there may be processor-specific faults in addition to these.
+FLTILL illegal instruction
+FLTPRIV privileged instruction
+FLTBPT breakpoint trap
+FLTTRACE trace trap (single-step)
+FLTWATCH watchpoint trap
+FLTACCESS memory access fault (bus error)
+FLTBOUNDS memory bounds violation
+FLTIOVF integer overflow
+FLTIZDIV integer zero divide
+FLTFPE floating-point exception
+FLTSTACK unrecoverable stack fault
+FLTPAGE recoverable page fault
+When not traced, a fault normally results in the posting of a signal to the lwp that incurred the fault. If an lwp stops
+on a fault, the signal is posted to the lwp when execution is resumed unless the fault is cleared by PCCFAULT or by
+the PRCFAULT option of PCRUN. FLTPAGE is an exception; no signal is posted. The pr_info field in the lwp<hy>
+status structure identifies the signal to be sent and contains machine-specific information about the fault.
+The current fault, if any, is cleared; the associated signal will not be sent to the specific or representative lwp.
+These control operations instruct the process's lwps to stop on entry to or exit from specified system calls. The set of
+system calls to be traced is defined via an operand sysset_t structure.
+When entry to a system call is being traced, an lwp stops after having begun the call to the system but before the sys<hy>
+tem call arguments have been fetched from the lwp. When exit from a system call is being traced, an lwp stops on
+completion of the system call just prior to checking for signals and returning to user level. At this point, all return
+values have been stored into the lwp's registers.
+If an lwp is stopped on entry to a system call (PR_SYSENTRY) or when sleeping in an interruptible system call
+(PR_ASLEEP is set), it may be instructed to go directly to system call exit by specifying the PRSABORT flag in a
+<beginning of page>
+PCRUN control message. Unless exit from the system call is being traced, the lwp returns to user level showing
+EINTR.
+Set or clear a watched area in the controlled process from a prwatch structure operand:
+ typedef struct prwatch {
+  uintptr_t pr_vaddr; /* virtual address of watched area */
+  size_t pr_size; /* size of watched area in bytes */
+  int pr_wflags; /* watch type flags */
+ } prwatch_t;
+pr_vaddr specifies the virtual address of an area of memory to be watched in the controlled process. pr_size speci<hy>
+fies the size of the area, in bytes. pr_wflags specifies the type of memory access to be monitored as a bit-mask of the
+following flags:
+WA_READ read access
+WA_WRITE write access
+WA_EXEC execution access
+WA_TRAPAFTER trap after the instruction completes
+If pr_wflags is non-empty, a watched area is established for the virtual address range specified by pr_vaddr and
+pr_size. If pr_wflags is empty, any previously-established watched area starting at the specified virtual address is
+cleared; pr_size is ignored.
+A watchpoint is triggered when an lwp in the traced process makes a memory reference that covers at least one byte
+of a watched area and the memory reference is as specified in pr_wflags. When an lwp triggers a watchpoint, it in<hy>
+curs a watchpoint trap. If FLTWATCH is being traced, the lwp stops; otherwise, it is sent a SIGTRAP signal; if
+SIGTRAP is being traced and is not blocked, the lwp stops.
+The watchpoint trap occurs before the instruction completes unless WA_TRAPAFTER was specified, in which case
+it occurs after the instruction completes. If it occurs before completion, the memory is not modified. If it occurs after
+completion, the memory is modified (if the access is a write access).
+Physical i/o is an exception for watchpoint traps. In this instance, there is no guarantee that memory before the
+watched area has already been modified (or in the case of WA_TRAPAFTER, that the memory following the
+watched area has not been modified) when the watchpoint trap occurs and the lwp stops.
+pr_info in the lwpstatus structure contains information pertinent to the watchpoint trap. In particular, the si_addr
+field contains the virtual address of the memory reference that triggered the watchpoint, and the si_code field con<hy>
+tains one of TRAP_RWATCH, TRAP_WWATCH, or TRAP_XWATCH, indicating read, write, or execute access,
+respectively. The si_trapafter field is zero unless WA_TRAPAFTER is in effect for this watched area; non-zero in<hy>
+dicates that the current instruction is not the instruction that incurred the watchpoint trap. The si_pc field contains
+the virtual address of the instruction that incurred the trap.
+A watchpoint trap may be triggered while executing a system call that makes reference to the traced process's mem<hy>
+ory. The lwp that is executing the system call incurs the watchpoint trap while still in the system call. If it stops as a
+result, the lwpstatus structure contains the system call number and its arguments. If the lwp does not stop, or if it is
+set running again without clearing the signal or fault, the system call fails with EFAULT. If WA_TRAPAFTER was
+specified, the memory reference will have completed and the memory will have been modified (if the access was a
+write access) when the watchpoint trap occurs.
+If more than one of WA_READ, WA_WRITE, and WA_EXEC is specified for a watched area, and a single in<hy>
+struction incurs more than one of the specified types, only one is reported when the watchpoint trap occurs. The
+precedence is WA_EXEC, WA_READ, WA_WRITE (WA_EXEC and WA_READ take precedence over
+WA_WRITE), unless WA_TRAPAFTER was specified, in which case it is WA_WRITE, WA_READ, WA_EX<hy>
+EC (WA_WRITE takes precedence).
+PCWATCH fails with EINVAL if an attempt is made to specify overlapping watched areas or if pr_wflags contains
+<beginning of page>
+flags other than those specified above. It fails with ENOMEM if an attempt is made to establish more watched areas
+than the system can support (the system can support thousands).
+The child of a vfork(2) borrows the parent's address space. When a vfork(2) is executed by a traced process, all
+watched areas established for the parent are suspended until the child terminates or performs an exec(2). Any
+watched areas established independently in the child are cancelled when the parent resumes after the child's termina<hy>
+tion or exec(2). PCWATCH fails with EBUSY if applied to the parent of a vfork(2) before the child has terminated
+or performed an exec(2). The PR_VFORKP flag is set in the pstatus structure for such a parent process.
+Certain accesses of the traced process's address space by the operating system are immune to watchpoints. The ini<hy>
+tial construction of a signal stack frame when a signal is delivered to an lwp will not trigger a watchpoint trap even if
+the new frame covers watched areas of the stack. Once the signal handler is entered, watchpoint traps occur normal<hy>
+ly. On SPARC based machines, register window overflow and underflow will not trigger watchpoint traps, even if the
+register window save areas cover watched areas of the stack.
+Watched areas are not inherited by child processes, even if the traced process's inherit-on-fork mode, PR_FORK, is
+set (see PCSET, below). All watched areas are cancelled when the traced process performs a successful exec(2).
+PCSET sets one or more modes of operation for the traced process. PCUNSET unsets these modes. The modes to
+be set or unset are specified by flags in an operand long in the control message:
+PR_FORK (inherit-on-fork): When set, the process's tracing flags and its inherit-on-fork mode are inherited by the
+child of a fork(2), fork1(2), or vfork(2). When unset, child processes start with all tracing flags cleared.
+PR_RLC (run-on-last-close): When set and the last writable /proc file descriptor referring to the traced process or
+any of its lwps is closed, all of the process's tracing flags and watched areas are cleared, any outstanding stop direc<hy>
+tives are canceled, and if any lwps are stopped on events of interest, they are set running as though PCRUN had
+been applied to them. When unset, the process's tracing flags and watched areas are retained and lwps are not set
+running on last close.
+PR_KLC (kill-on-last-close): When set and the last writable /proc file descriptor referring to the traced process or
+any of its lwps is closed, the process is terminated with SIGKILL.
+PR_ASYNC (asynchronous-stop): When set, a stop on an event of interest by one lwp does not directly affect any
+other lwp in the process. When unset and an lwp stops on an event of interest other than PR_REQUESTED, all oth<hy>
+er lwps in the process are directed to stop.
+PR_MSACCT (microstate accounting): Microstate accounting is now continuously enabled. This flag is deprecated
+and no longer has any effect upon microstate accounting. Applications may toggle this flag; however, microstate ac<hy>
+counting will remain enabled regardless.
+PR_MSFORK (inherit microstate accounting): All processes now inherit microstate accounting, as it is continuous<hy>
+ly enabled. This flag has been deprecated and its use no longer has any effect upon the behavior of microstate ac<hy>
+counting.
+PR_BPTADJ (breakpoint trap pc adjustment): On x86-based machines, a breakpoint trap leaves the program
+counter (the EIP) referring to the breakpointed instruction plus one byte. When PR_BPTADJ is set, the system will
+adjust the program counter back to the location of the breakpointed instruction when the lwp stops on a breakpoint.
+This flag has no effect on SPARC based machines, where breakpoint traps leave the program counter referring to the
+breakpointed instruction.
+PR_PTRACE (ptrace-compatibility): When set, a stop on an event of interest by the traced process is reported to
+the parent of the traced process by wait(3C), SIGTRAP is sent to the traced process when it executes a successful
+exec(2), setuid/setgid flags are not honored for execs performed by the traced process, any exec of an object file that
+the traced process cannot read fails, and the process dies when its parent dies. This mode is deprecated; it is provided
+only to allow ptrace(3C) to be implemented as a library function using /proc.
+It is an error (EINVAL) to specify flags other than those described above or to apply these operations to a system
+<beginning of page>
+process. The current modes are reported in the pr_flags field of /proc/pid/status and /proc/pid/lwp/lwp/lwpstatus.
+Set the general registers for the specific or representative lwp according to the operand prgregset_t structure.
+On SPARC based systems, only the condition-code bits of the processor-status register (R_PSR) of SPARC V8
+(32-bit) processes can be modified by PCSREG. Other privileged registers cannot be modified at all.
+On x86-based systems, only certain bits of the flags register (EFL) can be modified by PCSREG: these include the
+condition codes, direction-bit, and overflow-bit.
+PCSREG fails with EBUSY if the lwp is not stopped on an event of interest.
+Set the address at which execution will resume for the specific or representative lwp from the operand long. On
+SPARC based systems, both %pc and %npc are set, with %npc set to the instruction following the virtual address.
+On x86-based systems, only %eip is set. PCSVADDR fails with EBUSY if the lwp is not stopped on an event of in<hy>
+terest.
+Set the floating-point registers for the specific or representative lwp according to the operand prfpregset_t structure.
+An error (EINVAL) is returned if the system does not support floating-point operations (no floating-point hardware
+and the system does not emulate floating-point machine instructions). PCSFPREG fails with EBUSY if the lwp is
+not stopped on an event of interest.
+Set the extra state registers for the specific or representative lwp according to the architecture-dependent operand
+prxregset_t structure. An error (EINVAL) is returned if the system does not support extra state registers. PC<hy>
+SXREG fails with EBUSY if the lwp is not stopped on an event of interest.
+Set the ancillary state registers for the specific or representative lwp according to the SPARC V9 platform-dependent
+operand asrset_t structure. An error (EINVAL) is returned if either the target process or the controlling process is
+not a 64-bit SPARC V9 process. Most of the ancillary state registers are privileged registers that cannot be modified.
+Only those that can be modified are set; all others are silently ignored. PCSASRS fails with EBUSY if the lwp is
+not stopped on an event of interest.
+Create an agent lwp in the controlled process with register values from the operand prgregset_t structure (see PC<hy>
+SREG, above). The agent lwp is created in the stopped state showing PR_REQUESTED and with its held signal
+set (the signal mask) having all signals except SIGKILL and SIGSTOP blocked.
+The PCAGENT operation fails with EBUSY unless the process is fully stopped via /proc, that is, unless all of the
+lwps in the process are stopped either on events of interest or on PR_SUSPENDED, or are stopped on PR_JOB<hy>
+CONTROL and have been directed to stop via PCDSTOP. It fails with EBUSY if an agent lwp already exists. It
+fails with ENOMEM if system resources for creating new lwps have been exhausted.
+Any PCRUN operation applied to the process control file or to the control file of an lwp other than the agent lwp
+fails with EBUSY as long as the agent lwp exists. The agent lwp must be caused to terminate by executing the
+SYS_lwp_exit system call trap before the process can be restarted.
+Once the agent lwp is created, its lwp-ID can be found by reading the process status file. To facilitate opening the
+agent lwp's control and status files, the directory name /propc/pid/lwp/agent is accepted for lookup operations as an
+invisible alias for /proc/pid/lwp/lwpid, lwpid being the lwp-ID of the agent lwp (invisible in the sense that the name
+``agent'' does not appear in a directory listing of /proc/pid/lwp obtained from ls(1), getdents(2), or readdir(3C)).
+The purpose of the agent lwp is to perform operations in the controlled process on behalf of the controlling process:
+to gather information not directly available via /proc files, or in general to make the process change state in ways not
+directly available via /proc control operations. To make use of an agent lwp, the controlling process must be capable
+of making it execute system calls (specifically, the SYS_lwp_exit system call trap). The register values given to the
+agent lwp on creation are typically the registers of the representative lwp, so that the agent lwp can use its stack.
+The agent lwp is not allowed to execute any variation of the SYS_fork or SYS_exec system call traps. Attempts to
+do so yield ENOTSUP to the agent lwp.
+Symbolic constants for system call trap numbers like SYS_lwp_exit and SYS_lwp_create can be found in the head<hy>
+er file <sys/syscall.h>.
+Read or write the target process's address space via a priovec structure operand:
+ typedef struct priovec {
+  void *pio_base; /* buffer in controlling process */
+<beginning of page>
+  size_t pio_len; /* size of read/write request in bytes */
+  off_t pio_offset; /* virtual address in target process */
+ } priovec_t;
+These operations have the same effect as pread(2) and pwrite(2), respectively, of the target process's address space
+file. The difference is that more than one PCREAD or PCWRITE control operation can be written to the control
+file at once, and they can be interspersed with other control operations in a single write to the control file. This is
+useful, for example, when planting many breakpoint instructions in the process's address space, or when stepping
+over a breakpointed instruction. Unlike pread(2) and pwrite(2), no provision is made for partial reads or writes; if
+the operation cannot be performed completely, it fails with EIO.
+The traced process's nice(2) value is incremented by the amount in the operand long. Only a process with the
+{PRIV_PROC_PRIOCNTL} privilege asserted in its effective set can better a process's priority in this way, but
+any user may lower the priority. This operation is not meaningful for all scheduling classes.
+Set the target process credentials to the values contained in the prcred_t structure operand (see /proc/pid/cred). The
+effective, real, and saved user-IDs and group-IDs of the target process are set. The target process's supplementary
+groups are not changed; the pr_ngroups and pr_groups members of the structure operand are ignored. Only the
+privileged processes can perform this operation; for all others it fails with EPERM.
+Operates like PCSCRED but also sets the supplementary groups; the length of the data written with this control op<hy>
+eration should be "sizeof (prcred_t) + sizeof (gid_t) * (#groups - 1)".
+Set the target process privilege to the values contained in the prpriv_t operand (see /proc/pid/priv). The effective,
+permitted, inheritable, and limit sets are all changed. Privilege flags can also be set. The process is made privilege
+aware unless it can relinquish privilege awareness. See privileges(5).
+The limit set of the target process cannot be grown. The other privilege sets must be subsets of the intersection of the
+effective set of the calling process with the new limit set of the target process or subsets of the original values of the
+sets in the target process.
+If any of the above restrictions are not met, EPERM is returned. If the structure written is improperly formatted,
+EINVAL is returned.
+For security reasons, except for the psinfo, usage, lpsinfo, lusage, lwpsinfo, and lwpusage files, which are world-
+readable, and except for privileged processes, an open of a /proc file fails unless both the user-ID and group-ID of
+the caller match those of the traced process and the process's object file is readable by the caller. The effective set of
+the caller is a superset of both the inheritable and the permitted set of the target process. The limit set of the caller is
+a superset of the limit set of the target process. Except for the world-readable files just mentioned, files correspond<hy>
+ing to setuid and setgid processes can be opened only by the appropriately privileged process.
+A process that is missing the basic privilege {PRIV_PROC_INFO} cannot see any processes under /proc that it
+cannot send a signal to.
+A process that has {PRIV_PROC_OWNER} asserted in its effective set can open any file for reading. To manipu<hy>
+late or control a process, the controlling process must have at least as many privileges in its effective set as the target
+process has in its effective, inheritable, and permitted sets. The limit set of the controlling process must be a superset
+of the limit set of the target process. Additional restrictions apply if any of the uids of the target process are 0. See
+privileges(5).
+Even if held by a privileged process, an open process or lwp file descriptor (other than file descriptors for the world-
+readable files) becomes invalid if the traced process performs an exec(2) of a setuid/setgid object file or an object file
+that the traced process cannot read. Any operation performed on an invalid file descriptor, except close(2), fails with
+EAGAIN. In this situation, if any tracing flags are set and the process or any lwp file descriptor is open for writing,
+the process will have been directed to stop and its run-on-last-close flag will have been set (see PCSET). This en<hy>
+ables a controlling process (if it has permission) to reopen the /proc files to get new valid file descriptors, close the
+invalid file descriptors, unset the run-on-last-close flag (if desired), and proceed. Just closing the invalid file descrip<hy>
+tors causes the traced process to resume execution with all tracing flags cleared. Any process not currently open for
+writing via /proc, but that has left-over tracing flags from a previous open, and that executes a setuid/setgid or un<hy>
+readable object file, will not be stopped but will have all its tracing flags cleared.
+To wait for one or more of a set of processes or lwps to stop or terminate, /proc file descriptors (other than those ob<hy>
+tained by opening the cwd or root directories or by opening files in the fd or object directories) can be used in a
+poll(2) system call. When requested and returned, either of the polling events POLLPRI or POLLWRNORM indi<hy>
+cates that the process or lwp stopped on an event of interest. Although they cannot be requested, the polling events
+<beginning of page>
+POLLHUP, POLLERR, and POLLNVAL may be returned. POLLHUP indicates that the process or lwp has ter<hy>
+minated. POLLERR indicates that the file descriptor has become invalid. POLLNVAL is returned immediately if
+POLLPRI or POLLWRNORM is requested on a file descriptor referring to a system process (see PCSTOP). The
+requested events may be empty to wait simply for termination.
+/proc
+directory (list of processes)
+/proc/pid
+specific process directory
+/proc/self
+alias for a process's own directory
+/proc/pid/as
+address space file
+/proc/pid/ctl
+process control file
+/proc/pid/status
+process status
+/proc/pid/lstatus
+array of lwp status structs
+/proc/pid/psinfo
+process ps(1) info
+/proc/pid/lpsinfo
+array of lwp ps(1) info structs
+/proc/pid/map
+address space map
+/proc/pid/xmap
+extended address space map
+/proc/pid/rmap
+reserved address map
+/proc/pid/cred
+process credentials
+<beginning of page>
+/proc/pid/priv
+process privileges
+/proc/pid/sigact
+process signal actions
+/proc/pid/auxv
+process aux vector
+/proc/pid/ldt
+process LDT (x86 only)
+/proc/pid/usage
+process usage
+/proc/pid/lusage
+array of lwp usage structs
+/proc/pid/path
+symbolic links to process open files
+/proc/pid/pagedata
+process page data
+/proc/pid/watch
+active watchpoints
+/proc/pid/cwd
+alias for the current working directory
+/proc/pid/root
+alias for the root directory
+/proc/pid/fd
+directory (list of open files)
+/proc/pid/fd/*
+aliases for process's open files
+/proc/pid/object
+directory (list of mapped files)
+<beginning of page>
+/proc/pid/object/a.out
+alias for process's executable file
+/proc/pid/object/*
+aliases for other mapped files
+/proc/pid/lwp
+directory (list of lwps)
+/proc/pid/lwp/lwpid
+specific lwp directory
+/proc/pid/lwp/agent
+alias for the agent lwp directory
+/proc/pid/lwp/lwpid/lwpctl
+lwp control file
+/proc/pid/lwp/lwpid/lwpstatus
+lwp status
+/proc/pid/lwp/lwpid/lwpsinfo
+lwp ps(1) info
+/proc/pid/lwp/lwpid/lwpusage
+lwp usage
+/proc/pid/lwp/lwpid/gwindows
+register windows (SPARC only)
+/proc/pid/lwp/lwpid/xregs
+extra state registers
+/proc/pid/lwp/lwpid/asrs
+ancillary state registers (SPARC V9 only)
+ls(1), ps(1), chroot(1M), alarm(2), brk(2), chdir(2), chroot(2), close(2), creat(2), dup(2), exec(2), fcntl(2),
+fork(2), fork1(2), fstat(2), getdents(2), getustack(2), kill(2), lseek(2), mmap(2), nice(2), open(2), poll(2),
+pread(2), ptrace(3C), pwrite(2), read(2), readlink(2), readv(2), shmget(2), sigaction(2), sigaltstack(2), vfork(2),
+write(2), writev(2), _stack_grow(3C), readdir(3C), pthread_create(3C), pthread_join(3C), siginfo.h(3HEAD),
+signal.h(3HEAD), thr_create(3C), thr_join(3C), types32.h(3HEAD), ucontext.h(3HEAD), wait(3C), con<hy>
+tract(4), process(4), lfcompile(5), privileges(5)
+Errors that can occur in addition to the errors normally associated with file system access:
+<beginning of page>
+E2BIG Data to be returned in a read(2) of the page data file exceeds the size of the read buffer provided by the call<hy>
+er.
+EACCES An attempt was made to examine a process that ran under a different uid than the controlling process and
+{PRIV_PROC_OWNER} was not asserted in the effective set.
+EAGAIN The traced process has performed an exec(2) of a setuid/setgid object file or of an object file that it cannot
+read; all further operations on the process or lwp file descriptor (except close(2)) elicit this error.
+EBUSY PCSTOP, PCDSTOP, PCWSTOP, or PCTWSTOP was applied to a system process; an exclusive
+open(2) was attempted on a /proc file for a process already open for writing; PCRUN, PCSREG, PCSVADDR,
+PCSFPREG, or PCSXREG was applied to a process or lwp not stopped on an event of interest; an attempt was
+made to mount /proc when it was already mounted; PCAGENT was applied to a process that was not fully stopped
+or that already had an agent lwp.
+EINVAL In general, this means that some invalid argument was supplied to a system call. A non-exhaustive list of
+conditions eliciting this error includes: a control message operation code is undefined; an out-of-range signal number
+was specified with PCSSIG, PCKILL, or PCUNKILL; SIGKILL was specified with PCUNKILL; PCSFPREG
+was applied on a system that does not support floating-point operations; PCSXREG was applied on a system that
+does not support extra state registers.
+EINTR A signal was received by the controlling process while waiting for the traced process or lwp to stop via PC<hy>
+STOP, PCWSTOP, or PCTWSTOP.
+EIO A write(2) was attempted at an illegal address in the traced process.
+ENOENT The traced process or lwp has terminated after being opened. The basic privilege {PRIV_PROC_INFO}
+is not asserted in the effective set of the calling process and the calling process cannot send a signal to the target
+process.
+ENOMEM The system-imposed limit on the number of page data file descriptors was reached on an open of
+/proc/pid/pagedata; an attempt was made with PCWATCH to establish more watched areas than the system can
+support; the PCAGENT operation was issued when the system was out of resources for creating lwps.
+ENOSYS An attempt was made to perform an unsupported operation (such as creat(2), link(2), or unlink(2)) on an
+entry in /proc.
+EOVERFLOW A 32-bit controlling process attempted to read or write the as file or attempted to read the map,
+rmap, or pagedata file of a 64-bit target process. A 32-bit controlling process attempted to apply one of the control
+operations PCSREG, PCSXREG, PCSVADDR, PCWATCH, PCAGENT, PCREAD, PCWRITE to a 64-bit tar<hy>
+get process.
+EPERM The process that issued the PCSCRED or PCSCREDX operation did not have the
+{PRIV_PROC_SETID} privilege asserted in its effective set, or the process that issued the PCNICE operation did
+not have the {PRIV_PROC_PRIOCNTL} in its effective set.
+An attempt was made to control a process of which the E, P, and I privilege sets were not a subset of the effective set
+of the controlling process or the limit set of the controlling process is not a superset of limit set of the controlled
+process.
+Any of the uids of the target process are 0 or an attempt was made to change any of the uids to 0 using PCSCRED
+and the security policy imposed additional restrictions. See privileges(5).
+Descriptions of structures in this document include only interesting structure elements, not filler and padding fields,
+<beginning of page>
+and may show elements out of order for descriptive clarity. The actual structure definitions are contained in
+<procfs.h>.
+Because the old ioctl(2)-based version of /proc is currently supported for binary compatibility with old applications,
+the top-level directory for a process, /proc/pid, is not world-readable, but it is world-searchable. Thus, anyone can
+open /proc/pid/psinfo even though ls(1) applied to /proc/pid will fail for anyone but the owner or an appropriately
+privileged process. Support for the old ioctl(2)-based version of /proc will be dropped in a future release, at which
+time the top-level directory for a process will be made world-readable.
+On SPARC based machines, the types gregset_t and fpregset_t defined in <sys/regset.h> are similar to but not the
+same as the types prgregset_t and prfpregset_t defined in <procfs.h>.

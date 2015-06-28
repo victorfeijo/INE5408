@@ -1,0 +1,181 @@
+<beginning of page>
+ecpp <-> IEEE 1284 compliant parallel port driver
+#include <sys/types.h>
+#include <sys/ecppio.h>
+ecpp@unit-address
+The ecpp driver provides a bi-directional interface to IEEE 1284 compliant devices as well as a forward single-di<hy>
+rectional interface to Centronics devices. In addition to the Centronics protocol, the ecpp driver supports the IEEE
+1284Compatibility, Nibble, and ECP protocols. ECPP_COMPAT_MODE and ECPP_CENTRONICS modes of
+operation have logically identical handshaking protocols, however devices that support ECPP_COMPAT_MODE
+are IEEE 1284 compliant devices. IEEE 1284 compliant devices support at least ECPP_COMPAT_MODE and
+ECPP_NIBBLE_MODE. Centronics devices support only ECPP_CENTRONICS mode.
+By default, ECPP_COMPAT_MODE devices have a strobe handshaking pulse width of 500ns. For this mode, for<hy>
+ward data transfers are conducted by DMA. By default, the strobe pulse width for ECPP_CENTRONICS devices
+is two microseconds. Forward transfers for these devices are managed through PIO. The default characteristics for
+both ECPP_COMPAT_MODE and ECPP_CENTRONICS devices may be changed through tunable variables de<hy>
+fined in ecpp.conf.
+The ecpp driver is an exclusive-use device, meaning that if the device is already open, subsequent opens fail with
+EBUSY.
+Each time the ecpp device is opened, the device is marked as EBUSY and the configuration variables are set to their
+default values. The write_timeout period is set to 90 seconds.
+The driver sets the mode variable according to the following algorithm: The driver initially attempts to negotiate the
+link into ECPP_ECP_MODE during open(2). If it fails, the driver tries to negotiate into ECPP_NIBBLE_MODE
+mode. If that fails, the driver operates in ECPP_CENTRONICS mode. Upon successfully opening the device,
+IEEE 1284 compliant devices will be left idle in either reverse idle phase of ECPP_ECP_MODE or in ECPP_NIB<hy>
+BLE_MODE. Subsequent calls to write(2) invokes the driver to move the link into either ECPP_COM<hy>
+PAT_MODE or the forward phase of ECPP_ECP_MODE. After the transfer completes, the link returns to idle
+state.
+The application may attempt to negotiate the device into a specific mode or set the write_timeout values through the
+ECPPIOC_SETPARMS ioctl(2) call. For mode negotiation to be successful, both the host workstation and the pe<hy>
+ripheral must support the requested mode.
+ Characteristics of the ecpp driver may be tuned by the variables described in /kernel/drv/ecpp.conf. These vari<hy>
+ables are read by the kernel during system startup. To tune the variables, edit the ecpp.conf file and invoke up<hy>
+date_drv(1M) to have the kernel read the file again.
+Some Centronics peripherals and certain IEEE 1284 compatible peripherals will not operate with the parallel port
+operating in a fast handshaking mode. If printing problems occur, set "fast-centronics" and "fast-1284-compatible"
+to "false." See /kernel/drv/ecpp.conf for more information.
+The ecpp driver is a full duplex STREAMS device driver. While an application is writing to an IEEE 1284 compli<hy>
+ant device, another thread may read from it.
+A write(2) operation returns the number of bytes successfully written to the stream head. If a failure occurs while a
+Centronics device is transferring data, the content of the status bits will be captured at the time of the error and can
+be retrieved by the application program using the BPPIOC_GETERR ioctl(2) call. The captured status information
+is overwritten each time an attempted transfer or a BPPIOC_TESTIO ioctl(2) occurs.
+If a failure or error condition occurs during a read(2), the number of bytes successfully read is returned (short read).
+When attempting to read a port that has no data currently available, read(2) returns 0 if O_NDELAY is set. If
+O_NONBLOCK is set, read(2) returns -1 and sets errno to EAGAIN. If O_NDELAY and O_NONBLOCK are
+clear, read(2) blocks until data become available.
+The ioctl(2) calls described below are supported. Note that when ecpp is transferring data, the driver waits until the
+data has been sent to the device before processing the ioctl(2) call.
+The ecpp driver supports prnio(7I) interfaces. Note -
+The PRNIOC_RESET command toggles the nInit signal for 2 ms, followed by default negotiation.
+<beginning of page>
+The following ioctl(2) calls are supported for backward compatibility and are not recommended for new applica<hy>
+tions:
+ECPPIOC_GETPARMS Get current transfer parameters. The argument is a pointer to a struct ecpp_trans<hy>
+fer_parms. See below for a description of the elements of this structure. If no parameters have been configured
+since the device was opened, the structure will be set to its default configuration. See Default Operation above for
+more information.
+ECPPIOC_SETPARMS Set transfer parameters. The argument is a pointer to a struct ecpp_transfer_parms. If a
+parameter is out of range, EINVAL is returned. If the peripheral or host device cannot support the requested mode,
+EPROTONOSUPPORT is returned. See below for a description of ecpp_transfer_parms and its valid parameters.
+The Transfer Parameters Structure is defined in <sys/ecppio.h>.
+ struct ecpp_transfer_parms {
+  int write_timeout;
+  int mode;
+ };
+The write_timeout field is set to the value of ecpp-transfer-timeout specified in the ecpp.conf. The write_timeout
+field specifies how long the driver will wait for the peripheral to respond to a transfer request. The value must be
+greater than 0 and less than ECPP_MAX_TIMEOUT. All other values are out of range.
+The mode field reflects the IEEE 1284 mode to which the parallel port is currently configured. The mode may be set
+to one of the following values only: ECPP_CENTRONICS, ECPP_COMPAT_MODE, ECPP_NIB<hy>
+BLE_MODE, ECPP_ECP_MODE. All other values are invalid. If the requested mode is not supported, ECPPI<hy>
+OC_SETPARMS will return EPROTONOSUPPORT and the mode will be set to ECPP_CENTRONICS mode.
+Afterwards, the application may change the mode back to the original mode with ECPPIOC_SETPARMS.
+ECPPIOC_GETDEVID This ioctl gets the IEEE 1284 device ID from the peripheral in specified mode. Currently,
+the device ID can be retrieved only in Nibble mode. A pointer to the structure defined in <sys/ecppsys.h> must be
+passed as an argument.
+The 1284 device ID structure:
+ struct ecpp_device_id {
+  int mode; /* mode to use for reading device id */
+  int len; /* length of buffer */
+  int rlen; /* actual length of device id string */
+  char *addr; /* buffer address */
+ };
+The mode is the IEEE 1284 mode into which the port will be negotiated to retrieve device ID information. If the pe<hy>
+ripheral or host do not support the mode, EPROTONOSUPPORT is returned. Applications should set mode to
+ECPP_NIBBLE_MODE. len is the length of the buffer pointed to by addr. rlen is the actual length of the device
+ID string returned from the peripheral. If the returned rlen is greater than len, the application can call ECPPI<hy>
+OC_GETDEVID again with a buffer length equal or greater than rlen. Note that the two length bytes of the IEEE
+1284 device ID are not taken into account and are not returned in the user buffer.
+After ECPPIOC_GETDEVID successfully completes, the driver returns the link to ECPP_COMPAT_MODE.
+The application is responsible for determining the previous mode the link was operating in and returning the link to
+that mode.
+BPPIOC_TESTIO Tests the forward transfer readiness of a peripheral operating in Centronics or Compatibility
+mode.
+TESTIO determines if the peripheral is ready to receive data by checking the open flags and the Centronics status
+signals. If the current mode of the device is ECPP_NIBBLE_MODE, the driver negotiates the link into
+ECPP_COMPAT_MODE, check the status signals and then return the link to ECPP_NIBBLE_MODE mode. If
+the current mode is ECPP_CENTRONICS or ECPP_COMPAT_MODE, TESTIO examines the Centronics sta<hy>
+tus signals in the current mode. To receive data, the device must have the nErr and Select signals asserted and must
+not have the PE and Busy signals asserted. If ecpp is transferring data, TESTIO waits until the previous data sent to
+<beginning of page>
+the driver is delivered before executing TESTIO. However if an error condition occurs while a TESTIO is waiting,
+TESTIO returns immediately. If TESTIO determines that the conditions are ok, 0 is returned. Otherwise, -1 is re<hy>
+turned, errno is set to EIO and the state of the status pins is captured. The captured status can be retrieved using the
+BPPIOC_GETERR ioctl(2) call. The timeout_occurred and bus_error fields will never be set by this ioctl(2).
+BPPIOC_TESTIO and BPPIOC_GETERR are compatible to the ioctls specified in bpp(7D).
+BPPIOC_GETERR Get last error status. The argument is a pointer to a struct bpp_error_status defined in
+<sys/bpp_io.h> header file. The error status structure is:
+ struct bpp_error_status {
+  char timeout_occurred; /* 1=timeout */
+  char bus_error; /* not used */
+  uchar_t pin_status; /* status of pins which
+  /* could cause error */
+ };
+The pin_status field indicates possible error conditions. The valid bits for pin_status are: BPP_ERR_ERR,
+BPP_SLCT_ERR, BPP_PE_ERR, BPP_BUSY_ERR. A set bit indicates that the associated pin is asserted.
+This structure indicates the status of all the appropriate status bits at the time of the most recent error condition dur<hy>
+ing a write(2) call, or the status of the bits at the most recent BPPIOC_TESTIO ioctl(2)call.
+pin_status indicates possible error conditions under ECPP_CENTRONICS or ECPP_COMPAT_MODE. Under
+these modes, the state of the status pins will indicate the state of the device. For instance, many Centronics printers
+lower the nErr signal when a paper jam occurs. The behavior of the status pins depends on the device. Additional
+status information may be retrieved through the backchannel.
+The timeout_occurred value is set when a timeout occurs during write(2). bus_error is not used in this interface.
+The following ioctls are used to directly read and write the parallel port status and control signals. If the current
+mode of the device is ECPP_ECP_MODE or ECPP_NIBBLE_MODE, the driver negotiates the link into
+ECPP_COMPAT_MODE, gets or sets the registers and then returns the link to ECPP_NIBBLE_MODE. If the
+current mode is ECPP_CENTRONICS or ECPP_COMPAT_MODE, these ioctls will get/set the register values in
+the current mode.
+ECPPIOC_GETREGS Read register values. The argument is a pointer to a struct ecpp_regs. See below for a de<hy>
+scription of this structure.
+ECPPIOC_SETREGS Set ecpp register values. The argument is a pointer to a struct ecpp_regs. See below for a
+description of this structure. If a parameter is out of range, EINVAL is returned.
+The Port Register Structure is defined in <sys/ecppio.h>.
+ struct ecpp_regs {
+  uchar dsr; /* status reg */
+  u_char dcr; /* control reg */
+ };
+The status register is read-only. The ECPPIOC_SETREGS ioctl has no affect on this register. Valid bit values for
+dsr are: ECPP_nERR, ECPP_SLCT, ECPP_PE, ECPP_nACK, ECPP_nBUSY. All other bits are reserved and
+always return 1.
+The control register is read/write. Valid bit values for dcr are: ECPP_STB, ECPP_AFX, ECPP_nINIT,
+ECPP_SLCTIN. All other bits are reserved. Reading reserved bits always return 1. An attempt to write 0s into
+these bits results in EINVAL.
+/dev/lpN Solaris x86 only. (Backwards compatibility with former lp(7D) devices.)
+/dev/printers/N 1284 compliant parallel port device special files appears in both namespaces.
+<beginning of page>
+kernel/drv/ecpp
+32-bit ELF kernel module
+kernel/drv/sparcv9/ecpp
+64-bit SPARC ELF kernel module
+kernel/drv/amd64/ecpp
+64-bit x86 ELF kernel module
+kernel/drv/ecpp.conf
+driver configuration file
+kernel/drv/sparcv9/ecpp.conf
+driver configuration file for 64-bit SPARC
+kernel/drv/amd64/ecpp.conf
+driver configuration file for 64-bit x86
+EBADF The device is opened for write-only access and a read is attempted, or the device is opened for read-only
+access and a write is attempted.
+EBUSY The device has been opened and another open is attempted. An attempt has been made to unload the driver
+while one of the units is open.
+EINVAL A ECPPIOC_SETPARMS ioctl() is attempted with an out-of-range value in the ecpp_transfer_parms
+structure. A ECPPIOC_SETREGS ioctl() is attempted with an invalid value in the ecpp_regs structure. An ioctl()
+is attempted with an invalid value in the command argument.An invalid command argument is received during mod<hy>
+load(1M) or modunload(1M).
+EIO The driver encountered a bus error when attempting an access. A read or write did not complete properly, due
+to a peripheral error or a transfer timeout.
+ENXIO The driver has received an open request for a unit for which the attach failed. The driver has received a
+write request for a unit which has an active peripheral error.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ ArchitecturePCI-
+based systems _ ISA-based systems (x86) _ AvailabilitySUNWpd (Sparc) _ SUNWpsdcr (x86) _ Interface stabili<hy>
+tyEvolving
+modload(1M), modunload(1M), update_drv(1M)ioctl(2), open(2), read(2), write(2), attributes(5), bpp(7D), us<hy>
+bprn(7D), prnio(7I), streamio(7I)
+IEEE Std 1284-1994
+http://www.sun.com/io
+<beginning of page>
+Parallel port controller not supported
+Driver does not support parallel port controller on the given host. Attach failed.

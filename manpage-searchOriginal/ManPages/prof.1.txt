@@ -1,0 +1,102 @@
+<beginning of page>
+prof <-> display profile data
+prof [-ChsVz] [-a | c | n | t] [-o | x] [-g | l] [-m mdata]
+ [prog]
+The prof command interprets a profile file produced by the monitor function. The symbol table in the object file
+prog (a.out by default) is read and correlated with a profile file (mon.out by default). For each external text symbol
+the percentage of time spent executing between the address of that symbol and the address of the next is printed, to<hy>
+gether with the number of times that function was called and the average number of milliseconds per call.
+The mutually exclusive options -a, -c, -n, and -t determine the type of sorting of the output lines:
+-a Sort by increasing symbol address.
+-c Sort by decreasing number of calls.
+-n Sort lexically by symbol name.
+-t Sort by decreasing percentage of total time (default).
+The mutually exclusive options -o and -x specify the printing of the address of each symbol monitored:
+-o Print each symbol address (in octal) along with the symbol name.
+-x Print each symbol address (in hexadecimal) along with the symbol name.
+The mutually exclusive options -g and -l control the type of symbols to be reported. The -l option must be used with
+care; it applies the time spent in a static function to the preceding (in memory) global function, instead of giving the
+static function a separate entry in the report. If all static functions are properly located, this feature can be very use<hy>
+ful. If not, the resulting report may be misleading.
+Assume that A and B are global functions and only A calls static function S. If S is located immediately after A
+in the source code (that is, if S is properly located), then, with the -l option, the amount of time spent in A can easi<hy>
+ly be determined, including the time spent in S. If, however, both A and B call S, then, if the -l option is used, the
+report will be misleading; the time spent during B's call to S will be attributed to A, making it appear as if more
+time had been spent in A than really had. In this case, function S cannot be properly located.
+-g List the time spent in static (non-global) functions separately. The -g option function is the opposite of the -l
+function.
+-l Suppress printing statically declared functions. If this option is given, time spent executing in a static function is
+allocated to the closest global function loaded before the static function in the executable. This option is the default.
+It is the opposite of the -g function and should be used with care.
+The following options may be used in any combination:
+-C Demangle C++ symbol names before printing them out.
+-h Suppress the heading normally printed on the report. This is useful if the report is to be processed further.
+-m mdata Use file mdata instead of mon.out as the input profile file.
+-s Print a summary of several of the monitoring parameters and statistics on the standard error output.
+<beginning of page>
+-V Print prof version information on the standard error output.
+-z Include all symbols in the profile range, even if associated with zero number of calls and zero time.
+A single function may be split into subfunctions for profiling by means of the MARK macro. See prof(5).
+PROFDIR The name of the file created by a profiled program is controlled by the environment variable PROFDIR.
+If PROFDIR is not set, mon.out is produced in the directory current when the program terminates. If
+PROFDIR=string, string/pid.progname is produced, where progname consists of argv[0] with any path prefix re<hy>
+moved, and pid is the process ID of the program. If PROFDIR is set, but null, no profiling output is produced.
+mon.out default profile file
+a.out default namelist (object) file
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wbtool
+gprof(1), exit(2), pcsample(2), profil(2), malloc(3C), malloc(3MALLOC), monitor(3C), attributes(5), prof(5)
+If the executable image has been stripped and does not have the .symtab symbol table, gprof reads the global dy<hy>
+namic symbol tables .dynsym and .SUNW_ldynsym, if present. The symbols in the dynamic symbol tables are a
+subset of the symbols that are found in .symtab. The .dynsym symbol table contains the global symbols used by the
+runtime linker. .SUNW_ldynsym augments the information in .dynsym with local function symbols. In the case
+where .dynsym is found and .SUNW_ldynsym is not, only the information for the global symbols is available.
+Without local symbols, the behavior is as described for the -a option.
+The times reported in successive identical runs may show variances because of varying cache-hit ratios that result
+from sharing the cache with other processes. Even if a program seems to be the only one using the machine, hidden
+background or asynchronous processes may blur the data. In rare cases, the clock ticks initiating recording of the
+program counter may beat with loops in a program, grossly distorting measurements. Call counts are always record<hy>
+ed precisely, however.
+Only programs that call exit or return from main are guaranteed to produce a profile file, unless a final call to
+monitor is explicitly coded.
+The times for static functions are attributed to the preceding external text symbol if the -g option is not used. Howev<hy>
+er, the call counts for the preceding function are still correct; that is, the static function call counts are not added to
+the call counts of the external function.
+If more than one of the options -t, -c, -a, and -n is specified, the last option specified is used and the user is
+warned.
+LD_LIBRARY_PATH must not contain /usr/lib as a component when compiling a program for profiling. If
+LD_LIBRARY_PATH contains /usr/lib, the program will not be linked correctly with the profiling versions of the
+system libraries in /usr/lib/libp. See gprof(1).
+Functions such as mcount(), _mcount(), moncontrol(), _moncontrol(), monitor(), and _monitor() may appear in
+the prof report. These functions are part of the profiling implementation and thus account for some amount of the
+runtime overhead. Since these functions are not present in an unprofiled application, time accumulated and call
+counts for these functions may be ignored when evaluating the performance of an application.
+64-bit profiling may be used freely with dynamically linked executables, and profiling information is collected for
+the shared objects if the objects are compiled for profiling. Care must be applied to interpret the profile output, since
+it is possible for symbols from different shared objects to have the same name. If duplicate names are seen in the
+profile output, it is better to use the -s (summary) option, which prefixes a module id before each symbol that is du<hy>
+<beginning of page>
+plicated. The symbols can then be mapped to appropriate modules by looking at the modules information in the
+summary.
+If the -a option is used with a dynamically linked executable, the sorting occurs on a per-shared-object basis. Since
+there is a high likelihood of symbols from differed shared objects to have the same value, this results in an output
+that is more understandable. A blank line separates the symbols from different shared objects, if the -s option is giv<hy>
+en.
+32-bit profiling may be used with dynamically linked executables, but care must be applied. In 32-bit profiling,
+shared objects cannot be profiled with prof. Thus, when a profiled, dynamically linked program is executed, only
+the main portion of the image is sampled. This means that all time spent outside of the main object, that is, time
+spent in a shared object, will not be included in the profile summary; the total time reported for the program may be
+less than the total time used by the program.
+Because the time spent in a shared object cannot be accounted for, the use of shared objects should be minimized
+whenever a program is profiled with prof. If desired, the program should be linked to the profiled version of a li<hy>
+brary (or to the standard archive version if no profiling version is available), instead of the shared object to get pro<hy>
+file information on the functions of a library. Versions of profiled libraries may be supplied with the system in the
+/usr/lib/libp directory. Refer to compiler driver documentation on profiling.
+Consider an extreme case. A profiled program dynamically linked with the shared C library spends 100 units of time
+in some libc routine, say, malloc(). Suppose malloc() is called only from routine B and B consumes only 1 unit of
+time. Suppose further that routine A consumes 10 units of time, more than any other routine in the main (profiled)
+portion of the image. In this case, prof will conclude that most of the time is being spent in A and almost no time is
+being spent in B. From this it will be almost impossible to tell that the greatest improvement can be made by look<hy>
+ing at routine B and not routine A. The value of the profiler in this case is severely degraded; the solution is to use
+archives as much as possible for profiling.

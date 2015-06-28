@@ -1,0 +1,69 @@
+<beginning of page>
+prop_op <-> report driver property information
+#include <sys/types.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+int prefixprop_op(dev_t dev, dev_info_t *dip,
+ ddi_prop_op_t prop_op, int flags, char *name, caddr_t valuep,
+ int *lengthp);
+Solaris DDI specific (Solaris DDI). This entry point is required, but it can be ddi_prop_op(9F).
+dev Device number associated with this device.
+dip A pointer to the device information structure for this device.
+prop_op Property operator. Valid operators are:
+PROP_LEN Get property length only. (valuep unaffected).
+PROP_LEN_AND_VAL_BUF Get length and value into caller's buffer. (valuep used as input).
+PROP_LEN_AND_VAL_ALLOC Get length and value into allocated buffer. (valuep returned as pointer to pointer
+to allocated buffer).
+flags The only possible flag value is:
+DDI_PROP_DONTPASS Do not pass request to parent if property not found.
+name Pointer to name of property to be interrogated.
+valuep If prop_op is PROP_LEN_AND_VAL_BUF, this should be a pointer to the user's buffer. If prop_op is
+PROP_LEN_AND_VAL_ALLOC, this should be the address of a pointer.
+lengthp On exit, *lengthp will contain the property length. If prop_op is PROP_LEN_AND_VAL_BUF then
+lengthp should point to an int that contains the length of caller's buffer, before calling prop_op().
+prop_op() is an entry point which reports the values of certain properties of the driver or device to the system. Each
+driver must have a prefix prop_op entry point, but most drivers that do not need to create or manage their own prop<hy>
+erties can use ddi_prop_op() for this entry point. Then the driver can use ddi_prop_update(9F) to create proper<hy>
+ties for its device.
+prop_op() should return:
+DDI_PROP_SUCCESS Property found and returned.
+DDI_PROP_NOT_FOUND Property not found.
+DDI_PROP_UNDEFINED Prop explicitly undefined.
+<beginning of page>
+DDI_PROP_NO_MEMORY Property found, but unable to allocate memory. lengthp has the correct property
+length.
+DDI_PROP_BUF_TOO_SMALL Property found, but the supplied buffer is too small. lengthp has the correct
+property length.
+Example 1 Using prop_op() to Report Property Information
+In the following example, prop_op() intercepts requests for the temperature property. The driver tracks changes to
+temperature using a variable in the state structure in order to avoid frequent calls to ddi_prop_update(9F). The tem<hy>
+perature property is only updated when a request is made for this property. It then uses the system routine
+ddi_prop_op(9F) to process the property request. If the property request is not specific to a device, the driver does
+not intercept the request. This is indicated when the value of the dev parameter is equal to DDI_DEV_T_ANY.
+ int temperature; /* current device temperature */
+  .
+  .
+  .
+ static int
+ xxprop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
+  int flags, char *name, caddr_t valuep, int *lengthp)
+ {
+    int instance;
+    struct xxstate *xsp;
+  if (dev == DDI_DEV_T_ANY)
+     goto skip;
+  instance = getminor(dev);
+  xsp = ddi_get_soft_state(statep, instance);
+  if (xsp == NULL)
+     return (DDI_PROP_NOT_FOUND);
+  if (strcmp(name, "temperature") == 0) {
+     ddi_prop_update_int(dev, dip,\
+  "temperature", temperature);
+  }
+    /* other cases... */
+  skip:
+  return (ddi_prop_op(dev, dip, prop_op, flags,\
+  name, valuep, lengthp));
+ }
+Intro(9E), ddi_prop_op(9F), ddi_prop_update(9F)
+Writing Device Drivers

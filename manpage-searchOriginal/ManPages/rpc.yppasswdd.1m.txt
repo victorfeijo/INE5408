@@ -1,0 +1,72 @@
+<beginning of page>
+rpc.yppasswdd, yppasswdd <-> server for modifying NIS password file
+/usr/lib/netsvc/yp/rpc.yppasswdd [-D directory]
+ [-nogecos] [-noshell] [-nopw]
+ [-m argument1 argument2...]
+/usr/lib/netsvc/yp/rpc.yppasswdd
+ [passwordfile [adjunctfile]]
+ [-nogecos] [-noshell] [-nopw]
+ [-m argument1 argument2...]
+rpc.yppasswdd is a server that handles password change requests from yppasswd(1). It changes a password entry in
+the passwd, shadow, and security/passwd.adjunct files. The passwd and shadow files provide the basis for the
+passwd.byname and passwd.byuid maps. The passwd.adjunct file provides the basis for the passwd.adjunct.by<hy>
+name and passwd.adjunct.byuid maps. Entries in the passwd, shadow or passwd.adjunct files are changed only if
+the password presented by yppasswd(1) matches the encrypted password of the entry. All password files are located
+in the PWDIR directory.
+If the -D option is given, the passwd, shadow, or passwd.adjunct files are placed under the directory path that is the
+argument to -D.
+If the -noshell, -nogecos or -nopw options are given, these fields cannot be changed remotely using chfn, chsh, or
+passwd(1).
+If the -m option is given, a make(1S) is performed in /var/yp after any of the passwd, shadow, or passwd.adjunct
+files are modified. All arguments following the flag are passed to make.
+The second of the listed syntaxes is provided only for backward compatibility. If the second syntax is used, the pass<hy>
+wordfile is the full pathname of the password file and adjunctfile is the full pathname of the optional passwd.ad<hy>
+junct file. If a shadow file is found in the same directory as passwordfile, the shadowfile is used as described above.
+Use of this syntax and the discovery of a shadowfile file generates diagnostic output. The daemon, however, starts
+normally.
+The first and second syntaxes are mutually exclusive. You cannot specify the full pathname of the passwd, pass<hy>
+wd.adjunct files and use the -D option at the same time.
+The daemon is started automatically on the master server of the passwd map by ypstart(1M), which is invoked at
+boot time by the svcs:/network/nis/server:default service.
+The server does not insist on the presence of a shadow file unless there is no -D option present or the directory
+named with the -D option is /etc. In addition, a passwd.adjunct file is not necessary. If the -D option is given, the
+server attempts to find a passwd.adjunct file in the security subdirectory of the named directory. For example, in
+the presence of -D /var/yp the server checks for a /var/yp/security/passwd.adjunct file.
+If only a passwd file exists, then the encrypted password is expected in the second field. If both a passwd and a
+passwd.adjunct file exist, the encrypted password is expected in the second field of the adjunct file with ##user<hy>
+name in the second field of the passwd file. If all three files are in use, the encrypted password is expected in the
+shadow file. Any deviation causes a password update to fail.
+If you remove or add a shadow or passwd.adjunct file after rpc.yppasswdd has started, you must stop and restart
+the daemon to enable it to recognize the change. See ypstart(1m) for information on restarting the daemon.
+The rpc.yppasswdd daemon considers a shell that has a name that begins with 'r' to be a restricted shell. By default,
+the daemon does not check whether a shell begins with an 'r'. However, you can tell it to do so by uncommenting
+the check_restricted_shell_name=1 line in /etc/default/yppasswdd. The result will be to restrict a user's ability to
+change from his default shell. See yppasswdd(4).
+On start up, yppasswdd checks for the existence of a NIS to LDAP (N2L) configuration file,
+/var/yp/NISLDAPmapping. If the configuration file is present, the daemon runs in N2L mode. If the file is not
+present, yppasswdd runs in traditional, non-N2L mode.
+In N2L mode, changes are written directly to the Directory Information Tree (DIT). If the changes are written suc<hy>
+cessfully, the NIS map is updated. The NIS source files, passwd, shadow, and passwd.adjunct, for example, are not
+updated. Thus, in N2L mode, the -D option is meaningless. In N2L mode, yppasswdd propagates changes by call<hy>
+ing yppush(1M) instead of ypmake(1M). The -m option is thus unused.
+<beginning of page>
+During an NIS-to-LDAP transition, the yppasswdd daemon uses the N2L-specific map, ageing.byname, to read
+and write password aging information to the DIT. If you are not using password aging, then the ageing.byname
+mapping is ignored.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wypu
+svcs(1), make(1S), passwd(1), yppasswd(1), inetd(1M), svcadm(1M), ypmake(1M), yppush(1M), ypstart(1M),
+NISLDAPmapping(4), passwd(4), shadow(4), ypfiles(4), yppasswdd(4), ypserv(4), attributes(5), smf(5)
+If make has not been installed and the -m option is given, the daemon outputs a warning and proceeds, effectively
+ignoring the -m flag.
+When using the -D option, you should make sure that the PWDIR of the /var/yp/Makefile is set accordingly.
+The second listed syntax is supplied only for backward compatibility and might be removed in a future release of
+this daemon.
+The Network Information Service (NIS) was formerly known as Sun Yellow Pages (YP). The functionality of the
+two remains the same; only the name has changed. The name Yellow Pages is a registered trademark in the United
+Kingdom of British Telecommunications PLC, and cannot be used without permission.
+The NIS server service is managed by the service management facility, smf(5), under the service identifier:
+ svcs:/network/nis/server:default
+Administrative actions on this service, such as enabling, disabling, or requesting restart, can be performed using sv<hy>
+cadm(1M). The service's status can be queried using the svcs(1) command.

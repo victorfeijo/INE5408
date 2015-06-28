@@ -1,0 +1,238 @@
+<beginning of page>
+fcntl <-> file control
+#include <sys/types.h>
+#include <unistd.h>
+#include <fcntl.h>
+int fcntl(int fildes, int cmd, /* arg */ ...);
+The fcntl() function provides for control over open files. The fildes argument is an open file descriptor.
+The fcntl() function can take a third argument, arg, whose data type, value, and use depend upon the value of cmd.
+The cmd argument specifies the operation to be performed by fcntl().
+The values for cmd are defined in <fcntl.h> and include:
+F_DUPFD Return a new file descriptor which is the lowest numbered available (that is, not already open) file de<hy>
+scriptor greater than or equal to the third argument, arg, taken as an integer of type int. The new file descriptor refers
+to the same open file description as the original file descriptor, and shares any locks. The FD_CLOEXEC flag asso<hy>
+ciated with the new file descriptor is cleared to keep the file open across calls to one of the exec(2) functions.
+F_DUP2FD Similar to F_DUPFD, but always returns arg. F_DUP2FD closes arg if it is open and not equal to
+fildes. F_DUP2FD is equivalent to dup2(fildes, arg).
+F_FREESP Free storage space associated with a section of the ordinary file fildes. The section is specified by a vari<hy>
+able of data type struct flock pointed to by arg. The data type struct flock is defined in the <fcntl.h> header (see fc<hy>
+ntl.h(3HEAD)) and is described below. Note that all file systems might not support all possible variations of
+F_FREESP arguments. In particular, many file systems allow space to be freed only at the end of a file.
+F_FREESP64 Equivalent to F_FREESP, but takes a struct flock64 argument rather than a struct flock argument.
+F_ALLOCSP Allocate space for a section of the ordinary file fildes. The section is specified by a variable of data
+type struct flock pointed to by arg. The data type struct flock is defined in the <fcntl.h> header (see fc<hy>
+ntl.h(3HEAD) and is described below.
+F_ALLOCSP64 Equivalent to F_ALLOCSP, but takes a struct flock64 argument rather than a struct flock argu<hy>
+ment.
+F_GETFD Get the file descriptor flags defined in <fcntl.h> that are associated with the file descriptor fildes. File de<hy>
+scriptor flags are associated with a single file descriptor and do not affect other file descriptors that refer to the same
+file.
+F_GETFL Get the file status flags and file access modes, defined in <fcntl.h>, for the file descriptor specified by
+fildes. The file access modes can be extracted from the return value using the mask O_ACCMODE, which is de<hy>
+fined in <fcntl.h>. File status flags and file access modes do not affect other file descriptors that refer to the same file
+with different open file descriptions.
+F_GETOWN If fildes refers to a socket, get the process or process group ID specified to receive SIGURG signals
+when out-of-band data is available. Positive values indicate a process ID; negative values, other than <mi>1, indicate a
+process group ID. If fildes does not refer to a socket, the results are unspecified.
+F_GETXFL Get the file status flags, file access modes, and file creation and assignment flags, defined in <fcntl.h>,
+for the file descriptor specified by fildes. The file access modes can be extracted from the return value using the mask
+O_ACCMODE, which is defined in <fcntl.h>. File status flags, file access modes, and file creation and assignment
+flags do not affect other file descriptors that refer to the same file with different open file descriptions.
+<beginning of page>
+F_SETFD Set the file descriptor flags defined in <fcntl.h>, that are associated with fildes, to the third argument,
+arg, taken as type int. If the FD_CLOEXEC flag in the third argument is 0, the file will remain open across the ex<hy>
+ec() functions; otherwise the file will be closed upon successful execution of one of the exec() functions.
+F_SETFL Set the file status flags, defined in <fcntl.h>, for the file descriptor specified by fildes from the corre<hy>
+sponding bits in the arg argument, taken as type int. Bits corresponding to the file access mode and file creation and
+assignment flags that are set in arg are ignored. If any bits in arg other than those mentioned here are changed by the
+application, the result is unspecified.
+F_SETOWN If fildes refers to a socket, set the process or process group ID specified to receive SIGURG signals
+when out-of-band data is available, using the value of the third argument, arg, taken as type int. Positive values indi<hy>
+cate a process ID; negative values, other than <mi>1, indicate a process group ID. If fildes does not refer to a socket, the
+results are unspecified.
+The following commands are available for advisory record locking. Record locking is supported for regular files, and
+may be supported for other files.
+F_GETLK Get the first lock which blocks the lock description pointed to by the third argument, arg, taken as a
+pointer to type struct flock, defined in <fcntl.h>. The information retrieved overwrites the information passed to fc<hy>
+ntl() in the structure flock. If no lock is found that would prevent this lock from being created, then the structure will
+be left unchanged except for the lock type which will be set to F_UNLCK.
+F_GETLK64 Equivalent to F_GETLK, but takes a struct flock64 argument rather than a struct flock argument.
+F_SETLK Set or clear a file segment lock according to the lock description pointed to by the third argument, arg,
+taken as a pointer to type struct flock, defined in <fcntl.h>. F_SETLK is used to establish shared (or read) locks
+(F_RDLCK) or exclusive (or write) locks (F_WRLCK), as well as to remove either type of lock (F_UNLCK).
+F_RDLCK, F_WRLCK and F_UNLCK are defined in <fcntl.h>. If a shared or exclusive lock cannot be set, fc<hy>
+ntl() will return immediately with a return value of <mi>1.
+F_SETLK64 Equivalent to F_SETLK, but takes a struct flock64 argument rather than a struct flock argument.
+F_SETLKW This command is the same as F_SETLK except that if a shared or exclusive lock is blocked by other
+locks, the process will wait until the request can be satisfied. If a signal that is to be caught is received while fcntl()
+is waiting for a region, fcntl() will be interrupted. Upon return from the process' signal handler, fcntl() will return
+<mi>1 with errno set to EINTR, and the lock operation will not be done.
+F_SETLKW64 Equivalent to F_SETLKW, but takes a struct flock64 argument rather than a struct flock argu<hy>
+ment.
+When a shared lock is set on a segment of a file, other processes will be able to set shared locks on that segment or a
+portion of it. A shared lock prevents any other process from setting an exclusive lock on any portion of the protected
+area. A request for a shared lock will fail if the file descriptor was not opened with read access.
+An exclusive lock will prevent any other process from setting a shared lock or an exclusive lock on any portion of
+the protected area. A request for an exclusive lock will fail if the file descriptor was not opened with write access.
+The flock structure contains at least the following elements:
+ short l_type; /* lock operation type */
+ short l_whence; /* lock base indicator */
+ off_t l_start; /* starting offset from base */
+ off_t l_len; /* lock length; l_len == 0 means
+  until end of file */
+ int l_sysid; /* system ID running process holding lock */
+ pid_t l_pid; /* process ID of process holding lock */
+<beginning of page>
+The value of l_whence is SEEK_SET, SEEK_CUR, or SEEK_END, to indicate that the relative offset l_start
+bytes will be measured from the start of the file, current position or end of the file, respectively. The value of l_len is
+the number of consecutive bytes to be locked. The value of l_len may be negative (where the definition of off_t per<hy>
+mits negative values of l_len). After a successful F_GETLK or F_GETLK64 request, that is, one in which a lock
+was found, the value of l_whence will be SEEK_SET.
+The l_pid and l_sysid fields are used only with F_GETLK or F_GETLK64 to return the process ID of the process
+holding a blocking lock and to indicate which system is running that process.
+If l_len is positive, the area affected starts at l_start and ends at l_start + l_len <mi> 1. If l_len is negative, the area af<hy>
+fected starts at l_start + l_len and ends at l_start <mi> 1. Locks may start and extend beyond the current end of a file,
+but must not be negative relative to the beginning of the file. A lock will be set to extend to the largest possible value
+of the file offset for that file by setting l_len to 0. If such a lock also has l_start set to 0 and l_whence is set to
+SEEK_SET, the whole file will be locked.
+If a process has an existing lock in which l_len is 0 and which includes the last byte of the requested segment, and
+an unlock (F_UNLCK) request is made in which l_len is non-zero and the offset of the last byte of the requested
+segment is the maximum value for an object of type off_t, then the F_UNLCK request will be treated as a request to
+unlock from the start of the requested segment with an l_len equal to 0. Otherwise, the request will attempt to un<hy>
+lock only the requested segment.
+There will be at most one type of lock set for each byte in the file. Before a successful return from an F_SETLK,
+F_SETLK64, F_SETLKW, or F_SETLKW64 request when the calling process has previously existing locks on
+bytes in the region specified by the request, the previous lock type for each byte in the specified region will be re<hy>
+placed by the new lock type. As specified above under the descriptions of shared locks and exclusive locks, an
+F_SETLK, F_SETLK64, F_SETLKW, or F_SETLKW64 request will (respectively) fail or block when another
+process has existing locks on bytes in the specified region and the type of any of those locks conflicts with the type
+specified in the request.
+All locks associated with a file for a given process are removed when a file descriptor for that file is closed by that
+process or the process holding that file descriptor terminates. Locks are not inherited by a child process created using
+fork(2).
+A potential for deadlock occurs if a process controlling a locked region is put to sleep by attempting to lock another
+process' locked region. If the system detects that sleeping until a locked region is unlocked would cause a deadlock,
+fcntl() will fail with an EDEADLK error.
+The following values for cmd are used for file share reservations. A share reservation is placed on an entire file to al<hy>
+low cooperating processes to control access to the file.
+F_SHARE Sets a share reservation on a file with the specified access mode and designates which types of access to
+deny.
+F_UNSHARE Remove an existing share reservation.
+File share reservations are an advisory form of access control among cooperating processes, on both local and re<hy>
+mote machines. They are most often used by DOS or Windows emulators and DOS based NFS clients. However,
+native UNIX versions of DOS or Windows applications may also choose to use this form of access control.
+A share reservation is described by an fshare structure defined in <sys/fcntl.h>, which is included in <fcntl.h> as
+follows:
+ typedef struct fshare {
+  short f_access;
+  short f_deny;
+  int f_id;
+ } fshare_t;
+A share reservation specifies the type of access, f_access, to be requested on the open file descriptor. If access is
+granted, it further specifies what type of access to deny other processes, f_deny. A single process on the same file
+may hold multiple non-conflicting reservations by specifying an identifier, f_id, unique to the process, with each re<hy>
+quest.
+<beginning of page>
+An F_UNSHARE request releases the reservation with the specified f_id. The f_access and f_deny fields are ig<hy>
+nored.
+Valid f_access values are:
+F_RDACC Set a file share reservation for read-only access.
+F_WRACC Set a file share reservation for write-only access.
+F_RWACC Set a file share reservation for read and write access.
+Valid f_deny values are:
+F_COMPAT Set a file share reservation to compatibility mode.
+F_RDDNY Set a file share reservation to deny read access to other processes.
+F_WRDNY Set a file share reservation to deny write access to other processes.
+F_RWDNY Set a file share reservation to deny read and write access to other processes.
+F_NODNY Do not deny read or write access to any other process.
+Upon successful completion, the value returned depends on cmd as follows:
+F_DUPFD A new file descriptor.
+F_FREESP Value of 0.
+F_GETFD Value of flags defined in <fcntl.h>. The return value will not be negative.
+F_GETFL Value of file status flags and access modes. The return value will not be negative.
+F_GETLK Value other than <mi>1.
+F_GETLK64 Value other than <mi>1.
+F_GETOWN Value of the socket owner process or process group; this will not be <mi>1.
+F_GETXFL Value of file status flags, access modes, and creation and assignment flags. The return value will not be
+negative.
+F_SETFD Value other than <mi>1.
+F_SETFL Value other than <mi>1.
+<beginning of page>
+F_SETLK Value other than <mi>1.
+F_SETLK64 Value other than <mi>1.
+F_SETLKW Value other than <mi>1.
+F_SETLKW64 Value other than <mi>1.
+F_SETOWN Value other than <mi>1.
+F_SHARE Value other than <mi>1.
+F_UNSHARE Value other than <mi>1.
+Otherwise, <mi>1 is returned and errno is set to indicate the error.
+The fcntl() function will fail if:
+EAGAIN The cmd argument is F_SETLK or F_SETLK64, the type of lock (l_type) is a shared (F_RDLCK) or
+exclusive (F_WRLCK) lock, and the segment of a file to be locked is already exclusive-locked by another process;
+or the type is an exclusive lock and some portion of the segment of a file to be locked is already shared-locked or ex<hy>
+clusive-locked by another process.
+The cmd argument is F_FREESP, the file exists, mandatory file/record locking is set, and there are outstanding
+record locks on the file; or the cmd argument is F_SETLK, F_SETLK64, F_SETLKW, or F_SETLKW64,
+mandatory file/record locking is set, and the file is currently being mapped to virtual memory using mmap(2).
+The cmd argument is F_SHARE and f_access conflicts with an existing f_deny share reservation.
+EBADF The fildes argument is not a valid open file descriptor; or the cmd argument is F_SETLK, F_SETLK64,
+F_SETLKW, or F_SETLKW64, the type of lock, l_type, is a shared lock (F_RDLCK), and fildes is not a valid
+file descriptor open for reading; or the type of lock l_type is an exclusive lock (F_WRLCK) and fildes is not a valid
+file descriptor open for writing.
+The cmd argument is F_FREESP and fildes is not a valid file descriptor open for writing.
+The cmd argument is F_DUP2FD, and arg is negative or is not less than the current resource limit for RLIM<hy>
+IT_NOFILE.
+The cmd argument is F_SHARE, the f_access share reservation is for write access, and fildes is not a valid file de<hy>
+scriptor open for writing.
+The cmd argument is F_SHARE, the f_access share reservation is for read access, and fildes is not a valid file de<hy>
+scriptor open for reading.
+EFAULT The cmd argument is F_GETLK, F_GETLK64, F_SETLK, F_SETLK64, F_SETLKW,
+F_SETLKW64, or F_FREESP and the arg argument points to an illegal address.
+The cmd argument is F_SHARE or F_UNSHARE and arg points to an illegal address.
+EINTR The cmd argument is F_SETLKW or F_SETLKW64 and the function was interrupted by a signal.
+EINVAL The cmd argument is invalid or not supported by the file system; or the cmd argument is F_DUPFD and
+arg is negative or greater than or equal to OPEN_MAX; or the cmd argument is F_GETLK, F_GETLK64,
+F_SETLK, F_SETLK64, F_SETLKW, or F_SETLKW64 and the data pointed to by arg is not valid; or fildes
+<beginning of page>
+refers to a file that does not support locking.
+The cmd argument is F_UNSHARE and a reservation with this f_id for this process does not exist.
+EIO An I/O error occurred while reading from or writing to the file system.
+EMFILE The cmd argument is F_DUPFD and either OPEN_MAX file descriptors are currently open in the calling
+process, or no file descriptors greater than or equal to arg are available.
+ENOLCK The cmd argument is F_SETLK, F_SETLK64, F_SETLKW, or F_SETLKW64 and satisfying the
+lock or unlock request would result in the number of locked regions in the system exceeding a system-imposed limit.
+ENOLINK Either the fildes argument is on a remote machine and the link to that machine is no longer active; or the
+cmd argument is F_FREESP, the file is on a remote machine, and the link to that machine is no longer active.
+EOVERFLOW One of the values to be returned cannot be represented correctly.
+The cmd argument is F_GETLK, F_SETLK, or F_SETLKW and the smallest or, if l_len is non-zero, the largest,
+offset of any byte in the requested segment cannot be represented correctly in an object of type off_t.
+The cmd argument is F_GETLK64, F_SETLK64, or F_SETLKW64 and the smallest or, if l_len is non-zero, the
+largest, offset of any byte in the requested segment cannot be represented correctly in an object of type off64_t.
+The fcntl() function may fail if:
+EAGAIN The cmd argument is F_SETLK, F_SETLK64, F_SETLKW, or F_SETLKW64, and the file is current<hy>
+ly being mapped to virtual memory using mmap(2).
+EDEADLK The cmd argument is F_SETLKW or F_SETLKW64, the lock is blocked by some lock from another
+process and putting the calling process to sleep, waiting for that lock to become free would cause a deadlock.
+The cmd argument is F_FREESP, mandatory record locking is enabled, O_NDELAY and O_NONBLOCK are
+clear and a deadlock condition was detected.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Standard _ MT-LevelAsync-Signal Safe
+lockd(1M), chmod(2), close(2), creat(2), dup(2), exec(2), fork(2), mmap(2), open(2), pipe(2), read(2), sigac<hy>
+tion(2), write(2), dup2(3C), fcntl.h(3HEAD), attributes(5), standards(5)
+Programming Interfaces Guide
+In the past, the variable errno was set to EACCES rather than EAGAIN when a section of a file is already locked
+by another process. Therefore, portable application programs should expect and test for either value.
+Advisory locks allow cooperating processes to perform consistent operations on files, but do not guarantee exclusive
+access. Files can be accessed without advisory locks, but inconsistencies may result. The network share locking pro<hy>
+tocol does not support the f_deny value of F_COMPAT. For network file systems, if f_access is F_RDACC, f_de<hy>
+ny is mapped to F_RDDNY. Otherwise, it is mapped to F_RWDNY.
+To prevent possible file corruption, the system may reject mmap() requests for advisory locked files, or it may reject
+advisory locking requests for mapped files. Applications that require a file be both locked and mapped should lock
+the entire file (l_start and l_len both set to 0). If a file is mapped, the system may reject an unlock request, resulting
+<beginning of page>
+in a lock that does not cover the entire file.
+The process ID returned for locked files on network file systems might not be meaningful.
+If the file server crashes and has to be rebooted, the lock manager (see lockd(1M)) attempts to recover all locks that
+were associated with that server. If a lock cannot be reclaimed, the process that held the lock is issued a SIGLOST
+signal.

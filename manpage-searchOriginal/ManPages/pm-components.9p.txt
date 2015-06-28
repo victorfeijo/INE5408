@@ -1,0 +1,70 @@
+<beginning of page>
+pm-components <-> Power Management device property
+A device is power manageable if the power consumption of the device can be reduced when it is idle. In general, a
+power manageable device consists of a number of power manageable hardware units called components. Each com<hy>
+ponent is separately controllable and has its own set of power parameters.
+An example of a one-component power manageable device is a disk whose spindle motor can be stopped to save
+power when the disk is idle. An example of a two-component power manageable device is a frame buffer card with a
+connected monitor. The frame buffer electronics (with power that can be reduced when not in use) comprises the
+first component. The second component is the monitor, which can enter in a lower power mode when not in use. The
+combination of frame buffer electronics and monitor is considered as one device by the system.
+In the Power Management framework, all components are considered equal and completely independent of each oth<hy>
+er. If this is not true for a particular device, the device driver must ensure that undesirable state combinations do not
+occur. Each component is created in the idle state.
+The pm-components property describes the Power Management model of a device driver to the Power Management
+framework. It lists each power manageable component by name and lists the power level supported by each compo<hy>
+nent by numerical value and name. Its syntax and interpretation is described below.
+This property is only interpreted by the system immediately after the device has successfully attached, or upon the
+first call into Power Management framework, whichever comes first. Changes in the property made by the driver af<hy>
+ter the property has been interpreted will not be recognized.
+pm-components is a string array property. The existence of the pm-components property indicates that a device
+implements power manageable components and describes the Power Management model implemented by the device
+driver. The existence of pm-components also indicates to the framework that device is ready for Power Manage<hy>
+ment if automatic device Power Management is enabled. See power.conf(4).
+The pm-component property syntax is:
+pm-components="NAME=component name","numeric power level=power level name", "numeric power level=power level name" [, "numeric power level=power level name" ...] [, "NAME=component name", "numeric power level=power level name", "numeric power level=power level name" [, "numeric power level=power level name"...]...];
+The start of each new component is represented by a string consisting of NAME= followed by the name of the com<hy>
+ponent. This should be a short name that a user would recognize, such as "Monitor" or "Spindle Motor." The suc<hy>
+ceeding elements in the string array must be strings consisting of the numeric value (can be decimal or 0x <hexadec<hy>
+imal number>) of a power level the component supports, followed by an equal sign followed by a short descriptive
+name for that power level. Again, the names should be descriptive, such as "On," "Off," "Suspend", "Standby," etc.
+The next component continues the array in the same manner, with a string that starts out NAME=, specifying the be<hy>
+ginning of a new component (and its name), followed by specifications of the power levels the component supports.
+The components must be listed in increasing order according to the component number as interpreted by the driver's
+power(9E) routine. (Components are numbered sequentially from 0). The power levels must be listed in increasing
+order of power consumption. Each component must support at least two power levels, or there is no possibility of
+power level transitions. If a power level value of 0 is used, it must be the first one listed for that component. A power
+level value of 0 has a special meaning (off) to the Power Management framework.
+An example of a pm-components entry from the .conf file of a driver which implements a single power managed
+component consisting of a disk spindle motor is shown below. This is component 0 and it supports 2 power level,
+which represent spindle stopped or full speed.
+ pm-components="NAME=Spindle Motor", "0=Stopped", "1=Full Speed";
+ ...
+Below is an example of how the above entry would be implemented in the attach(9E) function of the driver.
+ static char *pmcomps[] = {
+  "NAME=Spindle Motor",
+  "0=Stopped",
+  "1=Full Speed"
+ };
+ ...
+<beginning of page>
+ xxattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
+ {
+ ...
+  if (ddi_prop_update_string_array(DDI_DEV_T_NONE, dip, "pm-components",
+  &pmcomp[0], sizeof (pmcomps) / sizeof (char *)) !=DDI_PROP_SUCCESS)
+    goto failed;
+ }
+Below is an example for a frame buffer which implements two components. Component 0 is the frame buffer elec<hy>
+tronics which supports four different power levels. Component 1 represents the state of Power Management of the
+attached monitor.
+ pm-components="NAME=Frame Buffer", "0=Off"
+   "1=Suspend", "2=Standby", "3=On",
+   "NAME=Monitor", "0=Off", "1=Suspend", "2=Standby,"
+   "3=On;
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface stability<hy>
+Committed
+power.conf(4), pm(7D), attach(9E), detach(9E), ddi_prop_update_string_array(9F) pm_busy_component(9F),
+pm_idle_component(9F)
+Writing Device Drivers

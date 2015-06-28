@@ -1,0 +1,133 @@
+<beginning of page>
+nisaddent <-> create NIS+ tables from corresponding /etc files or NIS maps
+/usr/lib/nis/nisaddent [-D defaults] [-Paorv] [-t table] type
+ [nisdomain]
+/usr/lib/nis/nisaddent [-D defaults] [-Paprmov] -f file
+ [-t table] type [nisdomain]
+/usr/lib/nis/nisaddent [-D defaults] [-Parmv] [-t table] -y ypdomain
+ [-Y map] type [nisdomain]
+/usr/lib/nis/nisaddent -d [-AMoq] [-t table] type
+ [nisdomain]
+nisaddent creates entries in NIS+ tables from their corresponding /etc files and NIS maps. This operation is custom<hy>
+ized for each of the standard tables that are used in the administration of Solaris systems. The type argument speci<hy>
+fies the type of the data being processed. Legal values for this type are one of aliases, bootparams, ethers, group,
+hosts, ipnodes, netid, netmasks, networks, passwd, protocols, publickey, rpc, services, shadow, or timezone for
+the standard tables, or key-value for a generic two-column (key, value) table. For a site specific table, which is not of
+key-value type, one can use nistbladm(1) to administer it.
+The NIS+ tables should have already been created by nistbladm(1), nissetup(1M), or nisserver(1M).
+It is easier to use nispopulate(1M) instead of nisaddent to populate the system tables.
+By default, nisaddent reads from the standard input and adds this data to the NIS+ table associated with the type
+specified on the command line. An alternate NIS+ table may be specified with the -t option. For type key-value, a
+table specification is required.
+Note that the data type can be different than the table name (-t). For example, the automounter tables have key-val<hy>
+ue as the table type.
+Although, there is a shadow data type, there is no corresponding shadow table. Both the shadow and the passwd data
+is stored in the passwd table itself.
+Files may be processed using the -f option, and NIS version 2 ( YP) maps may be processed using the -y option. The
+merge option is not available when reading data from standard input.
+When a ypdomain is specified, the nisaddent command takes its input from the dbm files for the appropriate NIS
+map (mail.aliases, bootparams, ethers.byaddr, group.byname, hosts.byaddr, hosts.byname, ipnodes.byad<hy>
+dr,ipnodes.byname, netid.byname, netmasks.byaddr, networks.byname, passwd.byname, protocols.byname,
+publickey.byname, rpc.bynumber, services.byname, or timezone.byname). An alternate NIS map may be speci<hy>
+fied with the -Y option. For type key-value, a map specification is required. The map must be in the /var/yp/ypdo<hy>
+main directory on the local machine. Note that ypdomain is case sensitive. ypxfr(1M) can be used to get the NIS
+maps.
+If a nisdomain is specified, nisaddent operates on the NIS+ table in that NIS+ domain, otherwise the default domain
+is used.
+In terms of performance, loading up the tables is fastest when done through the dbm files (-y).
+To accommodate other credential entries used by other authentication mechanisms stored in the cred.org_dir table,
+the publickey dump output has been modified to include a special algorithm type field. This format is incompatible
+with older versions of nisaddent. To produce dumps that can be read by older versions of nisaddent, or to load
+dumps created by such older versions, use the -o option.
+The following options are supported:
+-a Add the file or map to the NIS+ table without deleting any existing entries. This option is the default. Note that
+this mode only propagates additions and modifications, not deletions.
+-A All data. This option specifies that the data within the table and all of the data in tables in the initial table's con<hy>
+catenation path be returned.
+<beginning of page>
+-d Dump the NIS+ table to the standard output in the appropriate format for the given type. For tables of type key-
+value, use niscat(1) instead. To dump the cred table, dump the publickey and the netid types.
+-D defaults This option specifies a different set of defaults to be used during this operation. The defaults string is a
+series of tokens separated by colons. These tokens represent the default values to be used for the generic object prop<hy>
+erties. All of the legal tokens are described below.
+ttl=time This token sets the default time to live for objects that are created by this command. The value time is spec<hy>
+ified in the format as defined by the nischttl(1) command. The default is 12 hours.
+owner=ownername This token specifies that the NIS+ principal ownername should own the created object. The de<hy>
+fault for this value is the principal who is executing the command.
+group=groupname This token specifies that the group groupname should be the group owner for the object that is
+created. The default is NULL.
+access=rights This token specifies the set of access rights that are to be granted for the given object. The value rights
+is specified in the format as defined by the nischmod(1) command. The default is
+ <mi><mi><mi><mi>rmcdr<mi><mi><mi>r<mi><mi><mi>
+-f file Specify that file should be used as the source of input (instead of the standard input).
+-m Merge the file or map with the NIS+ table. This is the most efficient way to bring an NIS+ table up to date with a
+file or NIS map when there are only a small number of changes. This option adds entries that are not already in the
+database, modifies entries that already exist (if changed), and deletes any entries that are not in the source. Use the
+-m option whenever the database is large and replicated, and the map being loaded differs only in a few entries. This
+option reduces the number of update messages that have to be sent to the replicas. Also see the -r option.
+-M Master server only. This option specifies that lookups should be sent to the master server. This guarantees that
+the most up-to-date information is seen at the possible expense that the master server may be busy, or that it may be
+made busy by this operation.
+-o Use strictly conforming publickey files. Dumps will not add the algorithm type field used by additional authenti<hy>
+cation mechanisms that might be configured using nisauthconf(1M). 192-bit keys that are dumped using this option
+can be read by previous versions of nisaddent. However, the algorithm field will be lost and assumed to be "0" when
+read. Use the -o option when reading publickey files from previous versions of nisaddent to avoid warnings about
+the missing algorithm field.
+-p Process the password field when loading password information from a file. By default, the password field is ig<hy>
+nored because it is usually not valid (the actual password appears in a shadow file).
+-P Follow concatenation path. This option specifies that lookups should follow the concatenation path of a table if
+the initial search is unsuccessful.
+-q Dump tables in "quick" mode. The default method for dumping tables processes each entry individually. For
+some tables, for example, hosts, multiple entries must be combined into a single line, so extra requests to the server
+must be made. In "quick" mode, all of the entries for a table are retrieved in one call to the server, so the table can be
+dumped more quickly. However, for large tables, there is a chance that the process will run out of virtual memory
+and the table will not be dumped.
+<beginning of page>
+-r Replace the file or map in the existing NIS+ table by first deleting any existing entries, and then add the entries
+from the source (/etc files, or NIS+ maps). This option has the same effect as the -m option. The use of this option is
+strongly discouraged due to its adverse impact on performance, unless there are a large number of changes.
+-t table Specify that table should be the NIS+ table for this operation. This should be a relative name as compared to
+your default domain or the domainname if it has been specified.
+-v Verbose.
+-y ypdomain Use the dbm files for the appropriate NIS map, from the NIS domain ypdomain, as the source of input.
+The files are expected to be on the local machine in the /var/yp/ypdomain directory. If the machine is not an NIS
+server, use ypxfr(1M) to get a copy of the dbm files for the appropriate map.
+-Y map Use the dbm files for map as the source of input.
+Example 1 Using nisaddent
+This example adds the contents of /etc/passwd to the passwd.org_dir table:
+ example% cat /etc/passwd | nisaddent passwd
+The next example adds the shadow information. Note that the table type here is "shadow", not "passwd", even
+though the actual information is stored in the passwd table:
+ example% cat /etc/shadow | nisaddent shadow
+This example replaces the hosts.org_dir table with the contents of /etc/hosts (in verbose mode):
+ example% nisaddent -rv -f /etc/hosts hosts
+This example merges the passwd map from yypdomain with the passwd.org_dir.nisdomain table (in verbose
+mode). The example assumes that the /var/yp/myypdomain directory contains the yppasswd map.
+ example% nisaddent -mv -y myypdomain passwd nisdomain
+This example merges the auto.master map from myypdomain with the auto_master.org_dir table:
+ example% nisaddent -m -y myypdomain -Y auto.master \
+  -t auto_master.org_dir key-value
+This example dumps the hosts.org_dir table:
+ example% nisaddent -d hosts
+<beginning of page>
+This example dumps the ipnodes.org_dir table:
+ example% nisaddent -d ipnodes
+NIS_DEFAULTS This variable contains a default string that will override the NIS+ standard defaults. If the -D
+switch is used, those values will then override both the NIS_DEFAULTS variable and the standard defaults. To
+avoid security accidents, the access rights in the NIS_DEFAULTS variable are ignored for the passwd table (but ac<hy>
+cess rights specified with -D are used).
+NIS_PATH If this variable is set, and neither the nisdomain nor the table are fully qualified, each directory specified
+in NIS_PATH will be searched until the table is found (see nisdefaults(1)).
+The following exit values are returned:
+0 Successful operation.
+1 Failure caused by an error other than parsing.
+2 A parsing error occurred on an entry. A parsing error does not cause termination; the invalid entries are simply
+skipped.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wnisu
+niscat(1), nischmod(1), nischttl(1), nisdefaults(1), nistbladm(1), nisauthconf(1M), nispopulate(1M), nisserv<hy>
+er(1M), nissetup(1M), ypxfr(1M), hosts(4), passwd(4), shadow(4), attributes(5)
+NIS+ might not be supported in future releases of the Solaris operating system. Tools to aid the migration from
+NIS+ to LDAP are available in the current Solaris release. For more information, visit http://www.sun.com/directo<hy>
+ry/nisplus/transition.html.

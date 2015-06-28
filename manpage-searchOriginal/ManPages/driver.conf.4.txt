@@ -1,0 +1,89 @@
+<beginning of page>
+driver.conf <-> driver configuration files
+driver.conf
+Driver configuration files provide values for device properties. The values override values provided by the devices
+themselves. Most modern devices provide enough property values to make a driver configuration file unnecessary.
+The system associates a driver with its configuration file by name. For example, a driver in /usr/kernel/drv called
+wombat has the driver configuration file wombat.conf, also stored in /usr/kernel/drv, associated with it. On sys<hy>
+tems capable of support 64-bit drivers, the driver configuration file should be placed in the directory in which the
+32-bit driver is (or would be) located, even if only a 64-bit version is provided. For example, a 64-bit driver stored in
+/usr/kernel/drv/sparcv9 stores its driver configuration file in /usr/kernel/drv.
+The value of the name property is the node name. In a driver.conf file, where the generic node name and compati<hy>
+ble property associated with a self-identifying devices are typically not used, the node name must be a binding
+name. The binding name is the name chosen by the system to bind a driver to the device. The binding name is either
+an alias associated with the driver established by add_drv(1M) or the driver name itself.
+The syntax of a single entry in a driver configuration file takes one of three forms:
+ name="node name" parent="parent name" [property-name=value ...];
+In this form, the parent name can be either the binding name of the parent nexus driver or a specific full pathname,
+beginning with a slash (/) character, identifying a specific instance of a parent bus. If a binding name is used then all
+parent nodes bound to that driver match. A generic name (for example, pci) is not a valid binding name even though
+it can appear in the full pathname of all intended parents.
+Alternatively, the parent can be specified by the type of interface it presents to its children.
+ name="node name" class="class name" [property-name=value ...];
+For example, the driver for the SCSI host adapter can have different names on different platforms, but the target
+drivers can use class scsi to insulate themselves from these differences.
+Entries of either form above correspond to a device information (devinfo) node in the kernel device tree. Each node
+has a name which is usually the name of the driver, and a parent name which is the name of the parent devinfo node
+to which it will be connected. Any number of name-value pairs can be specified to create properties on the prototype
+devinfo node. These properties can be retrieved using the DDI property interfaces (for example,
+ddi_prop_get_int(9F) and ddi_prop_lookup(9F)). The prototype devinfo node specification must be terminated
+with a semicolon (;).
+The third form of an entry is simply a list of properties.
+ [property-name=value ...];
+A property created in this way is treated as global to the driver. It can be overridden by a property with the same
+name on a particular devinfo node, either by creating one explicitly on the prototype node in the driver.conf file or
+by the driver.
+Items are separated by any number of newlines, SPACE or TAB characters.
+The configuration file can contain several entries to specify different device configurations and parent nodes. The
+system can call the driver for each possible prototype devinfo node, and it is generally the responsibility of the driv<hy>
+ers probe(9E) routine to determine if the hardware described by the prototype devinfo node is really present.
+Property names must not violate the naming conventions for Open Boot PROM properties or for IEEE 1275 names.
+In particular, property names should contain only printable characters, and should not contain at-sign (@), slash (/),
+backslash (\fR), colon (:), or square brackets ([]). Property values can be decimal integers or strings delimited by
+double quotes ("). Hexadecimal integers can be constructed by prefixing the digits with 0x.
+A comma separated list of integers can be used to construct properties whose value is an integer array. The value of
+such properties can be retrieved inside the driver using ddi_prop_lookup_int_array(9F).
+<beginning of page>
+Comments are specified by placing a # character at the beginning of the comment string, the comment string extends
+for the rest of the line. Example 1 Configuration File for a PCI Bus Frame Buffer
+The following is an example of a configuration file called ACME,simple.conf for a PCI bus frame buffer called
+ACME,simple.
+ #
+ # Copyright (c) 1993, by ACME Fictitious Devices, Inc.
+ #
+ #ident "@(#)ACME,simple.conf 1.3 1999/09/09"
+ name="ACME,simple" class="pci" unit-address="3,1"
+  debug-mode=12;
+This example creates a prototype devinfo node called ACME,simple under all parent nodes of class pci. The node
+has device and function numbers of 3 and 1, respectively; the property debug-mode is provided for all instances of
+the driver.
+Example 2 Configuration File for a Pseudo Device Driver
+The following is an example of a configuration file called ACME,example.conf for a pseudo device driver called
+ACME,example.
+ #
+ # Copyright (c) 1993, ACME Fictitious Devices, Inc.
+ #
+ #ident "@(#)ACME,example.conf 1.2 93/09/09"
+ name="ACME,example" parent="pseudo" instance=0
+  debug-level=1;
+ name="ACME,example" parent="pseudo" instance=1;
+ whizzy-mode="on";
+ debug-level=3;
+This creates two devinfo nodes called ACME,example which attaches below the pseudo node in the kernel device
+tree. The instance property is only interpreted by the pseudo node, see pseudo(4) for further details. A property
+called debug-level is created on the first devinfo node which has the value 1. The example driver is able to fetch the
+value of this property using ddi_prop_get_int(9F).
+Two global driver properties are created, whizzy-mode (which has the string value "on") and debug-level (which
+has the value 3). If the driver looks up the property whizzy-mode on either node, it retrieves the value of the global
+whizzy-mode property ("on"). If the driver looks up the debug-level property on the first node, it retrieves the value
+of the debug-level property on that node (1). Looking up the same property on the second node retrieves the value of
+the global debug-level property (3).
+add_drv(1M), pci(4), pseudo(4), sbus(4), scsi(4), probe(9E), ddi_getlongprop(9F), ddi_getprop(9F), ddi_get<hy>
+proplen(9F), ddi_prop_get_int(9F), ddi_prop_lookup(9F), ddi_prop_op(9F)
+Writing Device Drivers
+To avoid namespace collisions between multiple driver vendors, it is strongly recommended that the name property
+of the driver should begin with a vendor-unique string. A reasonably compact and unique choice is the vendor over-
+the-counter stock symbol.
+The update_drv(1M) command should be used to prompt the kernel to reread driver.conf files. Using modun<hy>
+load(1M) to update driver.conf continues to work in release 9 of the Solaris operating environment, but the behavior
+will change in a future release.

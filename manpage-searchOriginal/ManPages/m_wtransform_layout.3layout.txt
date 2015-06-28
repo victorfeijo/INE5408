@@ -1,0 +1,149 @@
+<beginning of page>
+m_wtransform_layout <-> layout transformation for wide character strings
+cc [ flag... ] file... -llayout [ library... ]
+#include <sys/layout.h>
+int m_wtransform_layout(LayoutObject layout_object,
+ const wchar_t *InpBuf, const size_t ImpSize, const void *OutBuf,
+ size_t *Outsize, size_t *InpToOut, size_t *OutToInp,
+ unsignedchar *Property, size_t *InpBufIndex);
+The m_wtransform_layout() function performs layout transformations (reordering, shaping, cell determination) or
+provides additional information needed for layout transformation (such as the expected size of the transformed lay<hy>
+out, the nesting level of different segments in the text and cross-references between the locations of the correspond<hy>
+ing elements before and after the layout transformation). Both the input text and output text are wide character
+strings.
+The m_wtransform_layout() function transforms the input text in InpBuf according to the current layout values in
+layout_object. Any layout value whose value type is LayoutTextDescriptor describes the attributes of the InpBuf
+and OutBuf arguments. If the attributes are the same for both InpBuf and OutBuf, a null transformation is performed
+with respect to that specific layout value.
+The InpBuf argument specifies the source text to be processed. The InpBuf may not be NULL, unless there is a need
+to reset the internal state.
+The InpSize argument is the number of bytes within InpBuf to be processed by the transformation. Its value will not
+change after return from the transformation. InpSize set to <mi>1 indicates that the text in InpBuf is delimited by a null
+code element. If InpSize is not set to <mi>1, it is possible to have some null elements in the input buffer. This might be
+used, for example, for a "one shot" transformation of several strings, separated by nulls.
+Output of this function may be one or more of the following depending on the setting of the arguments:
+OutBuf Any transformed data is stored in OutBuf, converted to ShapeCharset.
+Outsize The number of wide characters in OutBuf.
+InpToOut A cross-reference from each InpBuf code element to the transformed data. The cross-reference relates to
+the data in InpBuf starting with the first element that InpBufIndex points to (and not necessarily starting from the be<hy>
+ginning of the InpBuf).
+OutToInp A cross-reference to each InpBuf code element from the transformed data. The cross-reference relates to
+the data in InpBuf starting with the first element that InpBufIndex points to (and not necessarily starting from the be<hy>
+ginning of the InpBuf).
+Property A weighted value that represents peculiar input string transformation properties with different connotations
+as explained below. If this argument is not a nullpointer, it represents an array of values with the same number of
+elements as the source substring text before the transformation. Each byte will contain relevant "property" informa<hy>
+tion of the corresponding element in InpBuf starting from the element pointed by InpBufIndex. The four rightmost
+bits of each "property" byte will contain information for bidirectional environments (when ActiveDirectional is
+True) and they will mean "NestingLevels." The possible value from 0 to 15 represents the nesting level of the corre<hy>
+sponding element in the InpBuf starting from the element pointed by InpBufIndex. If ActiveDirectional is false the
+content of NestingLevel bits will be ignored. The leftmost bit of each "property" byte will contain a "new cell indi<hy>
+cator" for composed character environments, and will have a value of either 1 (for an element in InpBuf that is trans<hy>
+formed to the beginning of a new cell) or 0 (for the "zero-length" composing character elements, when these are
+grouped into the same presentation cell with a non- composing character). Here again, each element of "property"
+pertains to the elements in the InpBuf starting from the element pointed by InpBufIndex. (Remember that this is not
+necessarily the beginning of InpBuf). If none of the transformation properties is required, the argument Property can
+be NULL. The use of "property" can be enhanced in the future to pertain to other possible usage in other environ<hy>
+ments.
+<beginning of page>
+The InpBufIndex argument is an offset value to the location of the transformed text. When m_wtransform_layout()
+is called, InpBufIndex contains the offset to the element in InpBuf that will be transformed first. (Note that this is not
+necessarily the first element in InpBuf). At the return from the transformation, InpBufIndex contains the offset to the
+first element in the InpBuf that has not been transformed. If the entire substring has been transformed successfully,
+InpBufIndex will be incremented by the amount defined by InpSize.
+Each of these output arguments may be null to specify that no output is desired for the specific argument, but at least
+one of them should be set to a non-null value to perform any significant work.
+In addition to the possible outputs above, layout_object maintains a directional state across calls to the transform
+functions. The directional state is reset to its initial state whenever any of the layout values TypeOfText, Orienta<hy>
+tion, or ImplicitAlg is modified by means of a call to m_setvalues_layout().
+The layout_object argument specifies a LayoutObject returned by the m_create_layout() function.
+The OutBufargument contains the transformed data. This argument can be specified as a null pointer to indicate that
+no transformed data is required.
+The encoding of the OutBuf argument depends on the ShapeCharset layout value defined in layout_object. If the
+ActiveShapeEditing layout value is not set (False), the encoding of OutBuf is guaranteed to be the same as the
+codeset of the locale associated with the LayoutObject defined by layout_object.
+On input, the OutSize argument specifies the size of the output buffer in number of wide characters. The output buf<hy>
+fer should be large enough to contain the transformed result; otherwise, only a partial transformation is performed. If
+the ActiveShapeEditing layout value is set (True) the OutBuf should be allocated to contain at least the InpSize
+multiplied by ShapeCharsetSize.
+On return, the OutSize argument is modified to the actual number of code elements in OutBuf.
+When the OutSize argument is specified as zero, the function calculates the size of an output buffer large enough to
+contain the transformed text, and the result is returned in this field. The content of the buffers specified by InpBuf
+and OutBuf, and the value of InpBufIndex, remain unchanged. If OutSize = NULL, the EINVAL error condition
+should be returned.
+If the InpToOut argument is not a null pointer, it points to an array of values with the same number of wide charac<hy>
+ters in InpBuf starting with the one pointed by InpBufIndex and up to the end of the substring in the buffer. On out<hy>
+put, the nth value in InpToOut corresponds to the nth byte in InpBuf. This value is the index (in units of wide charac<hy>
+ters) in OutBufthat identifies the transformed ShapeCharset element of the nth byte in InpBuf.
+InpToOut may be specified as NULL if no index array from InpBuf to OutBuf is desired.
+If the OutToInp argument is not a null pointer, it points to an array of values with the same number of wide charac<hy>
+ters as contained in OutBuf. On output, the nth value in OutToInp corresponds to the nth byte in OutBuf. This value
+is the index in InpBuf, starting with wide character byte pointed to by InpBufIndex, that identifies the logical code el<hy>
+ement of the nth wide character in OutBuf.
+OutToInp may be specified as NULL if no index array from OutBuf to InpBuf is desired.
+To perform shaping of a text string without reordering of code elements, the layout_object should be set with input
+and output layout value TypeOfText set to TEXT_VISUAL and both in and out of Orientation set to the same val<hy>
+ue.
+If successful, the m_wtransform_layout() function returns 0. If unsuccessful, the returned value is <mi>1 and the errno
+is set to indicate the source of error. When the size of OutBuf is not large enough to contain the entire transformed
+text, the input text state at the end of the uncompleted transformation is saved internally and the error condition
+E2BIG is returned in errno.
+The m_wtransform_layout() function may fail if:
+E2BIG The output buffer is full and the source text is not entirely processed.
+EBADF The layout values are set to a meaningless combination or the layout object is not valid.
+<beginning of page>
+EILSEQ Transformation stopped due to an input code element that cannot be shaped or is invalid. The InpBufIndex
+argument is set to indicate the code element causing the error. The suspect code element is either a valid code ele<hy>
+ment but cannot be shaped into the ShapeCharset layout value, or is an invalid code element not defined by the
+codeset of the locale of layout_object. The mbtowc() and wctomb() functions, when used in the same locale as the
+LayoutObject, can be used to determine if the code element is valid.
+EINVAL Transformation stopped due to an incomplete composite sequence at the end of the input buffer, or OutSize
+contains NULL.
+ERANGE More than 15 embedding levels are in source text or InpBuf contain unbalanced directional layout infor<hy>
+mation (push/pop) or an incomplete composite sequence has been detected in the input buffer at the beginning of the
+string pointed to by InpBufIndex.
+An incomplete composite sequence at the end of the input buffer is not always detectable. Sometimes the fact that
+the sequence is incomplete will only be detected when additional character elements belonging to the composite se<hy>
+quence are found at the beginning of the next input buffer.
+A LayoutObject will have a meaningful combination of default layout values. Whoever chooses to change the de<hy>
+fault layout values is responsible for making sure that the combination of layout values is meaningful. Otherwise, the
+result of m_wtransform_layout() might be unpredictable or implementation-specific with errno set to EBADF.
+Example 1 Shaping and reordering input string into output buffer
+The following example illustrated what the different arguments of m_wtransform_layout() look like when a string
+in InpBuf is shaped and reordered into OutBuf. Upper-case letters in the example represent left-to-right letters while
+lower-case letters represent right-to-left letters. xyz represents the shapes of cde.
+ Position: 0123456789
+ InpBuf: AB cde 12z
+ Position: 0123456789
+ OutBuf: AB 12 zyxZ
+ Position: 0123456789
+ OutToInp: 0127865439
+ Position: 0123456789
+ Property.NestLevel: 0001111220
+ Property.CelBdry: 1111111111
+The values (encoded in bianry) returned in the Property argument define the directionality of each code element in
+the source text as defined by the type of algorithm used within the layout_object. Whlie the algorithm may be imple<hy>
+mentation dependent, the resulting values and levels are defined such as to allow a single method to be used in deter<hy>
+mining the directionality of the sourece text. The base rules are:
+<bu> Odd levels are always RTL. <bu> Even levels are always LTR. <bu> The Orientation layout value setting determines the
+initial level (0 or 1) used.
+Within a Property array each increment in the level indicates the corresponding code elements should be presented
+in the opposite direction. Callers of this function should realize that the Property values for certain code elements is
+dependent on the context of the given character and the layout values: Orientation and ImplicitAlg. Callers should
+not assume that a given code element always has the same Property value in all cases.
+Example 2 Algorithm to handle nesting
+The following is an example of a standard presentation algorithm that handles nesting correctly. The goal of this al<hy>
+gorithm is ultimately to return to a zero nest level. Note that more efficient algorithms do exist; the following is pro<hy>
+vided for clarity rather than for efficiency.
+1. Search for the highest next level in the string. 2. Reverse all surrounding code elements of the same level. Re<hy>
+duce the nest level of these code elements by 1. 3. Repeat 1 and 2 until all code elements are of level 0.
+<beginning of page>
+The following shows the progression of the example from above:
+ Position: 0123456789 0123456789 0123456789
+ InpBuf: AB cde 12Z AB cde 21Z AB 12 edcZ
+ Property.NestLevel: 0001111220 0001111110 0000000000
+ Property.CellBdry: 1111111111 1111111111 1111111111
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Standard _ MT-LevelMT-Safe
+attributes(5), standards(5)

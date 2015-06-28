@@ -1,0 +1,49 @@
+<beginning of page>
+sysbus, isa <-> device tree properties for ISA bus device drivers
+Solaris for x86 supports the ISA bus as the system bus. Drivers for devices on this buse use the device tree built by
+the booting system to retrieve the necessary system resources used by the driver. These resources include device I/O
+port addresses, any interrupt capabilities that the device can have, any DMA channels it can require, and any memo<hy>
+ry-mapped addresses it can occupy.
+Configuration files for ISA device drivers are only necessary to describe properties used by a particular driver that
+are not part of the standard properties found in the device tree. See driver.conf(4) for further details of configuration
+file syntax.
+The ISA nexus drivers all belong to class sysbus. All bus drivers of class sysbus recognize the following properties:
+interrupts An arbitrary-length array where each element of the array represents a hardware interrupt (IRQ) that is
+used by the device. In general, this array only has one entry unless a particular device uses more than one IRQ.
+Solaris defaults all ISA interrupts to IPL 5. This interrupt priority can be overridden by placing an interrupt-prior<hy>
+ities property in a .conf file for the driver. Each entry in the array of integers for the interrupt-priorities property is
+matched one-to-one with the elements in the interrupts property to specify the IPL value that is used by the system
+for this interrupt in this driver. This is the priority that this device's interrupt handler receives relative to the interrupt
+handlers of other drivers. The priority is an integer from 1 to 16. Generally, disks are assigned a priority of 5, while
+mice and printers are lower, and serial communication devices are higher, typically 7. 10 is reserved by the system
+and must not be used. Priorities 11 and greater are high level priorities and are generally not recommended (see
+ddi_intr_hilevel(9F)).
+The driver can refer to the elements of this array by index using ddi_add_intr(9F). The index into the array is
+passed as the inumber argument of ddi_add_intr().
+Only devices that generate interrupts have an interrupts property.
+reg An arbitrary-length array where each element of the array consists of a 3-tuple of integers. Each array element
+describes a contiguous memory address range associated with the device on the bus.
+The first integer of the tuple specifies the memory type, 0 specifies a memory range and 1 specifies an I/O range. The
+second integer specifies the base address of the memory range. The third integer of each 3-tuple specifies the size, in
+bytes, of the mappable region.
+The driver can refer to the elements of this array by index, and construct kernel mappings to these addresses using
+ddi_map_regs(9F). The index into the array is passed as the rnumber argument of ddi_map_regs().
+All sysbus devices have reg properties. The first tuple of this property is used to construct the address part of the
+device name under /devices. In the case of Plug and Play ISA devices, the first tuple is a special tuple that does not
+denote a memory range, but is used by the system only to create the address part of the device name. This special
+tuple can be recognized by determining if the top bit of the first integer is set to a one.
+The order of the tuples in the reg property is determined by the boot system probe code and depends on the charac<hy>
+teristics of each particular device. However, the reg property maintains the same order of entries from system boot
+to system boot. The recommended way to determine the reg property for a particular device is to use the prt<hy>
+conf(1M) command after installing the particular device. The output of the prtconf command can be examined to
+determine the reg property for any installed device.
+You can use the ddi_get* and ddi_put* family of functions to access register space from a high-level interrupt con<hy>
+text.
+dma-channels A list of integers that specifies the DMA channels used by this device. Only devices that use DMA
+channels have a dma-channels property.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Architecturex86
+<beginning of page>
+prtconf(1M), driver.conf(4), scsi(4), attributes(5), ddi_add_intr(9F), ddi_intr_hilevel(9F), ddi_map_regs(9F),
+ddi_prop_op(9F)
+Writing Device Drivers

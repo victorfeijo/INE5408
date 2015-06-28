@@ -1,0 +1,116 @@
+<beginning of page>
+nispopulate <-> populate the NIS+ tables in a NIS+ domain
+/usr/lib/nis/nispopulate -Y [-x] [-f] [-n] [-u] [-v]
+ [-S 0 | 2] [-l <network_passwd>]
+ [-d <NIS+_domain>] -h <NIS_server_host>
+ [-a <NIS_server_addr>] -y <NIS_domain>
+ [table] ...
+/usr/lib/nis/nispopulate -F [-x] [-f] [-u] [-v] [-S 0 | 2]
+ [-d <NIS+_domain>] [-l <network_passwd>]
+ [-p <directory_path>] [table] ...
+/usr/lib/nis/nispopulate -C [-x] [-f] [-v]
+ [-d <NIS+_domain>] [-l <network_passwd>]
+ [hosts | passwd]
+The nispopulate shell script can be used to populate NIS+ tables in a specified domain from their corresponding
+files or NIS maps. nispopulate assumes that the tables have been created either through nisserver(1M) or nisset<hy>
+up(1M).
+The table argument accepts standard names that are used in the administration of Solaris systems and non-standard
+key-value type tables. See nisaddent(1M) for more information on key-value type tables. If the table argument is not
+specified, nispopulate will automatically populate each of the standard tables. These standard (default) tables are:
+auto_master, auto_home, ethers, group, hosts, ipnodes, networks, passwd, protocols, services, rpc, netmasks,
+bootparams, netgroup, aliases and shadow. Note that the shadow table is only used when populating from files.
+The non-standard tables that nispopulate accepts are those of key-value type. These tables must first be created man<hy>
+ually with the nistbladm(1) command.
+Use the first synopsis (-Y) to populate NIS+ tables from NIS maps. nispopulate uses ypxfr(1M) to transfer the NIS
+maps from the NIS servers to the /var/yp/<NIS_domain> directory on the local machine. Then, it uses these files as
+the input source. Note that <NIS_domain> is case sensitive. Make sure there is enough disk space for that directory.
+Use the second synopsis (-F) to populate NIS+ tables from local files. nispopulate will use those files that match the
+table name as input sources in the current working directory or in the specified directory.
+Note that when populating the hosts, ipnodes, and passwd tables, nispopulate will automatically create the NIS+
+credentials for all users and hosts (ipnodes) that are defined in the hosts, ipnodes, and passwd tables, respectively.
+A network passwd is required to create these credentials. This network password is used to encrypt the secret key for
+the new users and hosts. This password can be specified using the -l option or it will use the default password, nis<hy>
+plus. nispopulate will not overwrite any existing credential entries in the credential table. Use nisclient(1M) to
+overwrite the entries in the cred table. It creates both LOCAL and DES credentials for users, and only DES creden<hy>
+tials for hosts. To disable automatic credential creation, specify the "-S 0" option.
+The third synopsis (-C) is used to populate NIS+ credential table with level 2 authentication (DES) from the hosts,
+ipnodes and passwd tables of the specified domain. The valid table arguments for this operation are hosts, ipnodes
+and passwd. If this argument is not specified then it will use hosts, ipnodes and passwd as the input source. If other
+authentication mechanisms are configured using nisauthconf(1M), the NIS+ credential table will be loaded with
+credentials for those mechanisms.
+If nispopulate was earlier used with "-S 0" option, then no credentials were added for the hosts or the users. If later
+the site decides to add credentials for all users and hosts, then this (-C) option can be used to add credentials.
+-a <NIS_server_addr> Specifies the IP address for the NIS server. This option is only used with the -Y option.
+-C Populate the NIS+ credential table from hosts, ipnodes, and passwd tables using DES authentication (security
+level 2). If other authentication mechanisms are configured using nisauthconf(1M), the NIS+ credential table will
+be populated with credentials for those mechanisms.
+-d <NIS+_domain.> Specifies the NIS+ domain. The default is the local domain.
+-F Populates NIS+ tables from files.
+<beginning of page>
+-f Forces the script to populate the NIS+ tables without prompting for confirmation.
+-h <NIS_server_host> Specifies the NIS server hostname from where the NIS maps are copied from. This is only
+used with the -Y option. This hostname must be present in the NIS+ hosts or ipnodes table, or in the /etc/hosts file.
+If the hostname is not defined, the script will prompt you for its IP address, or you can use the -a option to specify
+the address manually.
+-l <network_passwd> Specifies the network password for populating the NIS+ credential table. This is only used
+when you are populating the hosts, ipnodes, and passwd tables. The default passwd is "nisplus".
+-n Does not overwrite local NIS maps in /var/yp/<NISdomain> directory if they already exist. The default is to over<hy>
+write the existing NIS maps in the local /var/yp/<NISdomain> directory. This is only used with the -Y option.
+-p <directory_path> Specifies the directory where the files are stored. This is only used with the -F option. The de<hy>
+fault is the current working directory.
+-S 0|2 Specifies the authentication level for the NIS+ clients. Level 0 is for unauthenticated clients and no credentials
+will be created for users and hosts in the specified domain. Level 2 is for authenticated (DES) clients and DES cre<hy>
+dentials will be created for users and hosts in the specified domain. The default is to set up with level 2 authentica<hy>
+tion (DES). There is no need to run nispopulate with -C for level 0 authentication. Also, if other authentication
+mechanisms are configured with nisauthconf(1M), credentials for those mechanisms will also be populated for the
+NIS+ clients.
+-u Updates the NIS+ tables (ie., adds, deletes, modifies) from either files or NIS maps. This option should be used to
+bring an NIS+ table up to date when there are only a small number of changes. The default is to add to the NIS+ ta<hy>
+bles without deleting any existing entries. Also, see the -n option for updating NIS+ tables from existing maps in the
+/var/yp directory.
+-v Runs the script in verbose mode.
+-x Turns the "echo" mode on. The script just prints the commands that it would have executed. Note that the com<hy>
+mands are not actually executed. The default is off.
+-Y Populate the NIS+ tables from NIS maps.
+-y <NIS_domain> Specifies the NIS domain to copy the NIS maps from. This is only used with the -Y option. The
+default domainname is the same as the local domainname.
+Example 1 Using nispopulate
+To populate all the NIS+ standard tables in the domain xyz.sun.com. from NIS maps of the yp.sun.COM domain as
+input source where host yp_host is a YP server of yp.sun.COM:
+ nis_server# /usr/lib/nis/nispopulate -Y -y yp.sun.COM \
+ -h yp_host -d xyz.sun.com.
+To update all of the NIS+ standard tables from the same NIS domain and hosts shown above:
+ nis_server# /usr/lib/nis/nispopulate -Y -u -y yp.sun.COM -h yp_host \
+ -d xyz.sun.com.
+<beginning of page>
+To populate the hosts table in domain xyz.sun.com. from the hosts file in the /var/nis/files directory and using
+somepasswd as the network password for key encryption:
+ nis_server# /usr/lib/nis/nispopulate -F -p \
+  /var/nis/files -l somepasswd hosts
+To populate the passwd table in domain xyz.sun.com. from the passwd file in the /var/nis/files directory without au<hy>
+tomatically creating the NIS+ credentials:
+ nis_server# /usr/lib/nis/nispopulate -F -p /var/nis/files \
+  -d xys.sun.com. -S 0 passwd
+To populate the credential table in domain xyz.sun.com. for all users defined in the passwd table.
+ nis_server# /usr/lib/nis/nispopulate -C -d xys.sun.com. passwd
+To create and populate a non-standard key-value type NIS+ table, private, from the file /var/nis/files/private: (nis<hy>
+populate assumes that the private.org_dirkey-value type table has already been created).
+ nis_server# /usr/bin/nistbladm -D access=og=rmcd,nw=r \
+ -c private key=S,nogw= value=,nogw= private.org.dir
+ nis_server# /usr/lib/nis/nispopulate -F -p /var/nis/files private
+nispopulate normally creates temporary files in the directory /tmp. You may specify another directory by setting the
+environment variable TMPDIR to your chosen directory. If TMPDIR is not a valid directory, then nispopulate will
+use /tmp).
+/etc/inet/hosts local database associating names of nodes with IP addresses
+/var/yp NIS (YP) domain directory
+/var/nis NIS+ domain directory
+/tmp
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wnisu
+NIS+(1), nistbladm(1), nisaddcred(1M), nisaddent(1M), nisauthconf(1M), nisclient( 1M), nisserver(1M), nis<hy>
+setup(1M), rpc.nisd(1M), ypxfr(1M), attributes(5)
+NIS+ might not be supported in future releases of the Solaris operating system. Tools to aid the migration from
+NIS+ to LDAP are available in the current Solaris release. For more information, visit http://www.sun.com/directo<hy>
+<beginning of page>
+ry/nisplus/transition.html.

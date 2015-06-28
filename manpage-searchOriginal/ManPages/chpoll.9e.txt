@@ -1,0 +1,48 @@
+<beginning of page>
+chpoll <-> poll entry point for a non-STREAMS character driver
+#include <sys/types.h>
+#include <sys/poll.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+int prefixchpoll(dev_t dev, short events, int anyyet,
+ short *reventsp, struct pollhead **phpp);
+This entry point is optional. Architecture independent level 1 (DDI/DKI).
+dev The device number for the device to be polled.
+events The events that may occur. Valid events are:
+POLLIN Data other than high priority data may be read without blocking.
+POLLOUT Normal data may be written without blocking.
+POLLPRI High priority data may be received without blocking.
+POLLHUP A device hangup has occurred.
+POLLERR An error has occurred on the device.
+POLLRDNORM Normal data (priority band = 0) may be read without blocking.
+POLLRDBAND Data from a non-zero priority band may be read without blocking
+POLLWRNORM The same as POLLOUT.
+POLLWRBAND Priority data (priority band > 0) may be written.
+anyyet A flag that is non-zero if any other file descriptors in the pollfd array have events pending. The poll(2) sys<hy>
+tem call takes a pointer to an array of pollfd structures as one of its arguments. See the poll(2) reference page for
+more details.
+reventsp A pointer to a bitmask of the returned events satisfied.
+phpp A pointer to a pointer to a pollhead structure.
+The chpoll() entry point routine is used by non-STREAMS character device drivers that wish to support polling. The
+driver must implement the polling discipline itself. The following rules must be followed when implementing the
+polling discipline: 1. Implement the following algorithm when the chpoll() entry point is called:
+ if (events_are_satisfied_now) {
+  *reventsp = satisfied_events & events;
+ } else {
+  *reventsp = 0;
+<beginning of page>
+  if (!anyyet)
+  *phpp = &my_local_pollhead_structure;
+ }
+ return (0);
+2. Allocate an instance of the pollhead structure. This instance may be tied to the per-minor data structure defined
+by the driver. The pollhead structure should be treated as a "black box" by the driver. Initialize the pollhead struc<hy>
+ture by filling it with zeroes. The size of this structure is guaranteed to remain the same across releases. 3. Call the
+pollwakeup() function with events listed above whenever pollable events which the driver should monitor occur.
+This function can be called with multiple events at one time. The pollwakup() can be called regardless of whether or
+not the chpoll() entry is called; it should be called every time the driver detects the pollable event. The driver must
+not hold any mutex across the call to pollwakeup(9F) that is acquired in its chpoll() entry point, or a deadlock may
+result.
+chpoll() should return 0 for success, or the appropriate error number.
+poll(2), nochpoll(9F), pollwakeup(9F)
+Writing Device Drivers

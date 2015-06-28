@@ -1,0 +1,100 @@
+<beginning of page>
+dat_evd_wait <-> remove first event from the Event Dispatcher event queue
+cc [ flag... ] file... -ldat [ library... ]
+#include <dat/udat.h>
+DAT_RETURN
+ dat_evd_wait(
+ IN DAT_EVD_HANDLE evd_handle,
+ IN DAT_TIMEOUT timeout,
+ IN DAT_COUNT threshold,
+ OUT DAT_EVENT *event,
+ OUT DAT_COUNT *nmore
+ )
+evd_handle Handle for an instance of the Event Dispatcher.
+timeout The duration of time, in microseconds, that the Consumer is willing to wait for the event.
+threshold The number of events that should be on the EVD queue before the operation should return with
+DAT_SUCCESS. The threshold must be at least 1.
+event Pointer to the Consumer-allocated structure that the Provider fills with the event data.
+nmore The snapshot of the queue size at the time of the operation return.
+The dat_evd_wait() function removes the first event from the Event Dispatcher event queue and fills the Consumer-
+allocated event structure with event data. The first element in this structure provides the type of the event; the rest
+provides the event type-specific parameters. The Consumer should allocate an event structure big enough to hold any
+event that the Event Dispatcher can deliver.
+For all events, the Provider fills the dat_event that the Consumer allocates. Therefore, for all events, all fields of
+dat_event are OUT from the Consumer point of view. For DAT_CONNECTION_REQUEST_EVENT, the
+Provider creates a Connection Request whose cr_handle is returned to the Consumer in DAT_CR_AR<hy>
+RIVAL_EVENT_DATA. That object is destroyed by the Provider as part of dat_cr_accept(3DAT), dat_cr_re<hy>
+ject(3DAT), or dat_cr_handoff(3DAT). The Consumer should not use cr_handle or any of its parameters, including
+private_data, after one of these operations destroys the Connection Request.
+For DAT_CONNECTION_EVENT_ESTABLISHED for the Active side of connection establishment, the
+Provider returns the pointer for private_data and the private_data_size. For the Passive side, DAT_CONNEC<hy>
+TION_EVENT_ESTABLISHED event private_data is not defined and private_data_size returns zero. The
+Provider is responsible for the memory allocation and deallocation for private_data. The private_data is valid until
+the Active side Consumer destroys the connected Endpoint (dat_ep_free(3DAT)), or transitions the Endpoint into
+Unconnected state so it is ready for the next connection. So, while the Endpoint is in Connected, Disconnect Pend<hy>
+ing, or Disconnected state, the private_data of DAT_CONNECTION_REQUEST_EVENT is still valid for Active
+side Consumers.
+Provider must pass to the Consumer the entire Private Data that the remote Consumer provided for dat_ep_con<hy>
+nect(3DAT), dat_ep_dup_connect(3DAT), and dat_cr_accept(). If the Consumer provides more data than the
+Provider and Transport can support (larger than IA Attribute of max_private_data_size), DAT_INVALID_PARAM<hy>
+ETER is returned for that operation.
+A Consumer that blocks performing a dat_evd_wait() on an Event Dispatcher effectively takes exclusive ownership
+of that Event Dispatcher. Any other dequeue operation (dat_evd_wait() or dat_evd_dequeue(3DAT)) on the Event
+Dispatcher is rejected with a DAT_INVALID_STATE error code.
+The CNO associated with the evd_handle() is not triggered upon event arrival if there is a Consumer blocked on
+dat_evd_wait() on this Event Dispatcher.
+The timeout allows the Consumer to restrict the amount of time it is blocked waiting for the event arrival. The value
+of DAT_TIMEOUT_INFINITE indicates that the Consumer waits indefinitely for an event arrival. Consumers
+should use extreme caution in using this value.
+<beginning of page>
+When timeout value is reached and the number of events on the EVD queue is below the threshold value, the opera<hy>
+tion fails and returns DAT_TIMEOUT_EXPIRED. In this case, no event is dequeued from the EVD and the return
+value for the event argument is undefined. However, an nmore value is returned that specifies the snapshot of the
+number of the events on the EVD queue that is returned.
+The threshold allows the Consumer to wait for a requested number of event arrivals prior to waking the Consumer. If
+the value of the threshold is larger than the Event Dispatcher queue length, the operation fails with the return
+DAT_INVALID_PARAMETER. If a non-positive value is specified for threshold, the operation fails and returns
+DAT_INVALID_PARAMETER.
+If EVD is used by an Endpoint for a DTO completion stream that is configured for a Consumer-controlled event No<hy>
+tification (DAT_COMPLETION_UNSIGNALLED_FLAG or DAT_COMPLETION_SOLICIT<hy>
+ED_WAIT_FLAG for Receive Completion Type for Receives; DAT_COMPLETION_UNSIGNALLED_FLAG
+for Request Completion Type for Send, RDMA Read, RDMA Write and RMR Bind), the threshold value must be 1.
+An attempt to specify some other value for threshold for this case results in DAT_INVALID_STATE.
+The returned value of nmore indicates the number of events left on the Event Dispatcher queue after the
+dat_evd_wait() returns. If the operation return value is DAT_SUCCESS, the nmore value is at least the value of
+(threshold -1). Notice that nmore is only a snapshot and the number of events can be changed by the time the Con<hy>
+sumer tries to dequeue events with dat_evd_wait() with timeout of zero or with dat_evd_dequeue().
+For returns other than DAT_SUCCESS, DAT_TIMEOUT_EXPIRED, and DAT_INTERRUPTED_CALL, the
+returned value of nmore is undefined.
+The returned event that was posted from an Event Stream guarantees Consumers that all events that were posted
+from the same Event Stream prior to the returned event were already returned to a Consumer directly through a
+dat_evd_dequeue() or dat_evd_wait() operation.
+If the return value is neither DAT_SUCCESS nor DAT_TIMEOUT_EXPIRED, then returned values of nmore and
+event are undefined. If the return value is DAT_TIMEOUT_EXPIRED, then the return value of event is undefined,
+but the return value of nmore is defined. If the return value is DAT_SUCCESS, then the return values of nmore and
+event are defined.
+If this function is called on an EVD in an unwaitable state, or if dat_evd_set_unwaitable(3DAT) is called on an
+EVD on which a thread is blocked in this function, the function returns with DAT_INVALID_STATE.
+The ordering of events dequeued by overlapping calls to dat_evd_wait() or dat_evd_dequeue() is not specified.
+DAT_SUCCESS The operation was successful. An event was returned to a Consumer.
+DAT_INVALID_HANDLE The evd_handle parameter is invalid.
+DAT_INVALID_PARAMETER The timeout or threshold parameter is invalid. For example, threshold is larger
+than the EVD's evd_min_qlen.
+DAT_ABORT The operation was aborted because IA was closed or EVD was destroyed
+DAT_INVALID_STATE One of the parameters was invalid for this operation. There is already a waiter on the
+EVD, or the EVD is in an unwaitable state.
+DAT_TIMEOUT_EXPIRED The operation timed out.
+DAT_INTERRUPTED_CALL The operation was interrupted by a signal.
+Consumers should be cautioned against using threshold combined with infinite timeout.
+Consumers should not mix different models for control of unblocking a waiter. If the Consumer uses Notification
+Suppression or Solicited Wait to control the Notification events for unblocking a waiter, the threshold must be set to
+<beginning of page>
+1. If the Consumer uses threshold to control when a waiter is unblocked, DAT_COMPLE<hy>
+TION_UNSIGNALLED_FLAG locally and DAT_COMPLETION_SOLICITED_WAIT remotely shall not be
+used. By default, all completions are Notification events.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Standard: uDAPL, 1.1, 1.2 _ MT-LevelSafe
+dat_cr_accept(3DAT), dat_cr_handoff(3DAT), dat_cr_reject(3DAT), dat_ep_connect(3DAT), dat_ep_dup_con<hy>
+nect(3DAT),dat_ep_free(3DAT), dat_evd_dequeue(3DAT), dat_evd_set_unwaitable(3DAT), libdat(3LIB), at<hy>
+tributes(5)

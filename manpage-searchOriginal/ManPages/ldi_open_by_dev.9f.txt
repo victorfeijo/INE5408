@@ -1,0 +1,77 @@
+<beginning of page>
+ldi_open_by_dev, ldi_open_by_name, ldi_open_by_devid, ldi_close <-> open and close devices
+#include <sys/sunldi.h>
+int ldi_open_by_dev(dev_t *devp, int otyp, int flag, cred_t *cr,
+ ldi_handle_t *lhp, ldi_ident_t li);
+int ldi_open_by_name(char *pathname, int flag, cred_t *cr,
+ ldi_handle_t *lhp, ldi_ident_t li);
+int ldi_open_by_devid(ddi_devid_t devid, char *minor_name, int flag,
+ cred_t *cr, ldi_handle_t *lhp, ldi_ident_t li);
+int ldi_close(ldi_handle_t lh, int flag, cred_ t *cr);
+lh Layered handle
+lhp Pointer to a layered handle that is returned upon a successful open.
+li LDI identifier.
+cr Pointer to the credential structure used to open a device.
+devp Pointer to a device number.
+pathname Pathname to a device.
+devid Device ID.
+minor_name Minor device node name.
+otyp Flag passed to the driver indicating which interface is open. Valid settings are:
+OTYP_BLK Open the device block interface.
+OTYP_CHR Open the device character interface.
+Only one OTYP flag can be specified. To open streams devices, specify OTYP_CHR.
+flag Bit field that instructs the driver on how to open the device. Valid settings are:
+FEXCL Open the device with exclusive access; fail all other attempts to open the device.
+FNDELAY Open the device and return immediately. Do not block the open even if something is wrong.
+FREAD Open the device with read-only permission. (If ORed with FWRITE, allow both read and write access).
+FWRITE Open a device with write-only permission (if ORed with FREAD, then allow both read and write access).
+FNOCTTY Open the device. If the device is a tty, do not attempt to open it as a session-controlling tty.
+<beginning of page>
+The ldi_open_by_dev(), ldi_open_by_name() and ldi_open_by_devid() functions allow a caller to open a block,
+character, or streams device. Upon a successful open, a layered handle to the device is returned via the layered han<hy>
+dle pointed to by lhp. The ldi identifier passed to these functions is previously allocated with
+ldi_ident_from_stream(9F), ldi_ident_from_dev(9F), and ldi_ident_from_dip(9F).
+The ldi_open_by_dev() function opens a device specified by the dev_t pointed to by devp. Upon successful open,
+the caller should check the value of the dev_t to see if it has changed. (Cloning devices will change this value during
+opens.) When opening a streams device, otyp must be OTYP_CHR.
+The ldi_open_by_devid() function opens a device by devid. The caller must specify the minor node name to open.
+The ldi_open_by_name() function opens a device by pathname. Pathname is a null terminated string in the kernel
+address space. Pathname must be an absolute path, meaning that it must begin with '/'. The format of the pathname
+supplied to this function is either a /devices path or any other filesystem path to a device node. Opens utilizing /de<hy>
+vices paths are supported before root is mounted. Opens utilizing other filesystem paths to device nodes are support<hy>
+ed only if root is already mounted.
+The ldi_close() function closes a layered handle that was obtained with either ldi_open_by_dev(),
+ldi_open_by_name(), or ldi_open_by_devid(). After ldi_close() returns the layered handle, the lh that was previ<hy>
+ously passed in is no longer valid.
+The ldi_close() function returns 0 for success. EINVAL is returned for invalid input parameters. Otherwise, any oth<hy>
+er error number may be returned by the device.
+The ldi_open_by_dev() and ldi_open_by_devid() functions return 0 upon success. If a failure occurs before the de<hy>
+vice is open, possible return values are shown below. Otherwise any other error number may be returned by the de<hy>
+vice.
+EINVAL Invalid input parameters.
+ENODEV Requested device does not exist.
+ENXIO Unsupported device operation or access mode.
+The ldi_open_by_name() function returns 0 upon success. If a failure occurs before the device is open, possible re<hy>
+turn values are shown below. Otherwise any other error number may be returned by the device.
+EINVAL Invalid input parameters.
+ENODEV Requested device path does not exist.
+EACCES Search permission is denied on a component of the path prefix, or the file exists and the permissions spec<hy>
+ified by cr are denied.
+ENXIO Unsupported device operation or access mode.
+These functions may be called from user or kernel context.
+These functions should not be called from a device's attach, detach, or power entry point. This could result in a sys<hy>
+tem crash or deadlock.
+scsi_vhci(7D), ldi_ident_from_dev(9F), ldi_ident_from_dip(9F), ldi_ident_from_stream(9F)
+Use only OTYP_CHR or OTYP_BLK options when you use the ldi_open_by_dev() and ldi_open_by_devid()
+functions to open a device. Other flags, including OTYP_LYR, have been deprecated and should not be used with
+these interfaces.
+The caller should be aware of cases when multiple paths to a single device may exist. (This can occur for scsi disk
+<beginning of page>
+devices if scsi_vhci(7D)) is disabled or a disk is connected to multiple controllers not supported by scsi_vhci(7D).
+In these cases, ldi_open_by_devid() returns a device handle that corresponds to a particular path to a target device.
+This path may not be the same across multiple calls to ldi_open_by_devid(). Device handles associated with the
+same device but different access paths should have different filesystem device paths and dev_t values.
+In the cases where multiple paths to a device exist and access to the device has not been virtualized via MPXIO (as
+with scsi disk devices not accessed via scsi_vhci(7D)), the LDI does not provide any path fail-over capabilities. If
+the caller wishes to do their own path management and failover they should open all available paths to a device via
+ldi_open_by_name().

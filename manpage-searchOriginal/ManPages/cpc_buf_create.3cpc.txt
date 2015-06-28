@@ -1,0 +1,81 @@
+<beginning of page>
+cpc_buf_create, cpc_buf_destroy, cpc_set_sample, cpc_buf_get, cpc_buf_set, cpc_buf_hrtime, cpc_buf_tick,
+cpc_buf_sub, cpc_buf_add, cpc_buf_copy, cpc_buf_zero <-> sample and manipulate CPC data
+cc [ flag... ] file... -lcpc [ library... ]
+#include <libcpc.h>
+cpc_buf_t *cpc_buf_create(cpc_t *cpc, cpc_set_t *set);
+int cpc_buf_destroy(cpc_t *cpc, cpc_buf_t *buf);
+int cpc_set_sample(cpc_t *cpc, cpc_set_t *set, cpc_buf_t *buf);
+int cpc_buf_get(cpc_t *cpc, cpc_buf_t *buf, int index, uint64_t *val);
+int cpc_buf_set(cpc_t *cpc, cpc_buf_t *buf, int index, uint64_t val);
+hrtime_t cpc_buf_hrtime(cpc_t *cpc, cpc_buf_t *buf);
+uint64_t cpc_buf_tick(cpc_t *cpc, cpc_buf_t *buf);
+void cpc_buf_sub(cpc_t *cpc, cpc_buf_t *ds, cpc_buf_t *a, cpc_buf_t *b);
+void cpc_buf_add(cpc_t *cpc, cpc_buf_t *ds, cpc_buf_t *a, cpc_buf_t *b);
+void cpc_buf_copy(cpc_t *cpc, cpc_buf_t *ds, cpc_buf_t *src);
+void cpc_buf_zero(cpc_t *cpc, cpc_buf_t *buf);
+Counter data is sampled into CPC buffers, which are represented by the opaque data type cpc_buf_t. A CPC buffer
+is created with cpc_buf_create() to hold the data for a specific CPC set. Once a CPC buffer has been created, it can
+only be used to store and manipulate the data of the CPC set for which it was created.
+Once a set has been successfully bound, the counter values are sampled using cpc_set_sample(). The cpc_set_sam<hy>
+ple() function takes a snapshot of the hardware performance counters counting on behalf of the requests in set and
+stores the 64-bit virtualized software representations of the counters in the supplied CPC buffer. If a set was bound
+with cpc_bind_curlwp(3CPC) or cpc_bind_curlwp(3CPC), the set can only be sampled by the LWP that bound it.
+The kernel maintains 64-bit virtual software counters to hold the counts accumulated for each request in the set,
+thereby allowing applications to count past the limits of the underlying physical counter, which can be significantly
+smaller than 64 bits. The kernel attempts to maintain the full 64-bit counter values even in the face of physical
+counter overflow on architectures and processors that can automatically detect overflow. If the processor is not capa<hy>
+ble of overflow detection, the caller must ensure that the counters are sampled often enough to avoid the physical
+counters wrapping. The events most prone to wrap are those that count processor clock cycles. If such an event is of
+interest, sampling should occur frequently so that the counter does not wrap between samples.
+The cpc_buf_get() function retrieves the last sampled value of a particular request in buf. The index argument speci<hy>
+fies which request value in the set to retrieve. The index for each request is returned during set configuration by
+cpc_set_add_request(3CPC). The 64-bit virtualized software counter value is stored in the location pointed to by
+the val argument.
+The cpc_buf_set() function stores a 64-bit value to a specific request in the supplied buffer. This operation can be
+useful for performing calculations with CPC buffers, but it does not affect the value of the hardware counter (and
+thus will not affect the next sample).
+The cpc_buf_hrtime() function returns a high-resolution timestamp indicating exactly when the set was last sam<hy>
+pled by the kernel.
+The cpc_buf_tick() function returns a 64-bit virtualized cycle counter indicating how long the set has been pro<hy>
+grammed into the counter since it was bound. The units of the values returned by cpc_buf_tick() are CPU clock cy<hy>
+cles.
+The cpc_buf_sub() function calculates the difference between each request in sets a and b, storing the result in the
+corresponding request within set ds. More specifically, for each request index n, this function performs ds[n] = a[n] -
+b[n]. Similarly, cpc_buf_add() adds each request in sets a and b and stores the result in the corresponding request
+within set ds.
+<beginning of page>
+The cpc_buf_copy() function copies each value from buffer src into buffer ds. Both buffers must have been created
+from the same cpc_set_t.
+The cpc_buf_zero() function sets each request's value in the buffer to zero.
+The cpc_buf_destroy() function frees all resources associated with the CPC buffer.
+Upon successful completion, cpc_buf_create() returns a pointer to a CPC buffer which can be used to hold data for
+the set argument. Otherwise, this function returns NULL and sets errno to indicate the error.
+Upon successful completion, cpc_set_sample(), cpc_buf_get(), and cpc_buf_set() return 0. Otherwise, they return
+-1 and set errno to indicate the error.
+These functions will fail if:
+EINVAL For cpc_set_sample(), the set is not bound, the set and/or CPC buffer were not created with the given cpc
+handle, or the CPC buffer was not created with the supplied set.
+EAGAIN When using cpc_set_sample() to sample a CPU-bound set, the LWP has been unbound from the proces<hy>
+sor it is measuring.
+ENOMEM The library could not allocate enough memory for its internal data structures.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stabili<hy>
+tyEvolving _ MT-LevelSafe
+cpc_bind_curlwp(3CPC), cpc_set_add_request(3CPC), libcpc(3LIB), attributes(5)
+Often the overhead of performing a system call can be too disruptive to the events being measured. Once a
+cpc_bind_curlwp(3CPC) call has been issued, it is possible to access directly the performance hardware registers
+from within the application. If the performance counter context is active, the counters will count on behalf of the
+current LWP.
+Not all processors support this type of access. On processors where direct access is not possible, cpc_set_sample()
+must be used to read the counters.
+SPARC
+ rd %pic, %rN ! All UltraSPARC
+ wr %rN, %pic ! (All UltraSPARC, but see text)
+x86
+ rdpmc ! Pentium II, III, and 4 only
+If the counter context is not active or has been invalidated, the %pic register (SPARC), and the rdpmc instruction
+(Pentium) becomes unavailable.
+Pentium II and III processors support the non-privileged rdpmc instruction that requires that the counter of interest
+be specified in %ecx and return a 40-bit value in the %edx:%eax register pair. There is no non-privileged access
+mechanism for Pentium I processors.

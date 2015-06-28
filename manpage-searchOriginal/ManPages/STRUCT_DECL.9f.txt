@@ -1,0 +1,159 @@
+<beginning of page>
+STRUCT_DECL, SIZEOF_PTR, SIZEOF_STRUCT, STRUCT_BUF, STRUCT_FADDR, STRUCT_FGET,
+STRUCT_FGETP, STRUCT_FSET, STRUCT_FSETP, STRUCT_HANDLE, STRUCT_INIT, STRUCT_SIZE,
+STRUCT_SET_HANDLE <-> 32-bit application data access macros
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+STRUCT_DECL(structname, handle);
+STRUCT_HANDLE(structname, handle);
+void STRUCT_INIT(handle, model_t umodel);
+void STRUCT_SET_HANDLE(handle, model_t umodel, void *addr);
+STRUCT_FGET(handle, field);
+STRUCT_FGETP(handle, field);
+STRUCT_FSET(handle, field, val);
+STRUCT_FSETP(handle, field, val);
+<typeof field> *STRUCT_FADDR(handle, field);
+struct structname *STRUCT_BUF(handle);
+size_t SIZEOF_STRUCT(structname, umodel);
+size_t SIZEOF_PTR(umodel);
+size_t STRUCT_SIZE(handle);
+Solaris DDI specific (Solaris DDI).
+The macros take the following parameters:
+structname The structure name that appears after the C keyword struct of the native form.
+umodel
+ A bit field that contains either the ILP32 model bit (DATAMODEL_ILP32), or the LP64 model bit (DATAMOD<hy>
+EL_LP64). In an ioctl(9E), these bits are present in the flag parameter. In a devmap(9E), the bits are present in the
+model parameter mmap(9E). The ddi_mmap_get_model(9F) can be called to get the data model of the current
+thread.
+handle The variable name used to refer to a particular instance of a structure which is handled by these macros.
+field The field name within the structure that can contain substructures. If the structures contain substructures,
+unions, or arrays, the field can be whatever complex expression would naturally follow the first . or ->.
+The above macros allow a device driver to access data consumed from a 32-bit application regardless whether the
+driver was compiled to the ILP32 or LP64 data model. These macros effectively hide the difference between the data
+model of the user application and the driver.
+The macros can be broken up into two main categories described in the following sections.
+The macros STRUCT_DECL() and STRUCT_HANDLE() declare structure handles on the stack, whereas the
+macros STRUCT_INIT() and STRUCT_SET_HANDLE() initialize the structure handles to point to an instance of
+the native form structure.
+<beginning of page>
+The macros STRUCT_HANDLE() and STRUCT_SET_HANDLE() are used to declare and initialize a structure
+handle to an existing data structure, for example, ioctls within a STREAMS module.
+The macros STRUCT_DECL() and STRUCT_INIT(), on the other hand, are used in modules which declare and
+initialize a structure handle to a data structure allocated by STRUCT_DECL(), that is, any standard character or
+block device driver ioctl(9E) routine that needs to copy in data from a user-mode program.
+STRUCT_DECL(structname, handle)
+Declares a structure handle for a struct and allocates an instance of its native form on the stack. It is assumed that the
+native form is larger than or equal to the ILP32 form. handle is a variable name and is declared as a variable by this
+macro.
+void STRUCT_INIT(handle, model_t umodel)
+Initializes handle to point to the instance allocated by STRUCT_DECL(). It also sets data model for handle to
+umodel and it must be called before any access is made through the macros that operate on these structures. When
+used in an ioctl(9E) routine, umodel is the flag parameter. In a devmap(9E) routine, umodel is the model parameter.
+In a mmap(9E) routine, umodel is the return value of ddi_mmap_get_model(9F). This macro is intended only for
+handles created with STRUCT_DECL().
+STRUCT_HANDLE(structname, handle)
+Declares a structure handle handle but, unlike STRUCT_DECL(), it does not allocate an instance of "struct".
+void STRUCT_SET_HANDLE(handle, model_t umodel, void *addr)
+Initializes handle to point to the native form instance at addr. It also sets the data model for handle to umodel. This
+is intended for handles created with STRUCT_HANDLE(). Fields cannot be referenced via the handle until this
+macro has been invoked. Typically, addr is the address of the native form structure containing the user-mode pro<hy>
+grams data. When used in an ioctl(9E), umodel is the flag parameter. In a devmap(9E) routine, umodel is the model
+parameter. In an mmap(9E) routine, umodel is the return value of ddi_mmap_get_model(9F).
+size_t STRUCT_SIZE(handle)
+Returns size of the structure referred to by handle, depending on the data model associated with handle. If the data
+model stored by STRUCT_INIT() or STRUCT_SET_HANDLE() is DATAMODEL_ILP32, the size of the
+ILP32 form is returned. Otherwise, the size of the native form is returned.
+STRUCT_FGET(handle, field)
+Returns the contents of field in the structure described by handle according to the data model associated with handle.
+STRUCT_FGETP(handle, field)
+This is the same as STRUCT_FGET() except that the field in question is a pointer of some kind. This macro casts
+caddr32_t to a (void *) when it is accessed. Failure to use this macro for a pointer leads to compiler warnings or fail<hy>
+ures.
+STRUCT_FSET(handle, field, val)
+Assigns val to the (non-pointer) in the structure described by handle. It should not be used within another expres<hy>
+sion, but only as a statement.
+STRUCT_FSETP(handle, field, val)
+This is the equivalent of STRUCT_FGETP() for STRUCT_FGET(), with the same exceptions. Like
+STRUCT_FSET, STRUCT_FSETP should not be used within another expression, but only as a statement.
+<beginning of page>
+struct structname *STRUCT_BUF(handle)
+Returns a pointer to the native mode instance of the structure described by handle.
+size_t SIZEOF_STRUCT(structname, umodel)
+Returns size of structname based on umodel.
+size_t SIZEOF_PTR(umodel)
+Returns the size of a pointer based on umodel.
+Example 1 Copying a Structure
+The following example uses an ioctl(9E) on a regular character device that copies a data structure that looks like this
+into the kernel:
+ struct opdata {
+  size_t size;
+  uint_t flag;
+ };
+Example 2 Defining a Structure
+This data structure definition describes what the ioctl(9E) would look like in a 32-bit application using fixed width
+types.
+ #if defined(_MULTI_DATAMODEL)
+ struct opdata32 {
+  size32_t size;
+  uint32_t flag;
+ };
+ #endif
+Example 3 Using STRUCT_DECL() and STRUCT_INIT()
+Note: This example uses the STRUCT_DECL() and STRUCT_INIT() macros to declare and initialize the struc<hy>
+ture handle.
+ int
+ xxioctl(dev_t dev, int cmd, intptr_t arg, int mode,
+  cred_t *cr, int *rval_p);
+ {
+  STRUCT_DECL(opdata, op);
+  if (cmd != OPONE)
+  return (ENOTTY);
+  STRUCT_INIT(op, mode);
+  if (copyin((void *)data,
+  STRUCT_BUF(op), STRUCT_SIZE(op)))
+  return (EFAULT);
+  if (STRUCT_FGET(op, flag) != FACTIVE ||
+  STRUCT_FGET(op, size) > sizeof (device_state))
+  return (EINVAL);
+  xxdowork(device_state, STRUCT_FGET(op, size));
+  return (0);
+ }
+This piece of code is an excerpt from a STREAMS module that handles ioctl(9E) data (M_IOCDATA) messages and
+<beginning of page>
+uses the data structure defined above. This code has been written to run in the ILP32 environment only.
+Example 4 Using STRUCT_HANDLE() and STRUCT_SET_HANDLE()
+The next example illustrates the use of the STRUCT_HANDLE() and STRUCT_SET_HANDLE() macros which
+declare and initialize the structure handle to point to an already existing instance of the structure.
+The above code example can be converted to run in the LP64 environment using the STRUCT_HANDLE() and
+STRUCT_SET_HANDLE() as follows:
+ struct strbuf {
+ int maxlen; /* no. of bytes in buffer */
+ int len; /* no. of bytes returned */
+ caddr_t buf; /* pointer to data */
+ };
+ static void
+ wput_iocdata(queue_t *q, mblk_t *msgp)
+ {
+  struct copyresp *cp = (struct copyresp *)msgp->b_rptr;
+  STRUCT_HANDLE(strbuf, sb);
+  if (msgp->b_cont->b_cont != NULL) {
+  msgp->b_cont = msgpullup(msgp->b_cont, -1);
+  if (msgp->b_cont == NULL) {
+  miocnak(q, msgp, 0, ENOSR);
+  return;
+  }
+  }
+  STRUCT_SET_HANDLE(sb, cp->cp_flag, (void *)msgp->b_cont->b_rptr);
+  if (STRUCT_FGET(sb, maxlen) < (int)sizeof (ipa_t)) {
+  miocnak(q, msgp, 0, ENOSR);
+  return;
+  }
+  ...
+  miocack(q, msgp, 0, 0);
+ }
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stabili<hy>
+tyEvolving
+devmap(9E), ioctl(9E), mmap(9E),ddi_mmap_get_model(9F)
+Writing Device Drivers
+STREAMS Programming Guide

@@ -1,0 +1,81 @@
+<beginning of page>
+ddi_dma_mem_alloc <-> allocate memory for DMA transfer
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+int ddi_dma_mem_alloc(ddi_dma_handle_t handle, size_t length,
+ ddi_device_acc_attr_t *accattrp, uint_t flags,
+ int (*waitfp) (caddr_t), caddr_t arg, caddr_t *kaddrp,
+ size_t *real_length, ddi_acc_handle_t *handlep);
+Solaris DDI specific (Solaris DDI).
+handle The DMA handle previously allocated by a call to ddi_dma_alloc_handle(9F).
+length The length in bytes of the desired allocation.
+accattrp Pointer to a ddi_device_acc_attr() structure of the device. See ddi_device_acc_attr(9S). The value in de<hy>
+vacc_attr_dataorder is ignored in the current release. The value in devacc_attr_endian_flags is meaningful on the
+SPARC architecture only.
+flags Used to determine the data transfer mode and/or the cache attribute.
+Possible values of the data transfer are:
+DDI_DMA_STREAMING Sequential, unidirectional, block-sized, and block-aligned transfers.
+DDI_DMA_CONSISTENT Nonsequential transfers of small objects.
+Possible values of the cache attribute are:
+IOMEM_DATA_CACHED The CPU can cache the data it fetches and push it to memory at a later time. This is the
+default attribute that is used if no cache attributes are specified.
+IOMEM_DATA_UC_WR_COMBINE The CPU never caches the data, but writes can occur out of order or can be
+combined. Reordering is implied.
+If IOMEM_DATA_UC_WR_COMBINE is specified but not supported, IOMEM_DATA_UNCACHED is used
+instead.
+IOMEM_DATA_UNCACHED The CPU never caches data, but has uncacheable access to memory. Strict ordering
+is implied.
+The cache attributes are mutually exclusive. Any combination of the values leads to a failure. On the SPARC archi<hy>
+tecture, only IOMEM_DATA_CACHED is meaningful. Others lead to a failure.
+waitfp The address of a function to call back later if resources are not available now. The callback function indicates
+how a caller wants to handle the possibility of resources not being available. If callback is set to
+DDI_DMA_DONTWAIT, the caller does not care if the allocation fails, and can handle an allocation failure appro<hy>
+priately. If callback is set to DDI_DMA_SLEEP, the caller wishes to have the allocation routines wait for resources
+to become available. If any other value is set and a DMA resource allocation fails, this value is assumed to be the ad<hy>
+dress of a function to be called when resources become available. When the specified function is called, arg is
+passed to it as an argument. The specified callback function must return either DDI_DMA_CALL<hy>
+BACK_RUNOUT or DDI_DMA_CALLBACK_DONE. DDI_DMA_CALLBACK_RUNOUT indicates that the
+callback function attempted to allocate DMA resources but failed. In this case, the callback function is put back on a
+list to be called again later. DDI_DMA_CALLBACK_DONE indicates that either the allocation of DMA re<hy>
+sources was successful or the driver no longer wishes to retry. The callback function is called in interrupt context.
+Therefore, only system functions accessible from interrupt context are available.
+<beginning of page>
+The callback function must take whatever steps are necessary to protect its critical resources, data structures, queues,
+and so on.
+arg Argument to be passed to the callback function, if such a function is specified.
+kaddrp On successful return, kaddrp points to the allocated memory.
+real_length The amount of memory, in bytes, allocated. Alignment and padding requirements may require
+ddi_dma_mem_alloc() to allocate more memory than requested in length.
+handlep Pointer to a data access handle.
+The ddi_dma_mem_alloc() function allocates memory for DMA transfers to or from a device. The allocation will
+obey the alignment, padding constraints and device granularity as specified by the DMA attributes (see
+ddi_dma_attr(9S)) passed to ddi_dma_alloc_handle(9F) and the more restrictive attributes imposed by the system.
+The flags parameter should be set to DDI_DMA_STREAMING if the device is doing sequential, unidirectional,
+block-sized, and block-aligned transfers to or from memory. The alignment and padding constraints specified by the
+minxfer and burstsizes fields in the DMA attribute structure, ddi_dma_attr(9S) (see ddi_dma_alloc_handle(9F))
+will be used to allocate the most effective hardware support for large transfers. For example, if an I/O transfer can be
+sped up by using an I/O cache, which has a minimum transfer of one cache line, ddi_dma_mem_alloc() will align
+the memory at a cache line boundary and it will round up real_length to a multiple of the cache line size.
+The flags parameter should be set to DDI_DMA_CONSISTENT if the device accesses memory randomly, or if
+synchronization steps using ddi_dma_sync(9F) need to be as efficient as possible. I/O parameter blocks used for
+communication between a device and a driver should be allocated using DDI_DMA_CONSISTENT.
+The device access attributes are specified in the location pointed by the accattrp argument (see ddi_device_acc_at<hy>
+tr(9S)).
+The data access handle is returned in handlep. handlep is opaque - drivers may not attempt to interpret its value. To
+access the data content, the driver must invoke ddi_get8(9F) or ddi_put8(9F) (depending on the data transfer direc<hy>
+tion) with the data access handle.
+DMA resources must be established before performing a DMA transfer by passing kaddrp and real_length as re<hy>
+turned from ddi_dma_mem_alloc() and the flag DDI_DMA_STREAMING or DDI_DMA_CONSISTENT to
+ddi_dma_addr_bind_handle(9F). In addition, to ensure the consistency of a memory object shared between the
+CPU and the device after a DMA transfer, explicit synchronization steps using ddi_dma_sync(9F) or ddi_dma_un<hy>
+bind_handle(9F) are required.
+The ddi_dma_mem_alloc() function returns:
+DDI_SUCCESS Memory successfully allocated.
+DDI_FAILURE Memory allocation failed.
+The ddi_dma_mem_alloc() function can be called from user, interrupt, or kernel context except when waitfp is set
+to DDI_DMA_SLEEP, in which case it cannot be called from interrupt context.
+ddi_dma_addr_bind_handle(9F), ddi_dma_alloc_handle(9F), ddi_dma_mem_free(9F), ddi_dma_sync(9F),
+ddi_dma_unbind_handle(9F), ddi_get8(9F), ddi_put8(9F), ddi_device_acc_attr(9S), ddi_dma_attr(9S)
+Writing Device Drivers
+If DDI_NEVERSWAP_ACC is specified, memory can be used for any purpose; but if either endian mode is speci<hy>
+fied, you must use ddi_get/put* and never anything else.

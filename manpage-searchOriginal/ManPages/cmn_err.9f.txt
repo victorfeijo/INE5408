@@ -1,0 +1,160 @@
+<beginning of page>
+cmn_err, vcmn_err, zcmn_err <-> display an error message or panic the system
+#include <sys/cmn_err.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+void cmn_err(int level, char *format...
+#include <sys/varargs.h>
+void vcmn_err(int level, char *format, va_list ap);
+#include <sys/types.h>
+void zcmn_err(zoneid_t zoneid, int level, char *format...);
+Architecture independent level 1 (DDI/DKI).
+level A constant indicating the severity of the error condition.
+format Message to be displayed.
+The vcmn_err() function takes level and format as described for cmn_err(), but its third argument is different:
+ap Variable argument list passed to the function.
+The zcmn_err() function works exactly like cmn_err(), but includes an additional argument:
+zoneid Zone to which log messages should be directed. See zones(5).
+The cmn_err() function displays a specified message on the console. cmn_err() can also panic the system. When
+the system panics, it attempts to save recent changes to data, display a "panic message" on the console, attempt to
+write a core file, and halt system processing. See the CE_PANIC level below.
+level is a constant indicating the severity of the error condition. The four severity levels are:
+CE_CONT Used to continue another message or to display an informative message not associated with an error.
+Note that multiple CE_CONT messages without a newline may or may not appear on the system console or in the
+system log as a single line message. A single line message may be produced by constructing the message with
+sprintf(9F) or vsprintf(9F) before calling cmn_err().
+CE_NOTE Used to display a message preceded with NOTICE. This message is used to report system events that
+do not necessarily require user action, but may interest the system administrator. For example, a message saying that
+a sector on a disk needs to be accessed repeatedly before it can be accessed correctly might be noteworthy.
+CE_WARN Used to display a message preceded with WARNING. This message is used to report system events
+that require immediate attention, such as those where if an action is not taken, the system may panic. For example,
+when a peripheral device does not initialize correctly, this level should be used.
+CE_PANIC Used to display a message preceded with "panic", and to panic the system. Drivers should specify this
+level only under the most severe conditions or when debugging a driver. A valid use of this level is when the system
+cannot continue to function. If the error is recoverable, or not essential to continued system operation, do not panic
+the system.
+<beginning of page>
+format is the message to be displayed. It is a character string which may contain plain characters and conversion
+specifications. By default, the message is sent both to the system console and to the system log.
+Each conversion specification in format is introduced by the % character, after which the following appear in se<hy>
+quence:
+An optional decimal digit specifying a minimum field width for numeric conversion. The converted value will be
+right-justified and padded with leading zeroes if it has fewer characters than the minimum.
+An optional l (ll) specifying that a following d, D, o, O, x, X, or u conversion character applies to a long (long long)
+integer argument. An l (ll) before any other conversion character is ignored.
+A character indicating the type of conversion to be applied:
+d,D,o,O,x,X,u The integer argument is converted to signed decimal (d, D), unsigned octal (o, O), unsigned hexadec<hy>
+imal (x, X), or unsigned decimal (u), respectively, and displayed. The letters abcdef are used for x and X conver<hy>
+sion.
+c The character value of the argument is displayed.
+b The %b conversion specification allows bit values to be displayed meaningfully. Each %b takes an integer value
+and a format string from the argument list. The first character of the format string should be the output base encoded
+as a control character. This base is used to display the integer argument. The remaining groups of characters in the
+format string consist of a bit number (between 1 and 32, also encoded as a control character) and the next characters
+(up to the next control character or '\0') give the name of the bit field. The string corresponding to the bit fields set in
+the integer argument is displayed after the numerical value. See EXAMPLE section.
+p The argument is taken to be a pointer; the value of the pointer is displayed in unsigned hexadecimal. The display
+format is equivalent to %lx. To avoid lint warnings, cast pointers to type void * when using the %p format specifier.
+s The argument is taken to be a string (character pointer), and characters from the string are displayed until a null
+character is encountered. If the character pointer is NULL, the string <null string> is used in its place.
+% Copy a %; no argument is converted.
+The first character in format affects where the message will be written:
+! The message goes only to the system log.
+^ The message goes only to the console.
+? If level is also CE_CONT, the message is always sent to the system log, but is only written to the console when
+the system has been booted in verbose mode. See kernel(1M). If neither condition is met, the '?' character has no
+effect and is simply ignored.
+Refer to syslogd(1M) to determine where the system log is written.
+The cmn_err() function sends log messages to the log of the global zone. cmn_err() appends a \n to each format,
+except when level is CE_CONT.
+The vcmn_err() function is identical to cmn_err() except that its last argument, ap, is a pointer to a variable list of
+arguments. ap contains the list of arguments used by the conversion specifications in format. ap must be initialized
+by calling va_start(9F). va_end(9F) is used to clean up and must be called after each traversal of the list. Multiple
+traversals of the argument list, each bracketed by va_start(9F) and va_end(9F), are possible.
+<beginning of page>
+With the exception of its first argument (zoneid), zcmn_err() is identical to cmn_err(). zoneid is the numeric ID of
+the zone to which the message should be directed. Note that zoneid only has an effect if the message is sent to the
+system log. Using zoneid will cause messages to be sent to the log associated with the specified local zone rather
+than the log in the global zone. This is accomplished by the message being received and processed by the sys<hy>
+logd(1M) process running in the specified zone instead of the one running in the global zone. You can retrieve a
+process zone ID from its credential structure using crgetzoneid(9F).
+None. However, if an unknown level is passed to cmn_err(), the following panic error message is displayed:
+ panic: unknown level in cmn_err (level=level, msg=format)
+The cmn_err() function can be called from user, kernel, interrupt, or high-level interrupt context. Example 1 Using
+cmn_err()
+This first example shows how cmn_err() can record tracing and debugging information only in the system log (lines
+17); display problems with a device only on the system console (line 23); or display problems with the device on
+both the system console and in the system log (line 28).
+ 1 struct reg {
+ 2 uchar_t data;
+ 3 uchar_t csr;
+ 4 };
+ 5
+ 6 struct xxstate {
+ 7 ...
+ 8 dev_info_t *dip;
+ 9 struct reg *regp;
+ 10 ...
+ 11 };
+ 12
+ 13 dev_t dev;
+ 14 struct xxstate *xsp;
+ 15 ...
+ 16 #ifdef DEBUG /* in debugging mode, log function call */
+ 17 cmn_err(CE_CONT, "!%s%d: xxopen function called.",
+ 18 ddi_binding_name(xsp->dip), getminor(dev));
+ 19 #endif /* end DEBUG */
+ 20 ...
+ 21 /* display device power failure on system console */
+ 22 if ((xsp->regp->csr & POWER) == OFF)
+ 23 cmn_err(CE_NOTE, "^OFF.",
+ 24 ddi_binding_name(xsp->dip), getminor(dev));
+ 25 ...
+ 26 /* display warning if device has bad VTOC */
+ 27 if (xsp->regp->csr & BADVTOC)
+ 28 cmn_err(CE_WARN, "%s%d: xxopen: Bad VTOC.",
+ 29 ddi_binding_name(xsp->dip), getminor(dev));
+Example 2 Using the %b conversion specification
+This example shows how to use the %b conversion specification. Because of the leading '?' character in the format
+string, this message will always be logged, but it will only be displayed when the kernel is booted in verbose mode.
+ cmn_err(CE_CONT, "?reg=0x%b\n", regval, "\020\3Intr\2Err\1Enable");
+Example 3 Using regval
+When regval is set to (decimal) 13, the following message would be displayed:
+ reg=0xd<Intr,,Enable>
+<beginning of page>
+Example 4 Error Routine
+This example shows an error reporting routine which accepts a variable number of arguments and displays a single
+line error message both in the system log and on the system console. Note the use of vsprintf() to construct the error
+message before calling cmn_err().
+ #include <sys/varargs.h>
+ #include <sys/ddi.h>
+ #include <sys/sunddi.h>
+ #define MAX_MSG 256;
+ void
+ xxerror(dev_info_t *dip, int level, const char *fmt, ...)
+ {
+  va_list ap;
+  int instance;
+  char buf[MAX_MSG], *name;
+ instance = ddi_get_instance(dip);
+ name = ddi_binding_name(dip);
+ /* format buf using fmt and arguments contained in ap */
+ va_start(ap, fmt);
+ vsprintf(buf, fmt, ap);
+ va_end(ap);
+ /* pass formatted string to cmn_err(9F) */
+ cmn_err(level, "%s%d: %s", name, instance, buf);
+ }
+Example 5 Log to Current Zone
+This example shows how messages can be sent to the log of the zone in which a thread is currently running, when
+applicable. Note that most hardware-related messages should instead be sent to the global zone using cmn_err().
+ zcmn_err(crgetzoneid(ddi_get_cred()), CE_NOTE, "out of processes0);
+dmesg(1M), kernel(1M), printf(3C), zones(5), ddi_binding_name(9F), ddi_cred(9F), sprintf(9F), va_arg(9F),
+va_end(9F), va_start(9F), vsprintf(9F)
+Writing Device Drivers
+The cmn_err() function with the CE_CONT argument can be used by driver developers as a driver code debugging
+tool. However, using cmn_err() in this capacity can change system timing characteristics.
+Messages of arbitrary length can be generated using cmn_err(), but if the call to cmn_err() is made from high-level
+interrupt context and insufficient memory is available to create a buffer of the specified size, the message will be
+truncated to LOG_MSGSIZE bytes (see <sys/log.h>). For this reason, callers of cmn_err() that require complete
+and accurate message generation should post down from high-level interrupt context before calling cmn_err().

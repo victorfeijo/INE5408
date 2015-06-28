@@ -1,0 +1,27 @@
+<beginning of page>
+freezestr, unfreezestr <-> freeze, thaw the state of a stream
+#include <sys/stream.h>
+#include <sys/ddi.h>
+void freezestr(queue_t *q);
+void unfreezestr(queue_t *q);
+Architecture independent level 1 (DDI/DKI).
+q Pointer to the message queue to freeze/unfreeze.
+freezestr() freezes the state of the entire stream containing the queue pair q. A frozen stream blocks any thread at<hy>
+tempting to enter any open, close, put or service routine belonging to any queue instance in the stream, and blocks
+any thread currently within the stream if it attempts to put messages onto or take messages off of any queue within
+the stream (with the sole exception of the caller). Threads blocked by this mechanism remain so until the stream is
+thawed by a call to unfreezestr().
+Drivers and modules must freeze the stream before manipulating the queues directly (as opposed to manipulating
+them through programmatic interfaces such as getq(9F), putq(9F), putbq(9F), etc.)
+These routines may be called from any stream open, close, put or service routine as well as interrupt handlers, call<hy>
+outs and call-backs.
+Writing Device Drivers
+STREAMS Programming Guide
+The freezestr() and unfreezestr() functions can have a serious impact on system performance. Their use should be
+very limited. In most cases, there is no need to use freezestr() and there are usually better ways to accomplish what
+you need to do than by freezing the stream.
+Calling freezestr() to freeze a stream that is already frozen by the caller will result in a single-party deadlock.
+The caller of unfreezestr() must be the thread who called freezestr().
+STREAMS utility functions such as getq(9F), putq(9F), putbq(9F), and so forth, should not be called by the caller
+of freezestr() while the stream is still frozen, as they indirectly freeze the stream to ensure atomicity of queue ma<hy>
+nipulation.

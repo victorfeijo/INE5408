@@ -1,0 +1,121 @@
+<beginning of page>
+chmod, fchmod <-> change access permission mode of file
+#include <sys/types.h>
+#include <sys/stat.h>
+int chmod(const char *path, mode_t mode);
+int fchmod(int fildes, mode_t mode);
+The chmod() and fchmod() functions set the access permission portion of the mode of the file whose name is given
+by path or referenced by the open file descriptor fildes to the bit pattern contained in mode. Access permission bits
+are interpreted as follows:
+tab(); lw(1.01i) lw(.69i) lw(3.79i) lw(1.01i) lw(.69i) lw(3.79i) S_ISUID04000Set user ID on execution. S_IS<hy>
+GID020#0T{ Set group ID on execution if # is 7, 5, 3, or 1. Enable mandatory file/record locking if # is 6, 4, 2, or 0.
+T} S_ISVTX01000Sticky bit. S_IRWXU00700Read, write, execute by owner. S_IRUSR00400Read by owner.
+S_IWUSR00200Write by owner. S_IXUSR00100T{ Execute (search if a directory) by owner. T} S_IR<hy>
+WXG00070Read, write, execute by group. S_IRGRP00040Read by group. S_IWGRP00020Write by group.
+S_IXGRP00010Execute by group. S_IRWXO00007Read, write, execute (search) by others.
+S_IROTH00004Read by others. S_IWOTH00002Write by others. S_IXOTH00001Execute by others.
+Modes are constructed by the bitwise OR operation of the access permission bits.
+The effective user ID of the process must match the owner of the file or the process must have the appropriate privi<hy>
+lege to change the mode of a file.
+If the process is not a privileged process and the file is not a directory, mode bit 01000 (save text image on execu<hy>
+tion) is cleared.
+If neither the process is privileged nor the file's group is a member of the process's supplementary group list, and
+the effective group ID of the process does not match the group ID of the file, mode bit 02000 (set group ID on ex<hy>
+ecution) is cleared.
+If a directory is writable and has S_ISVTX (the sticky bit) set, files within that directory can be removed or renamed
+only if one or more of the following is true (see unlink(2) and rename(2)): <bu> the user owns the file <bu> the user owns
+the directory <bu> the file is writable by the user <bu> the user is a privileged user
+If a regular file is not executable and has S_ISVTX set, the file is assumed to be a swap file. In this case, the sys<hy>
+tem's page cache will not be used to hold the file's data. If the S_ISVTX bit is set on any other file, the results are
+unspecified.
+If a directory has the set group ID bit set, a given file created within that directory will have the same group ID as
+the directory. Otherwise, the newly created file's group ID will be set to the effective group ID of the creating
+process.
+If the mode bit 02000 (set group ID on execution) is set and the mode bit 00010 (execute or search by group) is not
+set, mandatory file/record locking will exist on a regular file, possibly affecting future calls to open(2), creat(2),
+read(2), and write(2) on this file.
+If fildes references a shared memory object, fchmod() need only affect the S_IRUSR, S_IRGRP, S_IROTH,
+S_IWUSR, S_IWGRP, S_IWOTH, S_IXUSR, S_IXGRP, and S_IXOTH file permission bits.
+If fildes refers to a socket, fchmod() does not fail but no action is taken.
+If fildes refers to a stream that is attached to an object in the file system name space with fattach(3C), the fchmod()
+call performs no action and returns successfully.
+Upon successful completion, chmod() and fchmod() mark for update the st_ctime field of the file.
+Upon successful completion, 0 is returned. Otherwise, <mi>1 is returned, the file mode is unchanged, and errno is set to
+indicate the error.
+The chmod() and fchmod() functions will fail if:
+<beginning of page>
+EIO An I/O error occurred while reading from or writing to the file system.
+EPERM The effective user ID does not match the owner of the file and the process does not have appropriate privi<hy>
+lege.
+The {PRIV_FILE_OWNER} privilege overrides constraints on ownership when changing permissions on a file.
+The {PRIV_FILE_SETID} privilege overrides constraints on ownership when adding the setuid or setgid bits to an
+executable file or a directory. When adding the setuid bit to a root owned executable, additional restrictions apply.
+See privileges(5).
+The chmod() function will fail if:
+EACCES Search permission is denied on a component of the path prefix of path. The privilege
+{FILE_DAC_SEARCH} overrides file permissions restrictions in that case.
+EFAULT The path argument points to an illegal address.
+ELOOP A loop exists in symbolic links encountered during the resolution of the path argument.
+ENAMETOOLONG The length of the path argument exceeds PATH_MAX, or the length of a path component ex<hy>
+ceeds NAME_MAX while _POSIX_NO_TRUNC is in effect.
+ENOENT Either a component of the path prefix or the file referred to by path does not exist or is a null pathname.
+ENOLINK The fildes argument points to a remote machine and the link to that machine is no longer active.
+ENOTDIR A component of the prefix of path is not a directory.
+EROFS The file referred to by path resides on a read-only file system.
+The fchmod() function will fail if:
+EBADF The fildes argument is not an open file descriptor
+ENOLINK The path argument points to a remote machine and the link to that machine is no longer active.
+EROFS The file referred to by fildes resides on a read-only file system.
+The chmod() and fchmod() functions may fail if:
+EINTR A signal was caught during execution of the function.
+EINVAL The value of the mode argument is invalid.
+The chmod() function may fail if:
+ELOOP More than {SYMLOOP_MAX} symbolic links were encountered during the resolution of the path argu<hy>
+ment.
+<beginning of page>
+ENAMETOOLONG As a result of encountering a symbolic link in resolution of thepath argument, the length of
+the substituted pathname strings exceeds {PATH_MAX}.
+The fchmod() function may fail if:
+EINVAL The fildes argument refers to a pipe and the system disallows execution of this function on a pipe.
+Example 1 Set Read Permissions for User, Group, and Others
+The following example sets read permissions for the owner, group, and others.
+ #include <sys/stat.h>
+ const char *path;
+ ...
+ chmod(path, S_IRUSR|S_IRGRP|S_IROTH);
+Example 2 Set Read, Write, and Execute Permissions for the Owner Only
+The following example sets read, write, and execute permissions for the owner, and no permissions for group and
+others.
+ #include <sys/stat.h>
+ const char *path;
+ ...
+ chmod(path, S_IRWXU);
+Example 3 Set Different Permissions for Owner, Group, and Other
+The following example sets owner permissions for CHANGEFILE to read, write, and execute, group permissions to
+read and execute, and other permissions to read.
+ #include <sys/stat.h>
+ #define CHANGEFILE "/etc/myfile"
+ ...
+ chmod(CHANGEFILE, S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH);
+Example 4 Set and Checking File Permissions
+The following example sets the file permission bits for a file named /home/cnd/mod1, then calls the stat(2) function
+to verify the permissions.
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ int status;
+ struct stat buffer
+ ...
+ chmod("home/cnd/mod1", S_IRWXU|S_IRWXG|S_IROTH|S_IWOTH);
+ status = stat("home/cnd/mod1", &buffer;);
+If chmod() or fchmod() is used to change the file group owner permissions on a file with non-trivial ACL entries,
+only the ACL mask is set to the new permissions and the group owner permission bits in the file's mode field (de<hy>
+fined in mknod(2)) are unchanged. A non-trivial ACL entry is one whose meaning cannot be represented in the
+file's mode field alone. The new ACL mask permissions might change the effective permissions for additional users
+and groups that have ACL entries on the file.
+See attributes(5) for descriptions of the following attributes:
+<beginning of page>
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Standard _ MT-LevelAsync-Signal-Safe
+chmod(1), chown(2), creat(2), fcntl(2), mknod(2), open(2), read(2), rename(2), stat(2), write(2), fattach(3C),
+mkfifo(3C), stat.h(3HEAD), attributes(5), privileges(5), standards(5)
+Programming Interfaces Guide

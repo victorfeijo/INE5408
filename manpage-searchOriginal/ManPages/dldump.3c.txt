@@ -1,0 +1,183 @@
+<beginning of page>
+dldump <-> create a new file from a dynamic object component of the calling process
+#include <dlfcn.h>
+int dldump(const char * ipath, const char * opath, int flags);
+The dldump() function creates a new dynamic object opath from an existing dynamic object ipath that is bound to
+the current process. An ipath value of 0 is interpreted as the dynamic object that started the process. The new object
+is constructed from the existing objects' disc file. Relocations can be applied to the new object to pre-bind it to other
+dynamic objects, or fix the object to a specific memory location. In addition, data elements within the new object can
+be obtained from the objects' memory image as this data exists in the calling process.
+These techniques allow the new object to be executed with a lower startup cost. This reduction can be because of
+less relocations being required to load the object, or because of a reduction in the data processing requirements of
+the object. However, limitations can exist in using these techniques. The application of relocations to the new dy<hy>
+namic object opath can restrict its flexibility within a dynamically changing environment. In addition, limitations in
+regards to data usage can make dumping a memory image impractical. See EXAMPLES.
+The runtime linker verifies that the dynamic object ipath is mapped as part of the current process. Thus, the object
+must either be the dynamic object that started the process, one of the process's dependencies, or an object that has
+been preloaded. See exec(2), and ld.so.1(1).
+As part of the runtime processing of a dynamic object, relocation records within the object are interpreted and ap<hy>
+plied to offsets within the object. These offsets are said to be relocated. Relocations can be categorized into two ba<hy>
+sic types: non-symbolic and symbolic.
+The non-symbolic relocation is a simple relative relocation that requires the base address at which the object is
+mapped to perform the relocation. The symbolic relocation requires the address of an associated symbol, and results
+in a binding to the dynamic object that defines this symbol. The symbol definition can originate from any of the dy<hy>
+namic objects that make up the process, that is, the object that started the process, one of the process's dependencies,
+an object that has been preloaded, or the dynamic object being relocated.
+The flags parameter controls the relocation processing and other attributes of producing the new dynamic object
+opath. Without any flags, the new object is constructed solely from the contents of the ipath disc file without any re<hy>
+locations applied.
+Various relocation flags can be or'ed into the flags parameter to affect the relocations that are applied to the new ob<hy>
+ject. Non-symbolic relocations can be applied using the following:
+RTLD_REL_RELATIVE Relocation records from the object ipath, that define relative relocations, are applied to
+the object opath.
+A variety of symbolic relocations can be applied using the following flags (each of these flags also implies
+RTLD_REL_RELATIVE is in effect):
+RTLD_REL_EXEC Symbolic relocations that result in binding ipath to the dynamic object that started the process,
+commonly a dynamic executable, are applied to the object opath.
+RTLD_REL_DEPENDS Symbolic relocations that result in binding ipath to any of the dynamic dependencies of
+the process are applied to the object opath.
+RTLD_REL_PRELOAD Symbolic relocations that result in binding ipath to any objects preloaded with the
+process are applied to the object opath. See LD_PRELOAD in ld.so.1(1).
+RTLD_REL_SELF Symbolic relocations that result in binding ipath to itself, are applied to the object opath.
+RTLD_REL_WEAK Weak relocations that remain unresolved are applied to the object opath as 0.
+RTLD_REL_ALL All relocation records defined in the object ipath are applied to the new object opath. This is ba<hy>
+sically a concatenation of all the above relocation flags.
+<beginning of page>
+Note that for dynamic executables, RTLD_REL_RELATIVE, RTLD_REL_EXEC, and RTLD_REL_SELF have
+no effect. See EXAMPLES.
+If relocations, knowledgeable of the base address of the mapped object, are applied to the new object opath, then the
+new object becomes fixed to the location that the ipath image is mapped within the current process.
+Any relocations applied to the new object opath will have the original relocation record removed so that the reloca<hy>
+tion will not be applied more than once. Otherwise, the new object opath will retain the relocation records as they
+exist in the ipath disc file.
+The following additional attributes for creating the new dynamic object opath can be specified using the flags param<hy>
+eter:
+RTLD_MEMORY The new object opath is constructed from the current memory contents of the ipath image as it
+exists in the calling process. This option allows data modified by the calling process to be captured in the new ob<hy>
+ject. Note that not all data modifications may be applicable for capture; significant restrictions exist in using this
+technique. See EXAMPLES. By default, when processing a dynamic executable, any allocated memory that follows
+the end of the data segment is captured in the new object (see malloc(3C) and brk(2)). This data, which represents
+the process heap, is saved as a new .SUNW_heap section in the object opath. The objects' program headers and sym<hy>
+bol entries, such as _end, are adjusted accordingly. See also RTLD_NOHEAP. When using this attribute, any relo<hy>
+cations that have been applied to the ipath memory image that do not fall into one of the requested relocation cate<hy>
+gories are undone, that is, the relocated element is returned to the value as it existed in the ipath disc file.
+RTLD_STRIP Only collect allocatable sections within the object opath. Sections that are not part of the dynamic
+objects' memory image are removed. RTLD_STRIP reduces the size of the opath disc file and is comparable to
+having run the new object through strip(1).
+RTLD_NOHEAP Do not save any heap to the new object. This option is only meaningful when processing a dy<hy>
+namic executable with the RTLD_MEMORY attribute and allows for reducing the size of the opath disc file. The
+executable must confine its data initialization to data elements within its data segment, and must not use any allocat<hy>
+ed data elements that comprise the heap.
+It should be emphasized, that an object created by dldump() is simply an updated ELF object file. No additional
+state regarding the process at the time dldump() is called is maintained in the new object. dldump() does not pro<hy>
+vide a panacea for checkpoint and resume. A new dynamic executable, for example, will not start where the original
+executable called dldump(). It will gain control at the executable's normal entry point. See EXAMPLES.
+On successful creation of the new object, dldump() returns 0. Otherwise, a non-zero value is returned and more de<hy>
+tailed diagnostic information is available through dlerror(). Example 1 Sample code using dldump().
+The following code fragment, which can be part of a dynamic executable a.out, can be used to create a new shared
+object from one of the dynamic executables' dependencies libfoo.so.1:
+ const char * ipath = "libfoo.so.1";
+ const char * opath = "./tmp/libfoo.so.1";
+ ...
+ if (dldump(ipath, opath, RTLD_REL_RELATIVE) != 0)
+  (void) printf("dldump failed: %s\n", dlerror());
+The new shared object opath is fixed to the address of the mapped ipath bound to the dynamic executable a.out. All
+relative relocations are applied to this new shared object, which will reduce its relocation overhead when it is used as
+part of another process.
+By performing only relative relocations, any symbolic relocation records remain defined within the new object, and
+thus the dynamic binding to external symbols will be preserved when the new object is used.
+Use of the other relocation flags can fix specific relocations in the new object and thus can reduce even more the run<hy>
+<beginning of page>
+time relocation startup cost of the new object. However, this will also restrict the flexibility of using the new object
+within a dynamically changing environment, as it will bind the new object to some or all of the dynamic objects
+presently mapped as part of the process.
+For example, the use of RTLD_REL_SELF will cause any references to symbols from ipath to be bound to defini<hy>
+tions within itself if no other preceding object defined the same symbol. In other words, a call to foo() within ipath
+will bind to the definition foo within the same object. Therefore, opath will have one less binding that must be com<hy>
+puted at runtime. This reduces the startup cost of using opath by other applications; however, interposition of the
+symbol foo will no longer be possible.
+Using a dumped shared object with applied relocations as an applications dependency normally requires that the ap<hy>
+plication have the same dependencies as the application that produced the dumped image. Dumping shared objects,
+and the various flags associated with relocation processing, have some specialized uses. However, the technique is
+intended as a building block for future technology.
+The following code fragment, which is part of the dynamic executable a.out, can be used to create a new version of
+the dynamic executable:
+ static char * dumped = 0;
+ const char * opath = "./a.out.new";
+ ...
+ if (dumped == 0) {
+  char buffer[100];
+  int size;
+  time_t seconds;
+  ...
+  /* Perform data initialization */
+  seconds = time((time_t *)0);
+  size = cftime(buffer, (char *)0, &seconds);
+  if ((dumped = (char *)malloc(size + 1)) == 0) {
+  (void) printf("malloc failed: %s\n", strerror(errno));
+  return (1);
+  }
+  (void) strcpy(dumped, buffer);
+  ...
+  /*
+  * Tear down any undesirable data initializations and
+  * dump the dynamic executables memory image.
+  */
+  _exithandle();
+  _exit(dldump(0, opath, RTLD_MEMORY));
+ }
+ (void) printf("Dumped: %s\n", dumped);
+Any modifications made to the dynamic executable, up to the point the dldump() call is made, are saved in the new
+object a.out.new. This mechanism allows the executable to update parts of its data segment and heap prior to creat<hy>
+ing the new object. In this case, the date the executable is dumped is saved in the new object. The new object can
+then be executed without having to carry out the same (presumably expensive) initialization.
+For greatest flexibility, this example does not save any relocated information. The elements of the dynamic ex<hy>
+ecutable ipath that have been modified by relocations at process startup, that is, references to external functions, are
+returned to the values of these elements as they existed in the ipath disc file. This preservation of relocation records
+allows the new dynamic executable to be flexible, and correctly bind and initialize to its dependencies when execut<hy>
+ed on the same or newer upgrades of the OS.
+Fixing relocations by applying some of the relocation flags would bind the new object to the dependencies presently
+mapped as part of the process calling dldump(). It may also remove necessary copy relocation processing required
+for the correct initialization of its shared object dependencies. Therefore, if the new dynamic executables' dependen<hy>
+cies have no specialized initialization requirements, the executable may still only interact correctly with the depen<hy>
+<beginning of page>
+dencies to which it binds if they were mapped to the same locations as they were when dldump() was called.
+Note that for dynamic executables, RTLD_REL_RELATIVE, RTLD_REL_EXEC, and RTLD_REL_SELF have
+no effect, as relocations within the dynamic executable will have been fixed when it was created by ld(1).
+When RTLD_MEMORY is used, care should be taken to insure that dumped data sections that reference external
+objects are not reused without appropriate re-initialization. For example, if a data item contains a file descriptor, a
+variable returned from a shared object, or some other external data, and this data item has been initialized prior to
+the dldump() call, its value will have no meaning in the new dumped image.
+When RTLD_MEMORY is used, any modification to a data item that is initialized via a relocation whose reloca<hy>
+tion record will be retained in the new image will effectively be lost or invalidated within the new image. For exam<hy>
+ple, if a pointer to an external object is incremented prior to the dldump() call, this data item will be reset to its disc
+file contents so that it can be relocated when the new image is used; hence, the previous increment is lost.
+Non-idempotent data initializations may prevent the use of RTLD_MEMORY. For example, the addition of ele<hy>
+ments to a linked-list via init sections can result in the linked-list data being captured in the new image. Running this
+new image may result in init sections continuing to add new elements to the list without the prerequisite initializa<hy>
+tion of the list head. It is recommended that _exithandle(3C) be called before dldump() to tear down any data ini<hy>
+tializations established via initialization code. Note that this may invalidate the calling image; thus, following the
+call to dldump(), only a call to _Exit(2) should be made.
+The dldump() function is one of a family of functions that give the user direct access to the dynamic linking facili<hy>
+ties. These facilities are available to dynamically-linked processes only. See Linker and Libraries Guide).
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu _ MT-LevelMT-Safe
+ld(1), ld.so.1(1), strip(1), _Exit(2), brk(2), exec(2), _exithandle(3C), dladdr(3C), dlclose(3C), dlerror(3C),
+dlopen(3C), dlsym(3C), end(3C), malloc(3C), attributes(5)
+Linker and Libraries Guide
+These functions are available to dynamically-linked processes only.
+Any NOBITS sections within the ipath are expanded to PROGBITS sections within the opath. NOBITS sections
+occupy no space within an ELF file image. NOBITS sections declare memory that must be created and zero-filled
+when the object is mapped into the runtime environment. .bss is a typical example of this section type. PROGBITS
+sections, on the other hand, hold information defined by the object within the ELF file image. This section conver<hy>
+sion reduces the runtime initialization cost of the new dumped object but increases the objects' disc space require<hy>
+ment.
+When a shared object is dumped, and relocations are applied which are knowledgeable of the base address of the
+mapped object, the new object is fixed to this new base address. The dumped object has its ELF type reclassified to
+be a dynamic executable. The dumped object can be processed by the runtime linker, but is not valid as input to the
+link-editor.
+If relocations are applied to the new object, any remaining relocation records are reorganized for better locality of
+reference. The relocation sections are renamed to .SUNW_reloc and the association with the section to relocate, is
+lost. Only the offset of the relocation record is meaningful. .SUNW_reloc relocations do not make the new object
+invalid to either the runtime linker or link-editor, but can reduce the objects analysis with some ELF readers.

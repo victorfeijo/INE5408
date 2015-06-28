@@ -1,0 +1,89 @@
+<beginning of page>
+bge <-> SUNW,bge Gigabit Ethernet driver for Broadcom BCM57xx
+/dev/bge*
+The bge Gigabit Ethernet driver is a multi-threaded, loadable, clonable, GLD-based STREAMS driver supporting
+the Data Link Provider Interface, dlpi(7P), on Broadcom BCM57xx
+(BCM5700/5701/5703/5704/5705/5705M/5714/5721/5751/5751M/5782/5788 on x86) Gigabit Ethernet controllers
+fitted to the system motherboard. With the exception of BCM5700/BCM5701/BCM5704S, these devices incorporate
+both MAC and PHY functions and provide three-speed (copper) Ethernet operation on the RJ-45 connectors.
+(BCM5700/BCM5701/BCM5704S do not have a PHY integrated into the MAC chipset.)
+The bge driver functions include controller initialization, frame transmit and receive, promiscuous and multicast
+support, and error recovery and reporting.
+The bge driver and hardware support auto-negotiation, a protocol specified by the 1000 Base-T standard. Auto-nego<hy>
+tiation allows each device to advertise its capabilities and discover those of its peer (link partner). The highest com<hy>
+mon denominator supported by both link partners is automatically selected, yielding the greatest available through<hy>
+put, while requiring no manual configuration. The bge driver also allows you to configure the advertised capabilities
+to less than the maximum (where the full speed of the interface is not required), or to force a specific mode of opera<hy>
+tion, irrespective of the link partner's advertised capabilities.
+The cloning character-special device, /dev/bge, is used to access all BCM57xx devices (
+(BCM5700/5701/5703/5704, 5705/5714/5721/5751/5751M/5782 on x86) fitted to the system motherboard.
+The bge driver is managed by the dladm(1M) command line utility, which allows VLANs to be defined on top of
+bge instances and for bge instances to be aggregated. See dladm(1M) for more details.
+You must send an explicit DL_ATTACH_REQ message to associate the opened stream with a particular device
+(PPA). The PPA ID is interpreted as an unsigned integer data type and indicates the corresponding device instance
+(unit) number. The driver returns an error (DL_ERROR_ACK) if the PPA field value does not correspond to a valid
+device instance number for the system. The device is initialized on first attach and de-initialized (stopped) at last de<hy>
+tach.
+The values returned by the driver in the DL_INFO_ACK primitive in response to a DL_INFO_REQ are: <bu> Maximum
+SDU (default 1500). <bu> Minimum SDU (default 0). <bu> DLSAP address length is 8. <bu> MAC type is DL_ETHER. <bu>
+SAP length value is -2, meaning the physical address component is followed immediately by a 2-byte SAP compo<hy>
+nent within the DLSAP address. <bu> Broadcast address value is the Ethernet/IEEE broadcast address
+(FF:FF:FF:FF:FF:FF).
+Once in the DL_ATTACHED state, you must send a DL_BIND_REQ to associate a particular Service Access Point
+(SAP) with the stream.
+By default, the bge driver performs auto-negotiation to select the link speed and mode. Link speed and mode can be
+any one of the following, (as described in the IEEE803.2 standard): <bu> 1000 Mbps, full-duplex <bu> 1000 Mbps, half-du<hy>
+plex <bu> 100 Mbps, full-duplex <bu> 100 Mbps, half-duplex <bu> 10 Mbps, full-duplex <bu> 10 Mbps, half-duplex
+The auto-negotiation protocol automatically selects: <bu> Speed (1000 Mbps, 100 Mbps, or 10 Mbps) <bu> Operation mode
+(full-duplex or half-duplex)
+as the highest common denominator supported by both link partners. Because the bge device supports all modes, the
+effect is to select the highest throughput mode supported by the other device.
+Alternatively, you can set the capabilities advertised by the bge device using dladm(1M). The driver supports a
+number of parameters whose names begin with en_ (see below). Each of these parameters contains a boolean value
+that determines whether the device advertises that mode of operation. If en_autoneg_cap is set to 0, the driver
+forces the mode of operation selected by the first non-zero parameter in priority order as listed below:
+  (highest priority/greatest throughput)
+  en_1000fdx_cap 1000Mbps full duplex
+  en_1000hdx_cap 1000Mpbs half duplex
+  en_100fdx_cap 100Mpbs full duplex
+  en_100hdx_cap 100Mpbs half duplex
+  en_10fdx_cap 10Mpbs full duplex
+  en_10hdx_cap 10Mpbs half duplex
+  (lowest priority/least throughput)
+<beginning of page>
+For example, to prevent the device 'bge2' from advertising gigabit capabilities, enter (as super-user):
+ # dladm set-linkprop -p enable_1000hdx_cap=0 bge2
+ # dladm set-linkprop -p enable_1000fdx_cap=0 bge2
+All capabilities default to enabled. Note that changing any capability parameter causes the link to go down while the
+link partners renegotiate the link speed/duplex using the newly changed capabilities.
+The current settings of the parameters may be found using dladm show-ether. In addition, the driver exports the cur<hy>
+rent state, speed, duplex setting, and working mode of the link via kstat parameters (these are read only and may not
+be changed). For example, to check link state of device bge0:
+ # dladm show-ether -x bge0
+ LINK PTYPE STATE AUTO SPEED-DUPLEX PAUSE
+ bge0 current up yes 1G-f bi
+ -- capable -- yes 1G-fh,100M-fh,10M-fh bi
+ -- adv -- yes 1G-fh bi
+ -- peeradv -- yes 1G-f bi
+The output above indicates that the link is up and running at 1Gbps full-duplex with its rx/tx direction pause capabil<hy>
+ity.
+To extract link state information for the same link using kstat:
+ # kstat bge:0:mac:link_state
+ module: bge instance: 0
+ name: mac class: net
+ link_state
+The default MTU is 1500. To enable Jumbo Frames support, you can configure the bge driver by defining the de<hy>
+fault_mtu property via dladm(1M) or in driver.conf(4) to greater than 1500 bytes (for example: default_mtu=9000).
+Note that the largest jumbo size supported by bge is 9000 bytes. Additionally, not all bge-derived devices currently
+support Jumbo Frames. The following devices support Jumbo Frames up to 9KB: BCM5700, 5701, 5702, 5703C,
+5703S, 5704C, 5704S, 5714C, 5714S, 5715C and 5715S. Other devices currently do not support Jumbo Frames.
+/kernel/drv/bge* 32-bit ELF kernel module. (x86)
+/kernel/drv/amd64/bge 64-bit ELF kernel module (x86).
+/kernel/drv/sparcv9/bge 64-bit ELF kernel module (SPARC).
+See attributes(5) for a description of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ ArchitectureS<hy>
+PARC, x86
+dladm(1M), driver.conf(4), attributes(5), streamio(7I), dlpi(7P)
+Writing Device Drivers
+STREAMS Programming Guide
+Network Interfaces Programmer's Guide

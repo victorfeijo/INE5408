@@ -1,0 +1,197 @@
+<beginning of page>
+route <-> manually manipulate the routing tables
+route [-fnvq] sub-command [ [modifiers] args]
+route [-fnvq] [-p [-R root-dir]] add | delete [modifiers] destination gateway
+ [args]
+route [-fnvq] change | get [modifiers] destination
+ [gateway [args]]
+route [-fn] monitor [modifiers]
+route [-fnvq] flush [modifiers]
+route -p [-R root-dir] show
+route manually manipulates the network routing tables. These tables are normally maintained by the system routing
+daemon, such as in.routed(1M) and in.ripngd(1M).
+route supports a limited number of general options, but a rich command language. Users can specify an arbitrary re<hy>
+quest that can be delivered by means of the programmatic interface discussed in route(7P).
+route uses a routing socket and the new message types RTM_ADD, RTM_DELETE, RTM_GET, and
+RTM_CHANGE. While only superusers can modify routing tables, the RTM_GET operation is allowed for non-
+privileged users.
+-f Flush the routing tables of all gateway entries. If you use the -f option in conjunction with any of the route sub-
+commands, route flushes the gateways before performing the sub-command. Specify the table to flush by placing
+the inet or inet6 modifier immediately after the -f option. If unspecified, flushing IPv4 (inet) routes is the default.
+-n Prevent attempts to print host and network names symbolically when reporting actions. This option is useful
+when name servers are unavailable.
+-p Make changes to the network route tables persistent across system restarts. The operation is applied to the net<hy>
+work routing tables first and, if successful, is then applied to the list of saved routes used at system startup. In deter<hy>
+mining whether an operation was successful, a failure to add a route that already exists or to delete a route that is not
+in the routing table is ignored. Particular care should be taken when using host or network names in persistent
+routes, as network-based name resolution services are not available at the time routes are added at startup.
+-q Suppress all output.
+-R root-dir Specify an alternate root directory where route applies changes. This option is ignored unless used in
+conjunction with the -p option. When -R is specified, route changes are applied only to the list of saved routes to be
+used at startup, not to the network routing tables. In addition, certain checks, such as the existence of network inter<hy>
+faces used with -ifp, are skipped. This can be useful from within JumpStart scripts, where the root directory of the
+system being modified is in a location other than /.
+-v Print additional details in verbose mode.
+The following subcommands are supported:
+add Add a route.
+change Change aspects of a route (such as its gateway).
+delete Delete a specific route.
+<beginning of page>
+flush Remove all gateway entries from the routing table.
+get Look up and display the route for a destination.
+monitor Continuously report any changes to the routing information base, routing lookup misses, or suspected net<hy>
+work partitionings.
+show Display the list of routes to be applied at system startup. Can be used only in conjunction with the -p option.
+The add and delete sub-commands have the following syntax:
+ route [ -fnvq ] cmd destination gateway [metric/netmask]
+where cmd is add or delete, destination is the destination host or network, and gateway is the next-hop intermediary
+through which packets should be routed. Modifiers described in OPERANDS can be placed anywhere on the com<hy>
+mand line.
+The get and change sub-commands have the following syntax:
+ route [ -fnvq ] cmd destination [gateway [metric/netmask]]
+where cmd is get or change, destination is the destination host or network, and gateway is the next-hop intermediary
+through which packets should be routed. Modifiers described in OPERANDS can be placed anywhere on the com<hy>
+mand line.
+The monitor sub-command has the following syntax:
+ route monitor [ -inet | -inet6 ]
+route executes its sub-commands on routes to destinations by way of gateways.
+By default, destination and gateway addresses are interpreted as IPv4 addresses. All symbolic names are tried first as
+a host name, using getipnodebyname(3SOCKET). If this lookup fails in the AF_INET case, getnetby<hy>
+name(3SOCKET) interprets the name as that of a network.
+Including an optional modifier on the command line before the address changes how the route sub-command inter<hy>
+prets it.
+The following modifiers are supported:
+-inet Force the address to be interpreted as an IPv4 address, that is, under the AF_INET address family.
+-inet6 Force the address to be interpreted as an IPv6 address, that is, under the AF_INET6 address family.
+For IPv4 addresses, routes to a particular host are by default distinguished from those to a network by interpreting
+the Internet address specified as the destination. If the destination has a local address part (that is, the portion not
+covered by the netmask) of 0, or if the destination is resolved as the symbolic name of a network, then the route is
+assumed to be to a network; otherwise, it is presumed to be a route to a host.
+You can force this selection by using one of the following modifiers:
+-host Force the destination to be interpreted as a host.
+<beginning of page>
+-net Force the destination to be interpreted as a network.
+For example:
+tab(); cw(2.75i) cw(2.75i) lw(2.75i) lw(2.75i) DestinationDestination Equivalent _ 128.32-host 128.0.0.32
+128.32.130-host 128.32.0.130 -net 128.32128.32.0.0 -net 128.32.130128.32.130.0
+Two modifiers avoid confusion between addresses and keywords (for example., host used as a symbolic host name).
+You can distinguish a destination by preceding it with the -dst modifier. You can distinguish a gateway address by
+using the -gateway modifier. If the destination is directly reachable by way of an interface requiring no intermediary
+IP router to act as a gateway, this can be indicated by using the -interface or -iface modifier.
+In the following example, the route does not refer to an external gateway (router), but rather to one of the machine's
+interfaces. Packets with IP destination addresses matching the destination and mask on such a route are sent out on
+the interface identified by the gateway address. For interfaces using the ARP protocol, this type of route is used to
+specify that all matching destinations are local to the physical link. That is, a host could be configured to ARP for all
+addresses, without regard to the configured interface netmask, by adding a default route using this command. For ex<hy>
+ample:
+ example# route add default hostname -interface
+where gateway address hostname is the name or IP address associated with the network interface over which all
+matching packets should be sent. On a host with a single network interface, hostname is usually the same as the
+nodename returned by the uname -n command. See uname(1).
+For backward compatibility with older systems, directly reachable routes can also be specified by placing a 0 after
+the gateway address:
+ example# route add default hostname 0
+This value was once a route metric, but this metric is no longer used. If the value is specified as 0, then the destina<hy>
+tion is directly reachable (equivalent to specifying -interface). If it is non-zero but cannot be interpreted as a subnet
+mask, then a gateway is used (default).
+With the AF_INET address family or an IPv4 address, a separate subnet mask can be specified. This can be speci<hy>
+fied in one of the following ways: <bu> IP address following the gateway address . This is typically specified in decimal
+dot notation as for inet_addr(3SOCKET) rather than in symbolic form. <bu> IP address following the -netmask quali<hy>
+fier. <bu> Slash character and a decimal length appended to the destination address.
+If a subnet mask is not specified, the mask used is the subnet mask of the output interface selected by the gateway
+address, if the classful network of the destination is the same as the classful network of the interface. Otherwise, the
+classful network mask for the destination address is used.
+Each of the following examples creates an IPv4 route to the destination 192.0.2.32 subnet with a subnet mask of
+255.255.255.224:
+ example# route add 192.0.2.32/27 somegateway
+ example# route add 192.0.2.32 -netmask 255.255.255.224 somegateway
+ example# route add 192.0.2.32 somegateway 255.255.255.224
+For IPv6, only the slash format is accepted. The following example creates an IPv6 route to the destination 33fe::
+with a netmask of 16 one-bits followed by 112 zero-bits.
+ example# route add -inet6 3ffe::/16 somegateway
+<beginning of page>
+In cases where the gateway does not uniquely identify the output interface (for example, when several interfaces
+have the same address), you can use the -ifp ifname modifier to specify the interface by name. For example, -ifp lo0
+associates the route with the lo0 interface. If the named interface is an underlying interface in an IPMP (IP multi<hy>
+pathing) group, then requests to add a route will automatically be translated to the corresponding IPMP IP interface,
+and requests to delete or change a route on an underlying interface will fail.
+Routes have associated flags that influence operation of the protocols when sending to destinations matched by the
+routes. These flags can be set (and in some cases cleared, indicated by ~) by including the following modifiers on the
+command line:
+tab(); cw(1.32i) cw(1.24i) cw(2.94i) lw(1.32i) lw(1.24i) lw(2.94i) ModifierFlagDescription _ -inter<hy>
+face~RTF_GATEWAYDestination is directly reachable -iface~RTF_GATEWAYAlias for interface modifier -stati<hy>
+cRTF_STATICManually added route -nostatic~RTF_STATICT{ Pretend route was added by kernel or routing dae<hy>
+mon T} -rejectRTF_REJECTEmit an ICMP unreachable when matched -blackholeRTF_BLACKHOLESilently
+discard packets duing updates -proto1RTF_PROTO1Set protocol specific routing flag #1 -proto2RTF_PRO<hy>
+TO2Set protocol specific routing flag #2 -privateRTF_PRIVATEDo not advertise this route -multirtRTF_MUL<hy>
+TIRTCreates the specified redundant route -setsrcRTF_SETSRCAssigns the default source address
+The optional modifiers -rtt, -rttvar, -sendpipe, -recvpipe, -mtu, -hopcount, -expire, and -ssthresh provide initial
+values to quantities maintained in the routing entry by transport level protocols, such as TCP. These can be individu<hy>
+ally locked either by preceding each modifier to be locked by the -lock meta-modifier, or by specifying that all ensu<hy>
+ing metrics can be locked by the -lockrest meta-modifier.
+Some transport layer protocols can support only some of these metrics. The following optional modifiers are sup<hy>
+ported:
+-expire Lifetime for the entry. This optional modifier is not currently supported.
+-hopcount Maximum hop count. This optional modifier is not currently supported.
+-mtu Maximum MTU in bytes.
+-recvpipe Receive pipe size in bytes.
+-rtt Round trip time in microseconds.
+-rttvar Round trip time variance in microseconds.
+-sendpipe Send pipe size in bytes.
+-ssthresh Send pipe size threshold in bytes.
+-secattr Security attributes of the route. This modifier is available only if the system is configured with the Solaris
+Trusted Extensions feature.
+The -secattr modifier has the following format:
+ min_sl=val,max_sl=val,doi=val,cipso
+or:
+ sl=VAL,doi=VAL,cipso
+In the first form, above, the val for min_sl and max_sl is a sensitivity label in either hex or string form. The val for
+<beginning of page>
+doi is a non-negative integer. The route will apply only for packets with the same domain of interpretation as defined
+by the doi value and within the accreditation range defined by the min_sl and max_sl values. The cipso keyword is
+optional and set by default. Valid min_sl, max_sl and doi keyword/value pairs are mandatory. Note that if val con<hy>
+tains a space, it must be protected by double quotes.
+The second form, above, is equivalent to specifying the first form with the same VAL for min_sl and max_sl. The
+second form should be used for the get command, because get uses only a single sensitivity label.
+The modifiers host and net are taken to be equivalent to -host and -net. To specify a symbolic address that matches
+one of these names, use the dst or gateway keyword to distinguish it. For example: -dst host
+The following two flags are also accepted for compatibility with older systems, but have no effect.
+tab(); cw(2.84i) cw(2.66i) lw(2.84i) lw(2.66i) ModifierFlag _ -cloningRTF_CLONING -xresolveRTF_XRESOLVE
+The -ifa hostname modifier is also accepted, but has no effect.
+/etc/defaultrouter List of default routers
+/etc/hosts List of host names and net addresses
+/etc/networks List of network names and addresses
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu
+uname(1), in.ripngd(1M), in.routed(1M), netstat(1M), routed(1M), ioctl(2), getipnodebyname(3SOCKET), get<hy>
+netbyname(3SOCKET), inet_addr(3SOCKET), defaultrouter(4), hosts(4), networks(4), attributes(5), ARP(7P),
+ip(7P), route(7P), routing(7P)
+add [ host| network] destination:gateway flags
+The specified route is being added to the tables. The values printed are from the routing table entry supplied in the
+ioctl(2) call. If the gateway address used was not the primary address of the gateway (the first one returned by
+getipnodebyname(3SOCKET)) the gateway address is printed numerically as well as symbolically.
+delete [ host| network] destination:gateway flags
+change [ host| network] destination:gateway flags
+As add, but when deleting or changing an entry.
+destination done
+When the -f flag is specified, or the flush sub-command is used, each routing table entry deleted is indicated with a
+message of this form.
+Network is unreachable
+An attempt to add a route failed because the gateway listed was not on a directly-connected network. Give the next-
+hop gateway instead.
+<beginning of page>
+not in table
+A delete operation was attempted for an entry that is not in the table.
+entry exists
+An add operation was attempted for a route that already exists in the kernel.
+routing table overflow
+An operation was attempted, but the system was unable to allocate memory to create the new entry.
+insufficient privileges
+An attempt to add, delete, change, or flush a route failed because the calling process does not have appropriate privi<hy>
+leges.
+Specifying that destinations are local (with the -interfacemodifier) assumes that the routers implement proxy ARP,
+meaning that they respond to ARP queries for all reachable destinations. Normally, using either router discovery or
+RIP is more reliable and scalable than using proxy ARP. See in.routed(1M) for information related to RIP.
+Combining the all destinations are local route with subnet or network routes can lead to unpredictable results. The
+search order as it relates to the all destinations are local route are undefined and can vary from release to release.

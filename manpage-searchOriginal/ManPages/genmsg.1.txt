@@ -1,0 +1,180 @@
+<beginning of page>
+genmsg <-> generate a message source file by extracting messages from source files
+genmsg [-abdfrntx] [-c message-tag] [-g project-file]
+ [-l project-file] [-m prefix] [-M suffix]
+ [-o message-file] [-p preprocessor] [-s set-tags] file...
+The genmsg utility extracts message strings with calls to catgets(3C) from source files and writes them in a format
+suitable for input to gencat(1).
+genmsg reads one or more input files and, by default, generates a message source file whose name is composed of
+the first input file name with .msg. If the -o option is specified, genmsg uses the option argument for its output file.
+tab() box; lw(3.58i) |lw(1.92i) lw(3.58i) |lw(1.92i) CommandOutput File _ genmsg prog.cprog.c.msg gensmg
+main.c util.c tool.cmain.c.msg genmsg -o prog.msg mail.c util.cprog.msg
+genmsg also allows you to invoke a preprocessor to solve the dependencies of macros and define statements for the
+catgets(3C) calls.
+genmsg replaces message numbers with the calculated numbers based upon the project file if the message numbers
+are -1, and it generates copies of the input files with the new message numbers and a copy of the project file with the
+new maximum message numbers.
+A project file is a database that stores a list of set numbers with their maximum message numbers. Each line in a
+project file is composed of a set number and its maximum message number:
+Set_number Maximum_message_number
+In a project file, a line beginning with a number sign (#) or an ASCII space is considered as a comment and ignored.
+genmsg also has the reverse operation to replace all message numbers with -1.
+genmsg allows you to comment about messages and set numbers to inform the translator how the messages should
+be translated. It extracts the comment, which is surrounded with the comment indicators and has the specified tag in<hy>
+side the comment, from the input file and writes it with a dollar ($) prefix in the output file. genmsg supports the C
+and C++ comment indicators, '/*', '*/', and '//'.
+genmsg generates two kinds of messages for testing, prefixed messages and long messages. Prefixed messages allow
+you to check that your program is retrieving the messages from the message catalog. Long messages allow you to
+check the appearance of your window program's initial size and position.
+The following options are supported:
+-a Append the output into the message file message-file that is specified by the -o option. If two different messages
+that have the same set and message number are found, the message in the specified message file is kept and the other
+message in the input file is discarded.
+-b Place the extracted comment after the corresponding message in the output file. This option changes the place<hy>
+ment behavior of the -s or -c option.
+-c message-tag Extract message comments having message-tag inside them from the input files and write them with
+a '$' prefix as a comment in the output file.
+-d Include an original text of a message as a comment to be preserved along with its translations. With this option,
+the translator can see the original messages even after they are replaced with their translations.
+-f Overwrite the input files and the project file when used with the -l or -r option. With the -r option, genmsg over<hy>
+writes only the input files.
+<beginning of page>
+-g project-file Generate project-file that has a list of set numbers and their maximum message numbers in the input
+files.
+-l project-file Replace message numbers with the calculated numbers based upon project-file if the message numbers
+are -1 in the input files, and then generate copies of the input files with the new message numbers and a copy of
+project-file with the new maximum message numbers. If project-file is not found, genmsg uses the maximum mes<hy>
+sage number in the input file as a base number and generates project-file.
+-m prefix Fill in the message with prefix. This option is useful for testing.
+-M suffix Fill in the message with suffix. This option is useful for testing.
+-n Add comment lines to the output file indicating the file name and line number in the input files where each ex<hy>
+tracted string is encountered.
+-o message-file Write the output to message-file.
+-p preprocessor Invoke preprocessor to preprocess macros and define statements for the catgets(3C) calls. genmsg
+first invokes the option argument as a preprocesser and then starts the normal process against the output from the
+preprocessor. genmsg initiates this process for all the input files.
+-r Replace message numbers with -1. This is the reverse operation of the -l option.
+-s set-tag Extract set number comments having set-tag inside them from the input files and write them with a '$' pre<hy>
+fix as a comment in the output file. If multiple comments are specified for one set number, the first one is extracted
+and the rest of them are discarded.
+-t Generate a message that is three times as long as the original message. This option is useful for testing.
+-x Suppress warning messages about message and set number range checks and conflicts.
+file An input source file.
+Example 1 Assigning Message Numbers and Generating New Files
+Suppose that you have the following source and project files:
+ example% cat test.c
+ printf(catgets(catfd, 1, -1, "line too long\n"));
+ printf(catgets(catfd, 2, -1, "invalid code\n"));
+ example% cat proj
+ 1 10
+ 2 20
+The command
+ example% genmsg -l proj test.c
+<beginning of page>
+would assign the calculated message numbers based upon proj and generate the following files:
+test.c.msg Message file
+proj.new Updated project file
+test.c.new New source file
+ example% cat test.c.msg
+ $quote "
+ $set 1
+ 11 "line too long\n"
+ $set 2
+ 21 "invalid code\n"
+ example% cat proj.new
+ 1 11
+ 2 21
+ example% cat test.c.new
+ printf(catgets(catfd, 1, 11, "line too long\n"));
+ printf(catgets(catfd, 2, 21, "invalid code\n"));
+Example 2 Extracting Comments Into a File
+The command
+ example% genmsg -s SET -c MSG test.c
+ example% cat test.c
+ /* SET: tar messages */
+ /* MSG: don't translate "tar". */
+ catgets(catfd, 1, 1, "tar: tape write error");
+ // MSG: don't translate "tar" and "-I".
+ catgets(catfd, 1, 2, "tar: missing argument for -I flag");
+would extract the comments and write them in the following output file:
+ example% cat test.c.msg
+ $ /* SET: tar messages */
+ $set 1
+ $ /* MSG: don't translate "tar". */
+ 1 "tar: tape write error"
+ $ // MSG: don't translate "tar" and "-I".
+ 2 "tar: missing argument for -I flag"
+Example 3 Generating Test Messages
+The following command:
+ example% genmsg -m PRE: -M :FIX test.c
+might generate the following messages for testing:
+<beginning of page>
+ example% cat test.c.msg
+ 1 "PRE:OK:FIX"
+ 2 "PRE:Cancel:FIX"
+Example 4 Parsing a Macro and Writing the Extracted Messages
+Given the following input:
+ example% cat example.c
+ #include <nl_types.h>
+ #define MSG1 "message1"
+ #define MSG2 "message2"
+ #define MSG3 "message3"
+ #define MSG(n) catgets(catd, 1, n, MSG ## n)
+ void
+ main(int argc, char **argv)
+ {
+ nl_catd catd = catopen(argv[0], NL_CAT_LOCALE);
+ (void) printf("%s0\n, MSG(1));
+ (void) printf("%s0\n, MSG(2));
+ (void) printf("%s0\n, MSG(3));
+ (void) catclose(catd);
+ }
+The following command:
+ example% genmsg -p "cc -E" -o example.msg example.c
+would parse the MSG macros and write the extracted messages in example.msg.
+Example 5 Assigning Calculated Message Numbers
+Suppose that you have the following header, source, and project files:
+ example% cat ../inc/msg.h
+ #define WARN_SET 1
+ #define ERR_SET 2
+ #define WARN_MSG(id, msg) catgets(catd, WARN_SET, (id), (msg))
+ #define ERR_MSG(id, msg) catgets(catd, ERR_SET, (id), (msg))
+ example% example.c
+ #include "msg.h"
+ printf("%s, WARN_MSG(-1, "Warning error"));
+ printf("%s, ERR_MSG(-1, "Fatal error"));
+ example % proj
+ 1 10
+ 2 10
+The command
+ example% genmsg -f -p "cc -E -I../inc" -l proj \
+  -o example.msg example.c
+<beginning of page>
+would assign each of the -1 message numbers a calculated number based upon proj and would overwrite the results
+to example.c and proj. Also, this command writes the extracted messages in example.msg.
+See environ(5) for descriptions of the following environment variables that affect the execution of genmsg:
+LC_MESSAGES and NLSPATH.
+The following exit values are returned:
+0 Successful completion.
+>0 An error occurred.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wloc
+gencat(1), catgets(3C), catopen(3C), attributes(5), environ(5)
+genmsg does not handle pointers or variables in the catgets(3C) call. For example:
+ const int set_num = 1;
+ extern int msg_num(const char *);
+ const char *msg = "Hello";
+ catgets(catd, set_num, msg_num(msg), msg);
+When the auto message numbering is turned on with a preprocessor, if there are multiple -1's in the catgets(3C) line,
+genmsg replaces all of the -1's in the line with a calculated number. For example, given the input:
+ #define MSG(id, msg) catgets(catd, 1, (id), (msg))
+ if (ret == -1) printf("%s, MSG(-1, "Failed"));
+the command
+ genmsg -l proj -p "cc -E"
+would produce:
+  #define MSG(id, msg) catgets(catd, 1, (id), (msg))
+  if (ret == 1) printf("%s, MSG(1, "Failed"));
+The workaround would be to split it into two lines as follows:
+  if (ret == -1)
+  printf("%s, MSG(-1, "Failed"));

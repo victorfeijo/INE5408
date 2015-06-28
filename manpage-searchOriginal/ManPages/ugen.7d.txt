@@ -1,0 +1,782 @@
+<beginning of page>
+ugen <-> USB generic driver
+Node Name@unit-address
+#include <sys/usb/clients/ugen/usb_ugen.h>
+ugen is a generic USBA (Solaris USB Architecture) compliant client character driver that presents USB devices to
+applications through a standard open(2), close(2), read(2), write(2), aioread(3C), aiowrite(3C) Unix interface. Un<hy>
+interpreted raw data are transfered to and from the device via file descriptors created for each USB endpoint. Status
+is obtained by reading file descriptors created for endpoint and full device status.
+ugen supports control, bulk, isochronous and interrupt (in and out) transfers. libusb(3LIB) uses ugen to access de<hy>
+vices that do not contain drivers (such as digital cameras and PDAs). Refer to /usr/sfw/share/doc/libusb/libusb.txt
+for details.
+In general, no explicit binding of the ugen driver is necessary because usb_mid(7D) is the default driver for devices
+without a class or vendor unique driver. usb_mid(7D) creates the same logical device names as ugen, but only if no
+child interfaces are explicitly bound to ugen. If it is necessary to bind ugen explicitly to a device or interface, the
+following section explains the necessary steps.
+ugen can bind to a device with one or more interfaces in its entirety, or to a single interface of that device. The bind<hy>
+ing type depends on information that is passed to add_drv(1M) or update_drv(1M).
+An add_drv(1M) command binds ugen to a list of device types it is to control. update_drv(1M) adds an additional
+device type to the list of device types being managed by the driver.
+Names used to bind drivers can be found in /var/adm/messages. When a device is on-lined after hot insertion, and
+no driver is found, there will be an entry containing:
+ USB 2.0 device (usb<vid>,<pid>)...
+where vid is the USB vendor identifier in hex and pid is the product identifier in hex supplied by the device descrip<hy>
+tor usb_dev_descr(9S).
+When using ugen for the first time, you must add the driver utilizing add_drv(1M), using a command of the follow<hy>
+ing form:
+ Assuming that the vid is 472 and pid is b0b0:
+ add_drv -n -m '* <device perms> <owner> <group>'
+  -i '"usb472,b0b0"' ugen
+If the command fails with:
+ (ugen) already in use as a driver or alias.
+...add the device using update_drv(1M):
+ update_drv -a -m '* <device perms> <owner> <group>'
+  -i '"usb472,b0b0"' ugen
+This binds ugen to the entire device.
+If ugen only binds to one interface of the device, use the following driver_alias instead of usb<vid>,<pid>:
+  usbif<vid>,<pid>.config<cfg value>.<interface number>
+where cfg value is the value of bConfigurationValue in the configuration descriptor (usb_cfg_descr(9S)). For exam<hy>
+ple "usbif1234,4567.config1.0."
+Note that you can use update_drv to also remove bindings. Please see update_drv(1M) for more information.
+<beginning of page>
+After a successful add_drv or update_drv, remove the device and reinsert. Check with the prtconf(1M) -D option to
+determine if ugen is successfully bound to the device and the nodes created in /dev/usb/<vid>.<pid> (see below).
+An example showing how to bind a child device representing interface 0 of configuration 1 of a composite device
+follows:
+ update_drv -a -m '* 0666 root sys'
+  -i '"usbif472,b0b0.config1.0"' ugen
+Note that you can completely uninstall the ugen driver and delete it from the system by doing:
+ pkgrm SUNWugen
+Any pkgadd of SUNWugen after the pkgrm reactivates any pre-existing ugen driver device-bindings.
+Any pre-existing ugen driver device-bindings are preserved across operating system upgrades.
+For each device or child device it manages, ugen creates one logical device name for device-wide status and one
+logical device name for endpoint 0. ugen also creates logical device names for all other endpoints within the device
+node's binding scope (interface or device), plus logical device names for their status.
+If separate ugen instances control different interfaces of the same device, the device-wide status and endpoint logical
+device names created for each instance will share access to the same source or endpoint pipes. For example, a device
+with two interfaces, each operated by their own ugen instance, will show endpoint0 as if0cntrl0 to the first inter<hy>
+face, and will show it as if1cntrl0 to the second interface. Both of these logical device names share endpoint0.
+Likewise for the same device, ugen makes the device-wide status available as if0devstat to the first interface and as
+if1devstat to the second interface. if0devstat and if1devstat both return the same data.
+Any ugen logical device name can be held open by only one user at a time, regardless of whether the O_EXCL flag
+passed to open(2). When a single pipe or data source is shared by multiple logical device names, such as if[0,1]cn<hy>
+trl0 or if[0,1]devstat above, more than one logical device name sharing the pipe or data source can be open at a time.
+However, only one user may access the shared pipe or data source at a time, regardless of the logical device name
+used for access.
+When ugen is bound to an entire device, the following logical device names are created (each on a single line). N
+represents the instance number of the device type.
+ Endpoint 0 (default endpoint):
+  /dev/usb/<vid>.<pid>/<N>/cntrl0
+  /dev/usb/<vid>.<pid>/<N>/cntrl0stat
+  For example:
+  /dev/usb/472.b0b0/0/cntrl0
+  /dev/usb/472.b0b0/0/cntrl0stat
+ Configuration index 1, Endpoints > 0, alternate 0:
+  /dev/usb/<vid>.<pid>/<N>/if<interface#>
+  <in|out|cntrl><endpoint#>
+  /dev/usb/<vid>.<pid>/<N>/if<interface#>
+  <in|out|cntrl><endpoint#>stat
+  For example:
+  /dev/usb/472.b0b0/0/if0in1
+  /dev/usb/472.b0b0/0/if0in1stat
+ Configuration index 1, Endpoints > 0, alternate > 0:
+  /dev/usb/<vid>.<pid>/<N>/if<interface#>.
+  <alternate><in|out|cntrl><endpoint#>
+<beginning of page>
+  /dev/usb/<vid>.<pid>/<N>/if<interface#>.
+  <alternate<in|out|cntrl><endpoint#>stat
+  For example:
+  /dev/usb/472.b0b0/0/if0.1in3
+  /dev/usb/472.b0b0/0/if0.1in3stat
+ Configuration index> 1, Endpoints > 0, alternate 0:
+  /dev/usb/<vid>.<pid>/<N>/cfg<value>if<interface#>
+  <in|out|cntrl><endpoint#>
+  /dev/usb/<vid>.<pid>/<N>/cfg<value>if<interface#>
+  <in|out|cntrl><endpoint#>stat
+  For example:
+  /dev/usb/472.b0b0/0/cfg2if0in1
+  /dev/usb/472.b0b0/0/cfg2if0in1stat
+  Note that the configuration value from the configuration
+  descriptor indexed by the configuration index is used in
+  the node name and not the configuration index itself.
+ Configuration index> 1, Endpoints > 0, alternate > 0:
+  /dev/usb/<vid>.<pid>/<N>/cfg<value>if<interface#>.
+  <alternate<in|out|cntrl><endpoint#>
+  /dev/usb/<vid>.<pid>/<N>/cfg<value>if<interface#>.
+  <alternate<in|out|cntrl><endpoint#>stat
+  For example:
+  /dev/usb/472.b0b0/0/cfg2if0.1in1
+  /dev/usb/472.b0b0/0/cfg2if0.1in1stat
+  Device status:
+  /dev/usb/<vid>.<pid>/<N>/devstat
+  For example:
+  /dev/usb/472.b0b0/0/devstat
+When ugen is bound to a single device interface, the following logical device nodes are created:
+ Endpoint 0 (default endpoint):
+  /dev/usb/<vid>.<pid>/<N>/if<interface#>cntrl0
+  /dev/usb/<vid>.<pid>/<N>/if<interface#>cntrl0stat
+  For example:
+  /dev/usb/472.b0b0/0/if0cntrl0
+  /dev/usb/472.b0b0/0/if0cntrl0stat
+ Device status:
+  /dev/usb/<vid>.<pid>/<N>/if<interface#>devstat
+  For example:
+  /dev/usb/472.b0b0/0/if0devstat
+The format for all other logical device names is identical to the format used when ugen is bound to the entire device.
+Opening the endpoint of a different configuration or different alternate interface will cause an implicit change of
+configuration or a switch to an alternate interface. A configuration change is prohibited when any non-zero endpoint
+<beginning of page>
+device nodes are open. An alternate interface switch is prohibited if any endpoint in the same interface is open.
+A device may be hot-removed at any time. Following hot-removal, the device status changes to
+USB_DEV_STAT_DISCONNECTED, the status of open endpoints change to USB_LC_STAT_DISCONNECTED
+upon their access, and all subsequent transfer requests fail. Endpoints are reactivated by first reinserting the device
+and then closing and reopening all endpoints that were open when the device was disconnected.
+CPR (Checkpoint/Resume) may be initiated at any time and is treated similarly to a hot-removal. Upon successful
+suspend and resume, all subsequent transfer requests fail as an indication to the application to reinitialize. Applica<hy>
+tions should close and reopen all endpoints to reinstate them. All endpoint and device status on Resume (before
+close and reopen) is USB_LC_STAT_SUSPENDED. A system suspend will fail while ugen is performing a transfer.
+Devices which support remote wakeup can be power managed when they have no open logical device nodes. When
+an application opens the first logical device node of a device, that application should assume that a reinitialization of
+device state is required.
+Applications can monitor device status changes by reading the device status from the device status logical name.
+When opened without O_NONBLOCK and O_NDELAY, all reads from that file descriptor (with the exception of
+the the intial read that follows the open) block until a device status change occurs. Calls to read will always return
+immediately if opened with O_NONBLOCK or O_NDELAY. Nonblocking calls to read which have no data to re<hy>
+turn, return no error and zero bytes read.
+Device statuses are:
+USB_DEV_STAT_ONLINE Device is available.
+USB_DEV_STAT_DISCONNECTED Device has been disconnected.
+USB_DEV_STAT_RESUMED Device has been resumed, however, endpoints which were open on suspend have
+not yet been closed and reopened.
+USB_DEV_STAT_UNAVAILABLE Device has been reconnected, however, endpoints which were open on discon<hy>
+nect have not yet been closed and reopened.
+The following code reads the device status device logical name:
+ int fd;
+ int status;
+ if ((fd = open("/dev/usb/472.b0b0/0/devstat",
+  O_RDONLY)) < 0) {
+  /* handle error */
+ }
+ if (read(fd, &status, sizeof(status)) != sizeof(status)) {
+  /* handle error */
+ }
+ switch (status) {
+ case USB_DEV_STAT_DISCONNECTED:
+  printf ("Terminating as device has been disconnected.\n");
+  exit (0);
+ case USB_DEV_STAT_RESUMED:
+ case USB_DEV_STAT_UNAVAILABLE:
+  /*
+  * Close and reopen endpoints to reestablish device access,
+  * then reset device.
+  */
+  break;
+ case USB_DEV_STAT_ONLINE:
+<beginning of page>
+ default:
+  break;
+ }
+Use poll(2) to block on several logical names simultaneously, including device status logical names. Poll indicates
+when reading a logical name would return data. See poll(2) for details. Calls to read may be done whether or not
+they follow calls to poll.
+Each data endpoint has a corresponding status logical name. Use the status logical name to retrieve the state of the
+data endpoint, including detail on how its most recent transfer failed. Reads of the status file descriptors always re<hy>
+turn immediately. See the ERRORS section for more information on endpoint status values. All logical device name
+files created for returning status must be opened with O_RDONLY.
+The following code illustrates reading the status file descriptor of an endpoint which just failed a data transfer in or<hy>
+der to get more information on the failure.
+ int data_xfered, status;
+ int ep1_data_fd, ep1_stat_fd;
+ uchar_t request[8];
+ ep1_data_fd = open ("/dev/usb/472.b0b0/0/if0out1", O_WRONLY);
+ if (ep1_data_fd < 0) {
+  /* Handle open error. */
+ }
+ ep1_stat_fd = open ("/dev/usb/472.b0b0/0/if0out1stat",
+  O_RDONLY);
+ if (ep1_stat_fd < 0) {
+  /* Handle open error. */
+ }
+ data_xfered = write(ep1_data_fd, request, sizeof (request));
+ /* An error occured during the data transfer. */
+ if (data_xfered != sizeof (request)) {
+  /* Read status file descriptor for details on failure. */
+  if (read(ep1_stat_fd, (int *)&status, sizeof (status)) !=
+  sizeof (status)) {
+  status = USB_LC_STAT_UNSPECIFIED_ERR;
+  }
+  /* Take appropriate action. */
+  switch (status) {
+  case USB_LC_STAT_STALL:
+  printf ("Endpoint stalled.\n");
+  break;
+  case ...
+  ...
+  }
+  }
+The control endpoint is typically used to set up the device and to query device status or configuration.
+Applications requiring I/O on a control endpoint should open the corresponding logical device name and use regular
+UNIX I/O system calls. For example: read(2), write(2), aioread(3C) and aiowrite(3C). poll(2) is not supported on
+control endpoints.
+A control endpoint must be opened with O_RDWR since it is bidirectional. It cannot be opened with O_NON<hy>
+BLOCK or O_NDELAY.
+For example:
+<beginning of page>
+ fd = open("/dev/usb/472.b0b0/0/cntrl0", O_RDWR);
+ fdstat = open("/dev/usb/472.b0b0/0/cntrl0stat", O_RDONLY);
+Control endpoints can be read and written. A read operation receives data from the device and a write operation
+sends data to the device.
+To perform a control-IN transfer, perform a write(2) of USB setup data (see section 9.3 of the USB 1.1 or 2.0 speci<hy>
+fications) followed by a read(2) on the same control endpoint to fetch the desired data. For example:
+ void init_cntrl_req(
+  uchar_t *req, uchar_t bmRequestType, uchar_t bRequest,
+  ushort_t wValue, ushort_t wIndex, ushort_t wLength) {
+  req[0] = bmRequestType;
+  req[1] = bRequest;
+  req[2] = 0xFF & wValue;
+  req[3] = 0xFF & (wValue >> 8);
+  req[4] = 0xFF & wIndex;
+  req[5] = 0xFF & (wIndex >> 8);
+  req[6] = 0xFF & wLength;
+  req[7] = 0xFF & (wLength >> 8);
+  }
+  ....
+  uchar_t dev_descr_req[8];
+  usb_dev_descr_t descr;
+  init_cntrl_req(dev_descr_req,
+  USB_DEV_REQ_DEV_TO_HOST, USB_REQ_GET_DESCR,
+  USB_DESCR_TYPE_SETUP_DEV, 0, sizeof (descr));
+  count = write(fd, dev_descr_req, sizeof (dev_descr_req));
+  if (count != sizeof (dev_descr_req)) {
+  /* do some error recovery */
+  ...
+  }
+  count = read(fd, &descr, sizeof (descr));
+  if (count != sizeof (descr)) {
+  /* do some error recovery */
+  }
+The application can issue any number of reads to read data received on a control endpoint. ugen successfully com<hy>
+pletes all reads, returning the number of bytes transferred. Zero is returned when there is no data to transfer.
+If the read/write fails and returns -1, you can access the endpoint's status device logical name for precise error in<hy>
+formation:
+  int status;
+  count = read(fdstat, &status, sizeof (status));
+  if (count == sizeof (status)) {
+  switch (status) {
+  case USB_LC_STAT_SUSPENDED:
+  case USB_LC_STAT_DISCONNECTED:
+  /* close all endpoints */
+  ...
+  break;
+  default:
+<beginning of page>
+  ...
+  break;
+  }
+  }
+Refer to the ERRORS section for all possible error values.
+To perform a control-OUT transfer, send in a single transfer, the USB setup data followed by any accompanying data
+bytes.
+  /* 1st 8 bytes of wbuf are setup. */
+  init_cntrl_req(wbuf, .......);
+  /* Data bytes begin at byte 8 of wbuf. */
+  bcopy(data, &wuf[8], sizeof (data));
+  /* Send it all in a single transfer. */
+  count = write(fd, wbuf, sizeof (wbuf));
+A write(2) returns the number of bytes (both setup and data) actually transferred, (whether or not the write is com<hy>
+pletely successful), provided that some data is actually transferred. When no data is transferred, write(2) returns -1.
+Applications can read the corresponding endpoint status to retrieve detailed error information. Note that it is an error
+to specify a size different than:
+(number of data bytes + number of setup bytes).
+Here is a more extensive example which gets all descriptors of a device configuration. For sake of brevity, uninter<hy>
+esting parts are omitted.
+  #include <sys/usb/usba.h>
+  #include <sys/usb/clients/ugen/usb_ugen.h>
+  uchar_t *config_cloud;
+  uchar_t *curr_descr;
+  uchar_t *bytes;
+  int curr_descr_len;
+  int curr_descr_type;
+  usb_cfg_descr_t cfg_descr;
+  usb_if_descr_t if_descr;
+  usb_ep_descr_t ep_descr;
+  /* See 9.13 of USB 2.0 spec for ordering. */
+  static char *pipetypes[] = {
+  "Control", "Isochronous", "Bulk", "Interrupt"
+  };
+  /*
+  * Setup to send a request to read just the config descriptor. The
+  * size of the whole cloud, containing all cfg, interface, endpoint,
+  * class and vendor-specific descriptors, will be returned as part of
+  * the config descriptor.
+  */
+  init_cntrl_req(&setup_data, USB_DEV_REQ_DEV_TO_HOST, USB_REQ_GET_DESCR,
+  USB_DESCR_TYPE_SETUP_CFG, 0, USB_CFG_DESCR_SIZE);
+  /*
+  * Write setup data. USB device will prepare to return the whole
+  * config cloud as a response to this. We will read this separately.
+  */
+  count = write(ctrl_fd, &setup_data, sizeof (setup_data));
+  if (count != sizeof (setup_data)) {
+<beginning of page>
+  /* Error recovery. */
+  } else {
+  count = read(ctrl_fd, &cfg_descr, USB_CFG_DESCR_SIZE);
+  if (count != USB_CFG_DESCR_SIZE) {
+  /* Error recovery. */
+  }
+  }
+  /* USB data is little endian. */
+  bytes = (uchar_t *)(&cfg_descr.wTotalLength);
+  totalLength = bytes[0] + (bytes[1] << 8);
+  /*
+  * The size of the whole cloud is in the bLength field. Set up
+  * to read this amount of data, to get the whole cloud.
+  */
+  config_cloud = malloc(totalLength);
+  init_cntrl_req(&setup_data, USB_DEV_REQ_DEV_TO_HOST, USB_REQ_GET_DESCR,
+  USB_DESCR_TYPE_SETUP_CFG, 0, totalLength);
+  count = write(ctrl_fd, &setup_data, sizeof (setup_data));  
+  if (count != sizeof (setup_data)) {
+  /* Error recovery. */
+  } else {
+  count = read(ctrl_fd, config_cloud, totalLength);
+  if (count != totalLength) {
+  /* Error recovery. */
+  }
+  }
+  /* Got the data. Now loop, dumping out the descriptors found. */
+  curr_descr = config_cloud;
+  offset = 0;
+  while (offset < totalLength) {
+  /* All descr have length and type at offset 0 and 1 */
+  curr_descr_len = curr_descr[0];
+  curr_descr_type = curr_descr[1];
+  switch (curr_descr_type) {
+  case USB_DESCR_TYPE_CFG:
+  /*
+  * Copy data into separate structure, needed for
+  * proper alignment of all non char fields. Note:
+  * non-char fields of all descriptors begin on aligned
+  * boundaries. The issue is that some structures may
+  * be adjacent to others which have an odd-numbered
+  * byte size, and may thus start on an odd-numbered
+  * boundary. */
+  bcopy(curr_descr, &cfg_descr, curr_descr_len);
+  /* Remember to read any words in endian-neutral way. */
+  (void) printf("\nConfig %d found.\n",
+  cfg_descr.bConfigurationValue);
+  break;
+  case USB_DESCR_TYPE_IF:
+  bcopy(curr_descr, &if_descr, curr_descr_len);
+  (void) printf("\n\tInterface %d, Alt %d found.\n",
+  if_descr.bInterfaceNumber,
+  if_descr.bAlternateSetting);
+  break;
+<beginning of page>
+  case USB_DESCR_TYPE_EP:
+  bcopy(curr_descr, &ep_descr, curr_descr_len);
+  (void) printf("\n\t\tEndpoint %d (%s-%s) found.\n",
+  (ep_descr.bEndpointAddress & USB_EP_NUM_MASK),
+  (pipetypes[
+  ep_descr.bmAttributes & USB_EP_ATTR_MASK]),
+  ((ep_descr.bEndpointAddress &
+  USB_EP_DIR_IN) ? "IN" : "OUT"));
+  break;
+  default:
+  (void) printf(
+  "\n\t\t\tOther descriptor found. Type:%d\n",
+  curr_descr_type);
+  break;
+  }
+  offset += curr_descr_len;
+  curr_descr = &config_cloud[offset];
+  }
+Applications requiring data from an interrupt-IN endpoint should open the corresponding logical device name and
+use read(2), aioread(3C) and poll(2) system calls.
+An interrupt-IN endpoint must be opened with O_RDONLY. It can also be opened using O_NONBLOCK or
+O_NDELAY if desired.
+ fd = open("/dev/usb/472.b0b0/0/if0in1", O_RDONLY);
+ fdstat = open("/dev/usb/472.b0b0/0/if0in1stat", O_RDONLY);
+ugen starts polling interrupt<em>IN endpoints immediately upon opening them and stops polling them upon closure.
+(Polling refers to interrogation of the device by the driver and should not be confused with poll(2), which is an inter<hy>
+rogation of the driver by the application.)
+A read(2) of an endpoint opened with the O_NONBLOCK or O_NDELAY flags set will not block when there is
+insufficient data available to satisfy the request. The read simply returns what it can without signifying any error.
+Applications should continuously check for and consume interrupt data. ugen enables buffering of up to one second
+of incoming data. In case of buffer overflow, ugen stops polling the interrupt-IN endpoint until the application con<hy>
+sumes all the data. In this case, a read(2) of an empty buffer returns -1, sets the endpoint status to
+USB_LC_STAT_INTR_BUF_FULL (to indicate that the buffer had been full and polling had been stopped) and
+causes ugen to start polling the endpoint again. To retrieve the status, the application can open and read the corre<hy>
+sponding endpoint's status device logical name.
+ for (;;) {
+  count = read(fd, buf, sizeof(buf));
+  if (count == -1) {
+  int cnt, status;
+  cnt = read(fdstat, &status, sizeof (status));
+  if (cnt == -1) {
+  /* more error recovery here */
+  } else {
+  switch (status) {
+  case USB_LC_STAT_INTR_BUF_FULL:
+  ...
+  break;
+  default:
+  ...
+  break;
+<beginning of page>
+  }
+  }
+  }
+  /* process the data */
+  ....
+  }
+ugen will never drop data. However, the device may drop data if the application cannot read it at the rate that it is
+produced.
+Applications requiring unbuffered data from an interrupt-IN endpoint should open the associated status endpoint
+with O_RDWR before opening the associated interrupt-IN endpoint and write a control byte with USB_EP_IN<hy>
+TR_ONE_XFER set. All other bits are reserved and should be 0.
+"One transfer" mode will persist until disabled explicitly after the associated interrupt-IN endpoint has been closed
+by writing a control byte with USB_EP_INTR_ONE_XFER cleared.
+"One transfer" mode is implicitly disabled when the status/control endpoint is closed.
+Attempts to change the "one transfer" mode while the endpoint is open will result in EINVAL.
+An application can open multiple interrupt-IN endpoints and can call poll(2) to monitor the availability of new data.
+(Note: poll works with interrupt-IN data endpoints, not their status endpoints.)
+  struct pollfd pfd[2];
+  bzero(pfd, sizeof (pfd));
+  pfd[0].fd = fd1; /* fd1 is one interrupt-IN endpoint. */
+  pfd[0].events = POLLIN;
+  pfd[1].fd = fd2; /* fd2 is another interrupt-IN endpoint. */
+  pfd[1].events = POLLIN;
+  for (;;) {
+  poll(pfd, 2, -1);
+  if (pfd[0].revents & POLLIN) {
+  count = read(fd1, buf, sizeof (buf));
+  ....
+  }
+  if (pfd[1].revents & POLLIN) {
+  count = read(fd2, buf, sizeof (buf));
+  ....
+  }
+  }
+You can monitor the device status endpoint via poll(2) concurrently with the multiple interrupt-IN endpoints. Sim<hy>
+ply add another pollfd element to the pfd array in the previous code example, and initialize the new element's fd
+field with the file descriptor of the device status endpoint (opened without O_NONBLOCK or O_NDELAY). Set
+the new element's event field to POLLIN like the other elements. Note that only interrupt-IN endpoints and the de<hy>
+vice status endpoint can be monitored using poll(2).
+Applications requiring output on an interrupt-OUT endpoint can open the corresponding logical device name and
+perform regular UNIX I/O system calls such as write(2) and aiowrite(3C).
+An interrupt-OUT endpoint must be opened with O_WRONLY.
+ fd = open("/dev/usb/472.b0b0/0/if0out3", O_WRONLY);
+ fdstat = open("/dev/usb/472.b0b0/0/if0out3stat", O_RDONLY);
+Data can be written to an interrupt-OUT endpoint as follows:
+<beginning of page>
+  count = write(fd, buf, sizeof (buf)):
+  if (count == -1) {
+  /* error recovery */
+  }
+Applications requiring I/O on a bulk endpoint can open the corresponding logical device name and perform regular
+UNIX I/O system calls. For example: read(2), write(2), aioread(3C) and aiowrite(3C). poll(2) is not supported on
+bulk endpoints.
+A bulk endpoint must be opened with O_RDONLY or O_WRONLY and cannot be opened with O_NONBLOCK
+or O_NDELAY:
+ fd = open("/dev/usb/472.b0b0/0/if0in2", O_RDONLY);
+ fdstat = open("/dev/usb/472.b0b0/0/if0in2stat", O_RDONLY);
+Data can be read from a bulk-IN endpoint as follows:
+  count = read(fd, buf, sizeof (buf)):
+  if (count == -1) {
+  /* error recovery */
+  }
+  Data can be written to a bulk-OUT endpoint as follows:
+  count = write(fd, buf, sizeof (buf)):
+  if (count == -1) {
+  /* error recovery */
+  }
+Applications requiring I/O on an isochronous endpoint can open the corresponding logical device name and perform
+regular UNIX I/O system calls such as read(2), write(2), poll(2), aioread(3C) and aiowrite(3C). An isochronous
+endpoint must be opened with O_RDWR.
+ fd = open("/dev/usb/472.b0b0/0/if0.3in2", O_RDWR);
+ fdstat = open("/dev/usb/472.b0b0/0/if0.3in2stat", O_RDONLY);
+Applications can use the status logical name to retrieve the state of the isochronous data endpoint, including details
+on why the most recent transfer failed.
+Applications have the flexibility to specify the number of isochronous packets and the size of individual packets they
+want to transfer. Applications should use the following data structures to exchange isochronous packet information
+with the ugen driver:
+ typedef struct ugen_isoc_pkt_descr {
+   /*
+   * Set by the application, for all isochro.
+   * requests, to the num. of bytes to xfer
+   * in a packet.
+   */
+    ushort_t dsc_isoc_pkt_len;
+   /*
+   * Set by ugen to actual num. of bytes sent/received
+   * in a packet.
+    */
+  ushort_t dsc_isoc_pkt_actual_len;
+   /*
+<beginning of page>
+   * Per pkt. status set by ugen driver both for the
+   * isochronous IN and OUT requests. Application can
+   * use USB_LC_STAT_* to parse the status.
+   */
+  int dsc_isoc_pkt_status;
+  } ugen_isoc_pkt_descr_t;
+  typedef struct ugen_isoc_req_head {
+  /* pkt count of the isoc request */
+  int req_isoc_pkts_count;
+  /* pkt descriptors */
+  ugen_isoc_pkt_descr_t req_isoc_pkt_descrs[1];
+  } ugen_isoc_req_head_t;
+req_isoc_pkts_count is limited by the capability of the USB host controller driver. The current upper bound for the
+uhci and ohci drivers is 512. The upper bound for the ehci driver is 1024.
+For an isochronous-IN endpoint, applications must first use the ugen_isoc_req_head_t structure followed by
+ugen_isoc_pkt_descr_t to write packet request information to the ugen node. The ugen driver then checks the va<hy>
+lidity of the request. If it is valid, the driver immediately begins isochronous polling on the IN endpoint and applica<hy>
+tions can proceed with read(2) of the data on the isochronous-IN endpoint. Upon successful return of read(2),
+isochronous packet descriptors (whose dsc_isoc_pkt_actual_len and dsc_isoc_pkt_status fields were filled by the
+driver) are returned, followed by the request's device payload data.
+Applications should continuously check for and consume isochronous data. The ugen driver enables buffering of up
+to eight seconds of incoming data for full-speed isochronous endpoint, one second of data for high-speed
+isochronous endpoints who request one transaction per microframe and 1/3 of a second of incoming data for high-
+speed high-bandwidth isochronous endpoints who request three transactions per microframe. In case of buffer over<hy>
+flow, ugen discards the oldest data.
+The isochronous-IN polling can only be stopped by a close(2) associated file descriptor. If applications want to
+change packet information, they must first close(2) the endpoint to stop the isochronous-IN polling, then open(2) the
+endpoint and write(2) new packets request.
+The following example shows how to read an isochronous-IN endpoint:
+   #include <sys/usb/clients/ugen/usb_ugen.h>
+   char *buf, *p;
+   ushort_t pktlen;
+   int pktcnt, i;
+   int len;
+   ugen_isoc_req_head_t *req;
+   ugen_isoc_pkt_descr_t *pktdesc;
+   char rdbuf[5000];
+   pktcnt = 4; /* 4 packets in this request */
+   
+   len = sizeof(int) +
+    sizeof(ugen_isoc_pkt_descr_t) * pktcount;
+   buf = malloc(len);
+   if (!buf) {
+    /* Error recovery. */
+    }
+   req = (ugen_isoc_req_head_t *)buf;
+   req->req_isoc_pkts_count = pktcnt;
+   pktdesc = (ugen_isoc_pkt_descr_t *)
+    (req->req_isoc_pkt_descrs);
+  for (i = 0; i < pktcnt; i++) {
+     /*
+<beginning of page>
+     * pktlen should not exceed xfer
+     * capability of an endpoint
+     */
+     pktdesc[i].dsc_isoc_pkt_len = pktlen;
+      pktdesc[i].dsc_isoc_pkt_actual_len = 0;
+     pktdesc[i].dsc_isoc_pkt_status = 0;
+    }
+    /*
+    * write request info to driver and len must
+    * be exactly the sum of
+    * sizeof(int) + sizeof(ugen_isoc_pkt_descr_t) * pktcnt.
+    * Otherwise, an error is returned.
+    */
+    if (write(fd, buf, len) < 0) {
+     /* Error recovery. */
+    }
+    /*
+    * Read length should be sum of all pkt descriptors
+    * length + payload data length of all pkts
+    * (sizeof(ugen_isoc_pkt_descr_t) + pktlen) * pktcnt
+    */
+    if (read(fd, rdbuf, (sizeof(ugen_isoc_pkt_descr_t) +
+    pktlen) * pktcnt) < 0) {
+     /* Error recovery. */
+    }
+    pktdesc = (ugen_isoc_pkt_descr_t *) rdbuf;
+    /* points to payload beginning */
+    p = rdbuf + pktcnt * sizeof(ugen_isoc_pkt_descr_t);
+    for (i = 0; i < pktcnt; i++) {
+     printf("packet %d len = %d,"
+      " actual_len = %d, status = 0x%x0,
+      i, pktdesc->dsc_isoc_pkt_len,
+      pktdesc->dsc_isoc_pkt_actual_len,
+      pktdesc->dsc_isoc_pkt_status);
+     /* Processing data */
+     /*
+     * next packet data payload, do NOT use
+     * dsc_isoc_pkt_actual_len
+     */
+     p += pktdesc->dsc_isoc_pkt_len;
+     pktdesc++;
+  }
+For an isochronous-OUT endpoint, applications use the same packet descriptor and request structures to write re<hy>
+quest information to the ugen node. Following the packet request head information is the packet payload data. Up<hy>
+on successful return of write(2), applications can read(2) the same ugen file immediately to retrieve the individual
+packet transfer status of the last request. If the application isn't concerned about the status, it can omit it.
+In the following example, an application transfers data on an isochronous-OUT endpoint:
+   #include <sys/usb/clients/ugen/usb_ugen.h>
+   char *buf, *p;
+   ushort_t i, pktlen;
+   int len, pktcnt;
+   ugen_isoc_req_head_t *req;
+   ugen_isoc_pkt_descr_t *pktdesc;
+<beginning of page>
+   char rdbuf[4096];
+   pktcnt = 4;
+   /*
+   * set packet length to a proper value, don't
+   * exceed endpoint's capability
+   */
+   pktlen = 1024;
+   len = sizeof(int) +
+    sizeof(ugen_isoc_pkt_descr_t) * pktcount;
+   
+   len += pktlen * pktcnt;
+   buf = malloc(len);
+   if (!buf) {
+    /* Error recovery. */
+    }
+   req = (ugen_isoc_req_head_t *)buf;
+   req->req_isoc_pkts_count = pktcnt;
+   pktdesc =
+    (ugen_isoc_pkt_descr_t *)(req->req_isoc_pkt_descrs);
+   for (i = 0; i < pktcnt; i++) {
+    pktdesc[i].dsc_isoc_pkt_len = pktlen;
+    pktdesc[i].dsc_isoc_pkt_actual_len = 0;
+    pktdesc[i].dsc_isoc_pkt_status = 0;
+    }
+   
+   /* moving to beginning of payload data */
+   p = buf + sizeof(int) + sizeof(*pktdesc) * pktcnt;
+   for (i = 0; i < pktcnt; i++) {
+    /* fill in the data buffer */
+    p += pktlen;
+  }
+   /*
+   * write packet request information and data to ugen driver
+   *
+   * len should be the exact value of sizeof(int) +
+   * sizeof(ugen_isoc_pkt_descr_t) * pktcnt + payload length
+   */
+   if (write(fd, buf, len) < 0) {
+    /* Error recovery. */
+    }
+   /* read packet status */
+   if (read(fd, rdbuf, sizeof(*pktdesc) * pktcnt) < 0) {
+    /* Error recovery. */
+   } else {
+    /* Parse every packet's transfer status */
+    }
+The following statuses are returned by endpoint status device logical names:
+<beginning of page>
+USB_LC_STAT_NOERROR
+No error.
+USB_LC_STAT_CRC
+CRC error detected.
+USB_LC_STAT_BITSTUFFING
+Bit stuffing error.
+USB_LC_STAT_DATA_TOGGLE_MM
+Data toggle did not match.
+USB_LC_STAT_STALL
+Endpoint returned stall.
+USB_LC_STAT_DEV_NOT_RESP
+Device not responding.
+USB_LC_STAT_UNEXP_PID
+Unexpected Packet Identifier (PID).
+USB_LC_STAT_PID_CHECKFAILURE
+Check bits on PID failed.
+USB_LC_STAT_DATA_OVERRUN
+Data overrun.
+USB_LC_STAT_DATA_UNDERRUN
+Data underrun.
+USB_LC_STAT_BUFFER_OVERRUN
+Buffer overrun.
+USB_LC_STAT_BUFFER_UNDERRUN
+Buffer underrun.
+USB_LC_STAT_TIMEOUT
+Command timed out.
+USB_LC_STAT_NOT_ACCESSED
+Not accessed by the hardware.
+<beginning of page>
+USB_LC_STAT_UNSPECIFIED_ERR
+Unspecified USBA or HCD error.
+USB_LC_STAT_NO_BANDWIDTH
+No bandwidth available.
+USB_LC_STAT_HW_ERR
+Host Controller h/w error.
+USB_LC_STAT_SUSPENDED
+Device was suspended.
+USB_LC_STAT_DISCONNECTED
+Device was disconnected.
+USB_LC_STAT_INTR_BUF_FULL
+Polling was stopped as the interrupt-IN data buffer was full. Buffer is now empty and polling has been resumed.
+USB_LC_STAT_INTERRUPTED
+Request was interrupted.
+USB_LC_STAT_NO_RESOURCES
+No resources available for request.
+USB_LC_STAT_INTR_POLLING_FAILED
+Failed to restart polling.
+USB_LC_STAT_ISOC_POLLING_FAILED
+Failed to start isochronous polling.
+USB_LC_STAT_ISOC_UNINITIALIZED
+Isochronous packet information not initialized.
+USB_LC_STAT_ISOC_PKT_ERROR
+All packets in this isochronous request have errors. The polling on this isochronous-IN endpoint is suspended and
+can be resumed on next read(2).
+The following system call errno values are returned:
+EINVAL An attempt was made to enable or disable "one transfer" mode while the associated endpoint was open.
+EBUSY The endpoint has been opened and another open is attempted.
+<beginning of page>
+EACCES An endpoint open was attempted with incorrect flags.
+ENOTSUP Operation not supported.
+ENXIO Device associated with the file descriptor does not exist.
+ENODEV Device has been hot-removed or a suspend/resume happened before this command.
+EIO An I/O error occurred. Send a read on the endpoint status minor node to get the exact error information.
+EINTR Interrupted system call.
+ENOMEM No memory for the allocation of internal structures.
+  /kernel/drv/ugen 32 bit ELF kernel module (x86 platform only)
+  /kernel/drv/sparcv9/ugen 64 bit ELF kernel module
+  /dev/usb/<vid>.<pid>/<N>/cntrl0
+  /dev/usb/<vid>.<pid>/<N>/cntrl0stat
+  /dev/usb/<vid>.<pid>/<N>/if<interface#>
+  <in|out|cntrl><endpoint#>
+  /dev/usb/<vid>.<pid>/<N>/if<interface#>
+  <in|out|cntrl><endpoint#>stat
+  /dev/usb/<vid>.<pid>/<N>/if<interface#>.
+  <alternate><in|out|cntrl<endpoint#>
+  /dev/usb/<vid>.<pid>/<N>/if<interface#>.
+  <alternate><in|out|cntrl><endpoint#>stat
+  /dev/usb/<vid>.<pid>/<N>/cfg<value>if<interface#>
+  <in|out|cntrl><endpoint#>
+  /dev/usb/<vid>.<pid>/<N>/cfg<value>if<interface#>
+  <in|out|cntrl<endpoint#stat>
+  /dev/usb/<vid>.<pid>/<N>/cfg<value>if<interface#>.
+  <alternate><in|out|cntrl><endpoint#>
+  /dev/usb/<vid>.<pid>/<N>/cfg<value>if<interface#>.
+  <alternate><in|out|cntrl><endpoint#>stat
+  /dev/usb/<vid>.<pid>/<N>/devstat
+  /dev/usb/<vid>.<pid>/<N>/if<interface#>cntrl0
+  /dev/usb/<vid>.<pid>/<N>/if<interface#>cntrl0stat
+where N is an integer representing the instance number of this type of device. (All logical device names for a single
+device share the same N.)
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ ArchitecturePCI-
+based SPARC _ Availability SUNWugen, SUNWugenu
+libusb(3LIB), close(2), poll(2), read(2), write(2), aioread(3C), aiowrite(3C), usba(7D), usb_dev_descr(9S).
+<beginning of page>
+In addition to being logged, the following messages may appear on the system console. All messages are formatted
+in the following manner:
+ Warning: <device path> (ugen<instance num>): Error Message...
+Too many minor nodes.
+Device has too many minor nodes. Not all are available.
+Instance number too high (<number>).
+Too many devices are using this driver.
+Cannot access <device>. Please reconnect.
+This device has been disconnected because a device other than the original one has been inserted. The driver informs
+you of this fact by displaying the name of the original device.
+Device is not identical to the previous one on this port. Please disconnect and reconnect.
+Same condition as described above; however in this case, the driver is unable to identify the original device with a
+name string.
+ugen returns -1 for all commands and sets errno to ENODEV when device has been hot-removed or resumed from
+a suspend. The application must close and reopen all open minor nodes to reinstate successful communication.

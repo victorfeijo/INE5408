@@ -1,0 +1,59 @@
+<beginning of page>
+pthread_atfork <-> register fork handlers
+#include <sys/types.h>
+#include <unistd.h>
+int pthread_atfork(void (*prepare) (void), void (*parent) (void),
+ void (*child) (void));
+The pthread_atfork() function declares fork handlers to be called prior to and following fork(2), within the thread
+that called fork(). The order of calls to pthread_atfork() is significant.
+Before fork() processing begins, the prepare fork handler is called. The prepare handler is not called if its address is
+NULL.
+The parent fork handler is called after fork() processing finishes in the parent process, and the child fork handler is
+called after fork() processing finishes in the child process. If the address of parent or child is NULL, then its handler
+is not called.
+The prepare fork handler is called in LIFO (last-in first-out) order, whereas the parent and child fork handlers are
+called in FIFO (first-in first-out) order. This calling order allows applications to preserve locking order.
+Upon successful completion, pthread_atfork() returns 0. Otherwise, an error number is returned.
+The pthread_atfork() function will fail if:
+ENOMEM Insufficient table space exists to record the fork handler addresses.
+Solaris threads do not offer pthread_atfork() functionality (there is no thr_atfork() interface). However, a Solaris
+threads application can call pthread_atfork() to ensure fork()-safety, since the two thread APIs are interoperable.
+Seefork(2) for information relating to fork() in a Solaris threads environment in Solaris 10 relative to previous re<hy>
+leases. Example 1 Make a library safe with respect to fork().
+All multithreaded applications that call fork() in a POSIX threads program and do more than simply call exec(2) in
+the child of the fork need to ensure that the child is protected from deadlock.
+Since the "fork-one" model results in duplicating only the thread that called fork(), it is possible that at the time of
+the call another thread in the parent owns a lock. This thread is not duplicated in the child, so no thread will unlock
+this lock in the child. Deadlock occurs if the single thread in the child needs this lock.
+The problem is more serious with locks in libraries. Since a library writer does not know if the application using the
+library calls fork(), the library must protect itself from such a deadlock scenario. If the application that links with
+this library calls fork() and does not call exec() in the child, and if it needs a library lock that may be held by some
+other thread in the parent that is inside the library at the time of the fork, the application deadlocks inside the library.
+The following describes how to make a library safe with respect to fork() by using pthread_atfork().
+1. Identify all locks used by the library (for example {L1,...Ln}). Identify also the locking order for these locks
+(for example {L1...Ln}, as well.) 2. Add a call to pthread_atfork(f1, f2, f3) in the library's .init section. f1, f2,
+f3 are defined as follows:
+  f1()
+  {
+  /* ordered in lock order */
+  pthread_mutex_lock(L1);
+  pthread_mutex_lock(...);
+  pthread_mutex_lock(Ln);
+  }
+  f2()
+  {
+  pthread_mutex_unlock(L1);
+  pthread_mutex_unlock(...);
+<beginning of page>
+  pthread_mutex_unlock(Ln);
+  }
+  f3()
+  {
+  pthread_mutex_unlock(L1);
+  pthread_mutex_unlock(...);
+  pthread_mutex_unlock(Ln);
+  }
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Standard _ MT-LevelMT-Safe
+exec(2), fork(2), atexit(3C), attributes(5), standards(5)

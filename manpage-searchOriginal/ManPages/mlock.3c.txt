@@ -1,0 +1,45 @@
+<beginning of page>
+mlock, munlock <-> lock or unlock pages in memory
+#include <sys/mman.h>
+int mlock(caddr_t addr, size_t len);
+int munlock(caddr_t addr, size_t len);
+#include <sys/mman.h>
+int mlock(const void * addr, size_t len);
+int munlock(const void * addr, size_t len);
+The mlock() function uses the mappings established for the address range [addr, addr + len) to identify pages to be
+locked in memory. If the page identified by a mapping changes, such as occurs when a copy of a writable
+MAP_PRIVATE page is made upon the first store, the lock will be transferred to the newly copied private page.
+The munlock() function removes locks established with mlock().
+A given page may be locked multiple times by executing an mlock() through different mappings. That is, if two dif<hy>
+ferent processes lock the same page, then the page will remain locked until both processes remove their locks. How<hy>
+ever, within a given mapping, page locks do not nest <mi> multiple mlock() operations on the same address in the same
+process will all be removed with a single munlock(). Of course, a page locked in one process and mapped in another
+(or visible through a different mapping in the locking process) is still locked in memory. This fact can be used to cre<hy>
+ate applications that do nothing other than lock important data in memory, thereby avoiding page I/O faults on refer<hy>
+ences from other processes in the system.
+The contents of the locked pages will not be transferred to or from disk except when explicitly requested by one of
+the locking processes. This guarantee applies only to the mapped data, and not to any associated data structures (file
+descriptors and on-disk metadata, among others).
+If the mapping through which an mlock() has been performed is removed, an munlock() is implicitly performed. An
+munlock() is also performed implicitly when a page is deleted through file removal or truncation.
+Locks established with mlock() are not inherited by a child process after a fork() and are not nested.
+Attempts to mlock() more memory than a system-specific limit will fail.
+Upon successful completion, the mlock() and munlock() functions return 0. Otherwise, no changes are made to
+any locks in the address space of the process, the functions return <mi>1 and set errno to indicate the error.
+The mlock() and munlock() functions will fail if:
+EINVAL The addr argument is not a multiple of the page size as returned by sysconf(3C).
+ENOMEM Addresses in the range [addr, addr + len) are invalid for the address space of a process, or specify one
+or more pages which are not mapped.
+ENOSYS The system does not support this memory locking interface.
+EPERM The {PRIV_PROC_LOCK_MEMORY} privilege is not asserted in the effective set of the calling
+process.
+The mlock() function will fail if:
+EAGAIN Some or all of the memory identified by the range [addr, addr + len) could not be locked because of in<hy>
+sufficient system resources or because of a limit or resource control on locked memory.
+Because of the impact on system resources, the use of mlock() and munlock() is restricted to users with the
+{PRIV_PROC_LOCK_MEMORY} privilege.
+<beginning of page>
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Standard _ MT-LevelMT-Safe
+fork(2), memcntl(2), mmap(2), plock(3C), mlockall(3C), sysconf(3C), attributes(5), standards(5)

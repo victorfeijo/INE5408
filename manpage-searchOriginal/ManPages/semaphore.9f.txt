@@ -1,0 +1,42 @@
+<beginning of page>
+semaphore, sema_init, sema_destroy, sema_p, sema_p_sig, sema_v, sema_tryp <-> semaphore functions
+#include <sys/ksynch.h>
+void sema_init(ksema_t *sp, uint_t val, char *name, ksema_type_t type,
+ void *arg);
+void sema_destroy(ksema_t *sp);
+void sema_p(ksema_t *sp);
+void sema_v(ksema_t *sp);
+int sema_p_sig(ksema_t *sp);
+int sema_tryp(ksema_t *sp);
+Solaris DDI specific (Solaris DDI).
+sp A pointer to a semaphore, type ksema_t.
+val Initial value for semaphore.
+name Descriptive string. This is obsolete and should be NULL. (Non-NULL strings are legal, but they are a waste of
+kernel memory.)
+type Variant type of the semaphore. Currently, only SEMA_DRIVER is supported.
+arg Type-specific argument; should be NULL.
+These functions implement counting semaphores as described by Dijkstra. A semaphore has a value which is atomi<hy>
+cally decremented by sema_p() and atomically incremented by sema_v(). The value must always be greater than or
+equal to zero. If sema_p() is called and the value is zero, the calling thread is blocked until another thread performs
+a sema_v() operation on the semaphore.
+Semaphores are initialized by calling sema_init(). The argument, val, gives the initial value for the semaphore. The
+semaphore storage is provided by the caller but more may be dynamically allocated, if necessary, by sema_init().
+For this reason, sema_destroy() should be called before deallocating the storage containing the semaphore.
+The sema_p_sig() function decrements the semaphore, as does sema_p(). However, if the semaphore value is zero,
+sema_p_sig() will return without decrementing the value if a signal (that is, from kill(2)) is pending for the thread.
+The sema_tryp() function will decrement the semaphore value only if it is greater than zero, and will not block.
+0 sema_tryp() could not decrement the semaphore value because it was zero.
+1 sema_p_sig() was not able to decrement the semaphore value and detected a pending signal.
+These functions can be called from user, interrupt, or kernel context, except for sema_init() and sema_destroy(),
+which can be called from user or kernel context only. None of these functions can be called from a high-level inter<hy>
+rupt context. In most cases, sema_v() and sema_p() should not be called from any interrupt context.
+If sema_p() is used from interrupt context, lower-priority interrupts will not be serviced during the wait. This means
+that if the thread that will eventually perform the sema_v() becomes blocked on anything that requires the lower-pri<hy>
+ority interrupt, the system will hang.
+For example, the thread that will perform the sema_v() may need to first allocate memory. This memory allocation
+<beginning of page>
+may require waiting for paging I/O to complete, which may require a lower-priority disk or network interrupt to be
+serviced. In general, situations like this are hard to predict, so it is advisable to avoid waiting on semaphores or con<hy>
+dition variables in an interrupt context.
+kill(2), condvar(9F), mutex(9F)
+Writing Device Drivers

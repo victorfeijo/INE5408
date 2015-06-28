@@ -1,0 +1,78 @@
+<beginning of page>
+t_alloc <-> allocate a library structure
+#include <xti.h>
+void *t_alloc(int fd, int struct_type, int fields);
+This routine is part of the XTI interfaces which evolved from the TLI interfaces. XTI represents the future evolution
+of these interfaces. However, TLI interfaces are supported for compatibility. When using a TLI routine that has the
+same name as an XTI routine, a different header file, tiuser.h, must be used. Refer to the section, TLI COMPATI<hy>
+BILITY, for a description of differences between the two interfaces.
+The t_alloc() function dynamically allocates memory for the various transport function argument structures as speci<hy>
+fied below. This function will allocate memory for the specified structure, and will also allocate memory for buffers
+referenced by the structure.
+The structure to allocate is specified by struct_type and must be one of the following:
+ T_BIND  struct t_bind
+ T_CALL   struct t_call
+ T_OPTMGMT   struct t_optmgmt
+ T_DIS    struct t_discon
+ T_UNITDATA  struct t_unitdata
+ T_UDERROR   struct t_uderr
+ T_INFO  struct t_info
+where each of these structures may subsequently be used as an argument to one or more transport functions.
+Each of the above structures, except T_INFO, contains at least one field of type struct netbuf. For each field of this
+type, the user may specify that the buffer for that field should be allocated as well. The length of the buffer allocated
+will be equal to or greater than the appropriate size as returned in the info argument of t_open(3NSL) or t_get<hy>
+info(3NSL). The relevant fields of the info argument are described in the following list. The fields argument specifies
+which buffers to allocate, where the argument is the bitwise-or of any of the following:
+T_ADDR The addr field of the t_bind, t_call, t_unitdata or t_uderr structures.
+T_OPT The opt field of the t_optmgmt, t_call, t_unitdata or t_uderr structures.
+T_UDATA The udata field of the t_call, t_discon or t_unitdata structures.
+T_ALL All relevant fields of the given structure. Fields which are not supported by the transport provider specified
+by fd will not be allocated.
+For each relevant field specified in fields, t_alloc() will allocate memory for the buffer associated with the field, and
+initialize the len field to zero and the buf pointer and maxlen field accordingly. Irrelevant or unknown values passed
+in fields are ignored. Since the length of the buffer allocated will be based on the same size information that is re<hy>
+turned to the user on a call to t_open(3NSL) and t_getinfo(3NSL), fd must refer to the transport endpoint through
+which the newly allocated structure will be passed. In the case where a T_INFO structure is to be allocated, fd may
+be set to any value. In this way the appropriate size information can be accessed. If the size value associated with
+any specified field is T_INVALID, t_alloc() will be unable to determine the size of the buffer to allocate and will
+fail, setting t_errno to TSYSERR and errno to EINVAL. See t_open(3NSL) or t_getinfo(3NSL). If the size
+value associated with any specified field is T_INFINITE, then the behavior of t_alloc() is implementation-defined.
+For any field not specified in fields, buf will be set to the null pointer and len and maxlen will be set to zero. See
+t_open(3NSL) or t_getinfo(3NSL).
+The pointer returned if the allocation succeeds is suitably aligned so that it can be assigned to a pointer to any type
+of object and then used to access such an object or array of such objects in the space allocated.
+Use of t_alloc() to allocate structures will help ensure the compatibility of user programs with future releases of the
+<beginning of page>
+transport interface functions.
+On successful completion, t_alloc() returns a pointer to the newly allocated structure. On failure, a null pointer is re<hy>
+turned.
+ALL - apart from T_UNINIT
+On failure, t_errno is set to one of the following:
+TBADF struct_type is other than T_INFO and the specified file descriptor does not refer to a transport endpoint.
+TNOSTRUCTYPE Unsupported struct_type requested. This can include a request for a structure type which is in<hy>
+consistent with the transport provider type specified, that is, connection-mode or connectionless-mode.
+TPROTO This error indicates that a communication problem has been detected between XTI and the transport
+provider for which there is no other suitable XTI error (t_errno).
+TSYSERR A system error has occurred during execution of this function.
+The XTI and TLI interface definitions have common names but use different header files. This, and other semantic
+differences between the two interfaces are described in the subsections below.
+The XTI interfaces use the header file, xti.h. TLI interfaces should not use this header. They should use the header:
+#include <tiuser.h>
+The t_errno values that can be set by the XTI interface and cannot be set by the TLI interface are:
+TPROTO
+TNOSTRUCTYPE
+Assume that the value associated with any field of struct t_info (argument returned by t_open() or t_getinfo()) that
+describes buffer limits is -1. Then the underlying service provider can support a buffer of unlimited size. If this is
+the case, t_alloc() will allocate a buffer with the default size 1024 bytes, which may be handled as described in the
+next paragraph.
+If the underlying service provider supports a buffer of unlimited size in the netbuf structure (see t_connect(3NSL)),
+t_alloc() will return a buffer of size 1024 bytes. If a larger size buffer is required, it will need to be allocated sepa<hy>
+rately using a memory allocation routine such as malloc(3C). The buf and maxlen fields of the netbuf data structure
+can then be updated with the address of the new buffer and the 1024 byte buffer originally allocated by t_alloc() can
+be freed using free(3C).
+Assume that the value associated with any field of struct t_info (argument returned by t_open() or t_getinfo() ) that
+describes nbuffer limits is -2. Then t_alloc() will set the buffer pointer to NULL and the buffer maximum size to 0,
+and then will return success (see t_open(3NSL) or t_getinfo(3NSL)).
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT LevelSafe
+free(3C), malloc(3C), t_connect(3NSL), t_free(3NSL), t_getinfo(3NSL), t_open(3NSL), attributes(5)

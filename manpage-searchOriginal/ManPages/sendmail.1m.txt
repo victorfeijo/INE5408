@@ -1,0 +1,898 @@
+<beginning of page>
+sendmail <-> send mail over the internet
+/usr/lib/sendmail [-Ac] [-Am] [-ba] [-bD] [-bd] [-bi] [-bl]
+ [-bm] [-bp] [-bP] [-bs] [-bt] [-bv] [-B type] [-C file]
+ [-D logfile] [-d X] [-F fullname] [-f name] [-G]
+ [-h N] [-L tag] [-M xvalue] [-N notifications] [-n]
+ [-Ooption =value] [-o xvalue] [-p protocol]
+ [-Q [reason]] [-q [time]] [-q Xstring] [-R ret]
+ [-r name] [-t] [-V envid] [-v] [-X logfile]
+ [address]...
+The sendmail utility sends a message to one or more people, routing the message over whatever networks are neces<hy>
+sary. sendmail does internetwork forwarding as necessary to deliver the message to the correct place.
+sendmail is not intended as a user interface routine. Other programs provide user-friendly front ends. sendmail is
+used only to deliver pre-formatted messages.
+With no flags, sendmail reads its standard input up to an EOF, or a line with a single dot, and sends a copy of the
+letter found there to all of the addresses listed. It determines the network to use based on the syntax and contents of
+the addresses.
+Local addresses are looked up in the local aliases(4) file, or in a name service as defined by the nsswitch.conf(4)
+file, and aliased appropriately. In addition, if there is a .forward file in a recipient's home directory, sendmail for<hy>
+wards a copy of each message to the list of recipients that file contains. Refer to the NOTES section for more infor<hy>
+mation about .forward files. Aliasing can be prevented by preceding the address with a backslash.
+There are several conditions under which the expected behavior is for the alias database to be either built or rebuilt.
+This cannot occur under any circumstances unless root owns and has exclusive write permission to the
+/etc/mail/aliases* files.
+If a message is found to be undeliverable, it is returned to the sender with diagnostics that indicate the location and
+nature of the failure; or, the message is placed in a dead.letter file in the sender's home directory.
+The sendmail service is managed by the service management facility, smf(5), under the service identifiers:
+ svc:/network/smtp:sendmail
+ svc:/network/sendmail-client:default
+Administrative actions on these services, such as enabling, disabling, or requesting restart, can be performed using
+svcadm(1M). The services' status can be queried using the svcs(1) command.
+These are separate services rather than instances of the same service so that other services can properly express any
+dependencies. In particular, here are some guidelines about which service/instance should be depended on for which
+purposes: <bu> For a service that uses sendmail to send mail, an optional dependency on the service svc:/net<hy>
+work/sendmail-client might be in order. <bu> For a service that needs to receive mail in general, but does not depend
+on sendmail being the particular SMTP receiver, a dependency on the service svc:/network/smtp might be in order.
+<bu> For a service that needs to interact with sendmail in particular, such as a Milter, a dependency on the instance
+svc:/network/smtp:sendmail might be in order.
+For the last two, note the difference, as the latter has the ":sendmail" instance specification, whereas the former
+does not, thus representing the more general service.
+On an unmodified system, access to sendmail by remote clients is enabled and disabled through the service manage<hy>
+ment facility (see smf(5)). In particular, remote access is determined by the value of the local_only SMF property:
+ svc:/network/smtp:sendmail/config/local_only = true
+A setting of true, as above, disallows remote access; false allows remote access. The default value is true.
+The following example shows the sequence of SMF commands used to enable sendmail to allow access to remote
+systems:
+<beginning of page>
+ # svccfg -s svc:/network/smtp:sendmail setprop config/local_only = false
+ # svcadm refresh svc:/network/smtp:sendmail
+ # svcadm restart svc:/network/smtp:sendmail
+See svcadm(1M) and svccfg(1M).
+Note, however, on a system where any of the sendmail(4) files have been customized, setting this property might not
+have the intended effect. See sendmail(4) for details.
+See sendmail(4) for details on which service properties can be set to automate (re)building of configuration files
+when the service is started.
+sendmail uses TCP Wrappers to restrict access to hosts. It uses the service name of sendmail for hosts_access().
+For more information on TCP Wrappers, see tcpd(1M) and hosts_access(4) in the SUNWtcpd package. tcpd(1M)
+and hosts_access(4) are not part of the Solaris man pages.
+The /etc/default/sendmail file stores startup options for sendmail so that the options are not removed when a host is
+upgraded. See also sendmail(4) for details on which service properties can be set to automate (re)building of config<hy>
+uration files when the service is started.
+You can use the following variables in the /etc/default/sendmail startup file:
+CLIENTOPTIONS=string
+Selects additional options to be used with the client daemon, which looks in the client-only queue (/var/spool/client<hy>
+mqueue) and acts as a client queue runner. No syntax checking is done, so be careful when making changes to this
+variable.
+CLIENTQUEUEINTERVAL=#
+Similar to the QUEUEINTERVAL option, CLIENTQUEUEINTERVAL sets the time interval for mail queue
+runs. However, the CLIENTQUEUEINTERVAL option controls the functions of the client daemon, instead of the
+functions of the master daemon. Typically, the master daemon is able to deliver all messages to the SMTP port.
+However, if the message load is too high or the master daemon is not running, then messages go into the client-only
+queue, /var/spool/clientmqueue. The client daemon, which checks in the client-only queue, then acts as a client
+queue processor.
+ETRN_HOSTS=string
+Enables an SMTP client and server to interact immediately without waiting for the queue run intervals, which are
+periodic. The server can immediately deliver the portion of its queue that goes to the specified hosts. For more infor<hy>
+mation, refer to the etrn(1M) man page.
+MODE=-bd
+Selects the mode to start sendmail with. Use the -bd option or leave it undefined.
+OPTIONS=string
+Selects additional options to be used with the master daemon. No syntax checking is done, so be careful when mak<hy>
+ing changes to this variable.
+QUEUEINTERVAL=#
+Sets the interval for mail queue runs on the master daemon. # can be a positive integer that is followed by either s for
+seconds, m for minutes, h for hours, d for days, or w for weeks. The syntax is checked before sendmail is started. If
+the interval is negative or if the entry does not end with an appropriate letter, the interval is ignored and sendmail
+starts with a queue interval of 15 minutes.
+<beginning of page>
+QUEUEOPTIONS=p
+Enables one persistent queue runner that sleeps between queue run intervals, instead of a new queue runner for each
+queue run interval. You can set this option to p, which is the only setting available. Otherwise, this option is not set.
+sendmail supports a mail filter API called "milter". For more information, see /usr/include/libmilter/README
+and http://www.milter.org
+The following options are supported:
+-Ac
+Uses submit.cf even if the operation mode does not indicate an initial mail submission.
+-Am
+Uses sendmail.cf even if the operation mode indicates an initial mail submission.
+-ba
+Goes into ARPANET mode. All input lines must end with a RETURN-LINEFEED, and all messages are generated
+with a RETURN-LINEFEED at the end. Also, the From: and Sender: fields are examined for the name of the
+sender.
+-bd
+Runs as a daemon in the background, waiting for incoming SMTP connections.
+-bD
+Runs as a daemon in the foreground, waiting for incoming SMTP connections.
+-bi
+Initializes the aliases(4) database. Root must own and have exclusive write permission to the /etc/mail/aliases* files
+for successful use of this option.
+-bl
+Runs as a daemon (like -bd) but accepts only loopback SMTP connections.
+-bm
+Delivers mail in the usual way (default).
+-bp
+Prints a summary of the mail queues.
+-bP
+Prints the number of entries in the queues. This option is only available with shared memory support.
+-bs
+Uses the SMTP protocol as described in RFC 2821. This flag implies all the operations of the -ba flag that are com<hy>
+patible with SMTP.
+<beginning of page>
+-bt
+Runs in address test mode. This mode reads addresses and shows the steps in parsing; it is used for debugging con<hy>
+figuration tables.
+-bv
+Verifies names only. Does not try to collect or deliver a message. Verify mode is normally used for validating users
+or mailing lists.
+-B type
+Indicates body type (7BIT or 8BITMIME).
+-C file
+Uses alternate configuration file.
+-D logfile
+Send debugging output to the indicated log file instead of stdout.
+-d X
+Sets debugging value to X.
+-f name
+Sets the name of the "from" person (that is, the sender of the mail).
+-F fullname
+Sets the full name of the sender.
+-G
+When accepting messages by way of the command line, indicates that they are for relay (gateway) submission.
+When this flag is set, sendmail might complain about syntactically invalid messages, for example, unqualified host
+names, rather than fixing them. sendmail does not do any canonicalization in this mode.
+-h N
+Sets the hop count to N. The hop count is incremented every time the mail is processed. When it reaches a limit, the
+mail is returned with an error message, the victim of an aliasing loop.
+-L tag
+Sets the identifier used in syslog messages to the supplied tag.
+-Mxvalue
+Sets macro x to the specified value.
+-n
+Does not do aliasing.
+<beginning of page>
+-N notifications
+Tags all addresses being sent as wanting the indicated notifications, which consists of the word "NEVER" or a com<hy>
+ma-separated list of "SUCCESS", "FAILURE", and "DELAY" for successful delivery, failure and a message that is
+stuck in a queue somwhere. The default is "FAILURE,DELAY".
+-oxvalue
+Sets option x to the specified value. Processing Options are described below.
+-Ooption=value
+Sets option to the specified value (for long from names). Processing Options are described below.
+-p protocol
+Sets the sending protocol. The protocol field can be in form protocol:host to set both the sending protocol and the
+sending host. For example: -pUUCP:uunet sets the sending protocol to UUCP and the sending host to uunet. Some
+existing programs use -oM to set the r and s macros; this is equivalent to using -p.
+-q[time]
+Processes saved messages in the queue at given intervals. If time is omitted, processes the queue once. time is given
+as a tagged number, where s is seconds, m is minutes, h is hours, d is days, and w is weeks. For example, -q1h30m
+or -q90m would both set the timeout to one hour thirty minutes.
+By default, sendmail runs in the background. This option can be used safely with -bd.
+-qp[time-]
+Similar to -q[time], except that instead of periodically forking a child to process the queue, sendmail forks a single
+persistent child for each queue that alternates between processing the queue and sleeping. The sleep time (time) is
+specified as the argument; it defaults to 1 second. The process always sleeps at least 5 seconds if the queue was emp<hy>
+ty in the previous queue run.
+-qf
+Processes saved messages in the queue once and does not fork(2), but runs in the foreground.
+-qG name
+Processes jobs in queue group called name only.
+-q[!]I substr
+Limits processed jobs to those containing substr as a substring of the queue ID or not when ! is specified.
+-q[!]Q substr
+Limits processed jobs to those quarantined jobs containing substr as a substring of the quarantine reason or not
+when ! is specified.
+-q[!]R substr
+Limits processed jobs to those containing substr as a substring of one of the recipients or not when ! is specified.
+-q[!]S substr
+Limits processed jobs to those containing substr as a substring of the sender or not when ! is specified.
+<beginning of page>
+-Q[reason]
+Quarantines a normal queue item with the given reason or unquarantines a quarantined queue item if no reason is
+given. This should only be used with some sort of item matching as described above.
+-r name
+An alternate and obsolete form of the -f flag.
+-R ret
+Identifies the information you want returned if the message bounces. ret can be HDRS for headers only or FULL for
+headers plus body.
+-t
+Reads message for recipients. To:,Cc:, and Bcc: lines are scanned for people to send to. The Bcc: line is deleted be<hy>
+fore transmission. Any addresses in the argument list is suppressed. The NoRecipientAction Processing Option can
+be used to change the behavior when no legal recipients are included in the message.
+-v
+Goes into verbose mode. Alias expansions are announced, and so forth.
+-V envid
+The indicated envid is passed with the envelope of the message and returned if the message bounces.
+-X logfile
+Logs all traffic in and out of sendmail in the indicated logfile for debugging mailer problems. This produces a lot of
+data very quickly and should be used sparingly.
+There are a number of "random" options that can be set from a configuration file. Options are represented by a single
+character or by multiple character names. The syntax for the single character names of is:
+ Oxvalue
+This sets option x to be value. Depending on the option, value may be a string, an integer, a boolean (with legal val<hy>
+ues t, T, f, or F; the default is TRUE), or a time interval.
+The multiple character or long names use this syntax:
+ O Longname=argument
+This sets the option Longname to be argument. The long names are beneficial because they are easier to interpret
+than the single character names.
+Not all processing options have single character names associated with them. In the list below, the multiple character
+name is presented first followed by the single character syntax enclosed in parentheses.
+AliasFile (Afile)
+Specifies possible alias files.
+<beginning of page>
+AliasWait (a N)
+If set, waits up to N minutes for an "@:@" entry to exist in the aliases(4) database before starting up. If it does not
+appear in N minutes, issues a warning. Defaults to 10 minutes.
+AllowBogusHELO
+Allows a HELO SMTP command that does not include a host name. By default this option is disabled.
+BadRcptThrottle=N
+If set and more than the specified number of recipients in a single SMTP envelope are rejected, sleeps for one sec<hy>
+ond after each rejected RCPT command.
+BlankSub (Bc)
+Sets the blank substitution character to c. Unquoted spaces in addresses are replaced by this character. Defaults to
+SPACE (that is, no change is made).
+CACertFile
+File containing one CA cert.
+CACertPath
+Path to directory with certs of CAs.
+CheckAliases (n)
+Validates the RHS of aliases when rebuilding the aliases(4) database.
+CheckpointInterval (CN)
+Checkpoints the queue every N (default 10) addresses sent. If your system crashes during delivery to a large list, this
+prevents retransmission to any but the last N recipients.
+ClassFactor (zfact)
+The indicated factor fact is multiplied by the message class (determined by the Precedence: field in the user header
+and the P lines in the configuration file) and subtracted from the priority. Thus, messages with a higher Priority: are
+favored. Defaults to 1800.
+ClientCertFile
+File containing the cert of the client, that is, this cert is used when sendmail acts as client.
+ClientKeyFile
+File containing the private key belonging to the client cert.
+ClientPortOptions
+Sets client SMTP options. The options are key=value pairs. Known keys are:
+Addr Address Mask
+Address Mask defaults to INADDR_ANY. The address mask can be a numeric address in dot notation or a network
+name.
+<beginning of page>
+Family
+Address family (defaults to INET).
+Listen
+Size of listen queue (defaults to 10).
+Port
+Name/number of listening port (defaults to smtp).
+RcvBufSize
+The size of the TCP/IP receive buffer.
+SndBufSize
+The size of the TCP/IP send buffer.
+Modifier
+Options (flags) for the daemon. Can be:
+h
+Uses name of interface for HELO command.
+If h is set, the name corresponding to the outgoing interface address (whether chosen by means of the Connection
+parameter or the default) is used for the HELO/EHLO command.
+ColonOkInAddr
+If set, colons are treated as a regular character in addresses. If not set, they are treated as the introducer to the RFC
+822 "group" syntax. This option is on for version 5 and lower configuration files.
+ConnectionCacheSize (kN)
+The maximum number of open connections that are to be cached at a time. The default is 1. This delays closing the
+current connection until either this invocation of sendmail needs to connect to another host or it terminates. Setting
+it to 0 defaults to the old behavior, that is, connections are closed immediately.
+ConnectionCacheTimeout (Ktimeout)
+The maximum amount of time a cached connection is permitted to idle without activity. If this time is exceeded, the
+connection is immediately closed. This value should be small (on the order of ten minutes). Before sendmail uses a
+cached connection, it always sends a NOOP (no operation) command to check the connection. If the NOOP com<hy>
+mand fails, it reopens the connection. This keeps your end from failing if the other end times out. The point of this
+option is to be a good network neighbor and avoid using up excessive resources on the other end. The default is five
+minutes.
+ConnectionRateThrottle
+The maximum number of connections permitted per second. After this many connections are accepted, further con<hy>
+nections are delayed. If not set or <= 0, there is no limit.
+ConnectionRateWindowSize
+Define the length of the interval for which the number of incoming connections is maintained. The default is 60 sec<hy>
+onds.
+<beginning of page>
+ControlSocketName
+Name of the control socket for daemon management. A running sendmail daemon can be controlled through this
+Unix domain socket. Available commands are: help, restart, shutdown, and status. The status command returns
+the current number of daemon children, the free disk space (in blocks) of the queue directory, and the load average
+of the machine expressed as an integer. If not set, no control socket is available. For the sake of security, this Unix
+domain socket must be in a directory which is accessible only by root; /var/spool/mqueue/.smcontrol is recom<hy>
+mended for the socket name.
+CRLFile
+File containing certificate revocation status, useful for X.509v3 authentication.
+DaemonPortOptions (Ooptions)
+Sets server SMTP options. The options are key=value pairs. Known keys are:
+Name
+User-definable name for the daemon (defaults to "Daemon#"). Used for error messages and logging.
+Addr
+Address mask (defaults INADDR_ANY).
+The address mask may be a numeric address in dot notation or a network name.
+Family
+Address family (defaults to INET).
+InputMailFilters
+List of input mail filters for the daemon.
+Listen
+Size of listen queue (defaults to 10).
+Modifier
+Options (flags) for the daemon; can be a sequence (without any delimiters) of:
+a
+Requires authentication.
+b
+Binds to interface through which mail has been received.
+c
+Performs hostname canonification (.cf).
+f
+Requires fully qualified hostname (.cf).
+<beginning of page>
+h
+Uses name of interface for HELO command.
+u
+Allows unqualified addresses (.cf).
+C
+Does not perform hostname canonification.
+E
+Disallows ETRN (see RFC 2476).
+Name
+User-definable name for the daemon (defaults to Daemon#). Used for error messages and logging.
+Port
+Name/number of listening port (defaults to smtp).
+ReceiveSize
+The size of the TCP/IP receive buffer.
+SendSize
+The size of the TCP/IP send buffer.
+children
+Maximum number of children per daemon. See MaxDaemonChildren.
+DeliveryMode
+Delivery mode per daemon. See DeliveryMode.
+refuseLA
+RefuseLA per daemon.
+delayLA
+DelayLA per daemon.
+queueLA
+QueueLA per daemon.
+sendmail listens on a new socket for each occurrence of the DaemonPortOptions option in a configuration file.
+DataFileBufferSize
+Sets the threshold, in bytes, before a memory-bases queue data file becomes disk-based. The default is 4096 bytes.
+<beginning of page>
+DeadLetterDrop
+Defines the location of the system-wide dead.letter file, formerly hard-coded to /var/tmp/dead.letter. If this option
+is not set (the default), sendmail does not attempt to save to a system-wide dead.letter file in the event it cannot
+bounce the mail to the user or postmaster. Instead, it renames the qf file as it has in the past when the dead.letter file
+could not be opened.
+DefaultCharSet
+Sets the default character set to use when converting unlabeled 8 bit input to MIME.
+DefaultUser (ggid) or (uuid)
+Sets the default group ID for mailers to run in to gid or set the default userid for mailers to uid. Defaults to 1. The
+value can also be given as a symbolic group or user name.
+DelayLA=LA
+When the system load average exceeds LA, sendmail sleeps for one second on most SMTP commands and before
+accepting connections.
+DeliverByMin=time
+Sets minimum time for Deliver By SMTP Service Extension (RFC 2852). If 0, no time is listed, if less than 0, the
+extension is not offered, if greater than 0, it is listed as minimum time for the EHLO keyword DELIVERBY.
+DeliveryMode (dx)
+Delivers in mode x. Legal modes are:
+i
+Delivers interactively (synchronously).
+b
+Delivers in background (asynchronously).
+d
+Deferred mode. Database lookups are deferred until the actual queue run.
+q
+Just queues the message (delivers during queue run).
+Defaults to b if no option is specified, i if it is specified but given no argument (that is, Od is equivalent to Odi).
+DHParameters
+File containing the DH parameters.
+DialDelay
+If a connection fails, waits this many seconds and tries again. Zero means "do not retry".
+DontBlameSendmail
+If set, overrides the file safety checks. This compromises system security and should not be used. See
+http://www.sendmail.org/tips/DontBlameSendmail.html for more information.
+<beginning of page>
+DontExpandCnames
+If set, $[ ... $] lookups that do DNS-based lookups do not expand CNAME records.
+DontInitGroups
+If set, the initgroups(3C) routine is never invoked. If you set this, agents run on behalf of users only have their pri<hy>
+mary (/etc/passwd) group permissions.
+DontProbeInterfaces
+If set, sendmail does not insert the names and addresses of any local interfaces into the $=w class. If set, you must
+also include support for these addresses, otherwise mail to addresses in this list bounces with a configuration error.
+DontPruneRoutes (R)
+If set, does not prune route-addr syntax addresses to the minimum possible.
+DoubleBounceAddress
+If an error occurs when sending an error message, sends that "double bounce" error message to this address.
+EightBitMode (8)
+Uses 8-bit data handling. This option requires one of the following keys. The key can selected by using just the first
+character, but using the full word is better for clarity.
+mimify
+Does any necessary conversion of 8BITMIME to 7-bit.
+pass
+Passes unlabeled 8-bit input through as is.
+strict
+Rejects unlabeled 8-bit input.
+ErrorHeader (Efile/message)
+Appends error messages with the indicated message. If it begins with a slash, it is assumed to be the pathname of a
+file containing a message (this is the recommended setting). Otherwise, it is a literal message. The error file might
+contain the name, email address, and/or phone number of a local postmaster who could provide assistance to end
+users. If the option is missing or NULL, or if it names a file which does not exist or which is not readable, no mes<hy>
+sage is printed.
+ErrorMode (ex)
+Disposes of errors using mode x. The values for x are:
+e
+Mails back errors and gives 0 exit status always.
+m
+Mails back errors.
+<beginning of page>
+p
+Prints error messages (default).
+q
+No messages, just gives exit status.
+w
+Writes back errors (mail if user not logged in).
+FallbackMXhost (Vfallbackhost)
+If specified, the fallbackhost acts like a very low priority MX on every host. This is intended to be used by sites with
+poor network connectivity.
+FallBackSmartHost
+If specified, the fallBackSmartHost is used in a last-ditch effort for each host. This is intended to be used by sites
+with "fake internal DNS". That is, a company whose DNS accurately reflects the world inside that company's do<hy>
+main but not outside.
+FastSplit
+If set to a value greater than zero (the default is one), it suppresses the MX lookups on addresses when they are ini<hy>
+tially sorted, that is, for the first delivery attempt. This usually results in faster envelope splitting unless the MX
+records are readily available in a local DNS cache. To enforce initial sorting based on MX records set FastSplit to
+zero. If the mail is submitted directly from the command line, then the value also limits the number of processes to
+deliver the envelopes; if more envelopes are created they are only queued up and must be taken care of by a queue
+run. Since the default submission method is by way of SMTP (either from a MUA or by way of the Message Sub<hy>
+mission Program [MSP]), the value of FastSplit is seldom used to limit the number of processes to deliver the en<hy>
+velopes.
+ForkEachJob (Y)
+If set, delivers each job that is run from the queue in a separate process. Use this option if you are short of memory,
+since the default tends to consume considerable amounts of memory while the queue is being processed.
+ForwardPath (Jpath)
+Sets the path for searching for users' .forward files. The default is $z/.forward. Some sites that use the automounter
+may prefer to change this to /var/forward/$u to search a file with the same name as the user in a system directory. It
+can also be set to a sequence of paths separated by colons; sendmail stops at the first file it can successfully and
+safely open. For example, /var/forward/$u:$z/.forward searches first in /var/forward/ username and then in ~user<hy>
+name/.forward (but only if the first file does not exist). Refer to the NOTES section for more information.
+HeloName=name
+Sets the name to be used for HELO/EHLO (instead of $j).
+HelpFile (Hfile)
+Specifies the help file for SMTP.
+HoldExpensive (c)
+If an outgoing mailer is marked as being expensive, does not connect immediately.
+<beginning of page>
+HostsFile
+Sets the file to use when doing "file" type access of host names.
+HostStatusDirectory
+If set, host status is kept on disk between sendmail runs in the named directory tree. If a full path is not used, then
+the path is interpreted relative to the queue directory.
+IgnoreDots (i)
+Ignores dots in incoming messages. This is always disabled (that is, dots are always accepted) when reading SMTP
+mail.
+LogLevel (Ln)
+Sets the default log level to n. Defaults to 9.
+(Mxvalue)
+Sets the macro x to value. This is intended only for use from the command line.
+MailboxDatabase
+Type of lookup to find information about local mail boxes, defaults to pw which uses getpwnam(3C). Other types
+can be introduced by adding them to the source code, see libsm/mbdb.c for details.
+MatchGECOS (G)
+Tries to match recipient names using the GECOS field. This allows for mail to be delivered using names defined in
+the GECOS field in /etc/passwd as well as the login name.
+MaxDaemonChildren
+The maximum number of children the daemon permits. After this number, connections are rejected. If not set or
+<=0, there is no limit.
+MaxHopCount (hN)
+The maximum hop count. Messages that have been processed more than N times are assumed to be in a loop and are
+rejected. Defaults to 25.
+MaxMessageSize
+The maximum size of messages that are accepted (in bytes).
+MaxMimeHeaderLength=M[/N]
+Sets the maximum length of certain MIME header field values to M characters. For some of these headers which
+take parameters, the maximum length of each parameter is set to N if specified. If /N is not specified, one half of M
+is used. By default, these values are 0, meaning no checks are done.
+MaxNOOPCommands=N
+Overrides the default of 20 for the number of useless commands.
+<beginning of page>
+MaxQueueChildren=N
+When set, this limits the number of concurrent queue runner processes to N. This helps to control the amount of sys<hy>
+tem resources used when processing the queue. When there are multiple queue groups defined and the total number
+of queue runners for these queue groups would exceed MaxQueueChildren then the queue groups are not all run
+concurrently. That is, some portion of the queue groups run concurrently such that MaxQueueChildren is not be
+exceeded, while the remaining queue groups are run later (in round robin order). See MaxRunnersPerQueue.
+MaxQueueRunSize
+If set, limits the maximum size of any given queue run to this number of entries. This stops reading the queue direc<hy>
+tory after this number of entries is reached; job priority is not used. If not set, there is no limit.
+MaxRunnersPerQueue=N
+This sets the default maximum number of queue runners for queue groups. Up to N queue runners work in parallel
+on a queue group's messages. This is useful where the processing of a message in the queue might delay the process<hy>
+ing of subsequent messages. Such a delay can be the result of non-erroneous situations such as a low bandwidth con<hy>
+nection. The can be overridden on a per queue group basis by setting the Runners option. The default is 1 when not
+set.
+MeToo (M)
+Sends to me too, even if I am in an alias expansion.
+MaxRecipientsPerMessage
+If set, allows no more than the specified number of recipients in an SMTP envelope. Further recipients receive a 452
+error code and are deferred for the next delivery attempt.
+MinFreeBlocks (bN/M)
+Insists on at least N blocks free on the file system that holds the queue files before accepting email by way of SMTP.
+If there is insufficient space, sendmail gives a 452 response to the MAIL command. This invites the sender to try
+again later. The optional M is a maximum message size advertised in the ESMTP EHLO response. It is currently
+otherwise unused.
+MinQueueAge
+Specifies the amount of time a job must sit in the queue between queue runs. This allows you to set the queue run in<hy>
+terval low for better responsiveness without trying all jobs in each run. The default value is 0.
+MustQuoteChars
+Specifies the characters to be quoted in a full name phrase. &,;:\()[] are quoted automatically.
+NiceQueueRun
+Specifies the priority of queue runners. See nice(1).
+NoRecipientAction
+Sets action if there are no legal recipient files in the message. The legal values are:
+add-apparently-to
+Adds an Apparently-to: header with all the known recipients (which may expose blind recipients).
+add-bcc
+Adds an empty Bcc: header.
+<beginning of page>
+add-to
+Adds a To: header with all the known recipients (which may expose blind recipients).
+add-to-undisclosed
+Adds a To: undisclosed-recipients: header.
+none
+Does nothing, that is, leaves the message as it is.
+OldStyleHeaders (o)
+Assumes that the headers may be in old format, that is, spaces delimit names. This actually turns on an adaptive al<hy>
+gorithm: if any recipient address contains a comma, parenthesis, or angle bracket, it is assumed that commas already
+exist. If this flag is not on, only commas delimit names. Headers are always output with commas between the names.
+OperatorChars or $o
+Defines the list of characters that can be used to separate the components of an address into tokens.
+PidFile
+Specifies the filename of the pid file. The default is /var/run/sendmail.pid. The filename is macro-expanded before
+it is opened, and unlinked when sendmail exits.
+PostmasterCopy (Ppostmaster)
+If set, copies of error messages are sent to the named postmaster. Only the header of the failed message is sent.
+Since most errors are user problems, this is probably not a good idea on large sites, and arguably contains all sorts of
+privacy violations, but it seems to be popular with certain operating systems vendors.
+PrivacyOptions (popt,opt,...)
+Sets privacy options. Privacy is really a misnomer; many of these options are just a way of insisting on stricter adher<hy>
+ence to the SMTP protocol.
+The goaway pseudo-flag sets all flags except noreceipts, restrictmailq, restrictqrun, restrictexpand, noetrn, and
+nobodyreturn. If mailq is restricted, only people in the same group as the queue directory can print the queue. If
+queue runs are restricted, only root and the owner of the queue directory can run the queue. The restrict-expand
+pseudo-flag instructs sendmail to drop privileges when the -bv option is given by users who are neither root nor the
+TrustedUser so users cannot read private aliases, forwards, or :include: files. It adds the NonRootSafeAddr to the
+"DontBlame-Sendmail" option to prevent misleading unsafe address warnings. It also overrides the -v (verbose)
+command line option to prevent information leakage. Authentication Warnings add warnings about various condi<hy>
+tions that may indicate attempts to fool the mail system, such as using an non-standard queue directory.
+The options can be selected from:
+authwarnings
+Puts X-Authentication-Warning: headers in messages.
+goaway
+Disallows essentially all SMTP status queries.
+<beginning of page>
+needexpnhelo
+Insists on HELO or EHLO command before EXPN.
+needmailhelo
+Insists on HELO or EHLO command before MAIL.
+needvrfyhelo
+Insists on HELO or EHLO command before VRFY.
+noactualrecipient
+Do not put an X-Actual-Recipient line in a DNS that reveals the actual account to which an address is mapped.
+noetrn
+Disallows ETRN entirely.
+noexpn
+Disallows EXPN entirely.
+noreceipts
+Prevents return receipts.
+nobodyreturn
+Does not return the body of a message with DSNs.
+novrfy
+Disallows VRFY entirely.
+public
+Allows open access.
+restrictexpand
+Restricts -bv and -v command line flags.
+restrictmailq
+Restricts mailq command.
+restrictqrun
+Restricts -q command line flag.
+ProcessTitlePrefix string
+Prefixes the process title shown on "/usr/ucb/ps auxww" listings with string. The string is macro processed.
+<beginning of page>
+QueueDirectory (Qdir)
+Uses the named dir as the queue directory.
+QueueFactor (qfactor)
+Uses factor as the multiplier in the map function to decide when to just queue up jobs rather than run them. This val<hy>
+ue is divided by the difference between the current load average and the load average limit (x flag) to determine the
+maximum message priority to be sent. Defaults to 600000.
+QueueFileMode=mode
+Defaults permissions for queue files (octal). If not set, sendmail uses 0600 unless its real and effective uid are differ<hy>
+ent in which case it uses 0644.
+QueueLA (xLA)
+When the system load average exceeds LA, just queues messages (that is, does not try to send them). Defaults to
+eight times the number of processors online when sendmail starts.
+QueueSortOrder=algorithm
+Sets the algorithm used for sorting the queue. Only the first character of the value is used. Legal values are host (to
+order by the name of the first host name of the first recipient), filename (to order by the name of the queue file
+name), time (to order by the submission/creation time), random (to order randomly), modification (to order by the
+modification time of the qf file (older entries first)), none (to not order), and priority (to order by message priority).
+Host ordering makes better use of the connection cache, but may tend to process low priority messages that go to a
+single host over high priority messages that go to several hosts; it probably shouldn't be used on slow network links.
+Filename and modification time ordering saves the overhead of reading all of the queued items before starting the
+queue run. Creation (submission) time ordering is almost always a bad idea, since it allows large, bulk mail to go out
+before smaller, personal mail, but may have applicability on some hosts with very fast connections. Random is use<hy>
+ful if several queue runners are started by hand which try to drain the same queue since odds are they are working on
+different parts of the queue at the same time. Priority ordering is the default.
+QueueTimeout (Trtime/wtime)
+Sets the queue timeout to rtime. After this interval, messages that have not been successfully sent are returned to the
+sender. Defaults to five days (5d). The optional wtime is the time after which a warning message is sent. If it is miss<hy>
+ing or 0, then no warning messages are sent.
+RandFile
+File containing random data (use prefix file:) or the name of the UNIX socket if EGD is used (use prefix egd:). Note
+that Solaris supports random(7D), so this does not need to be specified.
+RecipientFactor (yfact)
+The indicated factor fact is added to the priority (thus lowering the priority of the job) for each recipient, that is, this
+value penalizes jobs with large numbers of recipients. Defaults to 30000.
+RefuseLA (XLA)
+When the system load average exceeds LA, refuses incoming SMTP connections. Defaults to 12 times the number
+of processors online when sendmail starts.
+RejectLogInterval
+Log interval when refusing connections for this long (default: 3h).
+<beginning of page>
+ResolverOptions (I)
+Tunes DNS lookups.
+RetryFactor (Zfact)
+The indicated factor fact is added to the priority every time a job is processed. Thus, each time a job is processed, its
+priority is decreased by the indicated value. In most environments this should be positive, since hosts that are down
+are all too often down for a long time. Defaults to 90000.
+RrtImpliesDsn
+If this option is set, a Return-Receipt-To: header causes the request of a DSN, which is sent to the envelope sender
+as required by RFC 1891, not to the address given in the header.
+RunAsUser
+If set, becomes this user when reading and delivering mail. Intended for use of firewalls where users do not have ac<hy>
+counts.
+SafeFileEnvironment
+If set, sendmail does a chroot into this directory before writing files.
+SaveFromLine (f)
+Saves Unix-style From lines at the front of headers. Normally they are assumed redundant and discarded.
+SendMimeErrors (j)
+If set, sends error messages in MIME format (see RFC 2045 and RFC 1344 for details). If disabled, sendmail does
+not return the DSN keyword in response to an EHLO and does not do Delivery Status Notification processing as de<hy>
+scribed in RFC 1891.
+ServerCertFile
+File containing the cert of the server, that is, this cert is used when sendmail acts as server.
+ServerKeyFile
+File containing the private key belonging to the server cert.
+ServiceSwitchFile
+Defines the path to the service-switch file. Since the service-switch file is defined in the Solaris operating environ<hy>
+ment this option is ignored.
+SevenBitInput (7)
+Strips input to seven bits for compatibility with old systems. This should not be necessary.
+SharedMemoryKey
+Specifies key to use for shared memory segment. If not set (or 0), shared memory is not be used. If this option is set,
+sendmail can share some data between different instances. For example, the number of entries in a queue directory
+or the available space in a file system. This allows for more efficient program execution, since only one process
+needs to update the data instead of each individual process gathering the data each time it is required.
+<beginning of page>
+SharedMemoryKeyFile=file
+If SharedMemoryKeyFile is set to -1, the automatically selected shared memory key will be stored in the specified
+file.
+SingleLineFromHeader
+If set, From: lines that have embedded newlines are unwrapped onto one line.
+SingleThreadDelivery
+If this option and the HostStatusDirectory option are both set, uses single thread deliveries to other hosts.
+SmtpGreetingMessage or $e
+Specifies the initial SMTP greeting message.
+SoftBounce
+If set, issue temporary errors (4xy) instead of permanent errors (5xy). This can be useful during testing of a new con<hy>
+figuration to avoid erroneous bouncing of mail.
+StatusFile (Sfile)
+Logs statistics in the named file. By default, this is /etc/mail/sendmail.st. As root, you must touch(1) this file to en<hy>
+able mailstats(1).
+SuperSafe (s)
+This option can be set to True, False, Interactive, or PostMilter. If set to True, sendmail is set to super-safe when
+running things, that is, always instantiate the queue file, even if you are going to attempt immediate delivery. send<hy>
+mail always instantiates the queue file before returning control to the client under any circumstances. This should re<hy>
+ally always be set to True. The Interactive value has been introduced in 8.12 and can be used together with Deliv<hy>
+eryMode=i. It skips some synchronization calls which are effectively doubled in the code execution path for this
+mode. If set to PostMilter, sendmail defers synchronizing the queue file until any milters have signaled acceptance
+of the message. PostMilter is useful only when sendmail is running as an SMTP server; in all other situations it acts
+the same as True.
+TempFileMode (Fmode)
+Specifies the file mode for queue files.
+Timeout (rtimeouts)
+Timeout reads after time interval. The timeouts argument is a list of keyword=value pairs. All but command apply to
+client SMTP. For backward compatibility, a timeout with no keyword= part is set all of the longer values. The recog<hy>
+nized timeouts and their default values, and their minimum values specified in RFC 1123 section 5.3.2 are:
+aconnect
+all connections for a single delivery attempt [0, unspecified]
+command
+command read [1h, 5m]
+connect
+initial connect [0, unspecified]
+<beginning of page>
+control
+complete control socket transaction [2m, none]
+datablock
+data block read [1h, 3m]
+datafinal
+reply to final . in data [1h, 10m]
+datainit
+reply to DATA command [5m, 2m]
+fileopen
+file open [60sec, none]
+helo
+reply to HELO or EHLO command [5m, none]
+hoststatus
+host retry [30m, unspecified]
+iconnect
+first attempt to connect to a host [0, unspecified]
+ident
+IDENT protocol timeout [5s, none]
+initial
+wait for initial greeting message [5m, 5m]
+lhlo
+wait for reply to an LMTP LHLO command [2m, unspecified]
+mail
+reply to MAIL command [10m, 5m]
+misc
+reply to NOOP and VERB commands [2m, none]
+queuereturn
+undeliverable message returned [5d]
+<beginning of page>
+queuewarn
+deferred warning [4h]
+quit
+reply to QUIT command [2m, none]
+rcpt
+reply to RCPT command [1h, 5m]
+resolver.retrans
+Resolver's retransmission time interval (in seconds) [varies]. Sets both Timeout.resolver.retrans.first and Time<hy>
+out.resolver.retrans.normal.
+resolver.retrans.first
+Resolver's retransmission time interval (in seconds) for the first attempt to deliver a message [varies].
+resolver.retrans.normal
+Resolver's retransmission time interval (in seconds) for all look-ups except the first delivery attempt [varies].
+resolver.retry
+Number of times to retransmit a resolver query [varies]. Sets both Timeout.resolver.retry.first and Timeout.re<hy>
+solver.retry.normal.
+resolver.retry.first
+Number of times to retransmit a resolver query for the first attempt to deliver a message [varies].
+resolver.retry.normal
+Number of times to retransmit a resolver query for all look-ups except the first delivery attempt [varies].
+rset
+reply to RSET command [5m, none]
+starttls
+response to an SMTP STARTTLS command [1h]
+TimeZoneSpec (ttzinfo)
+Sets the local time zone info to tzinfo, for example, "PST8PDT". Actually, if this is not set, the TZ environment vari<hy>
+able is cleared (so the system default is used); if set but null, the user's TZ variable is used, and if set and non-null,
+the TZ variable is set to this value.
+TLSSrvOptions
+If this option is 'V', then no client verification is performed,that is, the server does not ask for a certificate.
+<beginning of page>
+TrustedUser
+The user parameter can be a user name (looked up in the passwd map) or a numeric user id. Trusted user for file
+ownership and starting the daemon. If set, generated alias databases and the control socket (if configured) are auto<hy>
+matically owned by this user.
+TryNullMXList (w)
+If you are the "best" (that is, lowest preference) MX for a given host, you should normally detect this situation and
+treat that condition specially, by forwarding the mail to a UUCP feed, treating it as local, or whatever. However, in
+some cases (such as Internet firewalls) you may want to try to connect directly to that host as though it had no MX
+records at all. Setting this option causes sendmail to try this. The downside is that errors in your configuration are
+likely to be diagnosed as "host unknown" or "message timed out" instead of something more meaningful. This op<hy>
+tion is deprecated.
+UnixFromLine or $l
+The "From " line used when sending to files or programs.
+UnsafeGroupWrites
+If set, group-writable :include: and .forward files are considered "unsafe", that is, programs and files cannot be di<hy>
+rectly referenced from such files.
+UseErrorsTo (l)
+If there is an Errors-To: header, sends error messages to the addresses listed there. They normally go to the en<hy>
+velope sender. Use of this option causes sendmail to violate RFC 1123. This option is not recommended and depre<hy>
+cated.
+UseMSP
+Uses as mail submission program, that is, allows group writable queue files if the group is the same as that of a set-
+group-id sendmail binary.
+UserDatabaseSpec (U)
+Defines the name and location of the file containing User Database information.
+Verbose (v)
+Runs in verbose mode. If this is set, sendmail adjusts the HoldExpensive and DeliveryMode options so that all
+mail is delivered completely in a single job so that you can see the entire delivery process. The Verbose option
+should never be set in the configuration file; it is intended for command line use only.
+XscriptFileBufferSize
+Sets the threshold, in bytes, before a memory-bases queue transcript file becomes disk-based. The default is 4096
+bytes.
+If the first character of the user name is a vertical bar, the rest of the user name is used as the name of a program to
+pipe the mail to. It may be necessary to quote the name of the user to keep sendmail from suppressing the blanks
+from between arguments.
+If invoked as newaliases, sendmail rebuilds the alias database, so long as the /etc/mail/aliases* files are owned by
+root and root has exclusive write permission. If invoked as mailq, sendmail prints the contents of the mail queue.
+address
+address of an intended recipient of the message being sent.
+<beginning of page>
+See largefile(5) for the description of the behavior of sendmail when encountering files greater than or equal to 2
+Gbyte ( 2^31 bytes).
+sendmail returns an exit status describing what it did. The codes are defined in /usr/include/sysexits.h.
+EX_OK
+Successful completion on all addresses.
+EX_NOUSER
+User name not recognized.
+EX_UNAVAILABLE
+Catchall. Necessary resources were not available.
+EX_SYNTAX
+Syntax error in address.
+EX_SOFTWARE
+Internal software error, including bad arguments.
+EX_OSERR
+Temporary operating system error, such as "cannot fork".
+EX_NOHOST
+Host name not recognized.
+EX_TEMPFAIL
+Message could not be sent immediately, but was queued.
+No environment variables are used. However, sendmail's start-up script, invoked by svcadm(1M), reads /etc/de<hy>
+fault/sendmail. In this file, if the variable ETRN_HOSTS is set, the start-up script parses this variable and invokes
+etrn(1M) appropriately. ETRN_HOSTS should be of the form:
+ "s1:c1.1,c1.2 s2:c2.1 s3:c3.1,c3.2,c3.3"
+That is, white-space separated groups of server:client where client can be one or more comma-separated names. The
+:client part is optional. server is the name of the server to prod; a mail queue run is requested for each client name.
+This is comparable to running:
+ /usr/lib/sendmail -qR client
+on the host server.
+dead.letter
+Unmailable text
+<beginning of page>
+/etc/default/sendmail
+Contains default settings. You can override some of the settings by command line options.
+/etc/mail/aliases
+Mail aliases file (ASCII)
+/etc/mail/aliases.db
+Database of mail aliases (binary)
+/etc/mail/aliases.dir
+Database of mail aliases (binary)
+/etc/mail/aliases.pag
+Database of mail aliases (binary)
+/etc/mail/sendmail.cf
+Defines environment for sendmail
+/etc/mail/submit.cf
+Defines environment for MSP
+/etc/mail/trusted-users
+Lists users that are "trusted", that is, able to set their envelope from address using -f without generating a warning
+message. Note that this file is consulted by the default sendmail.cf, but not by the default submit.cf, in which the
+line referring to /etc/mail/trusted-users is commented out. See sendmail(4) for instructions on making changes to
+submit.cf and sendmail.cf.
+/var/spool/clientmqueue/*
+Temporary files and queued mail
+/var/spool/mqueue/*
+Temporary files and queued mail
+~/.forward
+List of recipients for forwarding messages
+/usr/include/libmilter/README
+Describes the steps needed to compile and run a filter
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wsndmu
+<beginning of page>
+svcs(1), biff(1B), mail(1), mailq(1), mailx(1), nice(1), check-hostname(1M), check-permissions(1M), etrn(1M),
+newaliases(1M), svcadm(1M), svccfg(1M), fork(2), getpwnam(3C), getusershell(3C), resolver(3RESOLV), alias<hy>
+es(4), hosts(4), sendmail(4), shells(4), attributes(5), largefile(5), smf(5), random(7D)
+tcpd(1M), hosts_access(4) in the SUNWtcpd package.
+RFC 2821 Simple Mail Transfer Protocol, John Klensin, April 2001.
+RFC 2822 Internet Message Format, Pete Resnick, April 2001.
+sendmail, Third Edition, Bryan Costales with Eric Allman, O'Reilly & Associates, Inc., 2003.
+http://www.sendmail.org
+http://www.milter.org
+The sendmail program requires a fully qualified host name when starting. A script has been included to help verify
+if the host name is defined properly (see check-hostname(1M)).
+The permissions and the ownership of several directories have been changed in order to increase security. In particu<hy>
+lar, access to /etc/mail and /var/spool/mqueue has been restricted.
+Security restrictions have been placed users using .forward files to pipe mail to a program or redirect mail to a file.
+The default shell (as listed in /etc/passwd) of these users must be listed in /etc/shells. This restriction does not affect
+mail that is being redirected to another alias.
+Additional restrictions have been put in place on .forward and :include: files. These files and the directory structure
+that they are placed in cannot be group- or world-writable. See check-permissions(1M).
+If you have interfaces that map to domains that have MX records that point to non-local destinations, you might
+need to enable the DontProbeInterfaces option to enable delivery to those destinations. In its default startup behav<hy>
+ior, sendmail probes each interface and adds an interface's IP addresses, as well as any domains that those addresses
+map to, to its list of domains that are considered local. For domains thus added, being on the list of local domains is
+equivalent to having a 0-preference MX record, with localhost as the MX value. If this is not the result you want,
+enable DontProbeInterfaces.

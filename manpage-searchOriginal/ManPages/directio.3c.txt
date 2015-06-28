@@ -1,0 +1,47 @@
+<beginning of page>
+directio <-> provide advice to file system
+#include <sys/types.h>
+#include <sys/fcntl.h>
+int directio(int fildes, int advice);
+The directio() function provides advice to the system about the expected behavior of the application when accessing
+the data in the file associated with the open file descriptor fildes. The system uses this information to help optimize
+accesses to the file's data. The directio() function has no effect on the semantics of the other operations on the data,
+though it may affect the performance of other operations.
+The advice argument is kept per file; the last caller of directio() sets the advice for all applications using the file as<hy>
+sociated with fildes.
+Values for advice are defined in <sys/fcntl.h>.
+DIRECTIO_OFF Applications get the default system behavior when accessing file data.
+When an application reads data from a file, the data is first cached in system memory and then copied into the appli<hy>
+cation's buffer (see read(2)). If the system detects that the application is reading sequentially from a file, the system
+will asynchronously "read ahead" from the file into system memory so the data is immediately available for the next
+read(2) operation.
+When an application writes data into a file, the data is first cached in system memory and is written to the device at a
+later time (see write(2)). When possible, the system increases the performance of write(2) operations by cacheing
+the data in memory pages. The data is copied into system memory and the write(2) operation returns immediately to
+the application. The data is later written asynchronously to the device. When possible, the cached data is "clustered"
+into large chunks and written to the device in a single write operation.
+The system behavior for DIRECTIO_OFF can change without notice.
+DIRECTIO_ON The system behaves as though the application is not going to reuse the file data in the near future.
+In other words, the file data is not cached in the system's memory pages.
+When possible, data is read or written directly between the application's memory and the device when the data is ac<hy>
+cessed with read(2) and write(2) operations. When such transfers are not possible, the system switches back to the
+default behavior, but just for that operation. In general, the transfer is possible when the application's buffer is
+aligned on a two-byte (short) boundary, the offset into the file is on a device sector boundary, and the size of the op<hy>
+eration is a multiple of device sectors.
+This advisory is ignored while the file associated with fildes is mapped (see mmap(2)).
+The system behavior for DIRECTIO_ON can change without notice.
+Upon successful completion, directio() returns 0. Otherwise, it returns <mi>1 and sets errno to indicate the error.
+The directio() function will fail if:
+EBADF The fildes argument is not a valid open file descriptor.
+ENOTTY The fildes argument is not associated with a file system that accepts advisory functions.
+EINVAL The value in advice is invalid.
+Small sequential I/O generally performs best with DIRECTIO_OFF.
+Large sequential I/O generally performs best with DIRECTIO_ON, except when a file is sparse or is being extend<hy>
+ed and is opened with O_SYNC or O_DSYNC (see open(2)).
+The directio() function is supported for the NFS and UFS file system types (see fstyp(1M)).
+<beginning of page>
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelMT-Safe
+fstyp(1M), mmap(2), open(2), read(2), write(2), fcntl.h(3HEAD), attributes(5)
+Switching between DIRECTIO_OFF and DIRECTIO_ON can slow the system because each switch to DIREC<hy>
+TIO_ON might entail flushing the file's data from the system's memory.

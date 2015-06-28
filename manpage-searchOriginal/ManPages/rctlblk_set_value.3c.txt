@@ -1,0 +1,141 @@
+<beginning of page>
+rctlblk_set_value, rctlblk_get_firing_time, rctlblk_get_global_action, rctlblk_get_global_flags, rctlblk_get_local_ac<hy>
+tion, rctlblk_get_local_flags, rctlblk_get_privilege, rctlblk_get_recipient_pid, rctlblk_get_value, rctlblk_get_en<hy>
+forced_value, rctlblk_set_local_action, rctlblk_set_local_flags, rctlblk_set_privilege, rctlblk_set_recipient_pid, rctl<hy>
+blk_size <-> manipulate resource control blocks
+#include <rctl.h>
+hrtime_t rctlblk_get_firing_time(rctlblk_t *rblk);
+int rctlblk_get_global_action(rctlblk_t *rblk);
+int rctlblk_get_global_flags(rctlblk_t *rblk);
+int rctlblk_get_local_action(rctlblk_t *rblk, int *signalp);
+int rctlblk_get_local_flags(rctlblk_t *rblk);
+rctl_priv_t rctlblk_get_privilege(rctlblk_t *rblk);
+id_t rctlblk_get_recipient_pid(rctlblk_t *rblk);
+rctl_qty_t rctlblk_get_value(rctlblk_t *rblk);
+rctl_qty_t rctlblk_get_enforced_value(rctlblk_t *rblk);
+void rctlblk_set_local_action(rctlblk_t *rblk, rctl_action_t action,
+ int signal);
+void rctlblk_set_local_flags(rctlblk_t *rblk, int flags);
+void rctlblk_set_privilege(rctlblk_t *rblk, rctl_priv_t privilege);
+void rctlblk_set_value(rctlblk_t *rblk, rctl_qty_t value);
+void rctlblk_set_recipient_pid(id_tpid);
+size_t rctlblk_size(void);
+The resource control block routines allow the establishment or retrieval of values from a resource control block used
+to transfer information using the getrctl(2) and setrctl(2) functions. Each of the routines accesses or sets the re<hy>
+source control block member corresponding to its name. Certain of these members are read-only and do not possess
+set routines.
+The firing time of a resource control block is 0 if the resource control action-value has not been exceeded for its life<hy>
+time on the process. Otherwise the firing time is the value of gethrtime(3C) at the moment the action on the re<hy>
+source control value was taken.
+The global actions and flags are the action and flags set by rctladm(1M). These values cannot be set with setrctl(2).
+Valid global actions are listed in the table below. Global flags are generally a published property of the control and
+are not modifiable.
+RCTL_GLOBAL_DENY_ALWAYS The action taken when a control value is exceeded on this control will always
+include denial of the resource.
+RCTL_GLOBAL_DENY_NEVER The action taken when a control value is exceeded on this control will always
+exclude denial of the resource; the resource will always be granted, although other actions can also be taken.
+RCTL_GLOBAL_SIGNAL_NEVER No signal actions are permitted on this control.
+RCTL_GLOBAL_CPU_TIME The valid signals available as local actions include the SIGXCPU signal.
+<beginning of page>
+RCTL_GLOBAL_FILE_SIZE The valid signals available as local actions include the SIGXFSZ signal.
+RCTL_GLOBAL_INFINITE This resource control supports the concept of an unlimited value; generally true only
+of accumulation-oriented resources, such as CPU time.
+RCTL_GLOBAL_LOWERABLE Non-privileged callers are able to lower the value of privileged resource control
+values on this control.
+RCTL_GLOBAL_NOACTION No global action will be taken when a resource control value is exceeded on this
+control.
+RCTL_GLOBAL_NOBASIC No values with the RCPRIV_BASIC privilege are permitted on this control.
+RCTL_GLOBAL_SYSLOG A standard message will be logged by the syslog(3C) facility when any resource con<hy>
+trol value on a sequence associated with this control is exceeded.
+RCTL_GLOBAL_SYSLOG_NEVER The resource control does not support the syslog() global action. Exceeding
+a resource control value on this control will not result in a message logged by the syslog() facility.
+RCTL_GLOBAL_UNOBSERVABLE The resource control (generally on a task- or project-related control) does
+not support observational control values. An RCPRIV_BASIC privileged control value placed by a process on the
+task or process will generate an action only if the value is exceeded by that process.
+RCTL_GLOBAL_BYTES This resource control represents a number of bytes.
+RCTL_GLOBAL_SECONDS This resource control represents a quantity of time in seconds.
+RCTL_GLOBAL_COUNT This resource control represents an integer count.
+The local action and flags are those on the current resource control value represented by this resource control block.
+Valid actions and flags are listed in the table below. In the case of RCTL_LOCAL_SIGNAL, the second argument
+to rctlblk_set_local_action() contains the signal to be sent. Similarly, the signal to be sent is copied into the integer
+location specified by the second argument to rctlblk_get_local_action(). A restricted set of signals is made avail<hy>
+able for normal use by the resource control facility: SIGBART, SIGXRES, SIGHUP, SIGSTOP, SIGTERM, and
+SIGKILL. Other signals are permitted due to global properties of a specific control. Calls to setrctl() with illegal
+signals will fail.
+RCTL_LOCAL_DENY When this resource control value is encountered, the request for the resource will be de<hy>
+nied. Set on all values if RCTL_GLOBAL_DENY_ALWAYS is set for this control; cleared on all values if
+RCTL_GLOBAL_DENY_NEVER is set for this control.
+RCTL_LOCAL_MAXIMAL This resource control value represents a request for the maximum amount of re<hy>
+source for this control. If RCTL_GLOBAL_INFINITE is set for this resource control, RCTL_LOCAL_MAXI<hy>
+MAL indicates an unlimited resource control value, one that will never be exceeded.
+RCTL_LOCAL_NOACTION No local action will be taken when this resource control value is exceeded.
+RCTL_LOCAL_SIGNAL The specified signal, sent by rctlblk_set_local_action(), will be sent to the process that
+placed this resource control value in the value sequence. This behavior is also true for signal actions on project and
+task resource controls. The specified signal is sent only to the recipient process, not all processes within the project
+or task.
+<beginning of page>
+The rctlblk_get_recipient_pid() function returns the value of the process ID that placed the resource control value
+for basic rctls. For privileged or system rctls, rctlblk_get_recipient_pid() returns -1.
+The rctlblk_set_recipient_pid() function sets the recipient pid for a basic rctl. When setrctl(2) is called with the
+flag RCTL_USE_RECIPIENT_PID, this pid is used. Otherwise, the PID of the calling process is used. Only privi<hy>
+leged users can set the recipient PID to one other than the PID of the calling process. Process-scoped rctls must
+have a recipient PID that matches the PID of the calling process.
+The rctlblk_get_privilege() function returns the privilege of the resource control block. Valid privileges are
+RCPRIV_BASIC, RCPRIV_PRIVILEGED, and RCPRIV_SYSTEM. System resource controls are read-only.
+Privileged resource controls require the {PRIV_SYS_RESOURCE} privilege to write, unless the RCTL_GLOB<hy>
+AL_LOWERABLE global flag is set, in which case unprivileged applications can lower the value of a privileged
+control.
+The rctlblk_get_value() and rctlblk_set_value() functions return or establish the enforced value associated with the
+resource control. In cases where the process, task, or project associated with the control possesses fewer capabilities
+than allowable by the current value, the value returned by rctlblk_get_enforced_value() will differ from that re<hy>
+turned by rctlblk_get_value(). This capability difference arises with processes using an address space model smaller
+than the maximum address space model supported by the system.
+The rctlblk_size() function returns the size of a resource control block for use in memory allocation. The rctlblk_t
+* type is an opaque pointer whose size is not connected with that of the resource control block itself. Use of rctl<hy>
+blk_size() is illustrated in the example below.
+The various set routines have no return values. Incorrectly composed resource control blocks will generate errors
+when used with setrctl(2) or getrctl(2).
+No error values are returned. Incorrectly constructed resource control blocks will be rejected by the system calls.
+Example 1 Display the contents of a fetched resource control block.
+The following example displays the contents of a fetched resource control block.
+ #include <rctl.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ rctlblk_t *rblk;
+ int rsignal;
+ int raction;
+ if ((rblk = malloc(rctlblk_size())) == NULL) {
+  (void) perror("rblk malloc");
+  exit(1);
+ }
+ if (getrctl("process.max-cpu-time", NULL, rblk, RCTL_FIRST) == -1) {
+  (void) perror("getrctl");
+  exit(1);
+ }
+ main()
+ {
+  raction = rctlblk_get_local_action(rblk, &rsignal),
+  (void) printf("Resource control for %s\n",
+  "process.max-cpu-time");
+  (void) printf("Process ID: %d\n",
+  rctlblk_get_recipient_pid(rblk));
+  (void) printf("Privilege: %x\n"
+  rctlblk_get_privilege(rblk));
+  (void) printf("Global flags: %x\n"
+  rctlblk_get_global_flags(rblk));
+  (void) printf("Global actions: %x\n"
+  rctlblk_get_global_action(rblk));
+  (void) printf("Local flags: %x\n"
+<beginning of page>
+  rctlblk_get_local_flags(rblk));
+  (void) printf("Local action: %x (%d)\n"
+  raction, raction == RCTL_LOCAL_SIGNAL ? rsignal : 0);
+  (void) printf("Value: %llu\n",
+  rctlblk_get_value(rblk));
+  (void) printf("Enforced value: %llu\n",
+  rctlblk_get_enforced_value(rblk));
+ }
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stabili<hy>
+tyEvolving _ MT-LevelMT-Safe
+rctladm(1M), getrctl(2), setrctl(2), gethrtime(3C), attributes(5)

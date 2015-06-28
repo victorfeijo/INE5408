@@ -1,0 +1,174 @@
+<beginning of page>
+tnf_kernel_probes <-> TNF kernel probes
+The set of probes (trace instrumentation points) available in the standard kernel. The probes log trace data to a ker<hy>
+nel trace buffer in Trace Normal Form (TNF). Kernel probes are controlled by prex(1). A snapshot of the kernel
+trace buffer can be made using tnfxtract(1) and examined using tnfdump(1).
+Each probe has a name and is associated with a set of symbolic keys, or categories. These are used to select and con<hy>
+trol probes from prex(1). A probe that is enabled for tracing generates a TNF record, called an event record. An
+event record contains two common members and may contain other probe-specific data members.
+ tnf_probe_event tag
+ tnf_time_delta time_delta
+tag Encodes TNF references to two other records:
+tag Describes the layout of the event record.
+schedule Identifies the writing thread and also contains a 64-bit base time in nanoseconds.
+time_delta A 32-bit time offset from the base time; the sum of the two times is the actual time of the event.
+ tnf_kthread_id tid
+ tnf_pid pid
+ tnf_symbol start_pc
+Thread creation event.
+tid The thread identifier for the new thread.
+pid The process identifier for the new thread.
+start_pc The kernel address of its start routine.
+ tnf_kthread_id tid
+ tnf_microstate state
+Thread microstate transition events.
+tid Optional; if it is absent, the event is for the writing thread, otherwise the event is for the specified thread.
+state Indicates the thread state: <bu> Running in user mode. <bu> Running in system mode. <bu> Asleep waiting for a user-
+mode lock. <bu> Asleep on a kernel object. <bu> Runnable (waiting for a cpu). <bu> Stopped. The values of this member are
+defined in <sys/msacct.h>. Note that to reduce trace output, transitions between the system and user microstates that
+are induced by system calls are not traced. This information is implicit in the system call entry and exit events.
+Thread termination event for writing thread. This probe has no data members other than the common members.
+
+ tnf_kthread_id tid
+ tnf_cpuid cpuid
+ tnf_long priority
+ tnf_ulong queue_length
+<beginning of page>
+Thread scheduling events. These are triggered when a runnable thread is placed on a dispatch queue.
+cpuid Specifies the cpu to which the queue is attached.
+priority The (global) dispatch priority of the thread.
+queue_length The current length of the cpu's dispatch queue.
+ tnf_opaque reason
+ tnf_symbols stack
+Thread blockage event. This probe captures a partial stack backtrace when the current thread blocks.
+reason The address of the object on which the thread is blocking.
+symbols References a TNF array of kernel addresses representing the PCs on the stack at the time the thread blocks.
+ tnf_sysnum sysnum
+System call entry event.
+sysnum The system call number. The writing thread implicitly enters the system microstate with this event.
+ tnf_long rval1
+ tnf_long rval2
+ tnf_long errno
+System call exit event.
+rval1 and rval2 The two return values of the system call
+errno The error return.
+The writing thread implicitly enters the user microstate with this event.
+ tnf_opaque address
+ tnf_fault_type fault_type
+ tnf_seg_access access
+Address-space fault event.
+address Gives the faulting virtual address.
+fault_type Gives the fault type: invalid page, protection fault, software requested locking or unlocking.
+access Gives the desired access protection: read, write, execute or create. The values for these two members are de<hy>
+fined in <vm/seg_enum.h>.
+ tnf_opaque vnode
+ tnf_offset offset
+<beginning of page>
+Major page fault event. The faulting page is mapped to the file given by the vnode member, at the given offset into
+the file. (The faulting virtual address is in the most recent address_fault event for the writing thread.)
+ tnf_opaque address
+Copy-on-write page fault event.
+address The virtual address at which the new page is mapped.
+ tnf_opaque address
+Zero-fill page fault event.
+address The virtual address at which the new page is mapped.
+ tnf_opaque vnode
+ tnf_offset offset
+Page unmapping event. This probe marks the unmapping of a file system page from the system.
+vnode and offset Identifies the file and offset of the page being unmapped.
+ tnf_opaque vnode
+ tnf_offset offset
+ tnf_size size
+Pagein start event. This event signals the initiation of pagein I/O.
+vnodeandoffset Identifyies the file and offset to be paged in.
+size Specifies the number of bytes to be paged in.
+ tnf_opaque vnode
+ tnf_ulong pages_pageout
+ tnf_ulong pages_freed
+ tnf_ulong pages_reclaimed
+Pageout completion event. This event signals the completion of pageout I/O.
+vnode Identifies the file of the pageout request.
+pages_pageout The number of pages written out.
+pages_freed The number of pages freed after being written out.
+pages_reclaimed The number of pages reclaimed after being written out.
+ tnf_ulong pages_free
+ tnf_ulong pages_needed
+<beginning of page>
+Page daemon scan start event. This event signals the beginning of one iteration of the page daemon.
+pages_free The number of free pages in the system.
+pages_needed The number of pages desired free.
+ tnf_ulong pages_free
+ tnf_ulong pages_scanned
+Page daemon scan end event. This event signals the end of one iteration of the page daemon.
+pages_free The number of free pages in the system.
+pages_scanned The number of pages examined by the page daemon. (Potentially more pages will be freed when
+any queued pageout requests complete.)
+ tnf_pid pid
+ tnf_ulong page_count
+Address space swapout event. This event marks the swapping out of a process address space.
+pid Identifies the process.
+page_count Reports the number of pages either freed or queued for pageout.
+ tnf_pid pid
+ tnf_lwpid lwpid
+ tnf_kthread_id tid
+ tnf_ulong page_count
+Light-weight process swapout event. This event marks the swapping out of an LWP and its stack.
+pid The LWP's process identifier
+lwpid The LWP identifier
+tid member The LWP's kernel thread identifier.
+page_count The number of pages swapped out.
+ tnf_pid pid
+ tnf_lwpid lwpid
+ tnf_kthread_id tid
+ tnf_ulong page_count
+Light-weight process swapin event. This event marks the swapping in of an LWP and its stack.
+pid The LWP's process identifier.
+<beginning of page>
+lwpid The LWP identifier.
+tid The LWP's kernel thread identifier.
+page_count The number of pages swapped in.
+ tnf_device device
+ tnf_diskaddr block
+ tnf_size size
+ tnf_opaque buf
+ tnf_bioflags flags
+Block I/O strategy event. This event marks a call to the strategy(9E) function of a block device driver.
+device Contains the major and minor numbers of the device.
+block The logical block number to be accessed on the device.
+size The size of the I/O request.
+buf The kernel address of the buf(9S) structure associated with the transfer.
+flags The buf(9S) flags associated with the transfer.
+ tnf_device device
+ tnf_diskaddr block
+ tnf_opaque buf
+Buffered I/O completion event. This event marks calls to the biodone(9F) function.
+device Contains the major and minor numbers of the device.
+block The logical block number accessed on the device.
+buf The kernel address of the buf(9S) structure associated with the transfer.
+ tnf_device device
+ tnf_offset offset
+ tnf_size size
+ tnf_bioflags rw
+Raw I/O start event. This event marks entry into the physio(9F) fufnction which performs unbuffered I/O.
+device Contains the major and minor numbers of the device of the transfer.
+offset The logical offset on the device for the transfer.
+size The number of bytes to be transferred.
+<beginning of page>
+rw The direction of the transfer: read or write (see buf(9S)).
+ tnf_device device
+Raw I/O end event. This event marks exit from the physio(9F) fufnction.
+device The major and minor numbers of the device of the transfer.
+Use the prex utility to control kernel probes. The standard prex commands to list and manipulate probes are avail<hy>
+able to you, along with commands to set up and manage kernel tracing.
+Kernel probes write trace records into a kernel trace buffer. You must copy the buffer into a TNF file for post-pro<hy>
+cessing; use the tnfxtract utility for this.
+You use the tnfdump utility to examine a kernel trace file. This is exactly the same as examining a user-level trace
+file.
+The steps you typically follow to take a kernel trace are: 1. Become superuser (su). 2. Allocate a kernel trace buf<hy>
+fer of the desired size (prex). 3. Select the probes you want to trace and enable (prex). 4. Turn kernel tracing on
+(prex). 5. Run your application. 6. Turn kernel tracing off (prex). 7. Extract the kernel trace buffer (tnfxtract).
+8. Disable all probes (prex). 9. Deallocate the kernel trace buffer (prex). 10. Examine the trace file (tnfdump).
+A convenient way to follow these steps is to use two shell windows; run an interactive prex session in one, and run
+your application and tnfxtract in the other.
+prex(1), tnfdump(1), tnfxtract(1), libtnfctl(3TNF), TNF_PROBE(3TNF), tracing(3TNF), strategy(9E),
+biodone(9F), physio(9F), buf(9S)

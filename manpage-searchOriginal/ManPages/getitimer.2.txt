@@ -1,0 +1,59 @@
+<beginning of page>
+getitimer, setitimer <-> get or set value of interval timer
+#include <sys/time.h>
+int getitimer(int which, struct itimerval *value);
+int setitimer(int which, const struct itimerval *value,
+ struct itimerval *ovalue);
+The system provides each process with four interval timers, defined in <sys/time.h>. The getitimer() function stores
+the current value of the timer specified by which into the structure pointed to by value. The setitimer() function call
+sets the value of the timer specified by which to the value specified in the structure pointed to by value, and if ovalue
+is not NULL, stores the previous value of the timer in the structure pointed to by ovalue.
+A timer value is defined by the itimerval structure (see gettimeofday(3C)) for the definition of timeval), which in<hy>
+cludes the following members:
+ struct timeval it_interval; /* timer interval */
+ struct timeval it_value; /* current value */
+The it_value member indicates the time to the next timer expiration. The it_interval member specifies a value to be
+used in reloading it_value when the timer expires. Setting it_value to 0 disables a timer, regardless of the value of
+it_interval. Setting it_interval to 0 disables a timer after its next expiration (assuming it_value is non-zero).
+Time values smaller than the resolution of the system clock are rounded up to the resolution of the system clock, ex<hy>
+cept for ITIMER_REALPROF, whose values are rounded up to the resolution of the profiling clock. The four
+timers are as follows:
+ITIMER_REAL Decrements in real time. A SIGALRM signal is delivered to the process when this timer expires.
+ITIMER_VIRTUAL Decrements in lightweight process (lwp) virtual time. It runs only when the calling lwp is ex<hy>
+ecuting. A SIGVTALRM signal is delivered to the calling lwp when it expires.
+ITIMER_PROF Decrements both in lightweight process (lwp) virtual time and when the system is running on be<hy>
+half of the lwp. It is designed to be used by interpreters in statistically profiling the execution of interpreted pro<hy>
+grams. Each time the ITIMER_PROF timer expires, the SIGPROF signal is delivered to the calling lwp. Because
+this signal may interrupt in-progress functions, programs using this timer must be prepared to restart interrupted
+functions.
+ITIMER_REALPROF Decrements in real time. It is designed to be used for real-time profiling of multithreaded
+programs. Each time the ITIMER_REALPROF timer expires, one counter in a set of counters maintained by the
+system for each lightweight process (lwp) is incremented. The counter corresponds to the state of the lwp at the time
+of the timer tick. All lwps executing in user mode when the timer expires are interrupted into system mode. When
+each lwp resumes execution in user mode, if any of the elements in its set of counters are non-zero, the SIGPROF
+signal is delivered to the lwp. The SIGPROF signal is delivered before any other signal except SIGKILL. This sig<hy>
+nal does not interrupt any in-progress function. A siginfo structure, defined in <sys/siginfo.h>, is associated with
+the delivery of the SIGPROF signal, and includes the following members:
+ si_tstamp; /* high resolution timestamp */
+ si_syscall; /* current syscall */
+ si_nsysarg; /* number of syscall arguments */
+ si_sysarg[]; /* actual syscall arguments */
+ si_fault; /* last fault type */
+ si_faddr; /* last fault address */
+ si_mstate[]; /* ticks in each microstate */
+The enumeration of microstates (indices into si_mstate) is defined in <sys/msacct.h>.
+Unlike the other interval timers, the ITIMER_REALPROF interval timer is not inherited across a call to one of the
+exec(2) family of functions.
+<beginning of page>
+Upon successful completion, 0 is returned. Otherwise, <mi>1 is returned and errno is set to indicate the error.
+The getitimer() and setitimer() functions will fail if:
+EINVAL The specified number of seconds is greater than 100,000,000, the number of microseconds is greater than
+or equal to 1,000,000, or the which argument is unrecognized.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Standard _ MT-LevelMT-Safe
+alarm(2), exec(2), gettimeofday(3C), sleep(3C), sysconf(3C), attributes(5), standards(5)
+The setitimer() function is independent of the alarm(2) and sleep(3C) functions.
+The ITIMER_PROF and ITIMER_REALPROF timers deliver the same signal and have different semantics.
+They cannot be used together.
+The granularity of the resolution of alarm time is platform-dependent.

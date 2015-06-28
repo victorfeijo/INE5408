@@ -1,0 +1,157 @@
+<beginning of page>
+scsa2usb <-> SCSI to USB bridge driver
+storage@unit-address
+The scsa2usb driver is a USBA (Solaris USB architecture) compliant nexus driver that supports the USB Mass Stor<hy>
+age Bulk Only Transport Specification 1.0 and USB Control/Bulk/Interrupt (CBI) Transport Specification 1.0. The
+scsa2usb driver also supports USB storage devices that implement CBI Transport without the interrupt completion
+for status (that is, Control/Bulk (CB) devices.) It supports bus-powered and self-powered USB mass storage devices.
+This nexus driver is both a USB client driver and a SCSA HBA driver. As such, the scsa2usb driver only supports
+storage devices that utilize the above two transports.
+The scsa2usb driver also supports a ugen(7D) interface allowing raw access to the device, for example by
+libusb(3LIB) applications, bypassing the child sd(7D) or st(7D) driver. Because a libusb application might change
+the state of the device, you should not access the disk or tape concurrently.
+The scsa2usb nexus driver maps SCSA target driver requests to USBA client driver requests.
+The scsa2usb driver creates a child device info node for each logical unit (LUN) on the mass storage device. The
+standard Solaris SCSI disk driver or tape driver is attached to those nodes. Refer to sd(7D) or st(7D).
+This driver supports multiple LUN devices and creates a separate child device info node for each LUN. All child
+LUN nodes attach to sd(7D) for disks or st(7D) for tapes.
+In previous releases, all USB disk storage devices were treated as removable media devices and managed by rmfor<hy>
+mat(1) and volume management software. In the current release, however, only disk storage devices with a remov<hy>
+able bit (RMB) value of 1 are removable. (The RMB is part of the device's SCSI INQUIRY data.) See SCSI specifi<hy>
+cations T10/995D Revision 11a, T10/1236-D Revision 20 or T10/1416-D Revision 23 for more information. How<hy>
+ever, for backward compatibility, all USB disk storage devices can still be managed by rmformat(1). With or with<hy>
+out a volume manager, you can mount, eject, hot remove and hot insert a 1394 mass storage device as the follow<hy>
+ing sections explain.
+Some devices may be supported by the USB mass storage driver even though they do not identify themselves as
+compliant with the USB mass storage class.
+The scsa2usb.conf file contains an attribute-override-list that lists the vendor ID, product ID, and revision for
+matching mass storage devices, as well as fields for overriding the default device attributes. The entries in this list
+are commented out by default and may be uncommented to enable support of particular devices.
+Follow the information given in the scsa2usb.conf file to see if a particular device can be supported using the over<hy>
+ride information. Also see http://www.sun.com/io. For example, by adding the following to the scsa2usb.conf file,
+many USB memory sticks and card readers might operate more reliably:
+ attribute-override-list = "vid=* reduced-cmd-support=true";
+Note that this override applies to all USB mass storage devices and might be inappropriate for a USB CD writer. If
+so, you can add an entry for each device to the attribute override list.
+If USB mass storage support is considered a security risk, this driver can be disabled in /etc/system as follows:
+ exclude: scsa2usb
+Alternatively, you can disable automatic handling of a device as described in the following subsection.
+Disk storage devices are managed by Volume Manager. Software that manages removable media creates a device
+nickname that can be listed with eject(1) or rmmount(1). A device that is not mounted automatically can be mount<hy>
+ed using rmmount(1) under /rmdisk/label. Note that the mount(1M) and mount(1M) commands do not accept
+nicknames; you must use explicit device names with these commands.
+See rmmount(1) to unmount the device and eject(1) to eject the media. If the device is ejected while it is mounted,
+volume management software unmounts the device before ejecting it. It also might kill any active applications that
+are accessing the device.
+Volume management software is hotplug-aware and normally mounts file systems on USB mass storage devices if
+the file system is recognized. Before hot removing the USB device, use eject(1) to unmount the file system. After
+<beginning of page>
+the device is removed, a console warning, such as "The disconnected device was busy, please reconnect," might dis<hy>
+play. The warning is harmless and you can ignore it.
+You can disable the automatic mounting and unmounting of removable devices by inserting a entry for a removable
+device in /etc/vfstab. In this entry, you must set the mount at boot field to no. See vfstab(4). See the System Admin<hy>
+istration Guide, Volume I and Solaris Common Desktop Environment: User's Guide for details on how to manage a
+removable device with CDE and Removable Media Manager. See dtfile.1X under CDE for information on how to
+use Removable Media Manager.
+Use mount(1M) to explicitly mount the device and umount(1M) to unmount the device. Use eject(1) to eject the
+media. After you have explicitly mounted a removable device, you cannot use a nickname as an argument to eject.
+Removing the disk device while it is being accessed or mounted fails with a console warning. To hot remove the disk
+device from the system, unmount the file system, then kill all applications accessing the device. Next, hot remove the
+device. A storage device can be hot inserted at any time.
+For a comprehensive listing of (non-bootable) USB mass-storage devices that are compatible with this driver, see
+www.sun.com/io.
+Disk block special file names are located in /dev/dsk, while raw file names are located in /dev/rdsk. Tape raw file
+names are located in /dev/rmt. Input/output requests to the devices must follow the same restrictions as those for
+SCSI disks or tapes. Refer to sd(7D) or st(7D).
+Refer to dkio(7I) and cdio(7I).
+Refer to sd(7D) for disks or st(7D) for tapes.
+The device special files for the USB mass storage device are created like those for a SCSI disk or SCSI tape. Refer
+to sd(7D) or st(7D).
+/dev/dsk/cntndnsn
+Block files for disks.
+/dev/rdsk/cntndnsn
+Raw files for disks.
+/dev/usb/*/*/*
+ugen(7D) nodes
+/dev/rmt/[0- 127][l,m,h,u,c][b][n]
+Raw files for tapes.
+/vol/dev/aliases/zip0
+Symbolic link to the character device for the media in Zip drive 0
+/vol/dev/aliases/jaz0
+Symbolic link to the character device for the media in Jaz drive 0.
+/vol/dev/aliases/rmdisk0
+Symbolic link to the character device for the media in removable drive 0. This is a generic removable media device.
+/kernel/drv/scsa2usb
+32-bit x86 ELF kernel module
+<beginning of page>
+/kernel/drv/amd64/scsa2usb
+64-bit x86 ELF kernel module
+/kernel/drv/sparcv9/scsa2usb
+64-bit SPARC ELF kernel module
+/kernel/drv/scsa2usb.conf
+Can be used to override specific characteristics.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ ArchitectureS<hy>
+PARC, x86, PCI-based systems _ Availability SUNWusb
+cdrw(1), eject(1), rmformat(1), rmmount(1), cfgadm_scsi(1M), cfgadm_usb(1M), fdisk(1M), mount(1M),
+umount(1M), dtfile.1X (in CDE man pages), libusb(3LIB), scsi(4), vfstab(4), attributes(5), ieee1394(7D)sd(7D),
+st(7D), ugen(7D), usba(7D), pcfs(7FS), cdio(7I), dkio(7I)
+Writing Device Drivers
+System Administration Guide, Volume I
+Solaris Common Desktop Environment: User's Guide
+Universal Serial Bus Specification 2.0
+Universal Serial Bus Mass Storage Class Specification Overview 1.0
+Universal Serial Bus Mass Storage Class Bulk-Only Transport Specification 1.0
+Universal Serial Bus Mass Storage Class Control/Bulk/Interrupt (CBI) Transport Specification 1.0
+System Administration Guide: Basic Administration
+SCSI Specification T10/995D Revision 11a <em> March 1997
+SCSI SpecificationT10/1236-D Revision 20 <em> July 2001
+SCSI SpecificationT10/1416-D Revision 23<em> May 2005
+http://www.sun.com/io
+Refer to sd(7D) and st(7D).
+In addition to being logged, the following messages may appear on the system console. All messages are formatted
+in the following manner:
+ Warning: <device path> (scsa2usb<instance number>): Error Message...
+Cannot access <device>. Please reconnect.
+There was an error in accessing the mass-storage device during reconnect. Please reconnect the device.
+Device is not identical to the previous one on this port. Please disconnect and reconnect.
+Another USB device has been inserted on a port that was connected to a mass-storage device. Please disconnect the
+<beginning of page>
+USB device and reconnect the mass-storage device back into that port.
+Reinserted device is accessible again.
+The mass-storage device that was hot-removed from its USB slot has been re-inserted to the same slot and is avail<hy>
+able for access.
+Please disconnect and reconnect this device.
+A hotplug of the device is needed before it can be restored.
+The following messages may be logged into the system log. They are formatted in the following manner:
+ <device path><scsa2usb<instance number>): message...
+Invalid <record> in scsa2usb.conf file entry.
+An unrecognized record was specified in the scsa2usb.conf file.
+Pkt submitted with 0 timeout which may cause indefinite hangs.
+An application submitted a request but did not specify a timeout.
+Syncing not supported.
+Syncing after a panic is not supported. The filesystem may be corrupted.
+scsa2usb.conf override: <record>.
+An override record specified in scsa2usb.conf was applied. Examples of an override record applied to a device with
+vendor ID 123 and product ID 456 are:
+ vid=0x123 pid=0x456 reduced-cmd-support=true
+  or
+ vid=* reduced-cmd-support=true
+...meaning that the override record is applied to this device and all other USB mass storage devices.
+The Zip 100 drive does not comply with Universal Serial Bus Specification 1.0 and cannot be power managed. Pow<hy>
+er Management support for Zip 100 has been disabled.
+If the system panics while a UFS file system is mounted on the mass storage media, no syncing will take place for
+the disk mass-storage device. (Syncing is not supported by the scsa2usb driver.) As a result, the file system on the
+media will not be consistent on reboot.
+If a PCFS file system is mounted, no syncing is needed and the filesystem will be consistent on reboot.
+If a mass-storage device is busy, system suspend cannot proceed and the system will immediately resume again.
+Attempts to remove a mass-storage device from the system will fail. The failure will be logged to the console. An at<hy>
+tempt to replace the removed device with some other USB device will also fail. To successfully remove a USB mass-
+storage device you must "close" all references to it.
+An Iomega Zip 100Mb disk cannot be formatted on an Iomega Zip250 drive. See the Iomega web site at
+http://www.iomega.com for details.
+Concurrent I/O to devices with multiple LUNs on the same device is not supported.
+<beginning of page>
+Some USB CD-RW devices may perform inadequately at their advertised speeds. To compensate, use USB CD-RW
+devices at lower speeds (2X versus 4X). See cdrw(1) for details.
+This driver also supports CBI devices that do not use USB interrupt pipe for status completion.

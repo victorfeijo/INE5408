@@ -1,0 +1,242 @@
+<beginning of page>
+kmem_cache_create, kmem_cache_alloc, kmem_cache_free, kmem_cache_destroy, kmem_cache_set_move <-> ker<hy>
+nel memory cache allocator operations
+#include <sys/types.h>
+#include <sys/kmem.h>
+kmem_cache_t *kmem_cache_create(char *name, size_t bufsize,
+ size_t align, int (*constructor)(void *, void *, int),
+ void (*destructor)(void *, void *), void (*reclaim)(void *),
+ void *private, void *vmp, int cflags);
+void kmem_cache_destroy(kmem_cache_t *cp);
+void *kmem_cache_alloc(kmem_cache_t *cp, int kmflag);
+void kmem_cache_free(kmem_cache_t *cp, void *obj);
+void kmem_cache_set_move(kmem_cache_t *cp, kmem_cbrc_t (*move)(void *,
+ void *, size_t *, void *));
+ [Synopsis for callback functions:]
+int (*constructor)(void *buf, void *user_arg, int kmflags);
+void (*destructor)(void *buf, void *user_arg);
+kmem_cbrc_t (*move)(void *old, void *new, size_t bufsize,
+ void *user_arg);
+Solaris DDI specific (Solaris DDI)
+The parameters for the kmem_cache_* functions are as follows:
+name Descriptive name of a kstat(9S) structure of class kmem_cache. Names longer than 31 characters are truncat<hy>
+ed.
+bufsize Size of the objects it manages.
+align Required object alignment.
+constructor Pointer to an object constructor function. Parameters are defined below.
+destructor Pointer to an object destructor function. Parameters are defined below.
+reclaim Drivers should pass NULL.
+private Pass-through argument for constructor/destructor.
+vmp Drivers should pass NULL.
+cflags Drivers must pass 0.
+kmflag Possible flags are:
+KM_SLEEP Allow sleeping (blocking) until memory is available.
+<beginning of page>
+KM_NOSLEEP Return NULL immediately if memory is not available.
+KM_PUSHPAGE Allow the allocation to use reserved memory.
+obj Pointer to the object allocated by kmem_cache_alloc().
+move Pointer to an object relocation function. Parameters are defined below.
+The parameters for the callback constructor function are as follows:
+void *buf Pointer to the object to be constructed.
+void *user_arg The private parameter from the call to kmem_cache_create(); it is typically a pointer to the soft-
+state structure.
+int kmflags Propagated kmflag values.
+The parameters for the callback destructor function are as follows:
+void *buf Pointer to the object to be deconstructed.
+void *user_arg The private parameter from the call to kmem_cache_create(); it is typically a pointer to the soft-
+state structure.
+The parameters for the callback move() function are as follows:
+void *old Pointer to the object to be moved.
+void *new Pointer to the object that serves as the copy destination for the contents of the old parameter.
+size_t bufsize Size of the object to be moved.
+void *user_arg The private parameter from the call to kmem_cache_create(); it is typically a pointer to the soft-
+state structure.
+In many cases, the cost of initializing and destroying an object exceeds the cost of allocating and freeing memory for
+it. The functions described here address this condition.
+Object caching is a technique for dealing with objects that are: <bu> frequently allocated and freed, and <bu> have setup and
+initialization costs.
+The idea is to allow the allocator and its clients to cooperate to preserve the invariant portion of an object's initial
+state, or constructed state, between uses, so it does not have to be destroyed and re-created every time the object is
+used. For example, an object containing a mutex only needs to have mutex_init() applied once, the first time the ob<hy>
+ject is allocated. The object can then be freed and reallocated many times without incurring the expense of mu<hy>
+tex_destroy() and mutex_init() each time. An object's embedded locks, condition variables, reference counts, lists
+of other objects, and read-only data all generally qualify as constructed state. The essential requirement is that the
+client must free the object (using kmem_cache_free()) in its constructed state. The allocator cannot enforce this, so
+programming errors will lead to hard-to-find bugs.
+A driver should call kmem_cache_create() at the time of _fini(9E) or attach(9E), and call the corresponding
+kmem_cache_destroy() at the time of _fini(9E) or detach(9E).
+<beginning of page>
+kmem_cache_create() creates a cache of objects, each of size bufsize bytes, aligned on an align boundary. Drivers
+not requiring a specific alignment can pass 0. name identifies the cache for statistics and debugging. constructor and
+destructor convert plain memory into objects and back again; constructor can fail if it needs to allocate memory but
+cannot. private is a parameter passed to the constructor and destructor callbacks to support parameterized caches (for
+example, a pointer to an instance of the driver's soft-state structure). To facilitate debugging, kmem_cache_create()
+creates a kstat(9S) structure of class kmem_cache and name name. It returns an opaque pointer to the object cache.
+kmem_cache_alloc() gets an object from the cache. The object will be in its constructed state. kmflag has either
+KM_SLEEP or KM_NOSLEEP set, indicating whether it is acceptable to wait for memory if none is currently
+available.
+A small pool of reserved memory is available to allow the system to progress toward the goal of freeing additional
+memory while in a low memory situation. The KM_PUSHPAGE flag enables use of this reserved memory pool on
+an allocation. This flag can be used by drivers that implement strategy(9E) on memory allocations associated with a
+single I/O operation. The driver guarantees that the I/O operation will complete (or timeout) and, on completion, that
+the memory will be returned. The KM_PUSHPAGE flag should be used only in kmem_cache_alloc() calls. All al<hy>
+locations from a given cache should be consistent in their use of the flag. A driver that adheres to these restrictions
+can guarantee progress in a low memory situation without resorting to complex private allocation and queuing
+schemes. If KM_PUSHPAGE is specified, KM_SLEEP can also be used without causing deadlock.
+kmem_cache_free() returns an object to the cache. The object must be in its constructed state.
+kmem_cache_destroy() destroys the cache and releases all associated resources. All allocated objects must have
+been previously freed.
+kmem_cache_set_move() registers a function that the allocator may call to move objects from sparsely allocated
+pages of memory so that the system can reclaim pages that are tied up by the client. Since caching objects of the
+same size and type already makes severe memory fragmentation unlikely, there is generally no need to register such
+a function. The idea is to make it possible to limit worst-case fragmentation in caches that exhibit a tendency to be<hy>
+come highly fragmented. Only clients that allocate a mix of long- and short-lived objects from the same cache are
+prone to exhibit this tendency, making them candidates for a move() callback.
+The move() callback supplies the client with two addresses: the allocated object that the allocator wants to move and
+a buffer selected by the allocator for the client to use as the copy destination. The new parameter is an allocated,
+constructed object ready to receive the contents of the old parameter. The bufsize parameter supplies the size of the
+object, in case a single move function handles multiple caches whose objects differ only in size. Finally, the private
+parameter passed to the constructor and destructor is also passed to the move() callback.
+Only the client knows about its own data and when it is a good time to move it. The client cooperates with the allo<hy>
+cator to return unused memory to the system, and the allocator accepts this help at the client's convenience. When
+asked to move an object, the client can respond with any of the following:
+ typedef enum kmem_cbrc {
+  KMEM_CBRC_YES,
+  KMEM_CBRC_NO,
+  KMEM_CBRC_LATER,
+  KMEM_CBRC_DONT_NEED,
+  KMEM_CBRC_DONT_KNOW
+ } kmem_cbrc_t;
+The client must not explicitly free either of the objects passed to the move() callback, since the allocator wants to
+free them directly to the slab layer (bypassing the per-CPU magazine layer). The response tells the allocator which
+of the two object parameters to free:
+KMEM_CBRC_YES The client moved the object; the allocator frees the old parameter.
+KMEM_CBRC_NO The client refused to move the object; the allocator frees the new parameter (the unused copy
+destination).
+KMEM_CBRC_LATER The client is using the object and cannot move it now; the allocator frees the new parame<hy>
+ter (the unused copy destination). The client should use KMEM_CBRC_LATER instead of KMEM_CBRC_NO
+<beginning of page>
+if the object is likely to become movable soon.
+KMEM_CBRC_DONT_NEED The client no longer needs the object; the allocator frees both the old and new pa<hy>
+rameters. This response is the client's opportunity to be a model citizen and give back as much as it can.
+KMEM_CBRC_DONT_KNOW The client does not know about the object because:
+a) the client has just allocated the object and has not yet put it wherever it expects to find known objects
+b) the client has removed the object from wherever it expects to find known objects and is about to free the object
+c) the client has freed the object
+In all of these cases above, the allocator frees the new parameter (the unused copy destination) and searches for the
+old parameter in the magazine layer. If the object is found, it is removed from the magazine layer and freed to the
+slab layer so that it will no longer tie up an entire page of memory.
+Any object passed to the move() callback is guaranteed to have been touched only by the allocator or by the client.
+Because memory patterns applied by the allocator always set at least one of the two lowest order bits, the bottom
+two bits of any pointer member (other than char * or short *, which may not be 8-byte aligned on all platforms) are
+available to the client for marking cached objects that the client is about to free. This way, the client can recognize
+known objects in the move() callback by the unmarked (valid) pointer value.
+If the client refuses to move an object with either KMEM_CBRC_NO or KMEM_CBRC_LATER, and that object
+later becomes movable, the client can notify the allocator by calling kmem_cache_move_notify(). Alternatively, the
+client can simply wait for the allocator to call back again with the same object address. Responding KMEM_CR<hy>
+BC_NO even once or responding KMEM_CRBC_LATER too many times for the same object makes the allocator
+less likely to call back again for that object.
+[Synopsis for notification function:]
+void kmem_cache_move_notify(kmem_cache_t *cp, void *obj);
+The parameters for the notification function are as follows:
+cp Pointer to the object cache.
+obj Pointer to the object that has become movable since an earlier refusal to move it.
+Constructors can be invoked during any call to kmem_cache_alloc(), and will run in that context. Similarly, destruc<hy>
+tors can be invoked during any call to kmem_cache_free(), and can also be invoked during kmem_cache_de<hy>
+stroy(). Therefore, the functions that a constructor or destructor invokes must be appropriate in that context. Further<hy>
+more, the allocator may also call the constructor and destructor on objects still under its control without client in<hy>
+volvement.
+kmem_cache_create() and kmem_cache_destroy() must not be called from interrupt context. kmem_cache_cre<hy>
+ate() can also block for available memory.
+kmem_cache_alloc() can be called from interrupt context only if the KM_NOSLEEP flag is set. It can be called
+from user or kernel context with any valid flag.
+kmem_cache_free() can be called from user, kernel, or interrupt context.
+kmem_cache_set_move() is called from the same context as kmem_cache_create(), immediately after
+kmem_cache_create() and before allocating any objects from the cache.
+The registered move() callback is always invoked in the same global callback thread dedicated for move requests,
+guaranteeing that no matter how many clients register a move() function, the allocator never tries to move more than
+one object at a time. Neither the allocator nor the client can be assumed to know the object's whereabouts at the time
+<beginning of page>
+of the callback. Example 1 Object Caching
+Consider the following data structure:
+ struct foo {
+  kmutex_t foo_lock;
+  kcondvar_t foo_cv;
+  struct bar *foo_barlist;
+  int foo_refcnt;
+  };
+Assume that a foo structure cannot be freed until there are no outstanding references to it (foo_refcnt == 0) and all
+of its pending bar events (whatever they are) have completed (foo_barlist == NULL). The life cycle of a dynami<hy>
+cally allocated foo would be something like this:
+ foo = kmem_alloc(sizeof (struct foo), KM_SLEEP);
+ mutex_init(&foo->foo_lock, ...);
+ cv_init(&foo->foo_cv, ...);
+ foo->foo_refcnt = 0;
+ foo->foo_barlist = NULL;
+  use foo;
+ ASSERT(foo->foo_barlist == NULL);
+ ASSERT(foo->foo_refcnt == 0);
+ cv_destroy(&foo->foo_cv);
+ mutex_destroy(&foo->foo_lock);
+ kmem_free(foo);
+Notice that between each use of a foo object we perform a sequence of operations that constitutes nothing but expen<hy>
+sive overhead. All of this overhead (that is, everything other than use foo above) can be eliminated by object
+caching.
+ int
+ foo_constructor(void *buf, void *arg, int tags)
+ {
+  struct foo *foo = buf;
+  mutex_init(&foo->foo_lock, ...);
+  cv_init(&foo->foo_cv, ...);
+  foo->foo_refcnt = 0;
+  foo->foo_barlist = NULL;
+  return (0);
+ }
+ void
+ foo_destructor(void *buf, void *arg)
+ {
+  struct foo *foo = buf;
+  ASSERT(foo->foo_barlist == NULL);
+  ASSERT(foo->foo_refcnt == 0);
+  cv_destroy(&foo->foo_cv);
+  mutex_destroy(&foo->foo_lock);
+ }
+ user_arg = ddi_get_soft_state(foo_softc, instance);
+ (void) snprintf(buf, KSTAT_STRLEN, "foo%d_cache",
+  ddi_get_instance(dip));
+ foo_cache = kmem_cache_create(buf,
+  sizeof (struct foo), 0,
+  foo_constructor, foo_destructor,
+  NULL, user_arg, 0);
+<beginning of page>
+To allocate, use, and free a foo object:
+ foo = kmem_cache_alloc(foo_cache, KM_SLEEP);
+  use foo;
+ kmem_cache_free(foo_cache, foo);
+This makes foo allocation fast, because the allocator will usually do nothing more than fetch an already-constructed
+foo from the cache. foo_constructor and foo_destructor will be invoked only to populate and drain the cache, re<hy>
+spectively.
+Example 2 Registering a Move Callback
+To register a move() callback:
+ object_cache = kmem_cache_create(...);
+ kmem_cache_set_move(object_cache, object_move);
+If successful, the constructor function must return 0. If KM_NOSLEEP is set and memory cannot be allocated with<hy>
+out sleeping, the constructor must return -1.
+kmem_cache_create() returns a pointer to the allocated cache.
+If successful, kmem_cache_alloc() returns a pointer to the allocated object. If KM_NOSLEEP is set and memory
+cannot be allocated without sleeping, kmem_cache_alloc() returns NULL.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed
+condvar(9F), kmem_alloc(9F), mutex(9F), kstat(9S)
+Writing Device Drivers
+The Slab Allocator: An Object-Caching Kernel Memory Allocator, Bonwick, J.; USENIX Summer 1994 Technical
+Conference (1994).
+Magazines and vmem: Extending the Slab Allocator to Many CPUs and Arbitrary Resources, Bonwick, J. and
+Adams, J.; USENIX 2001 Technical Conference (2001).
+The constructor must be immediately reversible by the destructor, since the allocator may call the constructor and
+destructor on objects still under its control at any time without client involvement.
+The constructor must respect the kmflags argument by forwarding it to allocations made inside the constructor, and
+must not ASSERT anything about the given flags.
+The user argument forwarded to the constructor must be fully operational before it is passed to kmem_cache_cre<hy>
+ate().

@@ -1,0 +1,384 @@
+<beginning of page>
+sharemgr <-> configure and manage file sharing
+sharemgr subcommand [options]
+add-share [-nth] [-r resource-name] [-d "description text"]
+ -s sharepath group
+create [-nvh] [-P proto [-p property=value]] group
+delete [-nvh] [-P proto] [-f] group
+disable [-nvh] [-a | group...]
+enable [-nvh] [-a | group...]
+list [-vh] [-P proto]
+move-share [-nv] -s sharepath destination-group
+remove-share [-fnvh] -s sharepath group
+set [-nvh] -P proto [-p property=value]... [-S optionset]
+ [-s sharepath] group
+set-share [-nh] [-r resource] [-d "description text"]
+ -s sharepath group
+show [-pvxh] [-P proto] [group]...
+unset [-nvh] -P proto [-S optionset] [-p property]...
+ group
+share [-F fstype] [-p] [-o optionlist] [-d description]
+ [pathname [resourcename]]
+unshare [-F fstype] [-p] [-o optionlist] sharepath
+The sharemgr command configures share groups and the shares contained within them.
+A group name must conform to service management facility (SMF) (see smf(5)) service-naming conventions, thus is
+limited to starting with an alphabetic character, with the rest of the name consisting only of alphanumeric characters
+plus - (hyphen) and _ (underbar).
+Subcommands that result in a configuration change support a dry-run option. When dry-run (-n) is specified, the
+syntax and validity of the command is tested but the configuration is not actually updated.
+For all subcommands, the -h option lists usage and help information.
+For subcommands with the verbose (-v) option, additional information will be provided. For example, in conjunction
+with the -n option, verbose mode will also indicate whether the current user has sufficient permissions to accomplish
+the operation.
+There are two groups that are created automatically. The default group always exists and covers legacy NFS shares
+only. The zfs group will be created when ZFS shares are enabled.
+The options shown in the SYNOPSIS section are described in the context of each subcommand. All subcommands
+except list and show require root privileges or that you assume the Primary Administrator role.
+With no subcommand entered, a sharemgr command with the -h option displays a usage message for all subcom<hy>
+mands.
+The following subcommands follow sharemgr on a command line. Commands take the form:
+ % sharemgr <subcommand> [options]
+<beginning of page>
+create [-nvh] [-P proto [-p property=value]] group
+Create a new group with specified name.
+If -n is specified, the command checks only the validity of the command and that the group does not already exist.
+If no protocol is specified, all known protocols are enabled for the specified group. If a protocol is specified, only
+that protocol is enabled. You can specify properties for a specified protocol.
+If group exists, use of -P adds the specified protocol to that group.
+As an example of the create subcommand, the following command creates a new group with the name mygroup.
+ # sharemgr create mygroup
+Because no protocol was specified in the preceding command, all defined protocols will be enabled on the group.
+delete [-nvh] [-P proto] [-f] group
+Delete the specified group. If the group is not empty, you can use the -f option to force the deletion, which unshares
+and removes all shares from the group before removing the group itself.
+If you specify a protocol, rather than deleting the whole group, this subcommand deletes the protocol from the
+group.
+The -n option can be used to test the syntax of the command.
+As an example, the following command removes the group mygroup from the configuration if it is empty.
+ # sharemgr delete mygroup
+The following command removes any existing shares prior to removing the group.
+ # sharemgr delete -f mygroup
+Note the use of the force (-f) option, above.
+list [-vh] [-P proto]
+List the defined groups.
+If a protocol is specified, list only those groups that have the specified protocol defined.
+If the verbose option is specified, the current state of the group and all protocols enabled on the group are listed as
+well. For example:
+ # sharemgr list -v
+ mygroup enabled nfs
+ rdonlygrp disabled nfs
+show [-pvxh] [-P proto] [group...]
+Shows the contents of the specified group(s).
+If the verbose option is specified, the resource name and description of each share is displayed if they are defined.
+Otherwise, only the share paths are displayed. Also, when temporary shares are listed, they are prefixed with an as<hy>
+terisk (*).
+If the -p option is specified, all options defined for the protocols of the group are displayed, in addition to the display
+<beginning of page>
+without options. If the -P option is used, the output is limited to those groups that have the specified protocol en<hy>
+abled. If the -x option is specified, output is in XML format and the -p and -v options are ignored, because all infor<hy>
+mation is included in the XML.
+The following example illustrates the use of the -p option.
+ # sharemgr show -p mygroup
+ default nfs=()
+  * /data/backup
+ mygroup nfs=(nosuid=true)
+  /export/home/home0
+  /export/home/home1
+The following example illustrates the use of the -v option.
+ # sharemgr show -v mygroup
+ mygroup
+  HOME0=/export/home/home0 "Home directory set 0"
+  HOME1=/export/home/home1 "Home directory set 1"
+ZFS managed shares are handled in a way similar to the way NFS shares are handled. These shares appear as sub<hy>
+groups within the parent group zfs. The subgroups are always prefixed with zfs/ and use the ZFS dataset name for
+the rest of the name. The mount point and any sub-mounts that inherit sharing are shown as the shares of the sub<hy>
+group. For example:
+ # sharemgr show -vp zfs
+ zfs nfs=()
+  zfs/ztest
+  /ztest
+  /ztest/backups
+set [-nvh] -P proto [-S optionset] [-p property=value]* [-s share path] group
+Set protocol-specific properties on the specified group.
+The -P option is required and must specify a valid protocol.
+Optionsets are protocol-specific sets of properties that can be negotiated by the protocol client. For NFS, optionsets
+are equivalent to security modes as defined in nfssec(5). If -S optionset is specified, the properties are applied to the
+selected optionset. Otherwise they are applied to the general optionset.
+Together, -P and -S select a specific view of the group's options on which to work.
+Property values are strings. A specified property is set to a new value if the property already exists or is added to the
+protocol if it does not already exist.
+In the general case, at least one property must be set. If -S is specified, properties can be omitted and the specified
+optionset is enabled for the protocol.
+The -s option allows setting properties on a per-share basis. While this is supported, it should be limited to managing
+legacy shares and to the occasional need for an override of a group-level property or placing an additional property
+on one share within a group.
+An example of this subcommand:
+ # sharemgr set -P nfs -p anon=1234 mygroup
+The preceding command adds the property anon=1234 to the nfs view of group mygroup. If mygroup has existing
+shares, they will all be reshared with the new property value(s).
+<beginning of page>
+unset [-nvh] -P proto [-S optionset] [-p property]* [-s sharepath ] group
+Unset the specified properties for the protocol or for the specified optionset of the protocol.
+In the general case, at least one property must be set. If -S is specified, properties can be omitted and the specified
+optionset is removed from the protocol.
+The -s option allows removing a share-specific property.
+An example of this subcommand:
+ # sharemgr unset -P nfs -p anon mygroup
+The preceding command removes the anon= property from the nfs view of group mygroup. If mygroup has exist<hy>
+ing shares, they will all be reshared with the new property value(s).
+add-share [-nth] [-r resource-name] [-d "description text"] -s sharepath group
+Add a new share to the specified group.
+The -s option is mandatory and takes a full directory path.
+If either or both of -d and -r are specified, they specify values associated with the share. -d provides a description
+string to document the share and -r provides a protocol-independent resource name. Resource names are not used by
+NFS at this time but can be specified. These names currently follow the same naming rules as group names.
+The temporary option (-t) results in the share being shared but not stored in the configuration repository. This option
+is intended for shares that should not survive a reboot or server restart, or for testing purposes. Temporary shares are
+indicated in the show subcommand output with an asterisk (*) preceding the share.
+If sharepath is a ZFS path and that path is added to the zfs group, sharemgr creates a new ZFS subgroup; the new
+share is added to that subgroup. Any ZFS sub-filesystems under the ZFS filesystem designated by sharepath will in<hy>
+herit the shared status of sharepath.
+The effect of the add-share subcommand on a ZFS dataset is determined by the values of the sharesmb and
+sharenfs properties of that dataset.
+See zfs(1M) for a description of the sharesmb and sharenfs properties.
+The following are examples of the add-share subcommand.
+ # sharemgr add-share -s /export/home/home0 -d "home \
+ directory set 0" -r HOME0 mygroup
+ # sharemgr add-share -s /export/home/home1 -d "home \
+ directory set 1" -r HOME1 mygroup
+The preceding commands add /export/home/home0 and /export/home/home1 to the group mygroup. A descriptive
+comment and a resource name are included.
+move-share [-nvh] -s sharepath destination-group
+Move the specified share from the group it is currently in to the specified destination group. The move-share sub<hy>
+command does not create a group. A specified group must exist for the command to succeed.
+The following is an example of this subcommand.
+ # sharemgr move-share -s /export/home/home1 newgroup
+Assuming /export/home/home1 is in the group mygroup, the preceding command moves /export/home/home1 to
+the group newgroup and unshares and then reshares the directory with the properties associated with newgroup.
+<beginning of page>
+remove-share [-fnvh] -s sharepath group
+Remove the specified share from the specified group. The force (-f) option forces the share to be removed even if it
+is busy.
+You must specify the full path for sharepath. For group, use the subgroup as displayed in the output of the sharemgr
+show command. Note that if there are subshares that were created by inheritance, these will be removed, along with
+the parent shares.
+set-share [-nvh] [-r resource] [-d "description text"] -s sharepath group
+Set or change the specified share's description and resource values. One use of set-share is to rename a resource.
+The syntax for this use of the subcommand is:
+ # sharemgr set-share -r current_name=new_name -s sharepath group
+enable [-nvh] [group... | -a]
+Enable the specified group(s), or (with -a) all groups, and start sharing the contained shares. This state persists
+across reboots.
+An enabled group will be shared whenever the corresponding SMF service instance is enabled. sharemgr will start
+the SMF service instance if it is not currently online.
+disable [-nvh] [group... | -a]
+Disable the specified group(s), or (with -a) all groups, and unshare the shares that they contain. This state persists
+across reboots.
+A disabled group will not be shared even if the corresponding SMF service instance is online. This feature is useful
+when you do not want a group of shares to be started at boot time.
+start [-vh] [-P proto] [group... | -a]
+Start the specified group, or (with -a) all groups. The start subcommand is similar to enable in that all shares are
+started, but start works only on groups that are enabled. start is used by the SMF to start sharing at system boot.
+A group will not start sharing if it is in the sharemgr disabled state. However, the corresponding SMF service in<hy>
+stance will be started.
+Note that the start subcommand is similar to the shareall(1M) command in that it starts up only the configured
+shares. That is, the enabled shares will start being shared, but the configuration state is left the same. The command:
+ # sharemgr start -a
+...is equivalent to:
+ # shareall
+stop [-vh] [-P proto] [group... | -a]
+Stop the specified group, or (with -a) all groups. The stop subcommand is similar to disable in that all shares are no
+longer shared, but it works only on groups that are enabled. stop is used by the SMF to stop sharing at system shut<hy>
+down.
+Note that the stop subcommand is similar to the unshareall(1M) command in that all active shares are unshared, but
+the configuration is left the same. That is, the shares are stopped but the service instances are left enabled. The com<hy>
+mand:
+<beginning of page>
+ # sharemgr stop -a
+...is equivalent to:
+ # unshareall
+share [-F fstype] [-p] [-o optionlist] [-d description] [pathname [resourcename]]
+Shares the specified path in the default share group. This subcommand implements the share(1M) functionality.
+Shares that are shared in this manner will be transient shares. Use of the -p option causes the shares to be persistent.
+unshare [-F fstype] [-p] [-o optionlist] sharepath
+Unshares the specified share. This subcommand implements the unshare(1M) functionality. By default, the unshare
+is temporary. The -p option is provided to remove the share from the configuration in a way that persists across re<hy>
+boots.
+Properties are protocol-specific. Currently, only the NFS and SMB protocols are supported. Properties have the fol<hy>
+lowing characteristics: <bu> Values of type boolean take either true or false. <bu> Values of type value take a numeric val<hy>
+ue. <bu> Values of type file take a file name and not a file path. <bu> Values of type access-list are described in detail fol<hy>
+lowing the descriptions of the NFS properties.
+The general properties supported for NFS are:
+abe=boolean
+Set the access-based enumeration (ABE) policy for a share. When set to true, ABE filtering is enabled on this share
+and directory entries to which the requesting user has no access will be omitted from directory listings returned to
+the client. When set to false or not defined, ABE filtering will not be performed on this share. This property is not
+defined by default.
+disabled
+Disable ABE for this share.
+enabled
+Enable ABE for this share.
+aclok=boolean
+Allows the NFS server to do access control for NFS Version 2 clients (running SunOS 2.4 or earlier). When aclok is
+set on the server, maximum access is given to all clients. For example, with aclok set, if anyone has read permis<hy>
+sions, then everyone does. If aclok is not set, minimum access is given to all clients.
+ad-container
+Specifies the AD container in which to publish shares.
+The AD container is specified as a comma-separated list of attribute name-value pairs using the LDAP distinguished
+name (DN) or relative distinguished name (RDN) format. The DN or RDN must be specified in LDAP format using
+the cn=, ou=, and dc= prefixes: <bu> cn represents the common name <bu> ou represents the organizational unit <bu> dc repre<hy>
+sents the domain component cn=, ou= and dc= are attribute types. The attribute type used to describe an object's
+RDN is called the naming attribute, which, for ADS, includes the following object classes: <bu> cn for the user object
+class <bu> ou for the organizational unit (OU) object class <bu> dc for the domainDns object class
+<beginning of page>
+anon=uid
+Set uid to be the effective user ID of unknown users. By default, unknown users are given the effective user ID
+UID_NOBODY. If uid is set to -1, access is denied.
+catia=boolean
+CATIA V4 uses characters in file names that are considered to be invalid by Windows. CATIA V5 is available on
+Windows. A CATIA V4 file could be inaccessible to Windows clients if the file name contains any of the characters
+that are considered illegal in Windows. By default, CATIA character substitution is not performed.
+If the catia property is set to true, the following character substitution is applied to file names.
+ CATIA CATIA
+ V4 UNIX V5 Windows
+  " \250 0x00a8 Dieresis
+  * \244 0x00a4 Currency Sign
+  / \370 0x00f8 Latin Small Letter O with Stroke
+  : \367 0x00f7 Division Sign
+  < \253 0x00ab Left-Pointing Double Angle Quotation Mark
+  > \273 0x00bb Right-Pointing Double Angle Quotation Mark
+  ? \277 0x00bf Inverted Question Mark
+  \ \377 0x00ff Latin Small Letter Y with Dieresis
+  | \246 0x00a6 Broken Bar
+cksum=cksumlist
+Set the share to attempt to use end-to-end checksums. The value cksumlist specifies the checksum algorithms that
+should be used.
+csc=value
+Set the client-side caching policy for a share. Client-side caching is a client feature and offline files are managed en<hy>
+tirely by the clients.
+The following are valid values for the csc property: <bu> manual - Clients are permitted to cache files from the specified
+share for offline use as requested by users. However, automatic file-by-file reintegration is not permitted. manual is
+the default value. <bu> auto - Clients are permitted to automatically cache files from the specified share for offline use
+and file-by-file reintegration is permitted. <bu> vdo - Clients are permitted to automatically cache files from the speci<hy>
+fied share for offline use, file-by-file reintegration is permitted, and clients are permitted to work from their local
+cache even while offline. <bu> disabled - Client-side caching is not permitted for this share.
+guestok=boolean
+Set the guest access policy for the share. When set to true guest access is allowed on this share. When set to false or
+not defined guest access is not allowed on this share. This property is not defined by default.
+An idmap(1M) name-based rule can be used to map guest to any local username, such as guest or nobody. If the
+local account has a password in /var/smb/smbpasswd the guest connection will be authenticated against that pass<hy>
+word. Any connection made using an account that maps to the local guest account will be treated as a guest connec<hy>
+tion.
+Example name-based rule:
+ # idmap add winname:Guest unixuser:guest
+index=file
+Load file rather than a listing of the directory containing this file when the directory is referenced by an NFS URL.
+<beginning of page>
+log=tag
+Enables NFS server logging for the specified system. The optional tag determines the location of the related log
+files. The tag is defined in etc/nfs/nfslog.conf. If no tag is specified, the default values associated with the global tag
+in etc/nfs/nfslog.conf is used. Support of NFS server logging is available only for NFS Version 2 and Version 3 re<hy>
+quests.
+nosub=boolean
+Prevents clients from mounting subdirectories of shared directories. For example, if /export is shared with the no<hy>
+sub option on server wool then an NFS client cannot do:
+ # mount -F nfs wool:/export/home/mnt
+NFS Version 4 does not use the MOUNT protocol. The nosub option applies only to NFS Version 2 and Version 3
+requests.
+nosuid=boolean
+By default, clients are allowed to create files on a shared file system with the setuid or setgid mode enabled. Speci<hy>
+fying nosuid causes the server file system to silently ignore any attempt to enable the setuid or setgid mode bits.
+public=boolean
+Moves the location of the public file handle from root (/) to the exported directory for WebNFS-enabled browsers
+and clients. This option does not enable WebNFS service; WebNFS is always on. Only one file system per server can
+have the public property. You can apply the public property only to a share and not to a group.
+NFS also supports negotiated optionsets for supported security modes. The security modes are documented in nf<hy>
+ssec(5). The properties supported for these optionsets are:
+charset=access-list
+Where charset is one of: euc-cn, euc-jp, euc-jpms, euc-kr, euc-tw, iso8859-1, iso8859-2, iso8859-5, iso8859-6,
+iso8859-7, iso8859-8, iso8859-9, iso8859-13, iso8859-15, koi8-r.
+Clients that match the access-list for one of these properties will be assumed to be using that character set and file
+and path names will be converted to UTF-8 for the server.
+ro=access-list
+Sharing is read-only to the clients listed in access-list; overrides the rw suboption for the clients specified. See the
+description of access-list below.
+rw=access-list
+Sharing is read-write to the clients listed in access-list; overrides the ro suboption for the clients specified. See the
+description of access-list below.
+none=access-list
+Access is not allowed to any client that matches the access list. The exception is when the access list is an asterisk
+(*), in which case ro or rw can override none.
+root=access-list
+Only root users from the hosts specified in access-list have root access. See details on access-list below. By default,
+no host has root access, so root users are mapped to an anonymous user ID (see the anon=uid option described
+above). Netgroups can be used if the file system shared is using UNIX authentication (AUTH_SYS).
+<beginning of page>
+root_mapping=uid
+For a client that is allowed root access, map the root UID to the specified user id.
+window=value
+When sharing with sec=dh (see nfssec(5)), set the maximum lifetime (in seconds) of the RPC request's credential
+(in the authentication header) that the NFS server allows. If a credential arrives with a lifetime larger than what is al<hy>
+lowed, the NFS server rejects the request. The default value is 30000 seconds (8.3 hours). This property is ignored
+for security modes other than dh.
+The general properties supported for SMB are:
+ro=access-list
+Sharing is read-only to the clients listed in access-list; overrides the rw suboption for the clients specified. See the
+description of access-list below.
+rw=access-list
+Sharing is read-write to the clients listed in access-list; overrides the ro suboption for the clients specified. See the
+description of access-list below.
+none=access-list
+Access is not allowed to any client that matches the access list. The exception is when the access list is an asterisk
+(*), in which case ro or rw can override none.
+The access-list argument is either the string "*" to represent all hosts or a colon-separated list whose components
+can be any number of the following:
+hostname
+The name of a host. With a server configured for DNS or LDAP naming in the nsswitch.conf(4) hosts entry, a host<hy>
+name must be represented as a fully qualified DNS or LDAP name.
+netgroup
+A netgroup contains a number of hostnames. With a server configured for DNS or LDAP naming in the nss<hy>
+witch.conf(4) hosts entry, any hostname in a netgroup must be represented as a fully qualified DNS or LDAP name.
+domainname.suffix
+To use domain membership the server must use DNS or LDAP, rather than, for example, NIS or NIS+, to resolve
+hostnames to IP addresses. That is, the hosts entry in the nsswitch.conf(4) must specify dns or ldap ahead of nis or
+nisplus, because only DNS and LDAP return the full domain name of the host. Other name services, such as NIS or
+NIS+, cannot be used to resolve hostnames on the server because, when mapping an IP address to a hostname, they
+do not return domain information. For example, for the IP address 172.16.45.9:
+NIS or NIS+
+Returns: myhost
+DNS or LDAP
+Returns: myhost.mydomain.mycompany.com
+The domain name suffix is distinguished from hostnames and netgroups by a prefixed dot. For example:
+ rw=.mydomain.mycompany.com
+<beginning of page>
+A single dot can be used to match a hostname with no suffix. For example, the specification:
+ rw=.
+...matches mydomain but not mydomain.mycompany.com. This feature can be used to match hosts resolved
+through NIS and NIS+ rather than DNS and LDAP.
+network
+The network or subnet component is preceded by an at-sign (@). It can be either a name or a dotted address. If a
+name, it is converted to a dotted address by getnetbyname(3SOCKET). For example:
+ =@mynet
+...is equivalent to:
+ =@172.16 or =@172.16.0.0
+The network prefix assumes an octet-aligned netmask determined from the zeroth octet in the low-order part of the
+address up to and including the high-order octet, if you want to specify a single IP address. In the case where net<hy>
+work prefixes are not byte-aligned, the syntax allows a mask length to be specified explicitly following a slash (/) de<hy>
+limiter. For example:
+ =@theothernet/17 or =@172.16.132/22
+...where the mask is the number of leftmost contiguous significant bits in the corresponding IP address.
+A prefixed minus sign (-) denies access to a component of access-list. The list is searched sequentially until a match
+is found that either grants or denies access, or until the end of the list is reached. For example, if host terra is in the
+netgroup engineering, then:
+ rw=-terra:engineering
+...denies access to terra, but:
+ rw=engineering:-terra
+...grants access to terra.
+0 Successful completion.
+98 Service is offline and cannot be enabled (start only).
+other non-zero Command failed.
+/usr/include/libshare.h Error codes used for exit status.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wcsu _ Interface StabilityCommitted
+idmap(1M), sharectl(1M), zfs(1M), attributes(5), nfssec(5), smf(5), standards(5)

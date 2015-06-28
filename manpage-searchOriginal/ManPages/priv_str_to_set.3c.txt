@@ -1,0 +1,77 @@
+<beginning of page>
+priv_str_to_set, priv_set_to_str, priv_getbyname, priv_getbynum, priv_getsetbyname, priv_getsetbynum, priv_get<hy>
+text <-> privilege name functions
+#include <priv.h>
+priv_set_t *priv_str_to_set(const char *buf, const char *sep,
+ const char **endptr);
+char *priv_set_to_str(const priv_set_t *set, char sep, int flag);
+int priv_getbyname(const char *privname);
+const char *priv_getbynum(int privnum);
+int priv_getsetbyname(const char *privsetname);
+const char *priv_getsetbynum(int privname);
+char *priv_gettext(const char *privname);
+The priv_str_to_set() function maps the privilege specification in buf to a privilege set. It returns a privilege set on
+success or NULL on failure. If an error occurs when parsing the string, a pointer to the remainder of the string is
+stored in the object pointed to by endptr, provided that endptr is not a null pointer. If an error occurs when allocating
+memory, errno is set and the object pointed to by endptr is set to the null pointer, provided that endptr is not a null
+pointer.
+The application is responsible for freeing the returned privilege set using priv_freeset(3C).
+A privilege specification should contain one or more privilege names, separated by characters in sep using the same
+algorithm as strtok(3C). Privileges can optionally be preceded by a dash (-) or an exclamation mark (!), in which
+case they are excluded from the resulting set. The special strings "none" for the empty set, "all" for the set of all
+privileges, "zone" for the set of all privileges available within the caller's zone, and "basic" for the set of basic privi<hy>
+leges are also recognized. Set specifications are interpreted from left to right.
+The priv_set_to_str() function converts the privilege set to a sequence of privileges separated by sep, returning the a
+pointer to the dynamically allocated result. The application is responsible for freeing the memory using free(3C).
+To maintain future compatibility, the "basic" set of privileges is included as "basic,!missing_basic_priv1,...". When
+further currently unprivileged operations migrate to the basic privilege set, the conversion back of the result with
+priv_str_to_set() includes the additional basic privileges, guaranteeing that the resulting privilege set carries the
+same privileges. This behavior is the default and is equivalent to specifying a flag argument of PRIV_STR_PORT.
+When specifying a flag argument of PRIV_STR_LIT, the result does not treat basic privileges differently and the
+privileges present are all literally presented in the output. A flag argument of PRIV_STR_SHORT attempts to ar<hy>
+rive at the shortest output, using the tokens "basic", "zone", "all", and negated privileges. This output is most useful
+for trace output.
+The priv_getbyname() and priv_getsetbyname() functions map privilege names and privilege set names to num<hy>
+bers. The numbers returned are valid for the current kernel instance only and could change at the next boot. Only the
+privilege names should be committed to persistent storage. The numbers should not be committed to persistent stor<hy>
+age. Both functions return -1 on error, setting errno to EINVAL.
+The priv_getbynum() and priv_getsetbynum() functions map privileges numbers to names. The strings returned
+point to shared storage that should not be modified and is valid for the lifetime of the process. Both functions return
+NULL on error, setting errno to EINVAL.
+The priv_gettext() function returns a pointer to a string consisting of one or more newline-separated lines of text de<hy>
+scribing the privilege. The text is localized using {LC_MESSAGES}. The application is responsibe for freeing the
+memory returned.
+These functions pick up privileges allocated during the lifetime of the process using priv_getbyname(9F) by re<hy>
+freshing the internal data structures when necessary.
+Upon successful completion, priv_str_to_set() and priv_set_to_str() return a non-null pointer to allocated memory
+that should be freed by the application using the appropriate functions when it is no longer referenced.
+The priv_getbynum() and priv_getsetbynum() functions return non-null pointers to constant memory that should
+<beginning of page>
+not be modified or freed by the application. Otherwise, NULL is returned and errno is set to indicate the error.
+Upon successful completion, priv_getbyname() and priv_getsetbyname() return a non-negative integer. Otherwise,
+-1 is returned and errno is set to indicate the error.
+Upon successful completion, priv_gettext() returns a non-null value. It returns NULL if an error occurs or no de<hy>
+scriptive text for the specified privilege can be found.
+The priv_str_to_set() and priv_set_to_str() functions will fail if:
+ENOMEM The physical limits of the system are exceeded by the memory allocation needed to hold a privilege set.
+EAGAIN There is not enough memory available to allocate sufficient memory to hold a privilege set, but the appli<hy>
+cation could try again later.
+All of these functions will fail if:
+EINVAL One or more of the arguments is invalid.
+Example 1 List all the sets and privileges defined in the system.
+The following example lists all the sets and privileges defined in the system.
+ #include <priv.h>
+ #include <stdio.h>
+ /* list all the sets and privileges defined in the system */
+ const char *name;
+ int i;
+ printf("Each process has the following privilege sets:\n");
+ for (i = 0; (name = priv_getsetbynum(i++)) != NULL; )
+  printf("\t%s\n", name);
+ printf("Each set can contain the following privileges:\n");
+ for (i = 0; (name = priv_getbynum(i++)) != NULL; )
+  printf("\t%s\n", name);
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stabili<hy>
+tyEvolving _ MT-LevelMT-Safe
+free(3C), priv_set(3C), attributes(5), privileges(5), priv_getbyname(9F)

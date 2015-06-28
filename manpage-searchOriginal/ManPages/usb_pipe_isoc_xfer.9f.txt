@@ -1,0 +1,142 @@
+<beginning of page>
+usb_pipe_isoc_xfer, usb_pipe_stop_isoc_polling <-> USB isochronous transfer and polling functions
+#include <sys/usb/usba.h>
+int usb_pipe_isoc_xfer(usb_pipe_handle_t pipe_handle, usb_isoc_req_t *request,
+ usb_flags_t flags);
+void usb_pipe_stop_isoc_polling(usb_pipe_handle_t pipe_handle, usb__flags_t flags);
+Solaris DDI specific (Solaris DDI)
+For usb_pipe_isoc_xfer():
+pipe_handle Isochronous pipe handle on which request is made.
+request Pointer to isochronous transfer request.
+flags USB_FLAGS_SLEEP is the only flag recognized. Wait for needed resources if unavailable.
+For usb_pipe_stop_isoc_polling():
+pipe_handle Isochronous pipe handle on which to stop polling for input.
+flags USB_FLAGS_SLEEP is the only flag recognized. Wait for polling to stop.
+The usb_pipe_isoc_xfer() function requests the USBA framework to perform a transfer through a USB
+isochronous pipe. The request is passed to the host controller driver (HCD), which performs the necessary transac<hy>
+tions to complete the request.
+By their nature, isochronous transfers require several transactions for completion. Each request may contain several
+packet descriptors. Descriptors correspond to subtransfers to be made in different frames. A request is deemed com<hy>
+pleted once all packets of that request have been processed. It is illegal to specify the USB_ATTRS_ONE_XFER at<hy>
+tribute in an isochronous request. The isochronous polling interval is always one millisecond, the period of a full-
+speed frame.
+All isochronous requests are asynchronous, and will notify the caller of their completion via a callback function.
+All isochronous requests must specify normal and exception callback handlers.
+Requests will wait for needed, unavailable resources when USB_FLAGS_SLEEP has been specified in flags. Re<hy>
+quests made without USB_FLAGS_SLEEP set will fail if needed resources are not readily available.
+No errors seen during request processing will result in aborted transfers or exception callbacks. Such errors will in<hy>
+stead be logged in the packet descriptor's isoc_pkt_status field. These errors can be examined when the completed
+request is returned through a normal callback.
+Allocate room for data when allocating isochronous-OUT requests via usb_alloc_isoc_req(9F), by passing a positive
+value for the len argument. The data will be divided among the request transactions, each transaction represented
+by a packet descriptor. (See usb_isoc_request(9F). When all of the data has been sent, regardless of any errors en<hy>
+countered, a normal transfer callback will be made to notify the client driver of completion.
+If a request is submitted while other requests are active or queued, and the new request has its USB_AT<hy>
+TRS_ISOC_XFER_ASAP attribute set, the host controller driver will queue the request to start on a frame which
+immediately follows the last frame of the last queued request.
+All isochronous-IN transfers start background polling, and require only a single (original) request. The USBA
+framework will allocate a new request each time polling has new data to return. Specify a zero length when calling
+usb_alloc_isoc_req() to allocate the original request, since it will not be used to return data. Set the isoc_pk<hy>
+ts_length in the request to specify how much data to poll per interval (the length of one packet in the request).
+<beginning of page>
+The original request passed to usb_pipe_isoc_xfer() will be used to return status when polling termination is re<hy>
+quested, or for error condition notification. There can be only one isochronous-IN request submitted at a time.
+Isochronous transfer normal-completion callbacks cannot block for any reason since they are called from interrupt
+context. They will have USB_CB_INTR_CONTEXT set in their callback flags to note this.
+Isochronous exception callbacks have the following restrictions for blocking: 1. They can block for resources (for
+example to allocate memory). 2. They cannot block for synchronous completion of a command (for example
+usb_pipe_close(9F)) done on the same pipe. Asynchronous commands can be started, when the pipe's policy
+pp_max_async_reqs field is initialized to accommodate them. 3. They cannot block waiting for another callback to
+complete. 4.
+ They cannot block waiting for a synchronous transfer request to complete. They can, however, make an asynchro<hy>
+nous request (such as restarting polling with a new isochronous-IN transfer).
+Please see the section on callbacks in usb_callback_flags(9S) for more information.
+All isochronous transfer exception callbacks signify that polling has stopped. Polling requests are returned with the
+following completion reasons:
+  USB_CR_STOPPED_POLLING
+  USB_CR_PIPE_CLOSING
+Note: There are no exception callbacks for error conditions.
+The usb_pipe_stop_isoc_polling() function terminates polling on an isochronous-IN pipe. The
+usb_pipe_stop_isoc_polling() function does the following: 1. Cease polling. 2. Allow any requests-in-progress to
+complete and be returned to the client driver through the normal callback mechanism. 3. Idle the pipe. 4. Return
+the original polling request to the client driver through an exception callback with a completion reason of
+USB_CR_STOPPED_POLLING.
+For usb_pipe_isoc_xfer():
+USB_SUCCESS Transfer was successful.
+USB_INVALID_ARGS Request is NULL.
+USB_INVALID_CONTEXT Called from interrupt context with the USB_FLAGS_SLEEP flag set.
+USB_INVALID_REQUEST The request has been freed or otherwise invalidated.
+A set of conflicting attributes were specified. See usb_isoc_request(9S).
+The normal and/or exception callback was NULL, USB_FLAGS_SLEEP was not set and USB_AT<hy>
+TRS_ONE_XFER was not set.
+An isochronous request was specified with a zeroed isoc_pkt_descr, a NULL isoc_pkt_descr, or a NULL data argu<hy>
+ment.
+An isochronous request was specified with USB_ATTRS_ISOC_XFER_ASAP and a nonzero isoc_frame_no.
+USB_NO_FRAME_NUMBER An isochronous request was not specified with one and only one of USB_AT<hy>
+TRS_ISOC_START_FRAME or USB_ATTRS_ISOC_XFER_ASAP specified.
+An isochronous request was specified with USB_ATTRS_ISOC_START_FRAME and a zero isoc_frame_no.
+USB_INVALID_START_FRAME An isochronous request was specified with an invalid starting frame number
+(less than current frame number, or zero) and USB_ATTRS_ISOC_START_FRAME specified.
+<beginning of page>
+USB_INVALID_PIPE Pipe handle is NULL or invalid.
+ Pipe is closing or closed.
+USB_PIPE_ERROR Pipe handle refers to a pipe which is in the USB_PIPE_STATE_ERROR state.
+USB_NO_RESOURCES Memory, descriptors or other resources unavailable.
+USB_HC_HARDWARE_ERROR Host controller is in error state.
+USB_FAILURE An asynchronous transfer failed or an internal error occurred.
+ An isoch request requested too much data:
+  (length > (usb_get_max_pkts_per_isoc_request() *
+  endpoint's wMaxPacketSize))
+The pipe is in an unsuitable state (error, busy, not ready).
+Additional status information may be available in the isoc_completion_reason and isoc_cb_flags fields of the re<hy>
+quest. Please see usb_completion_reason(9S) and usb_callback_flags(9S) for more information.
+For usb_pipe_stop_isoc_polling():
+None, but will fail if called with USB_FLAGS_SLEEP specified from interrupt context; the pipe handle is invalid,
+NULL or pertains to a closing or closed pipe; or the pipe is in an error state. Messages regarding these errors will be
+logged to the console logfile.
+Both of these functions may be called from kernel or user context without regard to arguments. May be called from
+interrupt context only when the USB_FLAGS_SLEEP flag is clear.
+ /* Start polling on an isochronous-IN pipe. */
+  usb_isoc_req_t isoc_req;
+  void isoc_pipe_callback(usb_pipe_handle_t, usb_isoc_req_t*);
+  void isoc_pipe_exception_callback(
+  usb_pipe_handle_t, usb_isoc_req_t*);
+  uint_t pkt_size;
+  usb_ep_data_t *isoc_ep_tree_node;
+  usb_ep_descr_t *isoc_ep_descr = ...; /* From usb_lookup_ep_data() */
+  isoc_ep_descr = &isoc_ep_tree_node->ep_descr;
+  pkt_size = isoc_ep_descr->wMaxPacketSize;
+  isoc_req = usb_alloc_isoc_req(
+  dip, num_pkts, NUM_PKTS * pkt_size, USB_FLAGS_SLEEP);
+  ...
+  ...
+  isoc_req->isoc_attributes = USB_ATTRS_ISOC_XFER_ASAP;
+  ...
+  ...
+  isoc_req->isoc_cb = isoc_pipe_callback;
+  isoc_req->isoc_exc_cb = isoc_pipe_exception_callback;
+  ...
+  ...
+  isoc_req->isoc_pkts_length = pkt_size;
+  isoc_req->isoc_pkts_count = NUM_PKTS;
+  for (pkt = 0; pkt < NUM_PKTS; pkt++) {
+  isoc_req->isoc_pkt_descr[pkt].isoc_pkt_length = pkt_size;
+  }
+  if ((rval = usb_pipe_isoc_xfer(pipe, isoc_req, USB_FLAGS_NOSLEEP))
+<beginning of page>
+  != USB_SUCCESS) {
+  cmn_err (CE_WARN,"%s%d: Error starting isochronous pipe polling.",
+  ddi_driver_name(dip), ddi_get_instance(dip));
+  }
+  -------
+  /* Stop polling before powering off device. Wait for polling to stop. */
+  usb_pipe_stop_isoc_polling(pipe, USB_FLAGS_SLEEP);
+  pm_idle_component(dip, 0);
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ ArchitecturePCI-
+based systems _ Interface stabilityEvolving _ AvailabilitySUNWusb
+attributes(5), usb_alloc_request(9F), usb_get_current_frame_number(9F), usb_get_cfg(9F), usb_get_max_pk<hy>
+ts_per_isoc_request(9F), usb_get_status(9F), usb_pipe_bulk_xfer(9F), usb_pipe_ctrl_xfer(9F),
+usb_pipe_get_state(9F), usb_pipe_intr_xfer(9F), usb_pipe_open(9F), usb_pipe_reset(9F), usb_bulk_re<hy>
+quest(9S), usb_callback_flags(9S), usb_completion_reason(9S), usb_ctrl_request(9S), usb_ep_descr(9S),
+usb_intr_request(9S), usb_isoc_request(9S)

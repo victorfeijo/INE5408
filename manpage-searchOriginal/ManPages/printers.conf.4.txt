@@ -1,0 +1,121 @@
+<beginning of page>
+printers.conf <-> system printing configuration database
+/etc/printers.conf
+ou=printers
+printers.conf.byname
+printers.org_dir
+The printers.conf file is the system printing configuration database. System administrators use printers.conf to de<hy>
+scribe destinations for the print client commands and the print protocol adaptor. A destination names a printer or
+class of printers. See lpadmin(1M). The LP print spooler uses private LP configuration data for represented in the
+printers.conf database.
+The lpset command can be used to define the printer table in NIS+. It checks to see if the NIS+ table (print<hy>
+ers.org_dir) exists and if it does not it goes ahead and creates it in the correct format. See lpset(1M) for more infor<hy>
+mation.
+Each entry in printers.conf describes one destination. Entries are one line consisting of any number of fields sepa<hy>
+rated by colons (`:') and terminated by a NEWLINE. The first field of each entry specifies the name of the destina<hy>
+tion and aliases to which the entry describes. Specify one or more names or aliases of the destination in this first
+field. Specify the destination using atomic names. URI-style and POSIX-style names are not acceptable. See stan<hy>
+dards(5). Separate destination names by pipe signs (`|').
+Two destination names are reserved for special use in the first entry. Use _all to specify the interest list for lpget, lp<hy>
+stat, and cancel. Use _default to specify the default destination.
+The remaining fields in an entry are key=value pairs. See Specifying Configuration Options for details regarding
+key=value pairs.
+Empty lines can be included for readability. Entries can continue on to multiple lines by adding a backslash (`\') as
+the last character in the line. printers.conf can include comments. Comments have a pound sign (`#') as the first
+character in the line, and are terminated by a NEWLINE. Use the lpset command to create or modify printers.conf.
+See lpset(1M). Do not make changes in printers.conf by using an editor.
+key=value pairs are configuration options defined by the system administrator. key and value can be of arbitrary
+length. Separate key and value by the equal (`=') character.
+The following client/server configuration options (represented as key=value pairs) are supported:
+printer-uri-supported=scheme://endpoint
+Provides the information necessary to contact the print service for the entry. The scheme generally identifies the
+print service or protocol to use. Currently this is limited to lpsched, ipp, and lpd but might be expanded in the fu<hy>
+ture. Each of these schemes imposes a set of restrictions for specifying the endpoint and the functionality provided.
+lpsched://localhost/printers/queue
+ This is URI form is used for print queues that are configured under the local LP service.
+ipp://server[:port]/printers/queue
+http://server:631/printers/queue
+ipp://server[:port]/...
+This URI form is used for print queues that are remotely accessible by way of the Internet Print Protocol. This proto<hy>
+col is the preferred method of accessing remote print queues because it provides the greatest functionality over the
+wire. The ipp uri scheme is specified in the internet print protocol specifications and is much more free form than
+listed above. The actual content and format of the endpoint is determined by the remote print service.
+lpd://server/printers/queue[#Solaris]
+This URI form is used for print queues that are remotely accessable by way of the BSD Print Protocol. Though lim<hy>
+ited in capability, this protocol is widely used between client and server. It provides maximium interoperability with
+remote print services. When used to communicate with print services on a Solaris print server, the optional #Solaris
+component of the URI indicates that Solaris protcol extensions can be used during print job submission.
+<beginning of page>
+If an entry does not contain a printer-uri-supported key/value pair, the bsdaddr value is converted to its equivalent uri
+form and a printer-uri-supported key/value pair is added to the resulting data returned to applications requesting
+printer configuration data.
+bsdaddr=server,destination[,Solaris]
+Sets the server and destination name. Sets if the client generates protocol extensions for use with the lp command
+(see lp(1)). Solaris specifies a Solaris print server extension. If Solaris is not specified, no protocol extensions are
+generated. server is the name of the host containing the queue for destination. destination is the atomic name by
+which the server knows the destination. If the configuration file contents are to be shared with legacy systems (So<hy>
+laris 2.6 - Solaris 10), this key/value pair should be provided for backward compatability.
+use=destination
+Sets the destination to continue searching for configuration information. destination is an atomic, URI-style
+(scheme://endpoint), or Posix-style name (server:printer).
+all=destination_list
+Sets the interest list for the lpget, lpstat, and cancel commands. destination_list is a comma-separated list of desti<hy>
+nations. Specify destination using atomic, URI-style (scheme://endpoint), or Posix-style names (server:printer).
+See lpget(1M), lpstat(1), and cancel(1).
+The following LP configuration options (represented as key=value pairs) are supported:
+user-equivalence=true|false
+Sets whether or not usernames are considered equivalent when cancelling a print request submitted from a different
+host in a networked environment. true means that usernames are considered equivalent, and permits users to cancel
+a print requests submitted from a different host. user-equivalence is set to false by default. false means that user<hy>
+names are not considered equivalent, and does not permit users cancel a print request submitted from a different
+host. If user-equivalence is set to false, print requests can only be cancelled by the users on the host on whichs the
+print prequest was generated or by the superuser on the print server.
+Applications needing to resolve print queue names (destinations) to the associated print service and communications
+endpoint make use of a specific name resolution ordering. Destination names in URI and POSIX form are complete
+unto themselves and require no further resolution. Names in atomic form are resolved based on the printers data<hy>
+base entry in the /etc/nsswitch.conf file. See nsswitch.conf(4)
+The default destination is located differently depending on the command.
+The lp command locates the default destination in the following order: 1. lp command's -d destination option. 2.
+LPDEST environment variable. 3. PRINTER environment variable. 4. _default destination in $HOME/.print<hy>
+ers. 5. _default destination in /etc/printers.conf.
+The lpr, lpq, and lprm commands locate the default destination in the following order: 1. lpr command's -P desti<hy>
+nation option. 2. PRINTER environment variable. 3. LPDEST environment variable. 4. _default destination in
+$HOME/.printers. 5. _default destination in /etc/printers.conf.
+The lpget, lpstat, and cancel commands locate the interest list in the following order: 1. _all list in $HOME/.print<hy>
+ers. 2. _all list in /etc/printers.conf. Example 1 Setting the Interest List
+The following entry sets the interest list for the lpget, lpstat and cancel commands to printer1, printer2 and print<hy>
+er3:
+ _all:all=printer1,printer2,printer3
+Example 2 Setting the Server Name
+The following entry sets the server name to server and and printer name to ps_printer for destinations printer1 and
+<beginning of page>
+ps. It does not generate BSD protocol extensions.
+ printer1|ps:bsdaddr=server,ps_printer
+Example 3 Setting Server Name and Destination Name
+The following entry sets the server name to server and destination name to pcl_printer, for destination printer2. It
+also generates Solaris protocol extensions.
+ printer2:printer-uri-supported=lpd//server/printers/pcl_printer#Solaris
+Example 4 Setting Server Name and Destination Name with Continuous Search
+The following entry sets the server name to server and destination name to new_printer, for destination printer3. It
+also sets the printer3 to continue searching for configuration information to printer another_printer.
+ printer3:bsdaddr=server,new_printer:use=another_printer
+Example 5 Setting Default Destination
+The following entry sets the default destination to continue searching for configuration information to destination
+printer1.
+ _default:use=printer1
+Example 6 Using IPP as the URI
+The following example uses IPP as the URI:
+ printer4:printer-uri-supported=ipp\://server/printers/queue
+/etc/printers.conf System configuration database
+$HOME/.printers User-configurable printer database
+ou=printers LDAP version of /etc/printers.conf
+printers.conf.byname (NIS) NIS version of /etc/printers.conf
+printers.org_dir (NIS+) NIS+ version of /etc/printers.conf
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUNW<hy>
+pcu _ Stability LevelStable
+cancel(1), enable(1), enable(1), lp(1), lpq(1B), lpr(1B), lprm(1B), lpstat(1), accept(1M), in.lpd(1M), lpad<hy>
+<beginning of page>
+min(1M), lpget(1M), lpmove(1M), lpset(1M), accept(1M), nsswitch.conf(4), printers(4), attributes(5), stan<hy>
+dards(5)
+System Administration Guide: Basic Administration

@@ -1,0 +1,182 @@
+<beginning of page>
+scf_tmpl_validate_fmri, scf_tmpl_errors_destroy, scf_tmpl_next_error, scf_tmpl_reset_errors, scf_tmpl_strerror,
+scf_tmpl_error_type, scf_tmpl_error_source_fmri, scf_tmpl_error_pg_tmpl, scf_tmpl_error_pg, scf_tmpl_er<hy>
+ror_prop_tmpl, scf_tmpl_error_prop, scf_tmpl_error_value <-> template validation functions
+cc [ flag... ] file... -lscf [ library... ]
+#include <libscf.h>
+int scf_tmpl_validate_fmri(scf_handle_t *h, const char *fmri,
+ const char *snapshot, scf_tmpl_errors_t **errs, int flags);
+void scf_tmpl_errors_destroy(scf_tmpl_errors_t *errs);
+scf_tmpl_error_t *scf_tmpl_next_error(scf_tmpl_errors_t *errs,
+ scf_tmpl_errors_t *err)
+void scf_tmpl_reset_errors(scf_tmpl_errors_t *errs);
+int scf_tmpl_strerror(scf_tmpl_error_t *err, char *s,
+ size_t n, int flags);
+int scf_tmpl_error_type(const scf_tmpl_error_t *err,
+ scf_tmpl_error_type_t *type);
+int scf_tmpl_error_source_fmri(const scf_tmpl_error_t *err,
+ char *fmri);
+int scf_tmpl_error_pg_tmpl(const scf_tmpl_error_t *err, char *name,
+ char *type);
+int scf_tmpl_error_pg(const scf_tmpl_error_t *err,
+ char **name, char **type);
+int scf_tmpl_error_prop_tmpl(const scf_tmpl_error_t *err, char **name,
+ char **type);
+int scf_tmpl_error_prop(const scf_tmpl_error_t *err, char **name,
+ char **type,);
+int scf_tmpl_error_value(const scf_tmpl_error_t *err, char**val);
+The template validation functions offer a way to validate the configuration data of an service instance against the ap<hy>
+propriate template data. The scf_tmpl_validate_fmri() function returns the full set of errors for the specified in<hy>
+stance, and those errors can be printed or explored directly.
+By default, the validation is performed on the composed data from the running snapshot of an instance. A different
+snapshot can be explicitly selected by specifying a valid snapshot name rather than NULL for the snapshot argu<hy>
+ment. If flags includes SCF_TMPL_VALIDATE_FLAG_CURRENT, the snapshot argument is ignored and the
+current configuration is used.
+By default, these functions also explore template data defined by the service or instance itself, the service's restarter,
+and global template data. See smf_template(5) for more information about this composition.
+An instance FMRI is required, and FMRIs that specify other entities (for example, services) are explicitly rejected.
+The scf_tmpl_validate_fmri() function validates an instance FMRI against the template data in the repository. As
+described above, when the snapshot argument is NULL, the default running snapshot is used. If scf_tmpl_errors_t
+** is non-null, the structure is allocated and returned to the caller for further perusal or printing of the errors.
+The scf_tmpl_errors_destroy() function destroys and frees the scf_tmpl_errors_t and all of the scf_tmpl_error_t
+structures to which it refers.
+The scf_tmpl_next_error() function takes a pointer to a scf_tmpl_errors_t structure previously returned by
+scf_tmpl_validate_fmri(). On the first call, it returns a pointer to the first scf_tmpl_error_t found during valida<hy>
+tion. On subsequent calls, the next error is returned. To resume processing from the first error, the caller can use
+scf_tmpl_reset_errors().
+<beginning of page>
+The contents of an scf_tmpl_error_t are determined by its type. Types added as additional validation checks are in<hy>
+troduced. Based on the error type, a set of fields can be retrieved from the error.
+SCF_TERR_TYPE_INVALID
+reserved invalid type
+SCF_TERR_MISSING_PG
+required property group is missing
+ template source FMRI
+ property group template name and type
+SCF_TERR_WRONG_PG_TYPE
+property group type is incorrect
+ template source FMRI
+ property group template name and type
+ property group name and type
+SCF_TERR_MISSING_PROP
+required property is missing
+ template source FMRI
+ property group template name and type
+ property template name and type
+SCF_TERR_WRONG_PROP_TYPE
+property type is incorrect
+ template source FMRI
+ property group template name and type
+ property template name and type
+ property group name and type
+ property name and type
+SCF_TERR_CARDINALITY_VIOLATION
+number of values violates cardinality
+ template source FMRI
+ property group template name and type
+ property template name and type
+ property group name and type
+ property name and type
+ cardinality and cardinality limits
+SCF_TERR_VALUE_CONSTRAINT_VIOLATED
+constraint violated for value
+ template source FMRI
+ property group template name and type
+ property template name and type
+ property group name and type
+ property name and type
+ value
+SCF_TERR_RANGE_VIOLATION
+value violated specified range
+ template source FMRI
+ property group template name and type
+ property template name and type
+ property group name and type
+<beginning of page>
+ property name and type
+ value
+SCF_TERR_PROP_TYPE_MISMATCH
+value type is different from property type
+ template source FMRI
+ property group template name and type
+ property template name and type
+SCF_TERR_VALUE_OUT_OF_RANGE
+value is out of template defined range
+ template source FMRI
+ property group template name and type
+ property template name and type
+ value
+SCF_TERR_INVALID_VALUE
+value violates template defined constraints
+ template source FMRI
+ property group template name and type
+ property template name and type
+ value
+The SCF_TERR_PROP_TYPE_MISMATCH, SCF_TERR_VALUE_OUT_OF_RANGE and SCF_TERR_IN<hy>
+VALID_VALUE types are only set from calls to scf_tmpl_value_in_constraint(3SCF).
+The scf_tmpl_error_type() function retrieves the error type.
+The scf_tmpl_error_source_fmri() function retrieves a string with the FMRI of the source of the template that was
+violated. This string is freed by scf_tmpl_errors_destroy().
+The scf_tmpl_error_pg_tmpl() function retrieves strings with the name and type of the property group template
+that was violated. If the property group name or type was implicitly wildcarded (see smf_template(5)) in the tem<hy>
+plate, this function returns a string containing SCF_TMPL_WILDCARD ("*"). These strings are freed by scf_tm<hy>
+pl_errors_destroy().
+The scf_tmpl_error_pg() function retrieves strings with the name and type of the property group that was violated.
+These strings are freed by scf_tmpl_errors_destroy().
+The scf_tmpl_error_prop_tmpl() function retrieves strings with the name and type of the property template that
+was violated. If the property type was implicitly wildcarded (see smf_template(5)) in the template, this function re<hy>
+turns a string containing SCF_TMPL_WILDCARD ("*"). These strings are freed by scf_tmpl_errors_destroy().
+The scf_tmpl_error_prop() function retrieves strings with the name and type of the property that was violated.
+These strings are freed by scf_tmpl_errors_destroy().
+The scf_tmpl_error_value() function retrieves a string with the value containing the error in val. This string are
+freed by scf_tmpl_errors_destroy().
+The scf_tmpl_strerror() function takes an scf_tmpl_error_t previously returned by scf_tmpl_next_error() and re<hy>
+turns in s. If flags includes SCF_TMPL_STRERROR_HUMAN, s is a human-readable, localized description of
+the error. Otherwise, s is a one-line string suitable for logfile output.
+The scf_tmpl_validate_fmri() function returns 0 on successful completion with no validation failures. It returns 1 if
+there are validation failures. It returns -1 if there is an error validating the instance.
+The scf_tmpl_next_error() function returns a pointer to the next scf_tmpl_error_t. When none remain, it returns
+NULL.
+The scf_tmpl_error_type(), scf_tmpl_error_source_fmri(), scf_tmpl_error_pg_tmpl(), scf_tmpl_error_pg(),
+scf_tmpl_error_prop_tmpl(), scf_tmpl_error_prop(), and scf_tmpl_error_value() functions return 0 on success
+<beginning of page>
+and -1 on failure.
+The scf_tmpl_strerror() function returns the number of bytes that would have been written to s if n had been suffi<hy>
+ciently large.
+The scf_tmpl_validate_fmri() function will fail if:
+SCF_ERROR_BACKEND_ACCESS
+The storage mechanism that the repository server (svc.configd(1M)) chose for the operation denied access.
+SCF_ERROR_CONNECTION_BROKEN
+The connection to the repository was lost.
+SCF_ERROR_DELETED
+The instance or one of its template property group have been deleted.
+SCF_ERROR_HANDLE_DESTROYED
+The handle passed in has been destroyed.
+SCF_ERROR_INTERNAL
+An internal error occurred.
+SCF_ERROR_INVALID_ARGUMENT
+The handle argument, FMRI argument, or snapshot name is invalid
+SCF_ERROR_NO_MEMORY
+There is not enough memory to validate the instance.
+SCF_ERROR_NO_RESOURCES
+The server does not have adequate resources to complete the request.
+SCF_ERROR_NOT_BOUND
+The handle is not currently bound.
+SCF_ERROR_NOT_FOUND
+An object matching FMRI does not exist in the repository, or the snapshot does not exist.
+SCF_ERROR_PERMISSION_DENIED
+The instance or template could not be read due to access restrictions.
+SCF_ERROR_TEMPLATE_INVALID
+The template data is invalid.
+The scf_tmpl_strerror(), scf_tmpl_error_type(), scf_tmpl_error_source_fmri(), scf_tmpl_error_pg_tmpl(),
+scf_tmpl_error_pg(), scf_tmpl_error_prop_tmpl(), scf_tmpl_error_prop(), and scf_tmpl_error_value() func<hy>
+tions will fail if:
+<beginning of page>
+SCF_ERROR_INVALID_ARGUMENT The scf_tmpl_errors_t argument is invalid.
+The scf_tmpl_error_type(), scf_tmpl_error_source_fmri(), scf_tmpl_error_pg_tmpl(), scf_tmpl_error_pg(),
+scf_tmpl_error_prop_tmpl(), scf_tmpl_error_prop(), and scf_tmpl_error_value() functions will fail if:
+SCF_ERROR_NOT_FOUND The data requested is not available for the scf_tmpl_error_t argument supplied.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed _ MT-LevelSafe
+svc.configd(1M), scf_tmpl_value_in_constraint(3SCF), attributes(5), smf_template(5)

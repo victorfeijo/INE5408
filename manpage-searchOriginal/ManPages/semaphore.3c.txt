@@ -1,0 +1,105 @@
+<beginning of page>
+semaphore, sema_init, sema_destroy, sema_wait, sema_trywait, sema_post <-> semaphores
+cc [ flag... ] file... -lthread -lc [ library... ]
+#include <synch.h>
+int sema_init(sema_t *sp, unsigned int count, int type,
+ void * arg);
+int sema_destroy(sema_t *sp);
+int sema_wait(sema_t *sp);
+int sema_trywait(sema_t *sp);
+int sema_post(sema_t *sp);
+A semaphore is a non-negative integer count and is generally used to coordinate access to resources. The initial sem<hy>
+aphore count is set to the number of free resources, then threads slowly increment and decrement the count as re<hy>
+sources are added and removed. If the semaphore count drops to 0, which means no available resources, threads at<hy>
+tempting to decrement the semaphore will block until the count is greater than 0.
+Semaphores can synchronize threads in this process and other processes if they are allocated in writable memory
+and shared among the cooperating processes (see mmap(2)), and have been initialized for this purpose.
+Semaphores must be initialized before use; semaphores pointed to by sp to count are initialized by sema_init(). The
+type argument can assign several different types of behavior to a semaphore. No current type uses arg, although it
+may be used in the future.
+The type argument may be one of the following:
+USYNC_PROCESS The semaphore can synchronize threads in this process and other processes. Initializing the
+semaphore should be done by only one process. A semaphore initialized with this type must be allocated in memory
+shared between processes, either in Sys V shared memory (see shmop(2)), or in memory mapped to a file (see
+mmap(2)). It is illegal to initialize the object this way and not allocate it in such shared memory. arg is ignored.
+USYNC_THREAD The semaphore can synchronize threads only in this process. The arg argument is ignored.
+USYNC_THREAD does not support multiple mappings to the same logical synch object. If you need to mmap() a
+synch object to different locations within the same address space, then the synch object should be initialized as a
+shared object USYNC_PROCESS for Solaris threads and PTHREAD_PROCESS_PRIVATE for POSIX threads.
+A semaphore must not be simultaneously initialized by multiple threads, nor re-initialized while in use by other
+threads.
+Default semaphore initialization (intra-process):
+ sema_t sp;
+ int count = 1;
+ sema_init(&sp, count, NULL, NULL);
+or
+ sema_init(&sp, count, USYNC_THREAD, NULL);
+Customized semaphore initialization (inter-process):
+ sema_t sp;
+ int count = 1;
+ sema_init(&sp, count, USYNC_PROCESS, NULL);
+The sema_destroy() function destroys any state related to the semaphore pointed to by sp. The semaphore storage
+space is not released.
+<beginning of page>
+The sema_wait() function blocks the calling thread until the semaphore count pointed to by sp is greater than 0, and
+then it atomically decrements the count.
+The sema_trywait() function atomically decrements the semaphore count pointed to by sp, if the count is greater
+than 0; otherwise, it returns an error.
+The sema_post() function atomically increments the semaphore count pointed to by sp. If there are any threads
+blocked on the semaphore, one will be unblocked.
+The semaphore functionality described on this man page is for the Solaris threads implementation. For the POSIX-
+conforming semaphore interface documentation, see sem_close(3C), sem_destroy(3C), sem_getvalue(3C),
+sem_init(3C), sem_open(3C), sem_post(3C), sem_unlink(3C), and sem_wait(3C).
+Upon successful completion, 0 is returned; otherwise, a non-zero value indicates an error.
+These functions will fail if:
+EINVAL The sp argument does not refer to a valid semaphore.
+EFAULT Either the sp or arg argument points to an illegal address.
+The sema_wait() function will fail if:
+EINTR The wait was interrupted by a signal or fork().
+The sema_trywait() function will fail if:
+EBUSY The semaphore pointed to by sp has a 0 count.
+The sema_post() function will fail if:
+EOVERFLOW The semaphore value pointed to by sp exceeds SEM_VALUE_MAX.
+Example 1 The customer waiting-line in a bank is analogous to the synchronization scheme of a semaphore using
+sema_wait() and sema_trywait():
+ /* cc [ flag ... ] file ... -lthread [ library ... ] */
+ #include <errno.h>
+ #define TELLERS 10
+ sema_t tellers; /* semaphore */
+ int banking_hours(), deposit_withdrawal;
+ void*customer(), do_business(), skip_banking_today();
+ ...
+ sema_init(&tellers, TELLERS, USYNC_THREAD, NULL);
+  /* 10 tellers available */
+ while(banking_hours())
+  pthread_create(NULL, NULL, customer, deposit_withdrawal);
+ ...
+ void *
+ customer(int deposit_withdrawal)
+ {
+  int this_customer, in_a_hurry = 50;
+  this_customer = rand() % 100;
+  if (this_customer == in_a_hurry) {
+  if (sema_trywait(&tellers) != 0)
+  if (errno == EBUSY){ /* no teller available */
+  skip_banking_today(this_customer);
+  return;
+<beginning of page>
+  } /* else go immediately to available teller and
+  decrement tellers */
+  }
+  else
+  sema_wait(&tellers); /* wait for next teller, then
+  proceed, and decrement tellers */
+  do_business(deposit_withdrawal);
+  sema_post(&tellers); /* increment tellers; this_customer's
+  teller is now available */
+ }
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ MT-LevelAsync-
+Signal-Safe
+mmap(2), shmop(2), sem_close(3C), sem_destroy(3C), sem_getvalue(3C), sem_init(3C), sem_open(3C),
+sem_post(3C), sem_unlink(3C), sem_wait(3C), attributes(5), standards(5)
+These functions are also available by way of:
+ #include <thread.h>
+By default, there is no defined order of unblocking for multiple threads waiting for a semaphore.

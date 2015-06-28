@@ -1,0 +1,284 @@
+<beginning of page>
+virsh <-> management user interface for guest domains
+virsh subcommand [arguments]
+The virsh command provides the main interface for command and control of both xVM and guest domains. Users
+should use virsh wherever possible, as it provides a generic and stable interface to controlling virtualized operating
+systems. Some xVM operations are not yet implemented by virsh. In those cases, the legacy utility xm(1M) can be
+used for detailed control.
+virsh can be used to administer both transient and managed guests. A managed guest has a persistent configuration
+which is maintained across multiple invocations of the guest. The configuration of a transient guest is discarded
+when the guest shuts down.
+With minor exceptions, the basic form of a virsh command is:
+ # virsh subcommand domain-id | name | uuid [options]
+The components of a virsh command are described as follows:
+subcommand
+One of the subcommands described below.
+domain-id | name | uuid
+An identifier for a specific domain.
+options
+A subcommand-specific option.
+Exceptions to command form described above occur when a subcommand acts on all domains, the entire machine,
+or directly on the Solaris xVM hypervisor.
+Most virsh subcommands require root privileges or that you assume the Primary Administrator role.
+Many virsh commands act asynchronously, so that the system prompt returns immediately while activity proceeds in
+the background. Many operations on domains, such as create and shutdown, can take considerable time (30 seconds
+or more) to reach completion. Use the list subcommand to determine whether such an operation is complete.
+The virsh subcommands are categorized under the rubrics "generic", "domain", and "device" and are described in
+the following subsections of those names.
+capabilities
+Display an XML document describing the capabilities of the hypervisor to which we are currently connected. This
+includes a section on the host capabilities in terms of CPU features, and a description for each kind of guest which
+can be virtualized. For a more complete description, see the page under libvirt.org entitled "XML Format". The
+XML also shows the NUMA topology information, if available.
+connect URI [--readonly]
+Connect to the hypervisor. The URI parameter, if provided, specifies how to connect to the hypervisor. Without this
+parameter, the connection will be to the local hypervisor. The web page entitled "Connection URIs", under lib<hy>
+virt.org, lists the possible values, but not all types are supported by all systems.
+With the --readonly option, the connection is read-only.
+help [subcommand]
+With no argument, help displays a brief synopsis of all subcommands. With a specified subcommand, displays a
+brief description of that subcommand.
+<beginning of page>
+nodeinfo
+Returns basic information about a node, such as the number and type of CPUs, and the size of physical memory.
+quit
+Quit this interactive terminal.
+version
+Display version information about this instance of virsh.
+The following subcommands manipulate domains directly. Most take a domain identifier as their first argument. In
+the following description, the notation domain can be either a symbolic domain name, a numeric domain id, or a
+UUID, any of which uniquely identify a domain.
+console domain [--verbose]
+Connect the virtual serial console for the guest. This subcommand takes the following option:
+--verbose
+Displays verbose connection and disconnection messages.
+create file
+Create (and start) a domain based on the parameters contained in the XML file file, where file is an absolute path<hy>
+name. Such a file can be created using virsh dumpxml subcommand. Directly editing XML configuration is not
+recommended. Use this subcommand to create a transient guest. Use define (below) to create a managed guest.
+define file [--relative-path path]
+Define (but do not start) a domain from the specified XML file. If the disk paths in the XML file contain relative
+paths, the domain will be created with those paths relative to path, if provided.
+destroy domain
+Immediately terminate a domain. This is the equivalent of abruptly terminating power to a machine. In most cases,
+you should use the shutdown subcommand instead.
+domid domain_name
+Converts a domain name to a numeric domain ID.
+dominfo domain
+Returns basic information about a domain. In dominfo output, note that the OS Type field displays the type of virtu<hy>
+alization--hvm for a Hardware-assisted Virtual Machine (HVM), linux for a paravirtualized domain--not the guest
+OS installed in a domain.
+Note that, when the domain is running, dominfo displays dynamic data. Memory values include any hypervisor
+overhead.
+domname domain_id
+Converts a numeric domain id to a domain name.
+<beginning of page>
+domstate domain
+Returns the state of a running domain. See the description of the list subcommand.
+domuuid domain
+Convert the specified domain name or ID to a domain UUID.
+dump domain file
+Dump the core of the domain specified by domain to the file specified by file for analysis.
+dumpxml domain [--relative-path path]
+Output the configuration of the given domain in XML format. Captured in a file, this data can be used as the argu<hy>
+ment to a subsequent create subcommand.
+By default, all paths in the XML will be absolute. Adding the --relative-path option will make all disk paths relative
+to path.
+edit
+Starts the editor specified by the value of $EDITOR and, in this editor, opens the result of the command virsh
+dumpxml. The subcommand then redefines the domain with the edited XML. Editing XML is not recommended.
+hostname
+Returns the hostname of the control domain.
+list [domain...]
+Displays information about one or more domains. If no domains are specified, displays information about all defined
+domains. This subcommand takes the following options:
+--active Display only running domains.
+--inactive Display only non-running domains.
+--all Display both running and non-running domains.
+By default, all domains are displayed.
+An example of list output is as follows:
+ % virsh list
+ Id Name State
+ ----------------------------------
+ 0 Domain-0 running
+ 2 fedora paused
+ - solaris-hvm shut off
+Id is the numeric id for a domain; Name is the symbolic name. State is the run state and can be one of the follow<hy>
+ing:
+running
+The domain is currently running on a CPU.
+<beginning of page>
+idle
+The domain is not currently running on any CPU. This can be because the domain is waiting on I/O (a traditional
+wait state) or has gone to sleep because of inactivity.
+paused
+The domain has been paused, usually as a result of the administrator running virsh suspend. When in a paused state
+the domain still consumes allocated resources, such as memory, but is not eligible for scheduling by the xVM hyper<hy>
+visor.
+in shutdown
+The domain is in process of shutting down, but has not completely shutdown or crashed.
+shut off
+The domain is down.
+crashed
+The domain has crashed as a result of a sudden event. Normally, this state can occur only if the domain has been
+configured not to restart following a crash.
+migrate [--live] domain dest_uri [migrate_uri]
+Migrate the domain to the host specified by dest_uri. The --live option attempts a live migration. The optional mi<hy>
+grate_uri is a separate URI that specifies a transport method between the host and destination.
+reboot domain
+Reboot a domain. The effect of this command is identical to the effect of running init 6. The command returns im<hy>
+mediately, however, if successful, the entire reboot process might take a minute or more. There is no guarantee that
+the subcommand will succeed and it might take an unexpected length of time, depending on what services in the do<hy>
+main must be shutdown.
+restore state-file
+Restores a domain from a virsh save state file. See the description of the save subcommand.
+resume domain
+Moves a domain out of the paused state, making the domain eligible for scheduling by the underlying hypervisor.
+save domain state-file
+Saves a running domain to a file state-file, so that it can later be restored, using the restore subcommand. Once
+saved, the domain will no longer be running on the system, thus the memory allocated for the domain will be free
+for the use of other domains.
+Note that network connections present before the save operation might be severed, as TCP timeouts might have ex<hy>
+pired.
+schedinfo domain
+Show or set the scheduling parameters for the specified domain name, ID or UUID. schedinfo works only on run<hy>
+ning domains. This subcommand takes the following options:
+<beginning of page>
+--weight number weight for credit scheduler
+--cap number cap for credit scheduler
+--set Not implemented.
+setmaxmem domain kilobytes
+Change the maximum memory allocation limit in the specified guest domain. The kilobytes parameter is the maxi<hy>
+mum memory limit in kilobytes. If this subcommand is applied to a running domain, the specified value applies only
+after the domain has been rebooted.
+setmem domain kilobytes
+Change the current memory allocation in the specified guest domain. The kilobytes parameter is the number of kilo<hy>
+bytes of memory. Note that only paravirtualized domains support changing this value by means of the balloon driver,
+and it cannot exceed the maximum memory limit for the domain . A Solaris paravirtualized domain can never ex<hy>
+ceed the memory value set at boot time.
+setvcpus domain count
+Change the number of virtual CPUs active in the specified guest domain. The count parameter is the number of vir<hy>
+tual CPUs. Only paravirtualized domains can dynamically change this value, and only up to the value that was set at
+boot time. To change the number of CPUs in a way that persists, you must change the value when the domain is not
+running.
+shutdown domain
+Coordinates with the domain OS to perform graceful shutdown. The effect of this command is identical to the effect
+of running init 5. There is no guarantee that the subcommand will succeed and it might take an unexpected length of
+time, depending on what services in the domain must be shutdown.
+start domain
+Start a (previously defined) inactive domain.
+suspend domain
+Suspend a domain. When in this state, a domain still consumes allocated resources, such as memory, but is not eligi<hy>
+ble for scheduling by the xVM hypervisor.
+ttyconsole
+Return the pseudo-terminal used by the domain's serial console, if any.
+undefine domain
+Undefine the configuration for the inactive domain which is specified by either its domain name or UUID.
+uri
+Return the URI of the libvirt connection.
+vcpuinfo domain
+Return basic information about the domain virtual CPUs.
+<beginning of page>
+vcpupin domain vcpu cpulist
+Pin domain VCPUs to the host physical CPUs. The domain parameter is the domain name, ID, or uuid. The vcpu pa<hy>
+rameter is the VCPU number. The cpulist parameter is a list of host CPU numbers, separated by commas.
+This subcommand applies only to running domains.
+vncdisplay domain
+Output the IP address and port number for the VNC display.
+The following subcommands manipulate devices associated with domains. In the following descriptions, domain can
+stand for either a symbolic domain name, a numeric domain id, or a UUID, any of which uniquely identify a do<hy>
+main.
+attach-device domain file
+Attach a device defined by the given XML file (file) to the specified domain.
+attach-disk domain source target --driver driver --subdriver subdriver --type type --mode mode
+Attach a new or existing disk device to the domain. A disk device can be a removable media device, such as a CD or
+DVD drive. source and target are paths for the files and devices. driver can be file, tap or phy, depending on the
+kind of access. type can indicate cdrom or floppy as an alternative to the default, disk. mode can specify either
+readonly or shareable.
+Note that in a Solaris Hardware-assisted Virtual Machine (HVM) domU, you must run eject(1) in the domU to un<hy>
+lock a removable-media device (for example, a CD device) before running the attach-disk subcommand.
+attach-interface domain type source --target target --mac mac --script script --capped-bandwidth bandwidth
+--vlanid vid
+Attach a new network interface to the domain. type can be either network, to indicate a physical network device, or
+bridge, to indicate a bridge to a device. source indicates the source device. The --target option allows you to specify
+the target device in the guest. --mac allows you to specify the MAC address of the network interface. --script speci<hy>
+fies a path to a script handling a bridge. --capped-bandwidth sets the bandwidth for this interface. Bandwidth
+should be specified as an integer with one of the scale suffixes (K, M, or G for Kbps, Mbps, or Gbps, respectively).
+Bandwidth will be rounded up to 1.2M, if the input number is smaller than that. --vlanid sets the VLAN ID for this
+interface to vid.
+detach-device domain file
+Detach a device defined by the given XML file (file) from the specified domain. This subcommand takes the same
+type of XML descriptions as the subcommand attach-device.
+detach-disk domain target
+Detach a disk device from a domain. The target is the device as seen from the domain.
+detach-interface domain type --mac mac
+Detach a network interface from a domain. type can be either network, to indicate a physical network device, or
+bridge, to indicate a bridge to a device. It is recommended you use the --mac option to distinguish between the in<hy>
+terfaces if more than one is present in the domain.
+Example 1 Adding an ISO File to a Solaris Domain as a Virtual Disk
+The following command adds an ISO file to a paravirtualized Solaris domain as a virtual disk /dev/dsk/c0t1d0.
+ # virsh attach-disk --type cdrom --driver file --mode readonly \
+ domu-220 /data.iso xvdb
+<beginning of page>
+Example 2 Migrating a Domain, Relying on sshd Configuration
+To migrate a domain named domu to a machine named foo over ssh(1), first create the ssh connection:
+ # ssh -N -L 8003:localhost:8002 root@foo
+...then run the virsh migrate command:
+ # virsh migrate --live domu xen:/// xenmigr://localhost:8003
+This example assumes that TCP port forwarding is allowed by sshd_config(4). Note that this example does not re<hy>
+quire any modification of xend(1M) properties.
+Example 3 Migrating a Domain, Relying on xend Configuration
+The following virsh migrate command requires the proper setting of the xend xend-relocation-address and xend-
+relocation-hosts-allow properties, as described in the xend(1M) man page.
+ # virsh migrate --live domu xen:/// xenmigr://remotehost
+Example 4 Changing a CD in a Solaris HVM Guest Domain
+The following sequence of commands attaches a CD drive to a guest domain.
+In the guest domain, eject the CD:
+ solaris-hvm# eject cdrom
+Then, in the control domain, enter:
+ # virsh attach-disk solaris-hvm --type cdrom --driver file \
+ --mode readonly /isos/solaris.iso hdc
+Finally, in the guest domain, load the CD:
+ solaris-hvm# rmformat
+Example 5 Displaying dominfo Output
+The following command displays information about domain 0.
+ # virsh dominfo Domain-0
+ Id: 0
+ Name: Domain-0
+ UUID: 00000000-0000-0000-0000-000000000000
+<beginning of page>
+ OS Type: linux
+ State: running
+ CPU(s): 4
+ CPU time: 14436.6s
+ Max memory: no limit
+ Used memory: 3145728 kB
+In the preceding output, note that the OS Type, linux, indicates a paravirtualized domain.
+Example 6 Attaching an Interface
+The following command attaches a new network interface to a guest domain, connected to the NIC e1000g0, with an
+auto-generated MAC address (that is, the --mac option is omitted).
+ # virsh attach-interface pv-domu bridge e1000g0
+Example 7 Attaching a Disk
+The following command attaches a disk generated by vdiskadm(1M) to a paravirtualized domain.
+ # virsh attach-disk domu-223 /disks/data.vdisk xvdb --driver \
+ tap --subdriver vdisk
+/usr/share/lib/xml/rng/libvirt
+Relax-NG schemas for the XML formats used by libvirt and virsh.
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ AvailabilitySUN<hy>
+Wlibvirt _ Interface StabilityVolatile
+init(1M), vdiskadm(1M), xend(1M), xentop(1M), xm(1M), attributes(5), xVM(5)
+The ldm(1M) man page shipped with the LDoms software.
+The virtualization library (libvirt) web site, at the date of this publication, at:
+ http://www.libvirt.org
+<bu> Andrew Puch, apuch at redhat dot com <bu> Daniel Veillard, veillard at redhat dot com
+The preceding authors credit the xm man page authored by: <bu> Sean Dague, sean at dague dot net <bu> Daniel Stekloff,
+dsteklof at us dot ibm dot com
+Terminology differs between xm(1M) and virsh. In particular, the suspend and resume commands have different
+meanings.
+tab(); cw(2.75i) cw(2.75i) lw(2.75i) lw(2.75i) virshxm _ suspendpause resumeunpause savesuspend (without out<hy>
+put file argument) restoreresume (without output file argument)
+Terminology for the domain states differs between LDoms utilities, such as ldm, and virsh.
+<beginning of page>
+tab(); cw(2.75i) cw(2.75i) lw(2.75i) lw(2.75i) virshLDoms utility _ runningactive shut offinactive in shutdown<hy>
+bound

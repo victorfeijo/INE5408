@@ -1,0 +1,109 @@
+<beginning of page>
+dat_lmr_create <-> register a memory region with an IA
+cc [ flag... ] file... -ldat [ library... ]
+#include <dat/udat.h>
+DAT_RETURN
+ dat_lmr_create (
+ IN DAT_IA_HANDLE ia_handle,
+ IN DAT_MEM_TYPE mem_type,
+ IN DAT_REGION_DESCRIPTION region_description,
+ IN DAT_VLEN length,
+ IN DAT_PZ_HANDLE pz_handle,
+ IN DAT_MEM_PRIV_FLAGS mem_privileges,
+ OUT DAT_LMR_HANDLE *lmr_handle,
+ OUT DAT_LMR_CONTEXT *lmr_context,
+ OUT DAT_RMR_CONTEXT *rmr_context,
+ OUT DAT_VLEN *registered_size,
+ OUT DAT_VADDR *registered_address
+ )
+ia_handle
+Handle for an open instance of the IA.
+mem_type
+Type of memory to be registered. The following list outlines the memory type specifications.
+DAT_MEM_TYPE_VIRTUAL
+Consumer virtual memory.
+Region description: A pointer to a contiguous user virtual range.
+Length: Length of the Memory Region.
+DAT_MEM_TYPE_SO_VIRTUAL
+Consumer virtual memory with strong memory ordering. This type is a Solaris specific addition. If the ia_handle
+was opened without RO_AWARE_ (see dat_ia_open(3DAT)), then type DAT_MEM_TYPE_VIRTUAL is implic<hy>
+itly converted to this type.
+Region description: A pointer to a contiguous user virtual range.
+Length: Length of the Memory Region.
+DAT_MEM_TYPE_LMR
+LMR.
+Region description: An LMR_handle.
+Length: Length parameter is ignored.
+DAT_MEM_TYPE_SHARED_VIRTUAL
+Shared memory region. All DAT Consumers of the same uDAPL Provider specify the same Consumer cookie to in<hy>
+dicate who is sharing the shared memory region. This supports a peer-to-peer model of shared memory. All DAT
+Consumers of the shared memory must allocate the memory region as shared memory using Platform-specific primi<hy>
+tives.
+Region description: A structure with 2 elements, where the first one is of type DAT_LMR_COOKIE and is a
+unique identifier of the shared memory region, and the second one is a pointer to a contiguous user virtual range.
+Length: Length of the Memory Region
+<beginning of page>
+region_description
+Pointer to type-specific data describing the memory in the region to be registered. The type is derived from the
+mem_type parameter.
+length
+Length parameter accompanying the region_description.
+pz_handle
+Handle for an instance of the Protection Zone.
+mem_privileges:
+Consumer-requested memory access privileges for the registered local memory region. The Default value is
+DAT_MEM_PRIV_NONE_FLAG. The constant value DAT_MEM_PRIV_ALL_FLAG = 0x33, which specifies
+both Read and Write privileges, is also defined. Memory privilege definitions are as follows:
+Local Read DAT_MEM_PRIV_LOCAL_READ_FLAG
+0x01 Local read access requested.
+Local Write DAT_MEM_PRIV_LOCAL_WRITE_FLAG
+0x10 Local write access requested.
+Remote Read DAT_MEM_PRIV_REMOTE_READ_FLAG
+0x02 Remote read access requested.
+Remote Write DAT_MEM_PRIV_REMOTE_WRITE_FLAG
+0x20 Remote write access requested.
+lmr_handle
+Handle for the created instance of the LMR.
+lmr_context
+Context for the created instance of the LMR to use for DTO local buffers.
+registered_size
+Actual memory size registered by the Provider.
+registered_address
+Actual base address of the memory registered by the Provider.
+<beginning of page>
+The dat_lmr_create() function registers a memory region with an IA. The specified buffer must have been previous<hy>
+ly allocated and pinned by the uDAPL Consumer on the platform. The Provider must do memory pinning if needed,
+which includes whatever OS-dependent steps are required to ensure that the memory is available on demand for the
+Interface Adapter. uDAPL does not require that the memory never be swapped out; just that neither the hardware nor
+the Consumer ever has to deal with it not being there. The created lmr_context can be used for local buffers of DTOs
+and for binding RMRs, and lmr_handle can be used for creating other LMRs. For uDAPL the scope of the lmr_con<hy>
+text is the address space of the DAT Consumer.
+The return values of registered_size and registered_address indicate to the Consumer how much the contiguous re<hy>
+gion of Consumer virtual memory was registered by the Provider and where the region starts in the Consumer virtual
+address.
+The mem_type parameter indicates to the Provider the kind of memory to be registered, and can take on any of the
+values defined in the table in the PARAMETERS section.
+The pz_handle parameter allows Consumers to restrict local accesses to the registered LMR by DTOs.
+DAT_LMR_COOKIE is a pointer to a unique identifier of the shared memory region of the
+DAT_MEM_TYPE_SHARED_VIRTUAL DAT memory type. The identifier is an array of 40 bytes allocated by
+the Consumer. The Provider must check the entire 40 bytes and shall not interpret it as a null-terminated string.
+The return value of rmr_context can be transferred by the local Consumer to a Consumer on a remote host to be used
+for an RDMA DTO.
+If mem_privileges does not specify remote Read and Write privileges, rmr_context is not generated and NULL is re<hy>
+turned. No remote privileges are given for Memory Region unless explicitly asked for by the Consumer.
+DAT_SUCCESS The operation was successful.
+DAT_UNSUFFICIENT_RESOURCES The operation failed due to resource limitations.
+DAT_INVALID_PARAMETER Invalid parameter.
+DAT_INVALID_HANDLE Invalid DAT handle.
+DAT_INVALID_STATE Parameter in an invalid state. For example, shared virtual buffer was not created shared by
+the platform.
+DAT_MODEL_NOT_SUPPORTED The requested Model was not supported by the Provider. For example, re<hy>
+quested Memory Type was not supported by the Provider.
+Consumers can create an LMR over the existing LMR memory with different Protection Zones and privileges using
+previously created IA translation table entries.
+The Consumer should use rmr_context with caution. Once advertised to a remote peer, the rmr_context of the LMR
+cannot be invalidated. The only way to invalidate it is to destroy the LMR with dat_lmr_free(3DAT).
+See attributes(5) for descriptions of the following attributes:
+tab() box; cw(2.75i) |cw(2.75i) lw(2.75i) |lw(2.75i) ATTRIBUTE TYPEATTRIBUTE VALUE _ Interface Stability<hy>
+Committed _ MT-LevelSafe _ StandardT{ uDAPL, 1.1, 1.2 (except DAT_MEM_TYPE_SO_VIRTUAL) T}
+dat_lmr_free(3DAT), libdat(3LIB), attributes(5)
