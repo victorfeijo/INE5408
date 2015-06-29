@@ -256,5 +256,218 @@ void gerarArquivosDat(int argc, char* argv[]) {
     ///////////////////////////////////
     ///// TERMINOU A PALAVRAS.DAT
     ///////////////////////////////////
+}
 
+/**
+ * Pede o nome do comando/manpage a ser procurado
+ * Percorre o arquivo "indices.dat" que está organizado como uma árvore
+ * níveis procurando pelo texto informado.
+ *
+ * O percorrimento por níveis é feito do seguinte modo:
+ *  Estando em uma posição "x" e
+ *      verificando que aquilo que é procurado é menor que atual, vá para
+ *      o nodo da esquerda, no caso a posição "2(x+1)-1"
+ *
+ *      verificando que aquilo que é procurado é maior que atual, vá para
+ *      o nodo da direita, no caso posição "2(x+1)"
+ */
+ void buscaConteudoPorComando() {
+     //Array onde será salvo o comando a ser pesquisado
+     char comandoBusca[100];
+     for(int i=0; i<comandoTamMax; i++) {
+         comandoBusca[i] = ' ';
+     }
+     //Recebe o comando
+     scanf("%s",comandoBusca);
+     //Abre arquivo indices.dat
+     FILE* indicesDat = fopen("..\\indices.dat", "rb");
+
+     //calcula a quantidade de itens na arvore e armazena em "tamanho"
+     fseek(indicesDat, 0, SEEK_END);
+     int tamanho = ftell(indicesDat);
+     fseek(indicesDat, 0, SEEK_SET);
+     tamanho /= comandoTamMax;
+
+     //Percorrimento da árvore em arquivo, buscando pelo item pedido
+     int pos = 0;
+     bool achou = false;
+     char comandoAtual[100];
+     while(!achou && pos<tamanho) {
+         //Posiciona o leitor no começo do registro
+         fseek(indicesDat, pos*comandoTamMax, SEEK_SET);
+         char comandoAtual[100];
+         //le o registro do arquivo
+         fgets(comandoAtual, 100, indicesDat);
+         int cmpResult = strcmp(comandoBusca, comandoAtual);
+         //Buscando maior que encontrado, pega o ramo da direita
+         if(cmpResult < 0) {
+             pos++;
+             pos = (2*pos)-1;
+         //Buscando menor que encontrado, pega o ramo da esquerda
+         }else if(cmpResult > 0) {
+             pos++;
+             pos = (2*pos);
+         //Encontrou
+         }else {
+             achou = true;
+         }
+     }
+     //fecha indices.dat, mas deixa salvo o conteúdo pedido em "comandoAtual"
+     fclose(indicesDat);
+
+     if(achou) {
+         //Retira a posição dos ultimos 4 butes de comando
+         int posicao;
+         posicao = *((int*)&comandoAtual[96]);
+
+         //Abre a manpages.dat para pegar o conteúdo pedido
+
+         FILE* manPagesDat;
+         manPagesDat = fopen("..\\manpages.dat", "rb");
+         //Posiciona o leitor no começo do registro
+         posicao *= comandoTamMax+conteudoTamMax;
+         fseek(manPagesDat, posicao, SEEK_SET);
+         //Posiciona o leitor no começo do conteudo do registro
+         fseek(manPagesDat,comandoTamMax, SEEK_CUR);
+
+         char lido = ' ';
+         while(lido != '\0') {
+             printf("%c",lido=fgetc(manPagesDat));
+         }
+
+         fclose(manPagesDat);
+     }else {
+         printf("\nManPage não encontrada\n");
+     }
+ }
+
+ /**
+  * Pede uma palavra e pega a posicaoDasManPagesCom(palavra) a lista de
+  * de índices que possuem a palavra pesquisada.
+  * Traduz os índices para o nome das manpages acessando "manpages.dat" e
+  * pegando o nome dos registros de índice respectivos.
+  */
+void buscaPorUmaPalavra(){
+    //Pede a palavra a ser pesquisada
+    char palavra[100];
+    scanf("%s",palavra);
+    //Pega a lista de índices que possuem a palavra
+    deque<int> indices = posicaoDasManPagesCom(palavra);
+    FILE* manPagesDat;
+    manPagesDat = fopen("..\\manpages.dat", "rb");
+
+    printf("\n\n");
+    //Pega o nome dos registros a partir dos índices
+    while (!indices.empty()) {
+        fseek(manPagesDat, indices.front()*(comandoTamMax+conteudoTamMax), SEEK_SET);
+        char comando[100];
+        fgets(comando, 100, manPagesDat);
+        printf("%d - %s\n",indices.front(), comando);
+        indices.pop_front();
+    }
+    fclose(manPagesDat);
+}
+/**
+ * Pede as duas palavras, e obtem os indices de modo semelhante a
+ * buscaPorUmaPalavra, realiza as intersecção entre as listas de índices
+ * Traduz os índices para o nome das manpages consultando "manpages.dat"
+ */
+void buscaPorDuasPalavras() {
+    //Pede a primeira palavra
+    char palavra1[100];
+    scanf("%s", palavra1);
+    //Pega a lista de índices que possuem a primeira palavra
+    deque<int> indices1 = posicaoDasManPagesCom(palavra1);
+    //Pede a segunda palavra
+    char palavra2[100];
+    scanf("%s", palavra2);
+    //Pega índices da segunda palavra
+    deque<int> indices2 = posicaoDasManPagesCom(palavra2);
+
+    //Intersecção de indices1 e indices2
+    deque<int> indices;
+    while (!indices2.empty()) {
+        int atual = indices2.front();
+        bool achou = false;
+        for(int i=0; i<indices1.size() && !achou; i++) {
+            if(indices1.at(i) == atual) achou = true;
+        }
+        if(achou) indices.push_back(atual);
+        indices2.pop_front();
+    }
+
+    FILE* manPagesDat;
+    manPagesDat = fopen("..\\manpages.dat", "rb");
+    printf("\n\n");
+
+    while (!indices.empty()) {
+        fseek(manPagesDat, indices.front()*(comandoTamMax+conteudoTamMax), SEEK_SET);
+        char comando[100];
+        fgets(comando, 100, manPagesDat);
+        printf("%d - %s\n", indices.front(), comando);
+        indices.pop_front();
+    }
+
+    fclose(manPagesDat);
+}
+
+/**
+ * Recebe a palavra a ser procurada
+ * Consulta o "palavras.dat", que é uma árvore por níveis, procurando pela
+ * palavra pedida
+ * Retorna a lista de índices que possuem a palavra pedida
+ */
+deque<int> posicaoDasManPagesCom(char* palavra) {
+    FILE* palavrasDat;
+    palavrasDat = fopen("..\\palavras.dat", "rb");
+
+    //Lê a quantidade de palavras dos 4 bytes e guarda em "tamanho"
+    char tamanhoC[4];
+    for(int i=0; i<4; i++) {
+        tamanhoC[i] = fgetc(palavrasDat);
+    }
+
+    int tamanho = *((int*)&tamanhoC[0]);
+    int pos = 0;
+    bool achou = false;
+    char palavraAtual[100];
+    while (!achou && pos<tamanho) {
+        //Posiciona o leitor no inicio do registro da palavra
+        fseek(palavrasDat, 4+(pos*palavraTamMax), SEEK_SET);
+        //Pega palavra do registro
+        fgets(palavraAtual, 100, palavrasDat);
+
+        int cmpResult = strcmp(palavra, palavraAtual);
+        //Buscando maior que encontrado, pega o ramo da esquerda
+        if(cmpResult < 0) {
+            pos++;
+            pos = (2*pos)-1;
+        //Buscando menor que encontrado, pega o ramo da direita
+        }else if(cmpResult > 0) {
+            pos++;
+            pos = (2*pos);
+        //Encontrado
+        }else {
+            achou = true;
+        }
+    }
+
+    deque<int> indices;
+    if(achou) {
+        pos = *((int*)&palavraAtual[92]);
+        int qtd = *((int*)&palavraAtual[96]);
+        fseek(palavrasDat, 4+(tamanho*palavraTamMax)+pos*4, SEEK_SET)
+        for(int i=0; i<qtd; i++) {
+            char indiceC[4];
+            for(int a=0; a<4; a++) indiceC[a] = fgetc(palavrasDat);
+            int indice = *((int*)&indiceC[0]);
+            indices.push_back(indice);
+        }
+    }else {
+        printf("Nenhum arquivo encontrado com a palavra '&s'\n", palavra);
+    }
+
+    fclose(palavrasDat);
+
+    return indices;
 }
