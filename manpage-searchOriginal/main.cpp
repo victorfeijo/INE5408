@@ -26,7 +26,7 @@ void buscaPorUmaPalavra();
 void buscaPorDuasPalavras();
 void buscaConteudoPorComando();
 
-static const int wordTamMax = 100;
+static const int palavraTamMax = 100;
 static const int comandoTamMax = 100;
 static const int conteudoTamMax = 149900;
 static const int qtdConectivos = 25;
@@ -41,13 +41,14 @@ static const char* conectivos[] = {
 int main(int argc, char* argv[]) {
     int entrada;
     do{
+        printf("\n");
         printf("Digite o número para opção\n");
         printf("(1) - Gerar arquivos .dat\n");
         printf("(2) - Buscar conteudo pelo nome da manpage\n");
         printf("(3) - Buscar manpages por uma palavra\n");
         printf("(4) - Buscar manpages por duas palavras\n");
         printf("(0) - Para sair\n");
-        scanf("%d\n",entrada);
+        scanf("%d",&entrada);
         switch (entrada) {
             case 1: gerarArquivosDat(argc, argv); break;
             case 2: buscaConteudoPorComando(); break;
@@ -86,9 +87,9 @@ void gerarArquivosDat(int argc, char* argv[]) {
     manPagesDat = fopen("..\\manpages.dat", "wb");
     printf("Gerando manpages.dat ...\n");
 
-    for(int i=1; i<argc, i++) {
+    for(int i=1; i<argc; i++) {
         //Abre e le cada arquivo de manpage
-        File *manPageF;
+        FILE *manPageF;
         manPageF = fopen(argv[i], "r");
         if (manPageF == NULL) perror ("Erro abrindo arquivo");
 
@@ -167,10 +168,10 @@ void gerarArquivosDat(int argc, char* argv[]) {
     printf("Organizado por nível\n");
 
     //Cria o arquivo indices.dat para escrita
-    File* indicesDat;
+    FILE* indicesDat;
     indicesDat = fopen("..\\indices.dat", "wb");
 
-    printf("Comçendo a gerar indices.dat ...\n", );
+    printf("Comçendo a gerar indices.dat ...\n");
 
     //Percorre cada indice do array
     for(int i=0; i<maxSize; i++) {
@@ -182,7 +183,7 @@ void gerarArquivosDat(int argc, char* argv[]) {
         printf("%d - %s\n",(i+1), comando);
         int posicao = indicesOrdenados[i].posicao;
         //troca os 4 ultimos bytes de comando, guardando a posição
-        *((int)&comando[96]) = posicao;
+        *((int*)&comando[96]) = posicao;
 
         //---------------POSSIVEL PROBLEMA COM O I-------------
         for(int i=0; i<comandoTamMax; i++) {
@@ -226,7 +227,7 @@ void gerarArquivosDat(int argc, char* argv[]) {
     /* Escreve palavras seguidas do inicio de local das posicoes, e a
      * quantidade de posiçoes */
     int posicao = 0;
-    for(i=0; i<maxSize; i++) {
+    for(int i=0; i<maxSize; i++) {
         Word atual = palavrasOrdenadas[i];
         printf("%d - %s\n",i, atual.word);
         *((int*)&atual.word[92]) = posicao;
@@ -456,10 +457,12 @@ deque<int> posicaoDasManPagesCom(char* palavra) {
     if(achou) {
         pos = *((int*)&palavraAtual[92]);
         int qtd = *((int*)&palavraAtual[96]);
-        fseek(palavrasDat, 4+(tamanho*palavraTamMax)+pos*4, SEEK_SET)
+        fseek(palavrasDat, 4+(tamanho*palavraTamMax)+pos*4, SEEK_SET);
         for(int i=0; i<qtd; i++) {
             char indiceC[4];
-            for(int a=0; a<4; a++) indiceC[a] = fgetc(palavrasDat);
+            for(int a=0;a<4;++a){
+                indiceC[a] = fgetc(palavrasDat);
+            }
             int indice = *((int*)&indiceC[0]);
             indices.push_back(indice);
         }
