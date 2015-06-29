@@ -41,7 +41,7 @@ public:
         Node(const T& t) : left(0), right(0), data(t), height(0){}
 
         void updateHeight() {
-            height = max(left->getHeight, right->getHeight()) + 1;
+            height = max(left->getHeight(), right->getHeight()) + 1;
         }
         //Biggest node of the subtree
         Node* rightMost() {

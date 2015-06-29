@@ -47,4 +47,4 @@ struct Index {
     }
 };
 
-#endif /* INDICE_H */
+#endif /* INDEX_H */

@@ -19,6 +19,11 @@ using namespace std;
 #include "AvlTree.h"
 #include "Word.h"
 #include "Index.h"
+#include <cstdlib>
+#include <iostream>
+#include <string.h>
+#include <fstream>
+#include <dirent.h>
 
 void gerarArquivosDat(int argc, char* argv[]);
 deque<int> posicaoDasManPagesCom(char* palavra);
@@ -40,6 +45,7 @@ static const char* conectivos[] = {
 
 int main(int argc, char* argv[]) {
     int entrada;
+    //INICIA MENU
     do{
         printf("\n");
         printf("Digite o número para opção\n");
@@ -77,17 +83,18 @@ int main(int argc, char* argv[]) {
  * caracteres: " \n.,|`´^~<>:;_-+=()[]\"'/*!@#"
  * Os conectivos são retirados utilizando o array de palavras "conectivos"
  */
-void gerarArquivosDat(int argc, char* argv[]) {
+void gerarArquivosDat(int argc1, char* argv[]) {
     //Alocando árvores em memória para não demorar a geração
     AvlTree<Index> indices;
     AvlTree<Word> palavras;
+    printf("----%d------", argc1);
 
     //-----------Começa MANPAGES.DAT----------------//
     FILE *manPagesDat;
     manPagesDat = fopen("..\\manpages.dat", "wb");
     printf("Gerando manpages.dat ...\n");
 
-    for(int i=1; i<argc; i++) {
+    for(int i=1; i<argc1; i++) {
         //Abre e le cada arquivo de manpage
         FILE *manPageF;
         manPageF = fopen(argv[i], "r");
